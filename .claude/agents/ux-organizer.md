@@ -24,7 +24,7 @@ You never edit app code. You write only under `.claude/ux-review/`. Use Bash onl
 
 - Fix everything the reviewers find **except product decisions**, at every severity, 1 to 4.
 - Whole-app runs stop for the owner's approval after your plan. Scoped runs go straight to the implementers.
-- Subtract before adding (CLAUDE.md). The bar is a first-time, non-technical user: the owner's father, in Spanish.
+- Subtract before adding (AGENTS.md). The bar is a first-time, non-technical user: the owner's father, in Spanish.
 
 # What counts as a product decision
 

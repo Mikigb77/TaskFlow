@@ -2,18 +2,18 @@
 
 Everything here is fixed in code and covered by widget or unit tests, but only a real phone can confirm it. Generated from the `Device check` section of `ISSUES.md`; when a check passes, move its line there to Verified. Most urgent first within each area.
 
-## A · Capture (voice and typing) (67)
+## A · Capture (voice and typing) (74)
 
 - [ ] **U1** (P0) The mic stops after a ~3 s pause.
   - Physical Android 13+ phone: a 10-second silent pause mid-sentence doesn't stop listening; a 5-second hesitation before the first word doesn't either; the words before and after the pause end up in one text; 60 seconds of speech continues to the result (U1's done-when). Android 12 (API 31–32): the restart fallback keeps listening across pauses (inferred from the AOSP documentation). Pull down the notification shade for 3 s mid-sentence → it keeps listening. Fresh install: allow the microphone at the first ask and speak at once → it keeps listening (the race after the first permission answer is inferred). Deny the microphone twice, open capture, use `Abrir Ajustes`, allow → back in the app, listening starts.
 - [ ] **U4** (P0) The result isn't in the same sheet, and the date isn't the hero.
-  - UX_REVIEW §7 task 1. 2026-10-14-speed (review A): the three-tap path holds in code; whether a result with nothing to ask should save itself is the owner's question UX-615. 2026-10-19-app (review A): holds at 1×; regressed at 2×, where an open question's answers sit under the pinned footer (UX-1302) and several-task day lines are 40 dp (UX-1312), both P168
+  - UX_REVIEW §7 task 1. 2026-10-14-speed (review A): the three-tap path holds in code; whether a result with nothing to ask should save itself is the owner's question UX-615. 2026-10-19-app (review A): holds at 1×; regressed at 2×, where an open question's answers sit under the pinned footer (UX-1302) and several-task day lines are 40 dp (UX-1312), both P168. 2026-10-21-changes (review A): fix-by-touch doesn't reach command cards; a set's target day, or a one-task change's new day, can only be fixed by saying it again (UX-1716, D3). Plan 2 of 2026-10-21-changes (2026-10-22): D3 answered «yes, on both cards»; P233 makes a move's day a chip that opens «Elegir día»; status unchanged. 2026-10-22-changes (review A): holds; a plan read from the dictation sits under the date line, which stays the largest; the said reminder gets one «Recordatorio» row (UX-1805, P242)
 - [ ] **U5** (P0) After saving, the user isn't shown the task.
-  - UX_REVIEW §7 tasks 2 and 3; with "Remove animations" on, a task saved from Tareas sits fully above the message. 2026-10-19-app (reviews A and B): still open on Calendar at large text, where a dated landing clears a fixed 88 dp and the message covers the lit row, and for a second task saved on the same day, which lands lit but out of view: UX-1309 (merged UX-1401), P169
+  - UX_REVIEW §7 tasks 2 and 3; with "Remove animations" on, a task saved from Tareas sits fully above the message. 2026-10-19-app (reviews A and B): still open on Calendar at large text, where a dated landing clears a fixed 88 dp and the message covers the lit row, and for a second task saved on the same day, which lands lit but out of view: UX-1309 (merged UX-1401), P169. 2026-10-21-changes (review A): advanced, a set moved by voice lands lit on its day; still open: after a set moves the day isn't named and other days aren't mentioned (UX-1703), and a task marked done by voice doesn't land (UX-1711), both P226. Close of 2026-10-21-changes: UX-1703 and UX-1711 verified (P226), so a set moved by voice names its day and a task marked done by voice lands lit; status unchanged. 2026-10-22-changes (reviews A, D): holds; the plan offer waits for the save message, but after a several-task dictation it asks about a task out of view without naming it (UX-1808, P244)
 - [ ] **U6** (P0) No speech-aware extraction or recognizer biasing (the app side).
   - on Android 13+, dictate project names, people and days, and they come out right more often. The speech-only repair prompt in `Backend/core/ai.py` is server-side, outside this loop. 2026-10-19-app (review A): unchanged; device check
 - [ ] **U7** (P0) No "Save as written" when the AI is slow or fails. _(needs: TalkBack)_
-  - in airplane mode, dictate "médico el viernes", tap `Guardar tal cual`, and the task is dated Friday. 2026-10-14-speed (review A): works, but the phone's parser misses parts of the day and «pasado mañana»: UX-604 (P104). 2026-10-19 (b4 round 1, P152; UX-919): the button now reads «Guardar como tarea» / “Save as a task” / «Desa-ho com a tasca»; the phone check is the same under the new name. 2026-10-19-app (review A): holds; on «No se encontraron tareas» it is the only forward action and saves the words as a task (UX-1301, P167)
+  - in airplane mode, dictate "médico el viernes", tap `Guardar tal cual`, and the task is dated Friday. 2026-10-14-speed (review A): works, but the phone's parser misses parts of the day and «pasado mañana»: UX-604 (P104). 2026-10-19 (b4 round 1, P152; UX-919): the button now reads «Guardar como tarea» / “Save as a task” / «Desa-ho com a tasca»; the phone check is the same under the new name. 2026-10-19-app (review A): holds; on «No se encontraron tareas» it is the only forward action and saves the words as a task (UX-1301, P167). 2026-10-21-changes (review A): regressed slightly; «Guardar como tarea» also offers itself for a «Ya he…» that found nothing (UX-1705, P225). Close of 2026-10-21-changes: UX-1705 verified (P225), «Guardar como tarea» no longer offers itself for a «Ya he…» that found nothing; status unchanged. 2026-10-22-changes (review A): holds; «Guardar como tarea» keeps «recuérdamelo…» in the title and sets no reminder, as expected (the phone's parser reads no reminders)
 - [ ] **UX-101** (S3) "Saved" bar never leaves; its only button undoes.
   - With Android's ‘Time to take action’ accessibility setting at 1 minute, the save bar stays about a minute and then goes. After a voice save, start a second capture: no `Deshacer` above `Guardar tarea`.
 - [ ] **UX-102** (S3) Leaving creates phantom "Capturas pendientes", even empty ones.
@@ -28,6 +28,8 @@ Everything here is fixed in code and covered by widget or unit tests, but only a
   - the largest font on a 360 dp phone. At 2× the reveal cuts the title's first line under the handle (review A: acceptable)
 - [ ] **UX-1309** (S3) Save message covers the lit task; second same-day task hidden.
   - the largest font. Merged UX-1401; U5's acceptance. D11 answered by the owner 2026-10-20: no cue (DECISIONS.md)
+- [ ] **UX-1808** (S3) The offer names no task or rhythm; «Sí» says nothing. _(needs: TalkBack)_
+  - with TalkBack on, the offer reads the task line, then the question, then «Sí, recuérdamelo» and «Ahora no»
 - [ ] **UX-437** (S3) Words heard before a speech restart can vanish.
   - Android 12 phone (the restart fallback), Spanish: say ‘comprar pan’, stay silent until the recognizer restarts, then say ‘y leche’. The field keeps ‘comprar pan y leche’. Android 13+ (segmented session): the same sentence with a long pause ends with both parts once.
 - [ ] **UX-456** (S3) Volver a decirlo discards the result, flush under Añadir.
@@ -82,6 +84,14 @@ Everything here is fixed in code and covered by widget or unit tests, but only a
   - staging, an account at its daily limit with online speech, reopened the next day
 - [ ] **UX-1654** (S2) Shared capture resumed days later opens on a past day.
   - on the emulator lane, share, kill the app, move the date forward, resume from Sin guardar
+- [ ] **UX-1707** (S2) Deshacer of a deletion waits for the server.
+  - on a throttled or dead connection, delete a set by voice, tap Deshacer; the tasks are back at once
+- [ ] **UX-1718** (S2) A set deletion after another card isn't brought into view.
+  - at the largest font, «Apunta comprar pan y borra todas las completadas de la semana pasada»; «Eliminar N tareas» and its ✕ are in view
+- [ ] **UX-1719** (S2) Answering a deletion set's project hides its heading.
+  - at the largest font, «Borra todas las completadas de mates», tap «Matemáticas»; the heading and ✕ stay in view
+- [ ] **UX-1812** (S2) A said reminder with no day is silently dropped.
+  - against a server at 0cf3431 or later, say «Llamar a mamá, recuérdamelo cada día»; the card asks for a day, and once given one the reminder is kept. History: D3 of plan 1 (review A's question 2), answered by the owner 2026-10-22 (evening) as recommended; the server half is done (0cf3431: `reminder_needs_day`, and the reminder kept for the day the task gets). The card says «Para recordártelo, ponle un día.» under the date and opens the date; the reminder applies once there's a day; saved without one, it's dropped. Planned in P254 (plan 2), which also shows that line after «Sin fecha» on a plan (UX-1811). Filed by the organizer; severity set by the organizer
 - [ ] **UX-441** (S2) TalkBack says "Listo" when the user cancels or types. _(needs: TalkBack)_
   - with TalkBack, Cancelar with words is silent before the keep-or-discard question, Listo says "Listo", and leaving the app says "En pausa"
 - [ ] **UX-451** (S2) Recognizer errors are silent to TalkBack. _(needs: TalkBack)_
@@ -128,6 +138,10 @@ Everything here is fixed in code and covered by widget or unit tests, but only a
   - what TalkBack actually says
 - [ ] **UX-1627** (S1) Microphone reason line can flash before the blocked banner. _(needs: TalkBack)_
   - Emulator lane, `permission-mic.blocked` (ES and CA, on-device and online paths): a screen recording from the sheet's opening shows no frame with «Permite el micrófono…» / «Permet el micròfon…» before the blocked banner. Emulator lane, `permission-mic.dialog.es` at 1.0 and 2.0: the reason line still shows under Android's dialog. Phone with TalkBack: «Borra el dentista del domingo» speaks «Se eliminará: …» once after Listo; a mixed dictation speaks «Añadir, cambiar y eliminar» once.
+- [ ] **UX-1714** (S1) The result redraws from the changing list while closing.
+  - a screen recording of «Mover 4 tareas» closing shows no redraw
+- [ ] **UX-1722** (S1) Day chip's ▾ stays 18 dp, barely shows at 2×.
+  - at the largest font, is the ▾ easy enough to see?
 - [ ] **UX-458** (S1) Result date line has no "date" name for TalkBack. _(needs: TalkBack)_
   - TalkBack reads "Fecha y hora: Hoy, botón"
 - [ ] **UX-462** (S1) Date line hides disabled state from TalkBack while saving. _(needs: TalkBack)_
@@ -139,7 +153,7 @@ Everything here is fixed in code and covered by widget or unit tests, but only a
 - [ ] **UX-617** (S1) Nothing teaches that one dictation can hold several tasks.
   - after P119, on a new account and on any day, say the example; two tasks are saved for tomorrow and both rows are lit.
 
-## B · Calendar, Tareas and the task form (34)
+## B · Calendar, Tareas and the task form (38)
 
 - [ ] **UX-201** (S4) Unfinished tasks from earlier days vanish from Today.
   - UX_REVIEW §7 step 4 on the day after step 2: open the app the next morning and find yesterday's ‘comprar pan’ under Atrasadas.
@@ -183,6 +197,14 @@ Everything here is fixed in code and covered by widget or unit tests, but only a
   - at the largest font, reopen the morning after saving a task for Friday
 - [ ] **UX-1632** (S2) TalkBack's count for today differs from the agenda's. _(needs: TalkBack)_
   - TalkBack with an overdue task
+- [ ] **UX-1905** (S2) «A tu manera» at 2×: stop and Listo off-screen.
+  - at the largest font, dictate a long rhythm into «A tu manera» with the real microphone; the stop control, then Listo, stay in view
+- [ ] **UX-1907** (S2) TalkBack isn't told the plan rows expand. _(needs: TalkBack)_
+  - with TalkBack on, open «Hasta la fecha límite»; the expanded state isn't read twice («desplegado … desplegado»)
+- [ ] **UX-2025** (S2) On someone else's task, reminder choices change nothing. _(needs: TalkBack)_
+  - With TalkBack on: - in a capture result of three, the collapsed row of a draft given to Marta; - that task's page. Both should read «Recordatorio para Marta» as plain text, with no «botón» and no «desactivado».
+- [ ] **UX-2026** (S2) Shared task: «solo para ti» misses the single reminder's rows. _(needs: TalkBack)_
+  - TalkBack order (title, line, rows), and a shared task in «A tu manera» with the keyboard open at 2× (the fixed header takes about 160 dp; the field and «Listo» should still scroll into view; no preview covers it). History: planned in P261 (plan 3). Filed by the organizer at the owner's request (2026-10-23: the line «must cover every reminder choice, not only plans»): P256's «Estos avisos son solo para ti.» sits above each «Listo», so the single rows, which apply in one tap, never get it. Fix: one line under the sheet's title, kept with it above the scrolling choices on shared tasks; the copies above «Listo» go. Severity set by the organizer
 - [ ] **UX-218** (S2) Offline shows a red error about a "server address".
   - in airplane mode, open Calendar and try to sign in, with no red banner and no "server address"
 - [ ] **UX-223** (S2) Back on a secondary tab closes the app.
@@ -275,8 +297,10 @@ Everything here is fixed in code and covered by widget or unit tests, but only a
 - [ ] **UX-630** (S1) A gone project's page offers adding, task lands elsewhere. _(needs: two accounts)_
   - While a member has a shared project's page open, remove them from the project. Their page should show the read-only line and "Este proyecto aún no tiene tareas.", with no Añadir tarea. On the same two-account setup, accept an invitation while the refresh fails: the joined project shows read-only until the next sync, which is expected.
 
-## D · Sign-in, settings, notifications and the rest (58)
+## D · Sign-in, settings, notifications and the rest (66)
 
+- [ ] **UX-2001** (S4) «Sí» to more reminders drops the one before the time.
+  - a plan on a 17:00 task rings at 16:50 with «Completar» and «Posponer 10 min», and snoozed it comes back as «Hoy a las 17:00». D8 (UX-2022, answered 2026-10-23) keeps a plan's own time on its day instead: planned in P261 (plan 3); this phone check stays for plans without a time of their own. History: D1 of plan 1 (with review A's question 1 and review B's question 2), answered by the owner 2026-10-22 (evening) as recommended (b): on the anchor's own day a timed task (or a deadline with a time) rings at its usual reminder, its own lead else «Tareas con hora», in the single reminder's words; earlier days keep the plan's time and the count doesn't change (contract «Except on the day of a timed task (D1)»). Planned in P252 (plan 2), with «Posponer 10 min» on that notice. Whether a time said for the day itself should win is D8 (UX-2022)
 - [ ] **UX-401** (S4) Reminders off by default; nothing asks to turn them on. _(needs: TalkBack)_
   - TalkBack reads the question once; after "Sí", the Android 13+ notification dialog appears; the reminder arrives on time. 2026-10-19-app (review D, emulator): passes for a task dated tomorrow — the question after the save message, Android's dialog right after «Sí»; it can also ask when no reminder can fire (UX-1601, D1)
 - [ ] **UX-1201** (S3) After six digits, the answer hides under the keyboard.
@@ -289,10 +313,12 @@ Everything here is fixed in code and covered by widget or unit tests, but only a
   - a date-only task for today saved after 9:00 brings no question; a date-only task's 9:00 reminder rings on its day. Emulator 2026-10-21 (`device-b6.md`, `reminder-ask.sheet.es.*`): after saving a task for tomorrow, whose reminder can fire, the question still comes; a date-only task for today after 9:00 stays for a phone
 - [ ] **UX-1602** (S3) Password recovery hands a Spanish newcomer an English code.
   - a Spanish recovery email on staging; the number pad and code autofill
+- [ ] **UX-2003** (S3) One «Sí» on a shared task rings every member's phone.
+  - two phones in one shared project; a task for «Todos» gets no offer, and «Sí» on a task assigned to me rings only my phone. Plan 2: D6 (owner, 2026-10-22 evening) makes plans personal (server 0cf3431), so P256 lets the offer come for any task that rings here, «Todos» included, and «Sí» sets only this account's plan; once P256 is verified, the phone check becomes: «Sí» on a «Todos» task rings only the phone that said it, and the other member can set a plan of their own · Close (plan 2, 2026-10-22): P256 verified in code (UX-2014, verify-p2-r1-B); the phone check is now: «Sí» on a «Todos» task rings only the phone that said it, and the other member can set a plan of their own
 - [ ] **UX-402** (S3) Signing in without an account is a dead end. _(needs: real server)_
   - UX-402 (inferred): against the real server, sign in with an email that has no account. The error offers "create an account with this email", and the email is kept.
 - [ ] **U12** (P1) No learn-by-doing first run; notification permission timing.
-  - the §7 newcomer check. 2026-10-19-app: review A, the microphone is asked in context but with no reason (UX-1305, P166); review B, on the emulator at 393 dp and 2.0 the first-run line sits above the button, but linear 2× previews at 360 dp still cut it (UX-702's check should add a 360 dp phone); review D, advanced — the question, Android's dialog, «Alarmas y recordatorios» and «Listo» run end to end on the emulator — but it can promise a reminder that can't fire (UX-1601, D1) and shows the opposite state for seconds after allowing (UX-1605, P187)
+  - the §7 newcomer check. 2026-10-19-app: review A, the microphone is asked in context but with no reason (UX-1305, P166); review B, on the emulator at 393 dp and 2.0 the first-run line sits above the button, but linear 2× previews at 360 dp still cut it (UX-702's check should add a 360 dp phone); review D, advanced — the question, Android's dialog, «Alarmas y recordatorios» and «Listo» run end to end on the emulator — but it can promise a reminder that can't fire (UX-1601, D1) and shows the opposite state for seconds after allowing (UX-1605, P187). 2026-10-22-changes (reviews A, D): holds for new accounts; the plan offer is a second, per-task question shown only with reminders on; an account that declined gets nothing when it dictates a reminder (UX-1802, P242)
 - [ ] **UX-1012** (S2) Chip borders are nearly invisible (1.20:1).
   - the chip borders in light and dark on a real screen
 - [ ] **UX-1205** (S2) Nothing helps the person whose email never comes.
@@ -321,6 +347,18 @@ Everything here is fixed in code and covered by widget or unit tests, but only a
   - Emulator lane, Android 13+: phone in Spanish (Spain), Idioma English, week start «Como el teléfono»: Calendar's week strip starts on Monday; switch Idioma back to «Como el teléfono»: still Monday, in Spanish. Emulator lane: with the same setup, let a reminder fire from the background (app swiped away): its text is in English and its time reads the way the app shows it.
 - [ ] **UX-1653** (S2) «Como el teléfono» misses a phone-language change while running.
   - Emulator lane, Android 13+, Idioma «Como el teléfono», app open in Spanish: send it to the background, switch the phone's language to Català in Android settings, return: TaskFlow is in Catalan without being restarted. Record whether Android kept the process alive (if it didn't, the cold start already covers this case on that device). Emulator lane: same setup, app swiped away after the change, a reminder fires: its text is Catalan. Emulator lane: Idioma English, phone Spanish (Spain); switch the phone's region to United States: the app stays English, the week strip follows the phone's new first day, and the screen settles at once (no repeated flashing; logcat shows no repeated configuration changes).
+- [ ] **UX-2004** (S2) Old plan notices pile up with stale counts.
+  - a «cada día» plan over 3 days leaves one notice in the shade, also on a phone that defers background work
+- [ ] **UX-2005** (S2) Plan notices never say which day or what time.
+  - plan notices show whole in the shade, in Spanish and Catalan, on a 24-hour and a 12-hour phone
+- [ ] **UX-2009** (S2) «Posponer 10 min» on a nudge days away.
+  - «Completar» is the only action on a plan notice and completes the task from the shade; on iOS the category registers
+- [ ] **UX-2010** (S2) The last days' notices depend on background work.
+  - on a battery-restricted phone, «Es mañana» and «Es hoy» still arrive
+- [ ] **UX-2014** (S2) Plans on shared tasks ring every member's phone. _(needs: two accounts)_
+  - two phones on two accounts in one shared project, server at 0cf3431 or later: a plan on a «Todos» task rings only the phone that set it, and the other member can set their own. Note 2026-10-23: the owner made «Una vez» personal too (DECISIONS.md); the server half is 49c8eeb, and the app half is plan 3 (2026-10-23): P259 (UX-2024, UX-2025, UX-2027, UX-2028), P260 (UX-2029), P261 (UX-2026: the sheet's line moves under its title, over every choice, instead of above each Listo) and P262 (UX-2030). History: D6 of plan 1 (review D's question 3), answered by the owner 2026-10-22 (evening): plans are personal, and each member can set their own on a shared task; server half done (0cf3431: one plan per person and task). Planned in P256 (plan 2): plan rows wherever the task rings on this phone and none on a task given to someone else, «Estos avisos son solo para ti.» on shared tasks, and the offer for any task that rings here (revisits UX-2003). «Una vez» stays shared (DECISIONS, Open). Filed by the organizer; severity set by the organizer
+- [ ] **UX-2022** (S2) D1 moves a time said for the day itself.
+  - the notice actually arrives at 09:00 on the task's day. History: D8 answered by the owner 2026-10-23 as recommended (DECISIONS.md): "it should be kept". A plan with a time of its own, said or typed («recuérdamelo el mismo día a las 9», «cada día a las 8»), keeps that time on the task's own day; only plans without one (the strengths, «Sí» to the offer, a rhythm with no hour) move the day's notice to the task's usual reminder, as P252 built. Contract updated in 49c8eeb. Planned in plan 3 (2026-10-23) as P261: `dayLead` (`reminder_plans.dart:73-90`) gives no lead to a plan with a time of its own, and the sheet works the lead out for each plan it shows; the notice, the line, the sheet and the card then keep that time. History: D8 of plan 2, filed by the organizer while planning D1 (P252): as D1 is worded, a timed task's own-day notice moves to its usual reminder whatever the plan's time, so «el mismo día a las 9» said for a 17:00 appointment rings at 16:50. Keep a time said or typed, moving only plans with no time of their own (recommended, by D2's «if you specifically say it»; one condition), or keep D1 as worded, which P252 builds meanwhile. Severity set by the organizer
 - [ ] **UX-406** (S2) The theme toggle is on 23 surfaces.
   - at 320 dp and 2× text, the app bars fit their titles without the toggle. 2026-10-19-app (review D, emulator): passes at 360 dp and 2.0 (`device/screen-settings.list-360dp`); 320 dp wasn't captured
 - [ ] **UX-409** (S2) Notification bodies are relative and go stale.

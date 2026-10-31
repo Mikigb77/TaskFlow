@@ -1,12 +1,14 @@
 ---
 name: ux
-description: Run TaskFlow's UX loop. frontend-ux-reviewer reviews what changed since the last review (or the whole app, or named screens), ux-organizer plans the fixes, ux-implementer makes them one package at a time, and the reviewer re-checks until they hold. Use when the owner types /ux, asks for a UX review of recent changes or of the app, or when CLAUDE.md's UX review step applies after user-facing work.
+description: Run TaskFlow's UX loop. frontend-ux-reviewer reviews what changed since the last review (or the whole app, or named screens), ux-organizer plans the fixes, ux-implementer makes them one package at a time, and the reviewer re-checks until they hold. Use when the owner types /ux, asks for a UX review of recent changes or of the app, or when AGENTS.md's UX review step applies after user-facing work.
 argument-hint: "[app | fix [skip P3 | only P1 P2] | <screens or flows>]"
 ---
 
 # /ux — TaskFlow's UX loop
 
-Invoking this skill is the owner's opt-in to running the `ux-review` and `ux-fix` workflows (decided 2026-10-13; see `.claude/ux-review/DECISIONS.md`). How the loop works: `.claude/ux-review/README.md`.
+Invoking this skill is the owner's opt-in to running the `ux-review` and `ux-fix` workflows (decided 2026-10-13; see `.claude/ux-review/DECISIONS.md`). How the loop works: `.claude/skills/ux/references/loop.md`.
+
+The skill is self-contained: its workflows are in `workflows/`, its tools in `scripts/` (the snapshots, the side-by-side worktrees, the plan reader, the phone checks and the device-capture lane), and how the loop works and the review guidelines in `references/`. The loop's records (decisions, the issue ledger, phone checks and runs) are in `.claude/ux-review/`, and its agents in `.claude/agents/`.
 
 ## 1. Read the argument
 
@@ -30,10 +32,10 @@ Invoking this skill is the owner's opt-in to running the `ux-review` and `ux-fix
 ## 3. Work out the scope
 
 ### changes
-1. Run `bash .claude/ux-review/ux.sh changed`.
+1. Run `bash .claude/skills/ux/scripts/ux.sh changed`.
    - It prints `NO_SNAPSHOT`: tell the owner there's no baseline yet, suggest `/ux app`, and stop.
    - It prints nothing: say "Nothing user-facing changed since the last UX review" (the date comes from `ux.sh status`), and stop.
-2. Run `bash .claude/ux-review/ux.sh keys` to get the changed ARB keys.
+2. Run `bash .claude/skills/ux/scripts/ux.sh keys` to get the changed ARB keys.
    - Find where each key is shown: `grep -rln "l10n.<key>\b" App/lib`.
    - Add those files' areas.
 3. Map every file to an area using the table below. Each area touched gets one reviewer. Its scope is its changed files, "and the flows and states they touch". An area with more than about 10 changed files gets two reviewers instead (keys `A1` and `A2`, and so on), each with half its files, grouped by screen.
@@ -87,7 +89,7 @@ The fourth command fails after writing its PNGs; that's expected (see `KNOWN_FAI
 
 ### Device captures
 
-Previews can't draw what Android draws around the app. Capture it from the separate `TaskFlow_Review` test emulator, never from the owner's phone or his own emulators. How the lane works, and its safety rules: `.claude/ux-review/emulator/README.md`.
+Previews can't draw what Android draws around the app. Capture it from the separate `TaskFlow_Review` test emulator, never from the owner's phone or his own emulators. How the lane works, and its safety rules: `.claude/skills/ux/scripts/emulator/README.md`.
 
 - **When:**
   - always in **app** mode;
@@ -95,7 +97,7 @@ Previews can't draw what Android draws around the app. Capture it from the separ
 - **How:** after the previews, run from the repo root:
 
   ```
-  python .claude/ux-review/emulator/capture.py
+  python .claude/skills/ux/scripts/emulator/capture.py
   ```
 
   - It builds the review APK from the working tree, installs it on `TaskFlow_Review` and writes `App/build/ux/device/`, with its own `INDEX.md`. The preview suite leaves that folder alone.
@@ -103,7 +105,7 @@ Previews can't draw what Android draws around the app. Capture it from the separ
   - `--apk <path>` installs an APK that's already built. If the build fails with "requires symlink support", run the command from PowerShell, or build there and pass `--apk`.
 - **Time:** a full run takes about an hour, longer when the machine is busy, so start it in the background and keep working. A scoped run takes 2–4 minutes to boot the emulator and install, plus its sections: 1–10 minutes each, and 21–25 for `languages`. Per-section times are in the lane's README.
   - Check on it with short commands, such as the last lines of its output; never wait on it in one long blocking call.
-  - If its output hasn't moved for about 8 minutes, stop it, run `python .claude/ux-review/emulator/capture.py stop`, and report what wasn't captured. (The notifications section says "waiting" and then waits about 5 minutes for its reminders.)
+  - If its output hasn't moved for about 8 minutes, stop it, run `python .claude/skills/ux/scripts/emulator/capture.py stop`, and report what wasn't captured. (The notifications section says "waiting" and then waits about 5 minutes for its reminders.)
 - **If the emulator can't start or the run fails,** carry on without it.
   - Say so in `notes`, for example "No device captures this run: <reason>", and in the report to the owner.
   - Device-only checks stay on the phone list.
@@ -111,7 +113,7 @@ Previews can't draw what Android draws around the app. Capture it from the separ
 
 ## 5. Review and plan — workflow `ux-review`
 
-Call the Workflow tool with `scriptPath` set to the absolute path of `.claude/workflows/ux-review.js` (the repo root comes from `git rev-parse --show-toplevel`). Don't use `name`: saved workflows are only looked up by name if they existed when the session started. Pass these args:
+Call the Workflow tool with `scriptPath` set to the absolute path of `.claude/skills/ux/workflows/ux-review.js` (the repo root comes from `git rev-parse --show-toplevel`). Don't use `name`: saved workflows are only looked up by name if they existed when the session started. Pass these args:
 
 ```
 { runId, runDir, date, mode,
@@ -122,9 +124,9 @@ Call the Workflow tool with `scriptPath` set to the absolute path of `.claude/wo
 
 When it returns:
 - **`inlineReports` isn't empty:** a reviewer wasn't allowed to save its report. Write each `text` to its `path`.
-- **`plan` is null** (no findings): run `bash .claude/ux-review/ux.sh save`, tell the owner, and stop.
+- **`plan` is null** (no findings): run `bash .claude/skills/ux/scripts/ux.sh save`, tell the owner, and stop.
 - **app mode:**
-  1. Run `bash .claude/ux-review/ux.sh save`.
+  1. Run `bash .claude/skills/ux/scripts/ux.sh save`.
   2. Show the owner:
      - each area's verdict;
      - the counts;
@@ -141,9 +143,9 @@ When it returns:
 1. **Make the starting point.** If `git status --porcelain` shows uncommitted user-facing changes, commit exactly those files first, so the round's own commit can be reverted on its own. Message: `Changes reviewed by the UX loop (<run id>)`, plus the attribution line.
 2. **Run the workflow.** First:
    - Keep the PC awake while it runs. In the desktop app, call `mcp__ccd_host__request_keep_awake` with `until: "session_idle"`. The longest runs so far each lost 2–4 hours to a sleeping or restarting laptop.
-   - Packages that share no file run side by side, each in its own worktree: up to 12 at once, even while a `ux-web-fix` run is going (owner, 2026-10-21). The machine is protected by the gate, not by the agent count: heavy commands run 3 at a time. How waves work: `.claude/ux-review/README.md`, step 5.
+   - Packages that share no file run side by side, each in its own worktree: up to 12 at once, even while a `ux-web-fix` run is going (owner, 2026-10-21). The machine is protected by the gate, not by the agent count: heavy commands run 3 at a time. How waves work: `.claude/skills/ux/references/loop.md`, step 5.
 
-   Then call the Workflow tool with `scriptPath` set to the absolute path of `.claude/workflows/ux-fix.js`, and args `{ runId, runDir, date, repoRoot, maxParallel, heavySlots, skip, only, batch, notes }`:
+   Then call the Workflow tool with `scriptPath` set to the absolute path of `.claude/skills/ux/workflows/ux-fix.js`, and args `{ runId, runDir, date, repoRoot, maxParallel, heavySlots, skip, only, batch, notes }`:
    - `repoRoot` is `git rev-parse --show-toplevel`, with forward slashes. Without it, every package runs in the main checkout, one at a time.
    - `maxParallel` is 12. `heavySlots` is 3.
    - Set `batch` (for example `trial`, then `main`) when a plan runs in several batches, so each batch keeps its own report and verify files. For `/ux fix`, the run folder is the newest one under `runs/` that has a `plan.json` but no `report.md`.
@@ -155,7 +157,7 @@ When it returns:
      - Body: the verified IDs, then the IDs still open, each with a short reason.
      - End with the attribution line.
    - **`testsPassed` is false:** don't commit. Tell the owner which checks fail, and that the changes are left uncommitted for them to look at.
-   - Either way, run `bash .claude/ux-review/ux.sh save` afterwards.
+   - Either way, run `bash .claude/skills/ux/scripts/ux.sh save` afterwards.
 
 Never push. Never commit on `main`. Never skip hooks.
 

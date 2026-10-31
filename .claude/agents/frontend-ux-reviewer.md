@@ -62,11 +62,11 @@ Do every step. Don't stop after the first few problems.
    - If it names nothing, review the working changes — `git status --porcelain`, `git diff`, `git diff --cached` and untracked files — keeping only the in-scope paths above.
    - For a whole-app review, start from the routes in `App/lib/main.dart` and the tabs in `App/lib/screens/main_shell.dart`.
 2. **Load context.**
-   - CLAUDE.md is already loaded, and so is your memory index.
+   - CLAUDE.md, with the AGENTS.md it imports, is already loaded, and so is your memory index.
    - Read `.claude/ux-review/DECISIONS.md` for the owner's decisions, and `.claude/ux-review/ISSUES.md` for every issue reported so far and its status.
    - If `../UX_REVIEW.md` exists (one folder above the repo root), read its plan (U1–U14) and its open decisions.
    - Read `App/docs/DESIGN.md`.
-   - Read `.claude/ux-review/GUIDELINES.md`, the research-backed guide you review against: §0 (numbers at a glance), §18 (myths to avoid), §20 (how to review a screen) and the sections for what's in scope. If it's missing, say so at the top of your report and use the summary under "What the research says".
+   - Read `.claude/skills/ux/references/guidelines.md`, the research-backed guide you review against: §0 (numbers at a glance), §18 (myths to avoid), §20 (how to review a screen) and the sections for what's in scope. If it's missing, say so at the top of your report and use the summary under "What the research says".
 3. **Map each affected flow:**
    - **Ways in:** tabs, buttons, notifications, the widget, launcher shortcuts, the share sheet, deep links.
    - **Every step** along the way.
@@ -78,7 +78,7 @@ Do every step. Don't stop after the first few problems.
    - Read `App/build/ux/AUDIT.md` with the renders. For each screen and state it records Flutter's accessibility guidelines (tap targets, labels, contrast), what TalkBack would read, clipped text and layout errors, and every tap target's size and the gap to its neighbour. Treat its numbers as measured evidence: still widget-test level, not a device.
    - Check each render's time against the code it shows. From the repo root, `find App/lib App/assets -newer <png> -type f` lists the app files changed since that render. A render older than the code it shows is not evidence.
    - Older renders: `App/build/*.png` and `App/artifacts/auth/`, from the earlier preview tests. `App/artifacts/design/*.png` dates from September and is stale.
-   - When a visual judgement matters and a render is missing or stale, run the preview for that screen (commands in CLAUDE.md) and read the PNG.
+   - When a visual judgement matters and a render is missing or stale, run the preview for that screen (commands in AGENTS.md) and read the PNG.
    - Inside the UX loop, the previews are rendered just before you start, and other reviewers may be running in parallel, so don't run Flutter there.
    - Read the device captures, when `App/build/ux/device/INDEX.md` exists. They show what previews can't draw: the launcher icon and shortcuts, the home-screen widget, notifications, permission dialogs, sharing, the capture flow on Android, and TalkBack.
      - The index lists each PNG with what it shows, its time and its commit, and what wasn't captured and why.
@@ -112,7 +112,7 @@ The delegation picks one. The default is **review**: the method above.
 
 # What the research says, and how it applies here
 
-This is a summary. The full evidence base is `.claude/ux-review/GUIDELINES.md`: rules with IDs, how to check each one, evidence strength and sources.
+This is a summary. The full evidence base is `.claude/skills/ux/references/guidelines.md`: rules with IDs, how to check each one, evidence strength and sources.
 - Where this summary and the guide differ, the guide wins.
 - Where the guide and an owner decision differ, the decision wins: raise it under "Questions for the owner" with the rule ID.
 
@@ -392,4 +392,4 @@ Record:
 - the map of screens and flows, kept current;
 - recurring problem types in this codebase.
 
-Don't store review transcripts, or anything already in the code or CLAUDE.md. Before relying on a memory, check that it still matches the code.
+Don't store review transcripts, or anything already in the code or AGENTS.md. Before relying on a memory, check that it still matches the code.

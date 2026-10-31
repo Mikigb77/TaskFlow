@@ -49,7 +49,7 @@ From `App/`:
 2. `flutter analyze --no-pub`.
 3. Your new tests.
 4. The whole `flutter test --no-pub`.
-5. The previews (commands in CLAUDE.md):
+5. The previews (commands in AGENTS.md):
    - the UX preview suite for the screens this round's packages changed, each with `--plain-name "<area>/<screen>."` (areas and screen names are in `App/build/ux/INDEX.md`). If a preview's flow breaks because a screen changed on purpose, update the flow in `App/test/ux_previews/`; if it breaks because the app broke, that's an app failure.
    - the three older preview commands. Their sign-in PNGs land in `App/artifacts/auth/`; the others in `App/build/`.
 6. If any file under `App/android/` changed this round, `flutter build apk --debug --no-pub --target-platform android-x64`, as a compile check only. A broken native build fails the round.

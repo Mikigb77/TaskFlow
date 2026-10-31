@@ -5,7 +5,7 @@ The app's Android package is still Flutter's placeholder, `com.example.agenda`, 
 **Decision (main session, 2026-10-18, while the owner was away; reversible until the first upload):** the new ID is `tech.garbar.taskflow`, from the company's domain garbar.tech, and `tech.garbar.taskflow.staging` for staging.
 
 ## Why now, and why it isn't switched yet
-- A package name is permanent once uploaded. Play never deletes or reuses one, and a different ID uploads as a different app. Source: `.claude/ux-review/GUIDELINES.md` and `.claude/ux-web/GUIDELINES.md` (AP-6), checked 2026-10-18.
+- A package name is permanent once uploaded. Play never deletes or reuses one, and a different ID uploads as a different app. Source: `.claude/skills/ux/references/guidelines.md` and `.claude/ux-web/GUIDELINES.md` (AP-6), checked 2026-10-18.
 - Since 2026, a package name must also be registered for Android's developer verification. Play removes unregistered apps from 30 September 2026.
 - The code can't switch on its own. Google sign-in, RevenueCat and Play each identify the app by its package name and signing certificate, so the switch breaks sign-in and purchases until the owner registers the new name in their consoles.
 
