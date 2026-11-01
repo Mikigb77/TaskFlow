@@ -76,9 +76,17 @@ only. Workers never operate devices. Missing emulator evidence is reported and
 device-only checks stay pending; it cannot establish a pass. A personal phone
 test still requires the owner. Never uninstall or clear personal app data.
 
-The independent tester runs meaningful acceptance tests, `flutter analyze
---no-pub`, the app suite (`flutter test --no-pub`) once per run, after the last
-package is in (owner, 2026-11-01), and refreshes the affected previews. Generate localization after ARB changes; do not hand-edit
+Every step of a package tests only what it touched, with the package check:
+`python -I -X utf8 .claude/skills/ux/scripts/check.py` from the package's worktree
+(or `--main --files <changed files>` in the main checkout). It runs l10n
+generation if an ARB file changed, the analyzer on the changed files and the files
+that use them, and only the tests that cover them; `--list` shows what and why,
+`--previews auto` renders the changed screens. The independent tester writes
+meaningful acceptance tests and runs them through the check. Once per run, after
+the last package is in (owner, 2026-11-01), it runs `flutter analyze --no-pub`, the
+whole app suite (`flutter test --no-pub`) and the previews: the run's only
+whole-suite run. What that finds is repaired once in the main checkout and
+re-checked with the package check, never the whole suite again. Generate localization after ARB changes; do not hand-edit
 generated Dart. Compile native changes when needed. Match known failures exactly
 and report new ones. Do not start backend services or make paid AI calls as an
 incidental consequence of a UI review.
