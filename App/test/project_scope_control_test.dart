@@ -13,6 +13,7 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/widgets/task_assignment_picker.dart';
 import 'support/design_fixtures.dart';
+import 'support/search_clear.dart';
 
 void main() {
   testWidgets(
@@ -334,5 +335,94 @@ void main() {
     expect(rect.left, greaterThanOrEqualTo(0));
     expect(rect.right, lessThanOrEqualTo(360));
     expect(tester.takeException(), isNull, reason: 'no overflow');
+  });
+
+  // ---- P288 (UX-2509): every search clears in one tap ----
+
+  group('P288 · «Todos los proyectos» sheet search clears in one tap', () {
+    const names = [
+      'Col·legi', 'Dentista', 'Compras', 'Casa', 'Trabajo', 'Viaje',
+      'Huerto', 'Gimnasio',
+    ];
+
+    Future<ProviderContainer> show(WidgetTester tester, String language) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      // From 8 projects the sheet has a search (UX-1522).
+      final container = ProviderContainer(overrides: [
+        taskListsProvider.overrideWith((ref) async =>
+            [for (final name in names) TaskListInfo(id: name, name: name)]),
+      ]);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+              locale: Locale(language),
+              theme: AppTheme.light,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: const Scaffold(
+                  body: SafeArea(child: ProjectScopeControl())))));
+      await tester.pumpAndSettle();
+      final l = lookupAppLocalizations(Locale(language));
+      await tester.tap(find.widgetWithText(ActionChip, l.projectsAll));
+      await tester.pumpAndSettle();
+      return container;
+    }
+
+    Finder sheet() => find.byType(BottomSheet);
+    Finder row(String name) => find.descendant(
+        of: sheet(), matching: find.widgetWithText(ListTile, name));
+
+    for (final language in ['es', 'en', 'ca']) {
+      testWidgets(
+          'UX-2509: ($language, 1×, 360×800) the «Todos los proyectos» sheet: an empty search has no ✕; typing «dent» shows a 48 dp ✕ read as «Borrar búsqueda»; one tap clears it, every project comes back and the sheet stays open',
+          (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        final semantics = tester.ensureSemantics();
+        final container = await show(tester, language);
+        final field = searchField(within: sheet());
+        expect(field, findsOneWidget);
+        expectNoClear(field, l);
+
+        await tester.enterText(field, 'dent');
+        await tester.pumpAndSettle();
+        expect(row('Dentista'), findsOneWidget);
+        expect(row('Compras'), findsNothing);
+        expectClear(tester, field, l);
+
+        await tapClear(tester, field, l);
+        expect(sheet(), findsOneWidget, reason: 'clearing keeps the sheet');
+        expect(searchText(tester, field), isEmpty);
+        expect(row('Dentista'), findsOneWidget);
+        expect(row('Compras', ), findsOneWidget);
+        expectNoClear(field, l);
+        expect(container.read(projectScopeProvider).projectId, isNull,
+            reason: 'clearing picks nothing');
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      });
+    }
+
+    testWidgets(
+        'UX-2509: (es, 1×, 360×800) the sheet with no match: the ✕ is in view and brings the projects back',
+        (tester) async {
+      final es = lookupAppLocalizations(const Locale('es'));
+      final semantics = tester.ensureSemantics();
+      await show(tester, 'es');
+      final field = searchField(within: sheet());
+      await tester.enterText(field, 'zanahorias');
+      await tester.pumpAndSettle();
+      expect(find.text(es.projectsNoneFound), findsOneWidget);
+      expectClear(tester, field, es);
+
+      await tapClear(tester, field, es);
+      expect(find.text(es.projectsNoneFound), findsNothing);
+      expect(row('Dentista'), findsOneWidget);
+      expectNoClear(field, es);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    });
   });
 }

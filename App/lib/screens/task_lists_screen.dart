@@ -18,6 +18,7 @@ import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/app_components.dart';
+import 'package:agenda/widgets/search_clear.dart';
 import 'package:agenda/widgets/invitation_cards.dart';
 import 'package:agenda/widgets/task_list_picker.dart';
 
@@ -49,164 +50,36 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
     if (mounted) ref.invalidate(taskListsProvider);
   }
 
-  Future<void> _edit(
-    BuildContext context,
-    WidgetRef ref, [
-    TaskListInfo? list,
-  ]) => editTaskList(context, ref, list: list);
-
-  Future<void> _archive(
-    BuildContext context,
-    WidgetRef ref,
-    TaskListInfo list,
-  ) async {
-    if (list.archived) return restoreProject(context, ref, list);
-    final store = ref.read(taskListStoreProvider);
-    final tasks = ref.read(taskProvider.notifier);
-    try {
-      await store.update(list.copyWith(archived: true));
-      if (context.mounted) {
-        ref.invalidate(taskListsProvider);
-        tasks.loadTasks();
-        final messenger = ScaffoldMessenger.of(context);
-        final strings = context.l10n;
-        showFeedback(
-          messenger,
-          strings.projectArchivedNoReminders(list.name),
-          actionLabel: strings.undo,
-          onAction: () async {
-            try {
-              await store.update(list);
-            } catch (_) {
-              showFeedback(messenger, strings.listUpdateError);
-              return;
-            }
-            if (mounted) ref.invalidate(taskListsProvider);
-            // Loading the tasks again reschedules the project's reminders.
-            await tasks.loadTasks();
-          },
-        );
-      }
-    } catch (_) {
-      if (context.mounted) {
-        showFeedback(
-          ScaffoldMessenger.of(context),
-          context.l10n.listUpdateError,
-        );
-      }
-    }
-  }
-
   Future<void> _delete(TaskListInfo list) async {
-    final account = ref.read(authProvider).account;
-    if (account == null ||
-        !await groupConfirm(
-          context,
-          context.l10n.deleteList,
-          list.shared
-              ? context.l10n.deleteListHelp
-              : context.l10n.deleteListPrivateHelp(list.name),
-          destructive: true,
-        ) ||
-        !mounted) {
-      return;
-    }
     final messenger = ScaffoldMessenger.of(context);
     final strings = context.l10n;
-    setState(() => _deleting.add(list.id));
-    try {
-      await ref
-          .read(apiClientProvider)
-          .request(
-            'DELETE',
-            'lists/${list.id}/',
-            data: {'version': list.version},
-            accountId: account.id,
-          );
-      if (!mounted) return;
-      // The row goes now; the sync takes the project's tasks off this phone
-      // behind it.
-      setState(() => _deleted.add(list.id));
-      showFeedback(messenger, strings.projectDeleted);
-      unawaited(_refresh());
-    } catch (error) {
-      showFeedback(messenger, requestProblemText(strings, error));
-    } finally {
-      if (mounted) setState(() => _deleting.remove(list.id));
-    }
-  }
-
-  Future<void> _resolve(
-    BuildContext context,
-    WidgetRef ref,
-    TaskListInfo list,
-  ) async {
-    final store = ref.read(taskListStoreProvider);
-    final remote = TaskListInfo.fromApi(list.conflict!);
-    final local = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        scrollable: true,
-        title: Text(context.l10n.chooseListDetails),
-        content: Text(
-          context.l10n.listConflictHelp(
-            '${list.name} · ${context.listColorName(list.color)}${list.archived ? ' · ${context.l10n.archived}' : ''}',
-            '${remote.name} · ${context.listColorName(remote.color)}${remote.archived ? ' · ${context.l10n.archived}' : ''}',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(context.l10n.later),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(context.l10n.useOtherDevice),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(context.l10n.useThisPhone),
-          ),
-        ],
-      ),
+    final gone = await deleteProject(
+      context,
+      ref,
+      list,
+      onSending: () => setState(() => _deleting.add(list.id)),
     );
-    if (local == null || !context.mounted) return;
-    try {
-      await store.resolve(list.id, keepLocal: local);
-      if (context.mounted) {
-        ref.invalidate(taskListsProvider);
-        ref.read(taskProvider.notifier).loadTasks();
-      }
-    } catch (_) {
-      if (context.mounted) {
-        showFeedback(
-          ScaffoldMessenger.of(context),
-          context.l10n.listResolveError,
-        );
-      }
-    }
-  }
-
-  Future<void> _pin(TaskListInfo list) async {
-    try {
-      await ref
-          .read(taskListStoreProvider)
-          .preferences(list.id, pinned: !list.pinned);
-      ref.invalidate(taskListsProvider);
-      await ref.read(taskProvider.notifier).loadTasks();
-    } catch (_) {
-      if (mounted) {
-        showFeedback(
-          ScaffoldMessenger.of(context),
-          context.l10n.listUpdateError,
-        );
-      }
-    }
+    if (!mounted) return;
+    // The row goes now; the sync takes the project's tasks off this phone
+    // behind it.
+    setState(() {
+      _deleting.remove(list.id);
+      if (gone) _deleted.add(list.id);
+    });
+    if (!gone) return;
+    showFeedback(messenger, strings.projectDeleted);
+    unawaited(_refresh());
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.watch(groupsProvider);
+    final groupsMatter =
+        ref.watch(groupsProvider).valueOrNull?.isNotEmpty == true ||
+        ref
+                .watch(pendingInvitationsProvider)
+                .valueOrNull
+                ?.any((invitation) => invitation.group) ==
+            true;
     return Scaffold(
       appBar: CustomAppBar(title: context.l10n.lists),
       body: ref
@@ -237,7 +110,7 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
                   children: [
                     // Worth searching only once there are many projects.
                     if (lists.length >= 8 || _query.isNotEmpty) ...[
-                      TextField(
+                      SearchField(
                         decoration: InputDecoration(
                           hintText: context.l10n.projectsFind,
                           prefixIcon: const Icon(Icons.search),
@@ -263,21 +136,25 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
                       _projectRow(context, list),
                       const Divider(),
                     ],
-                    // Groups come after the projects they hold.
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: TextButton.icon(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute<void>(
-                            builder: (_) => const GroupsScreen(),
+                    // Groups come after the projects they hold, once the
+                    // account shares something or is asked to join a group.
+                    if (groupsMatter ||
+                        lists.any((p) => p.shared || p.groupId != null)) ...[
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: TextButton.icon(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (_) => const GroupsScreen(),
+                            ),
                           ),
+                          icon: const Icon(Icons.groups_outlined),
+                          label: Text(context.l10n.groups),
                         ),
-                        icon: const Icon(Icons.groups_outlined),
-                        label: Text(context.l10n.groups),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               );
@@ -353,109 +230,302 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
     ),
     onTap: _deleting.contains(list.id)
         ? null
-        : () => list.conflict != null
-              ? _resolve(context, ref, list)
-              : Navigator.push(
-                  context,
-                  MaterialPageRoute<void>(
-                    builder: (_) => HomeScreen(isRoot: false, listId: list.id),
-                  ),
-                ),
-    trailing: _deleting.contains(list.id)
-        ? const SizedBox.square(
-            dimension: 48,
-            child: Center(
-              child: SizedBox.square(
-                dimension: 24,
-                child: CircularProgressIndicator(strokeWidth: 2.5),
+        : () async {
+            if (list.conflict != null) {
+              return resolveProject(context, ref, list);
+            }
+            final gone = await Navigator.push(
+              context,
+              MaterialPageRoute<bool>(
+                builder: (_) => HomeScreen(isRoot: false, listId: list.id),
               ),
-            ),
-          )
+            );
+            // Deleted from its page: the row goes before the sync catches up.
+            if (gone == true && mounted) setState(() => _deleted.add(list.id));
+          },
+    trailing: _deleting.contains(list.id)
+        ? const ProjectDeleting()
         : PopupMenuButton<String>(
             tooltip: context.l10n.manageItem(list.name),
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: 'pin',
-                child: Text(
-                  list.pinned
-                      ? context.l10n.unpinProject
-                      : context.l10n.pinProject,
-                ),
-              ),
-              if (list.shared)
-                PopupMenuItem(
-                  value: 'notifications',
-                  child: Text(context.l10n.projectNotifications),
-                ),
-              if (list.canManage)
-                PopupMenuItem(
-                  value: 'edit',
-                  child: Text(context.l10n.editList),
-                ),
-              if (list.canManage)
-                PopupMenuItem(
-                  value: 'archive',
-                  child: Text(
-                    list.archived
-                        ? context.l10n.restoreList
-                        : context.l10n.archiveList,
-                  ),
-                ),
-              if (ref.read(authProvider).account != null)
-                // Everyone can see the members and leave here. As on the
-                // project page, only the owner of an unshared personal
-                // project is told “Share”; the page it opens is “Members”
-                // in every other case.
-                PopupMenuItem(
-                  value: 'sharing',
-                  child: Text(
-                    !list.shared &&
-                            list.groupId == null &&
-                            list.role == 'owner'
-                        ? context.l10n.shareProject
-                        : context.l10n.people,
-                  ),
-                ),
-              if (list.conflict != null && list.canManage)
-                PopupMenuItem(
-                  value: 'resolve',
-                  child: Text(context.l10n.chooseDetails),
-                ),
-              // The server deletes it, so only a project it knows.
-              if (list.groupId == null &&
-                  list.role == 'owner' &&
-                  list.version > 0 &&
-                  ref.read(authProvider).account != null)
-                PopupMenuItem(
-                  value: 'delete',
-                  child: Text(
-                    list.shared
-                        ? context.l10n.deleteListForEveryone
-                        : context.l10n.deleteList,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ),
-            ],
-            onSelected: (action) => switch (action) {
-              'pin' => _pin(list),
-              'notifications' => showProjectPreferences(context, ref, list),
-              'edit' => _edit(context, ref, list),
-              'resolve' => _resolve(context, ref, list),
-              'delete' => _delete(list),
-              'sharing' => Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) => list.groupId == null
-                      ? ListSharingScreen(listId: list.id)
-                      : GroupScreen(groupId: list.groupId!),
-                ),
-              ),
-              _ => _archive(context, ref, list),
-            },
+            itemBuilder: (_) => projectMenuItems(context, ref, list),
+            onSelected: (action) => runProjectAction(
+              context,
+              ref,
+              list,
+              action,
+              delete: () => _delete(list),
+            ),
           ),
   );
+}
+
+/// In place of a project's ⋮ while its DELETE is on its way.
+class ProjectDeleting extends StatelessWidget {
+  const ProjectDeleting({super.key});
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.square(
+    dimension: 48,
+    child: Center(
+      child: SizedBox.square(
+        dimension: 24,
+        child: CircularProgressIndicator(strokeWidth: 2.5),
+      ),
+    ),
+  );
+}
+
+/// What ⋮ offers for [list], on Proyectos and on the project's own page, so
+/// the two can't drift. Without [people], the item that opens its members
+/// or its group goes: the project page has its own button for that. Without
+/// [pin], pinning goes: it only reorders Proyectos, so the page shows
+/// nothing happen.
+List<PopupMenuEntry<String>> projectMenuItems(
+  BuildContext context,
+  WidgetRef ref,
+  TaskListInfo list, {
+  bool people = true,
+  bool pin = true,
+}) => [
+  if (pin)
+    PopupMenuItem(
+      value: 'pin',
+      child: Text(
+        list.pinned ? context.l10n.unpinProject : context.l10n.pinProject,
+      ),
+    ),
+  if (list.shared)
+    PopupMenuItem(
+      value: 'notifications',
+      child: Text(context.l10n.projectNotifications),
+    ),
+  if (list.canManage)
+    PopupMenuItem(value: 'edit', child: Text(context.l10n.editList)),
+  if (list.canManage)
+    PopupMenuItem(
+      value: 'archive',
+      child: Text(
+        list.archived ? context.l10n.restoreList : context.l10n.archiveList,
+      ),
+    ),
+  if (people && ref.read(authProvider).account != null)
+    // Everyone can see the members and leave here. As on the project page,
+    // only the owner of an unshared personal project is told “Share”; the
+    // page it opens is “Members” in every other case.
+    PopupMenuItem(
+      value: 'sharing',
+      child: Text(
+        !list.shared && list.groupId == null && list.role == 'owner'
+            ? context.l10n.shareProject
+            : context.l10n.people,
+      ),
+    ),
+  if (list.conflict != null && list.canManage)
+    PopupMenuItem(value: 'resolve', child: Text(context.l10n.chooseDetails)),
+  // The server deletes it, so only a project it knows.
+  if (list.groupId == null &&
+      list.role == 'owner' &&
+      list.version > 0 &&
+      ref.read(authProvider).account != null)
+    PopupMenuItem(
+      value: 'delete',
+      child: Text(
+        list.shared
+            ? context.l10n.deleteListForEveryone
+            : context.l10n.deleteList,
+        style: TextStyle(color: Theme.of(context).colorScheme.error),
+      ),
+    ),
+];
+
+/// Carries out the [projectMenuItems] [action] chosen for [list]; each place
+/// deletes its own way, through [delete]. True when the members or group
+/// page it opened says the project is gone for this account.
+Future<bool> runProjectAction(
+  BuildContext context,
+  WidgetRef ref,
+  TaskListInfo list,
+  String action, {
+  required Future<void> Function() delete,
+}) async {
+  switch (action) {
+    case 'pin':
+      await pinProject(context, ref, list);
+    case 'notifications':
+      await showProjectPreferences(context, ref, list);
+    case 'edit':
+      await editTaskList(context, ref, list: list);
+    case 'resolve':
+      await resolveProject(context, ref, list);
+    case 'delete':
+      await delete();
+    case 'sharing':
+      final gone = await Navigator.push(
+        context,
+        MaterialPageRoute<bool>(
+          builder: (_) => list.groupId == null
+              ? ListSharingScreen(listId: list.id)
+              : GroupScreen(groupId: list.groupId!),
+        ),
+      );
+      return gone == true;
+    default:
+      await archiveProject(context, ref, list);
+  }
+  return false;
+}
+
+/// Pins [list] to the top of the project lists, or unpins it.
+Future<void> pinProject(
+  BuildContext context,
+  WidgetRef ref,
+  TaskListInfo list,
+) async {
+  try {
+    await ref
+        .read(taskListStoreProvider)
+        .preferences(list.id, pinned: !list.pinned);
+    ref.invalidate(taskListsProvider);
+    await ref.read(taskProvider.notifier).loadTasks();
+  } catch (_) {
+    if (context.mounted) {
+      showFeedback(ScaffoldMessenger.of(context), context.l10n.listUpdateError);
+    }
+  }
+}
+
+/// Archives [list], with Deshacer, or restores an archived one.
+Future<void> archiveProject(
+  BuildContext context,
+  WidgetRef ref,
+  TaskListInfo list,
+) async {
+  if (list.archived) return restoreProject(context, ref, list);
+  final store = ref.read(taskListStoreProvider);
+  final tasks = ref.read(taskProvider.notifier);
+  // Deshacer can come after the page that archived it has closed.
+  final container = ProviderScope.containerOf(context, listen: false);
+  try {
+    await store.update(list.copyWith(archived: true));
+    if (context.mounted) {
+      ref.invalidate(taskListsProvider);
+      tasks.loadTasks();
+      final messenger = ScaffoldMessenger.of(context);
+      final strings = context.l10n;
+      showFeedback(
+        messenger,
+        strings.projectArchivedNoReminders(list.name),
+        actionLabel: strings.undo,
+        onAction: () async {
+          try {
+            await store.update(list);
+          } catch (_) {
+            showFeedback(messenger, strings.listUpdateError);
+            return;
+          }
+          container.invalidate(taskListsProvider);
+          // Loading the tasks again reschedules the project's reminders.
+          await tasks.loadTasks();
+        },
+      );
+    }
+  } catch (_) {
+    if (context.mounted) {
+      showFeedback(ScaffoldMessenger.of(context), context.l10n.listUpdateError);
+    }
+  }
+}
+
+/// Asks, then deletes [list] on the server; [onSending] runs once the person
+/// has confirmed. True once it's gone; a failure says why.
+Future<bool> deleteProject(
+  BuildContext context,
+  WidgetRef ref,
+  TaskListInfo list, {
+  required VoidCallback onSending,
+}) async {
+  final account = ref.read(authProvider).account;
+  if (account == null ||
+      !await groupConfirm(
+        context,
+        context.l10n.deleteList,
+        list.shared
+            ? context.l10n.deleteListHelp
+            : context.l10n.deleteListPrivateHelp(list.name),
+        destructive: true,
+      ) ||
+      !context.mounted) {
+    return false;
+  }
+  final messenger = ScaffoldMessenger.of(context);
+  final strings = context.l10n;
+  final api = ref.read(apiClientProvider);
+  onSending();
+  try {
+    await api.request(
+      'DELETE',
+      'lists/${list.id}/',
+      data: {'version': list.version},
+      accountId: account.id,
+    );
+    return true;
+  } catch (error) {
+    showFeedback(messenger, requestProblemText(strings, error));
+    return false;
+  }
+}
+
+/// Asks which details of [list] to keep when this phone and another device
+/// changed it apart.
+Future<void> resolveProject(
+  BuildContext context,
+  WidgetRef ref,
+  TaskListInfo list,
+) async {
+  final store = ref.read(taskListStoreProvider);
+  final remote = TaskListInfo.fromApi(list.conflict!);
+  final local = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      scrollable: true,
+      title: Text(context.l10n.chooseListDetails),
+      content: Text(
+        context.l10n.listConflictHelp(
+          '${list.name} · ${context.listColorName(list.color)}${list.archived ? ' · ${context.l10n.archived}' : ''}',
+          '${remote.name} · ${context.listColorName(remote.color)}${remote.archived ? ' · ${context.l10n.archived}' : ''}',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(context.l10n.later),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(context.l10n.useOtherDevice),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(context.l10n.useThisPhone),
+        ),
+      ],
+    ),
+  );
+  if (local == null || !context.mounted) return;
+  try {
+    await store.resolve(list.id, keepLocal: local);
+    if (context.mounted) {
+      ref.invalidate(taskListsProvider);
+      ref.read(taskProvider.notifier).loadTasks();
+    }
+  } catch (_) {
+    if (context.mounted) {
+      showFeedback(
+        ScaffoldMessenger.of(context),
+        context.l10n.listResolveError,
+      );
+    }
+  }
 }
 
 /// Restores the archived [list], as Proyectos ⋮ does, and says so. Loading
@@ -537,6 +607,7 @@ Future<TaskListInfo?> editTaskList(
                 decoration: InputDecoration(
                   labelText: context.l10n.listName,
                   hintText: context.l10n.listNameHint,
+                  counterText: '',
                   errorMaxLines: 3,
                 ),
                 onChanged: (value) => name = value,

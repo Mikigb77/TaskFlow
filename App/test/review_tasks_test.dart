@@ -1139,12 +1139,12 @@ void main() {
       expect((plain.title as Text).data, es.reviewOptions);
       expect(plain.subtitle, isNull);
       expect(
-        find.text('${es.priorityValue(es.low)} · ${es.neverRepeat}'),
+        find.text('${es.priorityValue('low')} · ${es.neverRepeat}'),
         findsNothing,
       );
       final set = await options('set', 'Regar las plantas');
       final summary = (set.subtitle! as Text).data!;
-      expect(summary, contains(es.priorityValue(es.high)));
+      expect(summary, contains(es.priorityValue('high')));
       expect(summary, contains(es.weekly));
       expect(summary, isNot(contains(es.low)));
       expect(tester.takeException(), isNull);
@@ -2930,7 +2930,7 @@ void main() {
       expect(
         find.descendant(
           of: sheet,
-          matching: find.byType(DropdownButtonFormField<String>),
+          matching: find.byKey(const ValueKey('repeat-daily')),
         ),
         findsOneWidget,
       );
@@ -3035,6 +3035,62 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  });
+
+  // ---- Run 2026-10-28-app, round 1 · P279 (UX-2312): the result card says
+  // the priority as a phrase ----
+
+  group('P279 · priority phrase on the result card', () {
+    for (final language in ['es', 'ca', 'en']) {
+      for (final (priority, level) in [(3, 'high'), (2, 'medium')]) {
+        testWidgets(
+          'UX-2312: $language, a dictated task with priority $level reads «${lookupAppLocalizations(Locale(language)).priorityValue(level)}» on the result card, and TalkBack reads the same',
+          (tester) async {
+            final semantics = tester.ensureSemantics();
+            final l = lookupAppLocalizations(Locale(language));
+            await openResultIn(tester, language: language, [
+              CaptureDraft(
+                id: 'plants',
+                task: Task(
+                  title: 'Regar las plantas',
+                  priority: priority,
+                  dueDate: nextWeekday(DateTime.friday),
+                ),
+              ),
+            ]);
+            final editor = find.byType(CaptureReviewEditor);
+            expect(editor, findsOneWidget);
+            final phrase = l.priorityValue(level);
+            final shown = find.descendant(
+              of: editor,
+              matching: find.textContaining(phrase),
+            );
+            expect(shown, findsWidgets, reason: '«$phrase» on the card');
+            expect(
+              find.descendant(
+                of: editor,
+                matching: find.bySemanticsLabel(RegExp(RegExp.escape(phrase))),
+              ),
+              findsWidgets,
+              reason: 'TalkBack reads «$phrase»',
+            );
+            if (language != 'en') {
+              // Not «Prioridad Alta»: the standalone name after the word.
+              final name = level == 'high' ? l.high : l.medium;
+              expect(
+                find.descendant(
+                  of: editor,
+                  matching: find.textContaining('${l.priority} $name'),
+                ),
+                findsNothing,
+              );
+            }
+            expect(tester.takeException(), isNull);
+            semantics.dispose();
+          },
+        );
+      }
+    }
   });
 }
 

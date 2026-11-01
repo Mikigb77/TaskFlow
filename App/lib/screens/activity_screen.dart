@@ -14,15 +14,30 @@ import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 
-String activityLabel(BuildContext context, String action) => switch (action) {
-  'created' => context.l10n.activityCreated,
-  'assigned' => context.l10n.activityAssigned,
-  'unassigned' => context.l10n.activityUnassigned,
-  'completed' => context.l10n.activityCompleted,
-  'reopened' => context.l10n.activityReopened,
-  'deleted' => context.l10n.activityDeleted,
-  _ => context.l10n.activityUpdated,
-};
+/// Whether [fields], the task fields an update changed as the server lists
+/// them, are only its day: a moved task. Anything missing or unexpected is
+/// not a move, so it keeps the general sentence.
+bool onlyMoved(Object? fields) =>
+    fields is List &&
+    fields.isNotEmpty &&
+    fields.every((field) => field == 'scheduled_date' || field == 'due_date');
+
+/// A task's own history entry; an update that only changed the day says
+/// it moved the task, from the event's `details`.
+String activityLabel(BuildContext context, Map<String, dynamic> item) {
+  final details = item['details'];
+  return switch (item['action']) {
+    'created' => context.l10n.activityCreated,
+    'assigned' => context.l10n.activityAssigned,
+    'unassigned' => context.l10n.activityUnassigned,
+    'completed' => context.l10n.activityCompleted,
+    'reopened' => context.l10n.activityReopened,
+    'deleted' => context.l10n.activityDeleted,
+    'updated' when details is Map && onlyMoved(details['fields']) =>
+      context.l10n.activityMoved,
+    _ => context.l10n.activityUpdated,
+  };
+}
 
 class ActivityButton extends ConsumerWidget {
   const ActivityButton({super.key});
@@ -40,7 +55,7 @@ class ActivityButton extends ConsumerWidget {
       icon: Badge(
         isLabelVisible: count > 0,
         label: Text(count > 99 ? '99+' : '$count'),
-        child: const Icon(Icons.groups_outlined),
+        child: const Icon(Icons.campaign_outlined),
       ),
       onPressed: () async {
         await Navigator.push(
@@ -208,8 +223,9 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
   );
 }
 
-/// Who did what to which task. An assignment says who has it now, when the
-/// server says so; older entries keep the general sentence.
+/// Who did what to which task. An assignment says who has it now, and an
+/// update that only changed the day says it moved the task, when the server
+/// says so; older entries keep the general sentence.
 String activityEntry(BuildContext context, Map<String, dynamic> item) {
   final action = item['action'] as String? ?? '';
   final actor = item['actor_name'] as String? ?? context.l10n.activitySystem;
@@ -220,6 +236,9 @@ String activityEntry(BuildContext context, Map<String, dynamic> item) {
   }
   if (action == 'assigned' && assignee != null) {
     return context.l10n.activityAssignedTo(actor, assignee, title);
+  }
+  if (action == 'updated' && onlyMoved(item['fields'])) {
+    return context.l10n.activityEntry('moved', actor, title);
   }
   return context.l10n.activityEntry(action, actor, title);
 }
@@ -322,37 +341,55 @@ class TaskActivity extends ConsumerStatefulWidget {
 class _TaskActivityState extends ConsumerState<TaskActivity> {
   bool _open = false;
   @override
-  Widget build(BuildContext context) => ExpansionTile(
-    tilePadding: EdgeInsets.zero,
-    title: Text(context.l10n.activity),
-    leading: const Icon(Icons.history),
-    onExpansionChanged: (open) {
-      setState(() => _open = open);
-      if (open) ref.invalidate(taskHistoryProvider(widget.taskId));
-    },
-    children: [
-      if (_open)
-        ref
-            .watch(taskHistoryProvider(widget.taskId))
-            .when(
-              loading: () => const LinearProgressIndicator(),
-              error: (_, __) => TextButton(
-                onPressed: () =>
-                    ref.invalidate(taskHistoryProvider(widget.taskId)),
-                child: Text(context.l10n.retry),
-              ),
-              data: (items) => Column(
-                children: [
-                  for (final item in items)
-                    ListTile(
-                      title: Text(activityLabel(context, item['action'])),
-                      subtitle: Text(
-                        '${item['actor_name'] ?? context.l10n.activitySystem} · ${context.shortDate(DateTime.parse(item['created_at']).toLocal())}',
-                      ),
-                    ),
-                ],
-              ),
+  Widget build(BuildContext context) {
+    final strings = MaterialLocalizations.of(context);
+    return Column(
+      children: [
+        // One TalkBack stop that says whether it's open, as the reminder
+        // sheet's rows do; ExpansionTile adds a separate «Contraído» stop
+        // (UX-2615).
+        Semantics(
+          expanded: _open,
+          hint: _open ? strings.collapsedHint : strings.expandedHint,
+          onTapHint: _open
+              ? strings.expansionTileExpandedTapHint
+              : strings.expansionTileCollapsedTapHint,
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.history),
+            title: Text(context.l10n.activity),
+            trailing: Icon(
+              _open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
             ),
-    ],
-  );
+            onTap: () {
+              setState(() => _open = !_open);
+              if (_open) ref.invalidate(taskHistoryProvider(widget.taskId));
+            },
+          ),
+        ),
+        if (_open)
+          ref
+              .watch(taskHistoryProvider(widget.taskId))
+              .when(
+                loading: () => const LinearProgressIndicator(),
+                error: (_, __) => TextButton(
+                  onPressed: () =>
+                      ref.invalidate(taskHistoryProvider(widget.taskId)),
+                  child: Text(context.l10n.retry),
+                ),
+                data: (items) => Column(
+                  children: [
+                    for (final item in items)
+                      ListTile(
+                        title: Text(activityLabel(context, item)),
+                        subtitle: Text(
+                          '${item['actor_name'] ?? context.l10n.activitySystem} · ${context.shortDate(DateTime.parse(item['created_at']).toLocal())}',
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+      ],
+    );
+  }
 }

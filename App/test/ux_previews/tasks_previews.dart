@@ -12,6 +12,7 @@ import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:agenda/widgets/reminder_control.dart';
+import 'package:agenda/widgets/task_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -40,6 +41,7 @@ const projectPage = Screen(
   'A project\'s page (Tareas filtered to one project)',
   sources: [
     'lib/screens/home_screen.dart',
+    'lib/screens/task_lists_screen.dart',
     'lib/widgets/project_scope_control.dart',
     'lib/widgets/project_preferences.dart',
     'lib/widgets/task_tile.dart',
@@ -300,6 +302,68 @@ void tasksPreviews() {
       },
     );
 
+    preview(
+      tasksTab,
+      'deadline-passed',
+      'An overdue row whose deadline passed three days ago, among today\'s: it reads «Venció el <date>» once, in the row\'s usual grey, with «Prioridad alta».',
+      [es1, es2, ca1, ca2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [
+            ...normalDay(),
+            Task(
+              id: 90,
+              title: 'Entregar la declaración de la renta',
+              dueDate: day(-4),
+              hasTime: false,
+              deadline: day(-3),
+              priority: 3,
+            ),
+          ],
+          projects: allProjects,
+        );
+        await app.tab(p.l.tasks);
+        // The row at the top of the view: at 2× the header fills the screen.
+        final row = find.widgetWithText(
+          TaskTile,
+          'Entregar la declaración de la renta',
+        );
+        await p.tester.scrollUntilVisible(
+          row,
+          200,
+          scrollable: app.mainScroll(),
+        );
+        await Scrollable.ensureVisible(p.tester.element(row));
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      tasksTab,
+      'no-match',
+      'A search that finds nothing, «dentista»: «No hay tareas que coincidan…», and the ✕ at the search\'s end that empties it in one tap.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: busyDay(),
+          projects: allProjects,
+        );
+        await app.tab(p.l.tasks);
+        await p.tester.enterText(
+          find.widgetWithText(TextField, p.l.findTask),
+          'dentista',
+        );
+        await p.tester.pumpAndSettle();
+        // The keyboard down, so the empty state shows under the search.
+        FocusManager.instance.primaryFocus?.unfocus();
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
     // ------------------------------------------------------ project page
     preview(
       projectPage,
@@ -376,7 +440,7 @@ void tasksPreviews() {
     preview(
       projectPage,
       'personal',
-      'A personal project, «Casa»: no people.',
+      'A personal project, «Casa»: no people; its ⋮ («Gestionar Casa») open, with what Proyectos ⋮ offers for it but «Compartir proyecto», the page’s own button, and «Fijar proyecto», which only reorders Proyectos: Editar, Archivar and Eliminar proyecto.',
       [es1],
       (p) async {
         final app = await PreviewApp.open(
@@ -393,6 +457,32 @@ void tasksPreviews() {
           projects: allProjects,
         );
         await _openProject(app, 'casa');
+        await p.tester.tap(find.byTooltip(p.l.manageItem('Casa')));
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      projectPage,
+      'empty',
+      'A new personal project, «Huerto», with nothing in it yet: no search, only what to do next and «Añadir tarea».',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          projects: [
+            ...allProjects,
+            TaskListInfo(
+              id: 'huerto',
+              name: 'Huerto',
+              color: 'amber',
+              version: 1,
+            ),
+          ],
+        );
+        await _openProject(app, 'huerto');
         await p.shoot();
       },
     );
@@ -741,6 +831,32 @@ void tasksPreviews() {
       },
     );
 
+    preview(
+      detail,
+      'labels',
+      'A task with two labels and a day but no time: the labels read as one grey line, «#casa · #recados», with no outline; the day is one row, «Planificado para» over the date, with no «Hora» row.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [
+            ...normalDay(),
+            Task(
+              id: 78,
+              title: 'Comprar bombillas',
+              dueDate: day(2),
+              hasTime: false,
+              priority: 1,
+              labels: ['casa', 'recados'],
+            ),
+          ],
+          projects: allProjects,
+        );
+        await app.push('/taskDetails', arguments: 78);
+        await p.shoot();
+      },
+    );
+
     // --------------------------------------------------- tasks with files
     preview(
       tasksWithFiles,
@@ -801,10 +917,16 @@ void tasksPreviews() {
       },
     );
 
-    preview(projects, 'empty', 'No projects yet.', [es1], (p) async {
-      final app = await PreviewApp.open(p, tasks: normalDay());
-      await app.push('/lists');
-      await p.shoot();
-    });
+    preview(
+      projects,
+      'empty',
+      'No projects yet: no «Grupos» until something is shared.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(p, tasks: normalDay());
+        await app.push('/lists');
+        await p.shoot();
+      },
+    );
   });
 }

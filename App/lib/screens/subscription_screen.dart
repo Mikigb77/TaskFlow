@@ -261,7 +261,9 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                       ? () => _run(() => controller.presentPaywall(locale))
                       : null,
                   icon: const Icon(Icons.auto_awesome_outlined),
-                  label: Text(l10n.billingViewPlans),
+                  label: Text(l10n.billingViewPlans,
+                      textAlign: TextAlign.center,
+                      textWidthBasis: TextWidthBasis.longestLine),
                 ),
               ),
             )

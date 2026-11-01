@@ -110,7 +110,9 @@ class _DeviceCalendarsScreenState extends ConsumerState<DeviceCalendarsScreen>
                       ? null
                       : () => _run(_connect),
                   icon: const Icon(Icons.calendar_month_outlined),
-                  label: Text(l.calendarEnable)),
+                  label: Text(l.calendarEnable,
+                      textAlign: TextAlign.center,
+                      textWidthBasis: TextWidthBasis.longestLine)),
             if (state.access == CalendarAccess.granted && enabled) ...[
               const SizedBox(height: 20),
               SectionLabel(l.calendarChoose),

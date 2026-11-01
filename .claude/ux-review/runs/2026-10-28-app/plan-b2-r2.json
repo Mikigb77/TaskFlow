@@ -1,0 +1,210 @@
+{
+ "runId": "2026-10-28-app",
+ "mode": "app",
+ "round": 2,
+ "batch": "b2",
+ "packages": [
+  {
+   "id": "P301",
+   "title": "The repeat sheet: the choices set apart from their details, and Listo always in view",
+   "area": "B",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-2621",
+    "UX-2622"
+   ],
+   "files": [
+    "App/lib/widgets/repeat_rule_control.dart",
+    "App/test/recurrence_controls_test.dart",
+    "App/test/task_editor_form_test.dart",
+    "App/test/ux_previews/form_previews.dart"
+   ],
+   "brief": [
+    "Round 2 of P281's UX-2407 (verified: five one-tap rows with a ✓, Listo applies). Keep those rows, their keys (`repeat-$value`), their `selected` styling and the ✓ exactly as round 1 left them. Two regressions from verify-b2-r1-B1.md, both in `_RepeatSheet` (App/lib/widgets/repeat_rule_control.dart:114-199). No copy, no ARB change.",
+    "UX-2621 (S2, regression R1B1-1): with «Cada semana» ticked, right under «Cada año», with 0 dp between them (AUDIT `form/repeat-sheet · open`), comes `RepeatRuleControl`'s interval row «Cada semana / Intervalo de repetición ✎» in the same type, so it reads as a sixth choice that repeats the ticked one. Fix: inside `if (_task.isRecurring) ...[` (:146), put `const Divider(height: 24)` first, before `RepeatRuleControl`, so the interval, the weekday chips, «Se repite el mismo día de la semana…» and the end date read as details of the ticked row. With «No se repite» ticked there are no details and no divider. Don't change `RepeatRuleControl` itself (it is also the form's).",
+    "UX-2622 (S2, regression R1B1-2): Listo is the last child of the one `SingleChildScrollView` (:117-199), so at 2× with «Cada semana» ticked it sits about 200 dp below the screen (AUDIT es 2×: «Sin fecha de fin» and «Listo» off screen), with no scrollbar; closing the sheet any other way drops the choice silently. Fix: pin Listo under the scrolling part, the reminder sheet's fixed-header pattern at the other end (reminder_plan_sheet.dart:785-804, `Flexible(child: choices)`): `SafeArea(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [Flexible(child: SingleChildScrollView(padding: EdgeInsets.fromLTRB(24, 24, 24, 0), child: Column(… title, the five rows, the details …))), Padding(padding: EdgeInsets.fromLTRB(24, 16, 24, 24), child: FilledButton(… Listo …))]))`. The sheet is opened with `isScrollControlled: true` (:101-105), so the Column gets the screen's height as its bound: check that the sheet still hugs its content when everything fits (1×, «No se repite»). Listo keeps `Navigator.pop(context, _task)` and stays full width as now. The end date's date picker and its ✕ are unchanged.",
+    "Tests: run App/test/recurrence_controls_test.dart, task_editor_form_test.dart, review_tasks_test.dart, task_creation_test.dart and reminder_plan_sheet_test.dart (they open this sheet); a test that scrolls to Listo before tapping it still works, and none should need changing; say if one does. Previews: re-render form/ (App/test/ux_previews/form_previews.dart's `repeat-sheet` state at :288-330 already ticks «Cada semana»; keep its description true).",
+    "Not yours: `RepeatRuleControl` and the interval dialog (:1-98), the form (task_editor.dart), the capture card's repeat row (P298, verified)."
+   ],
+   "acceptance": [
+    "Repeat sheet with «Cada semana» ticked, ES and CA at 2× on 360×800: «Listo» is fully on screen without scrolling, and AUDIT `form/repeat-sheet · open` does not mark it off screen.",
+    "Same sheet, ES 1×: a Divider sits between «Cada año» and the interval row «Cada semana / Intervalo de repetición», and AUDIT puts at least 8 dp between them.",
+    "With «No se repite» ticked: no divider and no interval row; the sheet is no taller than its content plus Listo.",
+    "Ticking «Cada mes» then tapping Listo returns the task with recurrence 'monthly' (unchanged behaviour); the end date row still opens the date picker."
+   ],
+   "deviceChecks": [],
+   "dependsOn": [
+    "P281"
+   ]
+  },
+  {
+   "id": "P302",
+   "title": "A task's page: a second tap on Completar lands on nothing, and the time wraps with its dot",
+   "area": "B",
+   "size": "M",
+   "severity": 2,
+   "findings": [
+    "UX-2623",
+    "UX-2624"
+   ],
+   "files": [
+    "App/lib/screens/task_detail_screen.dart",
+    "App/lib/widgets/task_actions.dart",
+    "App/test/task_detail_test.dart",
+    "App/test/ux_previews/tasks_previews.dart"
+   ],
+   "brief": [
+    "Round 2 of P280 (UX-2404, UX-2409, UX-2410 and UX-2416 all verified in verify-b2-r1-B2.md). Keep everything it built: Completar closes the page and leaves «Tarea completada · Deshacer» over the list; «Reabrir» on an already-completed task keeps the page; `_pinned` (:45, :137-155) and `_leaving` (:49, :141). No new copy, no ARB change.",
+    "UX-2623 (S2, regression R1B2-1): `_toggle` (App/lib/screens/task_detail_screen.dart:54-60) pops in the frame of the first tap. A leaving route ignores pointers, so a hesitant second tap goes to the screen under it: at 360×800 1× the page's Completar covers 640–700 dp and Calendar's «Añadir tarea» (App/lib/widgets/task_actions.dart, the FilledButton.icon in `_button`, :100-116) covers 608–668 dp, so the second tap starts listening for a new task. The tester's own test shows it (App/test/task_detail_test.dart:1471-1473: «The second tap lands on Calendar, under the leaving page, where «Añadir tarea» sits»). Fix, both halves (the page is held for 300 ms, and the route's exit transition that follows still lets taps through, so the page alone can't cover a tap at 400 ms):",
+    "(1) The page holds for about 300 ms. In `_toggle`, for an open task: set `_leaving = task` and a new `_closing = true` in setState; tick at once, as now (`TaskInteractions.toggle(context, ref, task)`, so the haptic and the message come with the tap); then `await Future.delayed(const Duration(milliseconds: 300))` and pop only if the page is still mounted and its route is still current (`ModalRoute.of(context)?.isCurrent ?? false`), so a Back pressed meanwhile doesn't pop twice. While `_closing`, the bottom bar's FilledButton (:537-549) has `onPressed: null` and shows `Icons.check_rounded` with `complete` («Completar»), so it reads as done and a second tap lands on a dead button; the outlined «Cambiar fecha» beside it is `onPressed: null` too. «Reabrir» (a completed task) is unchanged: no hold, no pop.",
+    "(2) «Añadir tarea» ignores a tap while a page above its own screen is still leaving. In `_TaskActionsState`, where the tap is handled (`_add`, or the `onPressed` in `_button`), return at once when `ModalRoute.of(context)?.secondaryAnimation?.status == AnimationStatus.reverse` (the route above is being popped). No timer and no new state. This covers Calendar, Tareas and the Día view, which all use TaskActions. Don't change the button's look, size or copy.",
+    "UX-2624 (S1, regression R1B2-2): the date line joins day and time with a plain « · » (:338), so the time wraps alone and leaves the dot at the end of the line above (`detail.full.es.light.1x` «domingo, 1 de noviembre ·» / «21:00»; `detail.notes-steps.es.light.2x` «noviembre ·» / «09:00»). Fix: join with a normal space, the dot and a no-break space, `' ·\\u00A0'`, so «· 21:00» moves to the next line as one piece and the break falls before the dot. No copy change; no other line of the page changes.",
+    "Tests: the P280 group's 'second tap' test in App/test/task_detail_test.dart (around :1455-1477) is rightly broken: it expects the second tap to land on Calendar; update it to expect nothing opens, and say so. P280 tests that pump just one frame after Completar to see Calendar now need the 300 ms; update only those and list them. Also run the TaskActions harnesses (capture_sheet_test, capture_entries_test, capture_landing_test, home_screen_test, day_timeline_test): none should change. Previews: re-render tasks/ `detail.*` (es and ca, 1× and 2×).",
+    "Not yours: Calendar's own code (calendar_screen.dart, P305 in this round), the theme (P304), TaskInteractions' message copy."
+   ],
+   "acceptance": [
+    "Calendar row → task page → Completar, ES 1× on 360×800: taps on the same spot at 50 ms, 200 ms and 400 ms after the first open no capture sheet and no task form, complete nothing more and reopen nothing; after the page has closed, Calendar shows the row ticked with one «Tarea completada · Deshacer».",
+    "During the first 300 ms after Completar the page's main button reads «Completar» with a check icon and is disabled for TalkBack; it never reads «Reabrir».",
+    "Activity → a daily repeating task → Completar, then a second tap at 200 ms: only today's occurrence is completed (P280's check still holds).",
+    "Opening an already-completed task and tapping «Reabrir» keeps the page at once, now offering «Completar» (unchanged).",
+    "Once the page has closed and its exit has finished, a tap on Calendar's «Añadir tarea» opens the capture sheet as before.",
+    "Render `tasks/detail.full.es.light.1x`: the date line reads «domingo, 1 de noviembre» / «· 21:00» or fits on one line; no line ends in «·». Same at `detail.notes-steps.es.light.2x`."
+   ],
+   "deviceChecks": [
+    "Emulator, then phone: on a task's page, a quick double tap on «Completar» closes the page once and opens nothing under it, with gesture and with three-button navigation."
+   ],
+   "dependsOn": [
+    "P280"
+   ]
+  },
+  {
+   "id": "P303",
+   "title": "Novedades gets an icon of its own; a gone project, an offline refresh and pinning on a project's page say what happened",
+   "area": "C",
+   "size": "M",
+   "severity": 2,
+   "findings": [
+    "UX-2625",
+    "UX-2626",
+    "UX-2627",
+    "UX-2628"
+   ],
+   "files": [
+    "App/lib/screens/activity_screen.dart",
+    "App/lib/screens/notes_screen.dart",
+    "App/lib/screens/groups_screen.dart",
+    "App/lib/screens/task_lists_screen.dart",
+    "App/lib/screens/home_screen.dart",
+    "App/test/activity_screen_test.dart",
+    "App/test/notes_ui_test.dart",
+    "App/test/groups_screen_test.dart",
+    "App/test/task_lists_widget_test.dart",
+    "App/test/home_screen_test.dart"
+   ],
+   "brief": [
+    "Four small regressions from round 1 of P283, P284, P286 and P287 (verify-b2-r1-C1.md, verify-b2-r1-C2.md). Everything those packages built is verified: keep it. No copy, no ARB change.",
+    "UX-2625 (S2, regression R1C1-1 of P287's UX-2506): the header's Novedades button uses `Icons.feed_outlined` (App/lib/screens/activity_screen.dart:58), a page with lines; on Notas it sits right above the selected tab icon `description_outlined`, also a page with lines, and on Tareas the two read as one thing twice (`tasks/tasks-tab.normal.es.light.1x`, `notes/notes-tab.viewer-project.es.light.1x`). Fix: `Icons.campaign_outlined` (a megaphone), which the app doesn't use anywhere yet (grep finds none). Keep the Badge, the count and the tooltip «Novedades» (`groupActivity`). Not `history`/`restore` (Notas' «Sin guardar»), not `notifications_*` (reminders), not `inbox_outlined` (in use), not `groups_outlined` (people). The P287 group in App/test/activity_screen_test.dart (:1243 on) that finds `Icons.feed_outlined` is rightly broken: change it to `campaign_outlined` and say so.",
+    "UX-2626 (S1, regression R1C1-2 of P283's UX-2501): App/lib/screens/notes_screen.dart:150-158 sets `readOnly` when the shown project is gone (`shownList == null` once the projects have loaded), so Notas shows «Este proyecto es de solo lectura · pídeselo al propietario» for a project nobody can grant. Fix: `final readOnly = shownList != null && !shownList.canEdit;` and update the comment above it: only a project the account can see but not edit gets the bar. For a gone project «Añadir nota» shows as before P283: `_saveTo` (:48-49) is null and the sheet opens with `useScope: false`, so the note is saved with no project. The dropdown's `listUnavailable` item is unchanged.",
+    "UX-2627 (S1, regression R1C1-3 of P284's UX-2502): the group page's pull-to-refresh (App/lib/screens/groups_screen.dart, `_page`, `RefreshIndicator.onRefresh` at about :714-717) invalidates `groupDetailsProvider` and awaits only `loadTasks()`; with P284's `skipError: true` (:694) an offline refresh now ends with the page as it was and no word. Fix: take the messenger and strings before any await, invalidate as now, then `try { await ref.read(groupDetailsProvider(widget.groupId).future); } catch (error) { if (mounted) showFeedback(messenger, requestProblemText(strings, error, keptNote: false)); }`, then `await ref.read(taskProvider.notifier).loadTasks();` as now. The page keeps its members and projects; the floating message is the same as an action's failure (:378-381). Don't touch the Grupos list's own refresh (:297-300) or P285's «Invitar a una persona».",
+    "UX-2628 (S1, regression R1C2-1 of P286's UX-2503): the project page's ⋮ (App/lib/screens/home_screen.dart:567-588) lists «Fijar proyecto» / «Desfijar proyecto», but pinning only changes the order on Proyectos and gives no feedback, so on the page nothing visible happens. Fix, subtract first: add a flag to `projectMenuItems` (App/lib/screens/task_lists_screen.dart:281-286), `bool pin = true`, next to `people`, wrap the 'pin' item (:287-292) in `if (pin)`, and pass `pin: false` from the page. Proyectos' ⋮ (:250) keeps it, where the row visibly moves to «Proyectos fijados». If the page's list of items would be empty, the page shows no ⋮ and no 8 dp spacer before it (:566). `runProjectAction` keeps its 'pin' case for Proyectos.",
+    "Tests: App/test/task_lists_widget_test.dart (:1355-1395) checks the menus' items by role; the page's lists lose `es.pinProject`, Proyectos' keep it. Update only the page's expectations and say which. Previews: re-render `tasks/tasks-tab.normal`, `notes/notes-tab.list`, `notes/notes-tab.viewer-project`, `tasks/project.personal` (its ⋮ now lists Editar / Archivar / Eliminar) and `sharing/group.owner`.",
+    "Not yours: the icons of «Grupos», shared projects and «Todos» (`groups_outlined`), Novedades' entries (P287), the search fields (P288)."
+   ],
+   "acceptance": [
+    "With a shared project, ES 1× on 360×800, the header's Novedades button on Calendar, Tareas and Notas uses `Icons.campaign_outlined`, with its badge and the tooltip «Novedades»; no screen uses `Icons.feed_outlined`.",
+    "NotesScreen(listId: 'gone') with the projects loaded, ES 1×: «Añadir nota» shows and there is no «Este proyecto es de solo lectura» bar; a note added there is saved with no project.",
+    "Notas on a project the account only views: the read-only bar shows and «Añadir nota» doesn't (P283's check still holds).",
+    "Group page, loaded, then offline, ES 1×: a pull-to-refresh keeps the members and projects on screen and shows the network message as a floating message.",
+    "A project's own page ⋮ lists no «Fijar proyecto» or «Desfijar proyecto», for the owner, an editor and a viewer; Proyectos' ⋮ for the same project still lists it, and choosing it moves the row to «Proyectos fijados»."
+   ],
+   "deviceChecks": [],
+   "dependsOn": [
+    "P283",
+    "P284",
+    "P286",
+    "P287"
+   ]
+  },
+  {
+   "id": "P304",
+   "title": "Every primary is 60 dp, and wrapped button labels centre with their icon and clear their edges",
+   "area": "D",
+   "size": "M",
+   "severity": 2,
+   "findings": [
+    "UX-2108",
+    "UX-2630",
+    "UX-2631"
+   ],
+   "files": [
+    "App/lib/theme/app_theme.dart",
+    "App/lib/screens/subscription_screen.dart",
+    "App/lib/screens/data_transfer_screen.dart",
+    "App/lib/screens/device_calendars_screen.dart",
+    "App/test/appearance_test.dart",
+    "App/test/new_task_form_test.dart",
+    "App/test/task_editor_form_test.dart",
+    "App/test/data_transfer_screen_test.dart",
+    "App/test/subscription_screen_test.dart",
+    "App/test/device_calendar_ui_test.dart"
+   ],
+   "brief": [
+    "Round 2 of P289. Keep what round 1 built and the reviewer verified: the FilledButton theme (App/lib/theme/app_theme.dart:95-103, `minimumSize: Size(48, 48)` with `VisualDensity(vertical: 3)`: 60 dp and 12 dp above and below a wrapped label), TaskActions' 8 dp/12 dp padding, and the five `textAlign: TextAlign.center` labels (UX-2608, verified). No copy, no ARB change.",
+    "UX-2108 (S2, partly fixed, failed once). What round 1 did: every FilledButton is now 60 dp, and no capture/* render has a «primary under 56 dp» flag. Why it's only partly fixed: the form's primary, the confirming tap of every free account, is the app's one `ElevatedButton` (App/lib/widgets/task_editor.dart:1208, «Añadir tarea», «Añadir al calendario», «Guardar cambios»), styled as a filled button by its own theme (app_theme.dart:104-114, `minimumSize: Size(48, 54)`). It is still 312 × 54 dp, and AUDIT flags «primary under 56 dp» in form/new-task.{empty,filled,details,from-dictation,keyboard}, form/edit-task.{existing,long} and tasks/project.person-form. Fix: in `elevatedButtonTheme`, `minimumSize: const Size(48, 48)` and `visualDensity: const VisualDensity(vertical: 3)`, as the filled theme; keep its colours, elevation 0, shape and text style. Extend the comment above the filled theme to say the form's ElevatedButton matches it. task_editor.dart is not changed: its button keeps its key `task-save`, icon and labels. The form's button sits above the keyboard (form/new-task.keyboard): run the form's fit tests at 2× (new_task_form_test, task_editor_form_test) and fix what the 6 dp rightly break by giving room, never by making the button shorter than 60 dp; say what you changed.",
+    "UX-2630 (S1, regression R1D-2): at 2× a wrapped, centred label fills the row, so the icon of a `FilledButton.icon` sits at the button's left edge, 50–60 dp from its text (`settings/pro.free.ca.light.2x`: the sparkle at x≈41 dp, the text from x≈110 dp; `settings/data-transfer.start.es.light.2x`; `first-run/phone-calendars.not-allowed.ca.light.2x`). Fix: add `textWidthBasis: TextWidthBasis.longestLine` to the three labels' Text, beside their `textAlign: TextAlign.center`: App/lib/screens/subscription_screen.dart:264-265 (`billingViewPlans`), App/lib/screens/data_transfer_screen.dart:200-201 (`exportTaskFlowFile`), App/lib/screens/device_calendars_screen.dart:113 (`calendarEnable`). The text box then hugs its longest line, and icon and label centre together. The icons stay: download/upload name the two directions on Exportar e importar, and the subtraction would make these three unlike every other icon button.",
+    "UX-2631 (S1, regression R1D-3): on Exportar e importar the outlined «Elegir archivo para importar» (data_transfer_screen.dart:202-205) sits under the now padded, centred «Exportar archivo TaskFlow», but at 2× its two lines start at the left and touch the button's top and bottom edges. Fix: (1) in `outlinedButtonTheme` (app_theme.dart:115-120), `minimumSize: const Size(48, 44)` with `visualDensity: const VisualDensity(vertical: 2)`: still 52 dp at one line, with 8 dp added above and below a wrapped label; keep its shape and `side`. (2) On that label, `textAlign: TextAlign.center` and `textWidthBasis: TextWidthBasis.longestLine`. Every OutlinedButton in the app (about 20) gets the 8 dp: at 1× a one-line outlined button must stay 52 dp; at 2× some grow a few dp, so run the layout tests that measure fits at 2× (capture_sheet_test, calendar_feedback_test, new_task_form_test, review_tasks_test, task_detail_test) and give room where the growth rightly breaks one; say which.",
+    "Tests: App/test/appearance_test.dart's P289 group (:664 on) checks the filled theme; add nothing there, and update only what this change rightly breaks. Previews: re-render form/, settings/ (`pro.free`, `data-transfer.start`), first-run/ (`phone-calendars.*`), tasks/ (`project.person-form`, `detail.*`) and capture/.",
+    "Not yours: calendar_screen.dart and the UX-1628 return (P305, this round, which must hold with these heights), task_detail_screen.dart and task_actions.dart (P302), the two FilledButtons with their own inner `Padding(vertical: 12)` (delete_account_screen.dart:440, device_calendar_events.dart:354; a note for the main session, not a finding)."
+   ],
+   "acceptance": [
+    "AUDIT: the form's primary is at least 58 dp tall in form/new-task.* and form/edit-task.*, and in tasks/project.person-form; no `form/*` render and no `tasks/project.person-form` render has a «primary under 56 dp» flag.",
+    "New-task form, ES 2× on 360×740, keyboard up: the title field and «Añadir tarea» are both visible (the form's own fit checks still pass).",
+    "Render `settings/pro.free.ca.light.2x`, `settings/data-transfer.start.es.light.2x` and `first-run/phone-calendars.not-allowed.ca.light.2x`: each icon sits about 8 dp left of its label's longest line, and the icon and label are centred in the button.",
+    "Render `settings/data-transfer.start.es.light.2x`: «Elegir archivo para importar» is centred, with at least 8 dp between its text and the button's top and bottom edges.",
+    "At ES 1× on 360×800 a one-line OutlinedButton («Cambiar fecha» on a task's page, «Elegir archivo para importar») is 52 dp tall; FilledButtons stay 60 dp."
+   ],
+   "deviceChecks": [
+    "Phone, at Android's largest font: the task form's primary is hit first time with the keyboard up, and stays above the keyboard."
+   ],
+   "dependsOn": [
+    "P289"
+   ]
+  },
+  {
+   "id": "P305",
+   "title": "Return to today lands at the top again, whatever the bottom bar's height",
+   "area": "D",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-2629"
+   ],
+   "files": [
+    "App/lib/screens/calendar_screen.dart",
+    "App/test/capture_landing_test.dart"
+   ],
+   "brief": [
+    "UX-2629 (S2, regression R1D-1; it breaks UX-1628, verified 2026-10-20 in P197). The round check's one app failure: App/test/capture_landing_test.dart 'UX-1628: ES 2x on 360x800, after a landing on Friday that scrolled the agenda, resuming 31 minutes later selects today with the agenda at its minimum offset and Agenda de hoy inside the viewport' (:1498-1518; the assertion in `expectTodayAtTop`, about :1449) gets 321.0, expected 0.0 ±0.5, every time (App/build/round-check/suite.log:150-156). The Friday landing left the offset at 1186; after the resume today shows (max 975.5) but the agenda sits about one viewport down. The tester bisected it: HEAD passes; HEAD with only P289's app_theme.dart passes; the working tree with only app_theme.dart reverted passes; the working tree fails. So P289's 60 dp button, together with the round's taller Calendar content, changes the timing, and the code is fragile to heights. Its 5-minute and after-midnight siblings still pass.",
+    "Where: `didChangeAppLifecycleState` (App/lib/screens/calendar_screen.dart:384-399) calls `_comeBack(left)` inside setState, then `loadTasks()` and the phone-calendar refresh; `_comeBack` (:405-420) selects today and jumps to `minScrollExtent` in one post-frame callback. The landing's reveal (about :180-275) is an async loop that awaits `endOfFrame` and `animateTo`, and jumps a viewport at a time while the rows it looks for aren't built (`_scroll.jumpTo(… position.pixels + position.viewportDimension …)`, :220-227). The likely cause, to confirm first: the landing reveal (or a fresh one started by the resume's reload) is still running when `_comeBack` jumps, and its later jump moves the agenda down a viewport; or the reload changes the extent after the jump.",
+    "Fix: make the return-to-today jump the last thing that sets the offset. (1) Cancel any landing reveal when `_comeBack` selects today: for example a generation counter (`_revealRun`) that `_comeBack` increments and the reveal loop checks after every await, returning when it changed; also clear the landing's pending state (lit rows, `_end` room) as a manual day pick does, if it does. (2) After the resume's `loadTasks()` and phone-calendar refresh settle, jump to `minScrollExtent` again if today is still selected and the person hasn't scrolled since (`_comeBack` set it), on the next frame. Pick the smaller of the two that makes the test pass for the right reason, and say what you found the cause to be. Jump, never animate (the person wasn't looking). A short return (under 30 minutes, same day) still keeps both the day and the scroll.",
+    "Never shorten the 60 dp button, change the theme or the TaskActions padding, or change the test's numbers to make it pass; the test is unchanged. Run the whole of capture_landing_test.dart and calendar_feedback_test.dart.",
+    "Not yours: app_theme.dart (P304, this round: its outlined buttons may grow a few dp at 2×, so the fix must not rely on any height), task_actions.dart and task_detail_screen.dart (P302)."
+   ],
+   "acceptance": [
+    "The UX-1628 test 'resuming 31 minutes later' passes with the 60 dp «Añadir tarea»: ES 2× on 360×800, after a Friday landing that scrolled the agenda, a resume 31 minutes later selects today with the agenda at its minimum offset and «Agenda de hoy» inside the viewport.",
+    "Its siblings still pass: a 5-minute return keeps the landed day and its scroll; a return after midnight shows the new day at the top.",
+    "A landing on Friday with no resume still scrolls to and lights the new rows (the UX-2203 landing checks in capture_landing_test.dart pass)."
+   ],
+   "deviceChecks": [
+    "Phone, at the largest font: save a task for Friday by voice, leave the app for 31 minutes or more, come back: Calendar shows today with «Agenda de hoy» at the top."
+   ],
+   "dependsOn": [
+    "P289"
+   ]
+  }
+ ],
+ "decisions": [],
+ "skipped": [],
+ "escalated": []
+}

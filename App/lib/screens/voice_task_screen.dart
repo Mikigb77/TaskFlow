@@ -57,7 +57,10 @@ final captureRecorderFactoryProvider = Provider<AudioRecorder Function()>(
 /// selected day, the timeline's day): when it is a later day, a task said or
 /// typed without a date goes there. [person] is the person whose chip is on,
 /// on the shared project's page it opens from: a task going into
-/// [projectId] whose words named nobody is theirs (D7).
+/// [projectId] whose words named nobody is theirs (D7). With no
+/// [projectId], a capture goes to the project picked on Calendar's or
+/// Tareas' chip, when the user can add to it; [useScope] false (Notes) means
+/// no project at all.
 ///
 /// The mic comes with Pro, or while free dictations are left; otherwise the
 /// sheet types. Typed words go to the assistant only with Pro. [typing]
@@ -83,6 +86,7 @@ Future<void> showCaptureSheet(
   DateTime? day,
   bool typing = false,
   bool askedToSpeak = false,
+  bool useScope = true,
 }) async {
   final container = ProviderScope.containerOf(context, listen: false);
   if (container.read(typesInFormProvider)) {
@@ -145,6 +149,7 @@ Future<void> showCaptureSheet(
             day: day,
             typing: typing,
             askedToSpeak: askedToSpeak,
+            useScope: useScope,
           ),
         ),
       ),
@@ -407,6 +412,7 @@ class VoiceTaskScreen extends ConsumerWidget {
     this.day,
     this.typing = false,
     this.askedToSpeak = false,
+    this.useScope = true,
   });
   final String? captureId;
   final bool startListening;
@@ -416,6 +422,9 @@ class VoiceTaskScreen extends ConsumerWidget {
   final DateTime? day;
   final bool typing;
   final bool askedToSpeak;
+
+  /// With no [projectId], whether the capture follows the chip's project.
+  final bool useScope;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final voice = ref.watch(voiceAvailableProvider);
@@ -440,6 +449,7 @@ class VoiceTaskScreen extends ConsumerWidget {
       voice: voice,
       typing: typing,
       askedToSpeak: askedToSpeak,
+      useScope: useScope,
     );
   }
 }
@@ -460,6 +470,7 @@ class _VoiceCaptureScreen extends ConsumerStatefulWidget {
     this.voice = true,
     this.typing = false,
     this.askedToSpeak = false,
+    this.useScope = true,
   });
   final String kind;
   final String? projectId;
@@ -479,6 +490,9 @@ class _VoiceCaptureScreen extends ConsumerStatefulWidget {
 
   /// Opened to speak: without voice, a line says why the sheet types.
   final bool askedToSpeak;
+
+  /// With no [projectId], whether the capture follows the chip's project.
+  final bool useScope;
   @override
   ConsumerState<_VoiceCaptureScreen> createState() => _VoiceTaskScreenState();
 }
@@ -777,7 +791,10 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     if (_session != null) return;
     final now = ref.read(calendarClockProvider)();
     final day = widget.day == null ? null : Task.day(widget.day!);
-    final scoped = ref.read(projectScopeProvider).projectId;
+    // Notes says where a note goes: never another screen's filter.
+    final scoped = widget.useScope
+        ? ref.read(projectScopeProvider).projectId
+        : null;
     final projectId =
         _projectId ??
         widget.projectId ??

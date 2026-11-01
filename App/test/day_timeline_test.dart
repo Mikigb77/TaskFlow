@@ -13,6 +13,7 @@ import 'package:agenda/screens/day_timeline_screen.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/design_fixtures.dart';
@@ -485,19 +486,26 @@ void main() {
           hasTime: false,
           priority: priority);
 
-  for (final (scale, priority) in [(1.0, 1), (2.0, 1), (1.0, 2), (2.0, 2)]) {
+  // At 2× with priority 2, the test font wraps «Añadir tarea» to two padded
+  // lines, which a phone never does: «P207, in Manrope» measures that case.
+  // Titles wrap whole (P279), and the test font's square glyphs give a long
+  // one five lines at 2× where Manrope gives two, so at 2× the test-font
+  // cases use a short title; «P207, in Manrope» measures the long one.
+  String billAt(double scale) =>
+      scale == 1 ? 'Pagar la factura de la luz' : 'Pagar la luz';
+  for (final (scale, priority) in [(1.0, 1), (2.0, 1), (1.0, 2)]) {
     testWidgets(
-        'UX-1633: at ${scale}x on 360×800 (calendar/timeline.untimed, 09:41, priority $priority) «Sin hora», «Pagar la factura de la luz» and the 08:30 block are all on screen on arrival',
+        'UX-1633: at ${scale}x on 360×800 (calendar/timeline.untimed, 09:41, priority $priority) «Sin hora», «${billAt(scale)}» and the 08:30 block are all on screen on arrival',
         (tester) async {
       await openDay(tester,
           tasks: [
             ...normalDay(),
-            dateOnly(20, 'Pagar la factura de la luz', priority)
+            dateOnly(20, billAt(scale), priority)
           ],
           clock: at(0, 9, 41),
           scale: scale);
       final label = onDay(find.text(es.timelineUnblocked.toUpperCase()));
-      final bill = onDay(find.text('Pagar la factura de la luz'));
+      final bill = onDay(find.text(billAt(scale)));
       final walk = find.byTooltip('Paseo por el parque, 08:30');
       expect(label, findsOneWidget);
       expect(bill, findsOneWidget);
@@ -595,7 +603,7 @@ void main() {
               dueDate: at(0, 8, 30),
               priority: 1),
           for (final (i, title) in [
-            'Pagar la factura de la luz',
+            'Pagar la luz',
             'Llamar a la abuela',
             'Comprar sellos',
             'Devolver el libro',
@@ -606,7 +614,7 @@ void main() {
     expect(untimed, findsOneWidget);
     final area = tester.getRect(untimed);
     expectUntimedCap(tester,
-        onDay(find.widgetWithText(TaskTile, 'Pagar la factura de la luz')));
+        onDay(find.widgetWithText(TaskTile, 'Pagar la luz')));
     expect(area.top, greaterThanOrEqualTo(headerBottom(tester) - 0.5));
     final walk = find.byTooltip('Paseo por el parque, 08:30');
     expect(inView(tester, walk), isTrue, reason: 'the 08:30 task shows');
@@ -616,7 +624,7 @@ void main() {
     // stay where they are.
     final rows = [
       for (final title in [
-        'Pagar la factura de la luz',
+        'Pagar la luz',
         'Llamar a la abuela',
         'Comprar sellos',
         'Devolver el libro',
@@ -668,7 +676,7 @@ void main() {
     });
 
     Finder row(String title) => onDay(find.widgetWithText(TaskTile, title));
-    final medium = es.priorityValue(es.medium);
+    final medium = es.priorityValue('medium');
 
     /// The lines drawn on the Día view outside the hours and «Sin hora».
     List<Element> pinnedLines() =>
@@ -691,7 +699,7 @@ void main() {
 
     for (final scale in [1.0, 2.0]) {
       testWidgets(
-          'UX-1639: at ${scale}x on 360×800 (calendar/timeline.untimed, 09:41, priority 2) «Sin hora» and the whole «Pagar la factura de la luz» row, its «Prioridad Media» line included, are inside the «Sin hora» area with no «Hoy», and the 08:30 block is on screen on arrival',
+          'UX-1639: at ${scale}x on 360×800 (calendar/timeline.untimed, 09:41, priority 2) «Sin hora» and the whole «Pagar la factura de la luz» row, its «Prioridad media» line included, are inside the «Sin hora» area with no «Hoy», and the 08:30 block is on screen on arrival',
           (tester) async {
         await openDay(tester,
             tasks: [
@@ -878,7 +886,7 @@ void main() {
       final bill = row('Pagar la factura de la luz');
       expect(label, findsOneWidget);
       expect(bill, findsOneWidget);
-      final caMedium = ca.priorityValue(ca.medium);
+      final caMedium = ca.priorityValue('medium');
       final priority =
           find.descendant(of: bill, matching: find.text(caMedium));
       expect(priority, findsOneWidget, reason: '«$caMedium» stays');
@@ -1092,6 +1100,442 @@ void main() {
         expect(spinner(), findsNothing);
         expect(tester.takeException(), isNull);
       });
+    }
+  });
+
+  // ---- Run 2026-10-28-app, round 1 · P278 (UX-2309, UX-2314): the Día view
+  // fits the screen: one lane always fits, the header drops the current year,
+  // no stray dash, TalkBack skips the hour labels. Measured in Manrope. ----
+
+  group('P278 · Día view fits the screen', () {
+    setUpAll(() async {
+      await (FontLoader('Manrope')
+            ..addFont(rootBundle.load('assets/fonts/Manrope.ttf')))
+          .load();
+      await (FontLoader('MaterialIcons')
+            ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
+          .load();
+    });
+
+    /// The preview suite's busy day (`calendar/timeline.busy`): the normal day
+    /// and six more timed items, one of them an hour long beside 08:30.
+    List<Task> busyDay() => [
+          ...normalDay(),
+          Task(
+              id: 20,
+              title:
+                  'Reunión con el tutor de Lucía para hablar del trimestre y de las notas',
+              dueDate: at(0, 9),
+              durationMinutes: 60,
+              priority: 2),
+          Task(
+              id: 21,
+              title: 'Enviar el presupuesto de la reforma de la cocina',
+              dueDate: at(0, 11),
+              priority: 3),
+          Task(
+              id: 22,
+              title: 'Preparar la excursión',
+              dueDate: at(0, 12),
+              priority: 2),
+          Task(
+              id: 23,
+              title: 'Farmacia: recoger la receta',
+              dueDate: at(0, 16, 30),
+              priority: 1),
+          Task(
+              id: 24,
+              title: 'Corregir los ejercicios del tema 4',
+              dueDate: at(0, 18),
+              priority: 2),
+          Task(
+              id: 25,
+              title: 'Llamar a la abuela',
+              dueDate: at(0, 20, 30),
+              priority: 1),
+        ];
+
+    /// The timeline's blocks, each a tooltip with its whole label.
+    final blocks = find.descendant(of: hours, matching: find.byType(Tooltip));
+
+    /// The block whose label is [label].
+    Finder block(String label) =>
+        find.descendant(of: hours, matching: find.byTooltip(label));
+
+    Finder spoken(Pattern label) =>
+        find.descendant(of: screen, matching: find.bySemanticsLabel(label));
+
+    /// Every block ends inside the screen, its title on one line that stays
+    /// inside the block and ends with an ellipsis when it doesn't fit.
+    /// Returns how many titles were cut.
+    int expectBlocksFit(WidgetTester tester) {
+      final width = tester.view.physicalSize.width;
+      var cut = 0;
+      for (final element in blocks.evaluate()) {
+        final tooltip = element.widget as Tooltip;
+        final one = find.byElementPredicate((e) => e == element);
+        final rect = tester.getRect(one);
+        expect(rect.left, greaterThanOrEqualTo(-0.5),
+            reason: '«${tooltip.message}» starts on screen: $rect');
+        expect(rect.right, lessThanOrEqualTo(width + 0.5),
+            reason: '«${tooltip.message}» ends inside the screen: $rect');
+        final title = find.descendant(of: one, matching: find.byType(Text)).first;
+        final paragraph = tester.renderObject<RenderParagraph>(title);
+        final titleRect = tester.getRect(title);
+        expect(titleRect.right, lessThanOrEqualTo(rect.right + 0.5),
+            reason: 'the title of «${tooltip.message}» stays in its block');
+        expect(paragraph.maxLines, 1);
+        if (paragraph.didExceedMaxLines) {
+          cut++;
+          expect(paragraph.overflow, TextOverflow.ellipsis,
+              reason: '«${tooltip.message}» ends with an ellipsis');
+        }
+      }
+      return cut;
+    }
+
+    for (final (preview, untimedTask) in [('normal', false), ('untimed', true)]) {
+      for (final language in ['es', 'ca']) {
+        testWidgets(
+            'UX-2309: at 2x on 360×800 (calendar/timeline.$preview, $language) every block ends inside the screen, a title that doesn’t fit ends with an ellipsis inside its block, and the block’s TalkBack label and tooltip keep the whole title',
+            (tester) async {
+          final semantics = tester.ensureSemantics();
+          await openDay(tester,
+              tasks: [
+                ...normalDay(),
+                if (untimedTask) dateOnly(20, 'Pagar la factura de la luz', 2),
+              ],
+              clock: at(0, 9, 41),
+              scale: 2,
+              language: language);
+          expect(blocks, findsNWidgets(5), reason: 'five timed tasks');
+          final cut = expectBlocksFit(tester);
+          expect(cut, greaterThan(0),
+              reason: 'at 2× the long titles are cut, with an ellipsis');
+          for (final label in [
+            'Paseo por el parque, 08:30',
+            'Llamar al médico para pedir cita, 10:00',
+            'Recoger a los niños del colegio, 17:00',
+          ]) {
+            expect(block(label), findsOneWidget, reason: 'tooltip «$label»');
+            expect(spoken(label), findsOneWidget, reason: 'TalkBack «$label»');
+          }
+          // Nothing to drag sideways: one lane fills the space by the hours.
+          final sideways = find.descendant(
+              of: hours,
+              matching: find.byWidgetPredicate((w) =>
+                  w is Scrollable && w.axisDirection == AxisDirection.right));
+          expect(sideways, findsOneWidget);
+          expect(
+              tester.state<ScrollableState>(sideways).position.maxScrollExtent,
+              closeTo(0, 0.5),
+              reason: 'one lane always fits');
+          expect(tester.takeException(), isNull);
+          semantics.dispose();
+        });
+      }
+    }
+
+    testWidgets(
+        'UX-2309: at 1x on 360×800 (calendar/timeline.busy, es) both lanes are inside the screen, side by side, and the long title ends with an ellipsis',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      await openDay(tester, tasks: busyDay(), clock: at(0, 9, 41));
+      expect(blocks, findsNWidgets(11), reason: 'eleven timed tasks');
+      final walk = tester.getRect(block('Paseo por el parque, 08:30'));
+      const meeting =
+          'Reunión con el tutor de Lucía para hablar del trimestre y de las notas, 09:00 – 10:00';
+      final talk = tester.getRect(block(meeting));
+      expect((walk.left - talk.left).abs(), greaterThan(20),
+          reason: 'the overlap sits in two lanes: $walk, $talk');
+      expectBlocksFit(tester);
+      final title = tester.renderObject<RenderParagraph>(find
+          .descendant(of: block(meeting), matching: find.byType(Text))
+          .first);
+      expect(title.didExceedMaxLines, isTrue);
+      expect(title.overflow, TextOverflow.ellipsis);
+      expect(spoken(meeting), findsOneWidget,
+          reason: 'TalkBack reads the whole title');
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    });
+
+    for (final language in ['es', 'ca']) {
+      testWidgets(
+          'UX-2309: at 2x on 360×800 (calendar/timeline.busy, $language) when the lanes scroll sideways, the scrollbar is shown without touching',
+          (tester) async {
+        await openDay(tester,
+            tasks: busyDay(), clock: at(0, 9, 41), scale: 2, language: language);
+        final sideways = find.descendant(
+            of: hours,
+            matching: find.byWidgetPredicate((w) =>
+                w is Scrollable && w.axisDirection == AxisDirection.right));
+        expect(sideways, findsOneWidget);
+        final extent =
+            tester.state<ScrollableState>(sideways).position.maxScrollExtent;
+        if (extent > 0.5) {
+          final bars = find
+              .ancestor(of: sideways, matching: find.byType(Scrollbar))
+              .evaluate()
+              .map((e) => e.widget as Scrollbar)
+              .where((bar) => bar.thumbVisibility == true);
+          expect(bars, isNotEmpty,
+              reason: 'lanes scroll sideways by $extent dp: the bar shows');
+        } else {
+          // Nothing to scroll: then both lanes fit inside the screen.
+          expectBlocksFit(tester);
+        }
+        // Each lane still keeps its blocks' starts on the screen's first page.
+        final walk = tester.getRect(block('Paseo por el parque, 08:30'));
+        expect(walk.left, greaterThanOrEqualTo(-0.5));
+        expect(walk.right, lessThanOrEqualTo(tester.view.physicalSize.width + 0.5),
+            reason: 'the first lane fits on screen');
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    // UX-2314: the header follows Calendar's heading rule.
+    final wednesday = DateTime(2026, 10, 28);
+
+    testWidgets(
+        'UX-2314: for a day of the current year the header reads «miércoles, 28 de octubre», on one line at 1x on 360×800, and Calendar’s heading is unchanged',
+        (tester) async {
+      await openDay(tester,
+          tasks: [
+            Task(
+                id: 1,
+                title: 'Paseo por el parque',
+                dueDate: DateTime(2026, 10, 28, 8, 30),
+                priority: 1),
+          ],
+          clock: DateTime(2026, 10, 28, 9, 41),
+          day: wednesday);
+      final header = onDay(find.text('miércoles, 28 de octubre'));
+      expect(header, findsOneWidget);
+      expect(onDay(find.textContaining('2026')), findsNothing,
+          reason: 'the current year goes without saying');
+      final style = Theme.of(tester.element(header)).textTheme.titleMedium;
+      final line = TextPainter(
+          text: TextSpan(text: 'M', style: style),
+          textDirection: TextDirection.ltr,
+          textScaler: MediaQuery.textScalerOf(tester.element(header)))
+        ..layout();
+      expect(tester.getRect(header).height, lessThan(line.height * 1.5),
+          reason: 'one line');
+      line.dispose();
+      // Calendar, under the Día view, still names only the month.
+      final calendar = find.byType(CalendarScreen, skipOffstage: false);
+      expect(
+          find.descendant(
+              of: calendar,
+              matching: find.text('octubre', skipOffstage: false)),
+          findsOneWidget);
+      expect(
+          find.descendant(
+              of: calendar,
+              matching: find.text('octubre de 2026', skipOffstage: false)),
+          findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    for (final (day, heading) in [
+      (DateTime(2027, 1, 13), 'miércoles, 13 de enero de 2027'),
+      (DateTime(2025, 10, 29), 'miércoles, 29 de octubre de 2025'),
+    ]) {
+      testWidgets(
+          'UX-2314: for a day of another year the header keeps the year («$heading»)',
+          (tester) async {
+        await openDay(tester,
+            tasks: const [],
+            clock: DateTime(2026, 10, 28, 9, 41),
+            day: day);
+        expect(onDay(find.text(heading)), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    for (final language in ['ca', 'en']) {
+      testWidgets(
+          'UX-2314: in $language the header drops the current year too',
+          (tester) async {
+        await openDay(tester,
+            tasks: const [],
+            clock: DateTime(2026, 10, 28, 9, 41),
+            day: wednesday,
+            language: language);
+        final arrow = onDay(find.byTooltip(
+            lookupAppLocalizations(Locale(language)).previousDay));
+        final row =
+            find.ancestor(of: arrow, matching: find.byType(Row)).first;
+        final texts = find
+            .descendant(of: row, matching: find.byType(Text))
+            .evaluate()
+            .map((e) => (e.widget as Text).data ?? '')
+            .where((text) => text.contains('28'))
+            .toList();
+        expect(texts, hasLength(1), reason: 'the date heading: $texts');
+        expect(texts.single, isNot(contains('2026')));
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets(
+        'UX-2314: an item without a duration has no bar; one with a duration has its bar inside its block’s rounded shape',
+        (tester) async {
+      await openDay(tester,
+          size: const Size(360, 2400),
+          clock: at(0, 9, 41),
+          tasks: [
+            ...busyDay(),
+            Task(
+                id: 31,
+                title: 'Entregar el informe',
+                priority: 2,
+                deadline: at(0, 14),
+                deadlineHasTime: true),
+          ]);
+      final colors = Theme.of(tester.element(hours)).colorScheme;
+
+      /// What [inBlock] paints in [color]: a box or decoration, not text.
+      List<Element> bars(Finder inBlock, Color color) => find
+          .descendant(
+              of: inBlock,
+              matching: find.byWidgetPredicate((w) =>
+                  (w is ColoredBox && w.color == color) ||
+                  (w is DecoratedBox &&
+                      w.decoration is BoxDecoration &&
+                      (w.decoration as BoxDecoration).color == color) ||
+                  (w is Container && w.color == color)))
+          .evaluate()
+          .toList();
+
+      // Moments: a task at 08:30 and a deadline at 14:00.
+      for (final (label, color) in [
+        ('Paseo por el parque, 08:30', colors.primary),
+        ('Llamar al médico para pedir cita, 10:00', colors.primary),
+      ]) {
+        expect(block(label), findsOneWidget);
+        expect(bars(block(label), color), isEmpty,
+            reason: '«$label» has no duration: no bar');
+      }
+      final deadline = find.descendant(
+          of: hours,
+          matching: find.byWidgetPredicate((w) =>
+              w is Tooltip &&
+              (w.message ?? '').startsWith('${es.deadline}: Entregar el informe')));
+      expect(deadline, findsOneWidget);
+      expect(bars(deadline, colors.tertiary), isEmpty,
+          reason: 'a deadline moment has no bar');
+
+      // An hour: its bar runs its length, inside the block, which clips to
+      // its rounded corners.
+      const meeting =
+          'Reunión con el tutor de Lucía para hablar del trimestre y de las notas, 09:00 – 10:00';
+      final found = bars(block(meeting), colors.primary);
+      expect(found, hasLength(1), reason: 'an hour long: one bar');
+      final bar = tester.getRect(find.byElementPredicate((e) => e == found.single));
+      final shape = tester.getRect(block(meeting));
+      expect(bar.left, greaterThanOrEqualTo(shape.left - 0.5));
+      expect(bar.top, greaterThanOrEqualTo(shape.top - 0.5));
+      expect(bar.bottom, lessThanOrEqualTo(shape.bottom + 0.5));
+      expect(bar.height, closeTo(72, 0.5), reason: '60 minutes at 1.2 dp');
+      final material = tester.widget<Material>(find
+          .ancestor(
+              of: find.byElementPredicate((e) => e == found.single),
+              matching: find.byType(Material))
+          .first);
+      expect(material.clipBehavior, isNot(Clip.none),
+          reason: 'the bar is clipped to the block’s rounded corners');
+      expect(material.borderRadius, BorderRadius.circular(8));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'UX-2314: on the busy day (calendar/timeline.busy, es 1x) TalkBack stops on no hour label, while each block says its time',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      await openDay(tester, tasks: busyDay(), clock: at(0, 9, 41));
+      // The hours are drawn…
+      for (final hour in ['00:00', '08:00', '12:00', '23:00']) {
+        // 00:00 twice: the day's start and its end.
+        expect(onDay(find.text(hour)), findsWidgets, reason: hour);
+      }
+      // …but none is read aloud on its own, nor inside another label.
+      expect(spoken(RegExp(r'^\d{1,2}:\d{2}')), findsNothing,
+          reason: 'no hour label is a TalkBack stop');
+      expect(spoken(RegExp(r'(^|\n)\d{2}:00(\n|$)')), findsNothing);
+      for (final label in [
+        'Paseo por el parque, 08:30',
+        'Reunión con el tutor de Lucía para hablar del trimestre y de las notas, 09:00 – 10:00',
+        'Llamar al médico para pedir cita, 10:00',
+        'Enviar el presupuesto de la reforma de la cocina, 11:00',
+        'Preparar la excursión, 12:00',
+        'Comer con Ana, 13:30',
+        'Farmacia: recoger la receta, 16:30',
+        'Recoger a los niños del colegio, 17:00',
+        'Corregir los ejercicios del tema 4, 18:00',
+        'Clase de yoga, 19:30',
+        'Llamar a la abuela, 20:30',
+      ]) {
+        expect(spoken(label), findsOneWidget, reason: label);
+      }
+      semantics.dispose();
+    });
+  });
+
+  // ---- Run 2026-10-28-app, round 1 · P279 (UX-2313): the Día view's
+  // deadline blocks aren't an alarm ----
+
+  group('P279 · Día view deadline blocks', () {
+    for (final theme in ['light', 'dark']) {
+      for (final (state, offset) in [('passed', -1), ('still ahead', 1)]) {
+        testWidgets(
+            'UX-2313: $theme, a deadline block whose deadline is $state uses the theme’s tertiary colour, never the error colour, and keeps its «${es.deadline}:» prefix',
+            (tester) async {
+          await openDay(tester,
+              day: at(offset),
+              clock: at(0, 9, 41),
+              theme: theme,
+              tasks: [
+                Task(
+                    id: 31,
+                    title: 'Entregar el informe',
+                    priority: 2,
+                    deadline: at(offset, 14),
+                    deadlineHasTime: true),
+              ]);
+          final block = find.descendant(
+              of: hours,
+              matching: find.byWidgetPredicate((w) =>
+                  w is Tooltip &&
+                  (w.message ?? '')
+                      .startsWith('${es.deadline}: Entregar el informe')));
+          expect(block, findsOneWidget);
+          final colors = Theme.of(tester.element(block)).colorScheme;
+          expect(colors.tertiary, isNot(colors.error));
+          final texts = [
+            for (final element in find
+                .descendant(of: block, matching: find.byType(Text))
+                .evaluate())
+              element.widget as Text,
+          ];
+          expect(
+              texts.map((text) => text.data),
+              contains('${es.deadline}: Entregar el informe'));
+          final drawn = texts.map((text) => text.style?.color).toList();
+          expect(drawn, contains(colors.tertiary),
+              reason: 'its time in the tertiary colour');
+          expect(drawn, isNot(contains(colors.error)));
+          expect(
+              find.descendant(
+                  of: block,
+                  matching: find.byWidgetPredicate((w) =>
+                      (w is ColoredBox && w.color == colors.error) ||
+                      (w is Icon && w.color == colors.error))),
+              findsNothing);
+          expect(tester.takeException(), isNull);
+        });
+      }
     }
   });
 }

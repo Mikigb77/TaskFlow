@@ -417,7 +417,8 @@ Future<bool> _switchOn(
                 const SizedBox(height: 16),
                 FilledButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child: Text(context.l10n.allowPreciseAlarms),
+                  child: Text(context.l10n.allowPreciseAlarms,
+                      textAlign: TextAlign.center),
                 ),
                 const SizedBox(height: 8),
                 // Leaves as Back does.

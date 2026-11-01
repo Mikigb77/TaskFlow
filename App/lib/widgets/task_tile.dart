@@ -111,7 +111,7 @@ class TaskTile extends ConsumerWidget {
     final deadline = task.deadline == null
         ? null
         : deadlinePassed
-        ? '${taskDeadlineLabel(context, task)} · ${context.l10n.deadlineOverdue}'
+        ? context.deadlinePassedLine(task)
         : taskDeadlineLabel(context, task);
     // Who a task in a shared project is for, and what TalkBack reads for it.
     final assignee = list?.shared == true
@@ -136,7 +136,7 @@ class TaskTile extends ConsumerWidget {
             task.checklist.length,
           );
     final importance = task.priority > 1
-        ? context.l10n.priorityValue(context.priorityName(task.priority))
+        ? context.priorityPhrase(task.priority)
         : null;
     final notes = (task.notes?.trim().isNotEmpty ?? false) ? task.notes! : null;
     // Each detail under the title, and what TalkBack reads for it.
@@ -145,14 +145,7 @@ class TaskTile extends ConsumerWidget {
         (iconText(Icons.schedule_rounded, when, wraps: true), when),
       if (repeat != null) (iconText(Icons.repeat_rounded, repeat), repeat),
       if (duration != null) (Text(duration, style: small), duration),
-      if (deadline != null)
-        (
-          Text(
-            deadline,
-            style: small.copyWith(color: deadlinePassed ? colors.error : null),
-          ),
-          deadline,
-        ),
+      if (deadline != null) (Text(deadline, style: small), deadline),
       if (list != null && list.id != project)
         (
           ConstrainedBox(
@@ -172,7 +165,6 @@ class TaskTile extends ConsumerWidget {
                 ? Icons.groups_outlined
                 : Icons.person_outline,
             assignee,
-            textColor: unassigned ? colors.error : null,
             semanticsLabel: assigneeSpoken,
             wraps: true,
           ),
@@ -236,7 +228,10 @@ class TaskTile extends ConsumerWidget {
           ? {CustomSemanticsAction(label: context.l10n.reschedule): reschedule}
           : null,
       child: Dismissible(
-        direction: editable
+        // With TalkBack or Switch Access on, the swipe's scroll actions
+        // would complete or move the task unseen: the circle completes and
+        // «Cambiar fecha» stays as the row's custom action.
+        direction: editable && !MediaQuery.accessibleNavigationOf(context)
             ? DismissDirection.horizontal
             : DismissDirection.none,
         key: ValueKey('gesture:${task.id}:${task.occurrenceId}'),
@@ -307,8 +302,6 @@ class TaskTile extends ConsumerWidget {
                         if (!titleOnly) const SizedBox(height: 3),
                         Text(
                           task.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.titleMedium!
                               .copyWith(
                                 color: task.isCompleted

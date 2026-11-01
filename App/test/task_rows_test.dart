@@ -11,7 +11,9 @@ import 'package:agenda/main.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/regional_provider.dart';
+import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/calendar_screen.dart';
+import 'package:agenda/screens/completed_tasks_screen.dart';
 import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/screens/task_detail_screen.dart';
 import 'package:agenda/theme/app_theme.dart';
@@ -516,8 +518,8 @@ void main() {
   test(
     'UX-1418: the Calendar count reads «2 pendientes» with nothing done, and «2 pendientes · 1 completada» with one',
     () {
-      expect(es.agendaCounts(2, 0), '2 pendientes');
-      expect(es.agendaCounts(2, 1), '2 pendientes · 1 completada');
+      expect(es.agendaCounts(2, 0), '2\u00a0pendientes');
+      expect(es.agendaCounts(2, 1), '2\u00a0pendientes · 1\u00a0completada');
       expect(es.agendaCounts(2, 0), isNot(contains('0')));
       for (final language in ['en', 'ca']) {
         final l = lookupAppLocalizations(Locale(language));
@@ -543,7 +545,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.descendant(of: calendar, matching: find.textContaining('0 completadas')),
+        find.descendant(of: calendar, matching: find.textContaining('0\u00a0completadas')),
         findsNothing,
       );
     },
@@ -561,7 +563,7 @@ void main() {
     final label = tester.widget<Text>(
       inRow(
         'Recoger a los niños',
-        find.text(es.priorityValue(context.priorityName(3))),
+        find.text(context.priorityPhrase(3)),
       ),
     );
     expect(label.style?.fontSize, 12);
@@ -1028,6 +1030,800 @@ void main() {
       },
     );
   }
+
+  // ---- Run 2026-10-28-app, round 1 · P279 (UX-2305, UX-1416, UX-2313,
+  // UX-2312, UX-2616): task rows read whole and calm ----
+
+  group('P279 · task rows read whole and calm', () {
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    final en = lookupAppLocalizations(const Locale('en'));
+    AppLocalizations lIn(String language) =>
+        lookupAppLocalizations(Locale(language));
+
+    /// The whole app in [language], on Calendar.
+    Future<ProviderContainer> appIn(
+      WidgetTester tester, {
+      required List<Task> tasks,
+      String language = 'es',
+      List<TaskListInfo> projects = const [],
+      Size size = const Size(360, 800),
+      double scale = 1,
+    }) async {
+      sized(tester, size, scale);
+      final container = containerFor(tasks, projects, language: language);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const MyApp()),
+      );
+      await tester.pumpAndSettle();
+      return container;
+    }
+
+    /// [home] alone, in [language] and [theme].
+    Future<ProviderContainer> pageIn(
+      WidgetTester tester,
+      Widget home, {
+      required List<Task> tasks,
+      String language = 'es',
+      List<TaskListInfo> projects = const [],
+      Size size = const Size(360, 800),
+      double scale = 1,
+      ThemeData? theme,
+    }) async {
+      sized(tester, size, scale);
+      final container = containerFor(tasks, projects, language: language);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: theme ?? AppTheme.light,
+            locale: Locale(language),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(alwaysUse24HourFormat: true),
+              child: child!,
+            ),
+            home: home,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return container;
+    }
+
+    Future<void> showRow(WidgetTester tester, Finder finder) async {
+      await tester.ensureVisible(finder);
+      await tester.pumpAndSettle();
+    }
+
+    /// The laid-out paragraph of the [Text] or [RichText] that [text] finds.
+    RenderParagraph paragraphOf(WidgetTester tester, Finder text) =>
+        tester.renderObject<RenderParagraph>(
+          find
+              .descendant(
+                of: text,
+                matching: find.byType(RichText),
+                matchRoot: true,
+              )
+              .first,
+        );
+
+    /// Every colour the paragraph's text is drawn in.
+    Set<Color?> textColors(RenderParagraph paragraph) {
+      final found = <Color?>{};
+      paragraph.text.visitChildren((span) {
+        if (span is TextSpan && span.text != null) {
+          found.add(span.style?.color ?? paragraph.text.style?.color);
+        }
+        return true;
+      });
+      return found;
+    }
+
+    /// Every piece of text drawn inside [finder], in order.
+    List<String> textsIn(Finder finder) => [
+      for (final element in find
+          .descendant(of: finder, matching: find.byType(RichText))
+          .evaluate())
+        (element.widget as RichText).text.toPlainText(),
+    ];
+
+    /// How many lines the paragraph draws.
+    int lineCount(RenderParagraph paragraph) => paragraph
+        .getBoxesForSelection(
+          TextSelection(
+            baseOffset: 0,
+            extentOffset: paragraph.text.toPlainText().length,
+          ),
+        )
+        .map((box) => box.top.round())
+        .toSet()
+        .length;
+
+    int occurrences(String text, String part) =>
+        part.allMatches(text).length;
+
+    /// A title shown whole: no line limit, nothing past it, inside its row.
+    void expectWhole(WidgetTester tester, Finder title, Finder tile) {
+      expect(tester.widget<Text>(title).maxLines, isNull);
+      final paragraph = paragraphOf(tester, title);
+      expect(paragraph.didExceedMaxLines, isFalse);
+      final rect = tester.getRect(title);
+      final rowRect = tester.getRect(tile);
+      expect(rect.top, greaterThanOrEqualTo(rowRect.top - 0.5));
+      expect(rect.bottom, lessThanOrEqualTo(rowRect.bottom + 0.5));
+      expect(rect.right, lessThanOrEqualTo(rowRect.right + 0.5));
+      // Every character is laid out on a line the paragraph draws.
+      final text = paragraph.text.toPlainText();
+      final boxes = paragraph.getBoxesForSelection(
+        TextSelection(baseOffset: 0, extentOffset: text.length),
+      );
+      expect(boxes, isNotEmpty);
+      expect(
+        boxes.last.bottom,
+        lessThanOrEqualTo(paragraph.size.height + 0.5),
+      );
+    }
+
+    // ---- UX-2305: titles wrap in full; the notes line stays one line ----
+
+    for (final language in ['es', 'ca']) {
+      testWidgets(
+        'UX-2305: $language 2× on 360×800, Calendar (calendar/agenda.normal) shows «Llamar al médico para pedir cita» and «Recoger a los niños del colegio» whole, and the notes line is still one line',
+        (tester) async {
+          await appIn(
+            tester,
+            tasks: fx.normalDay(),
+            language: language,
+            scale: 2,
+          );
+          final calendar = find.byType(CalendarScreen);
+          for (final title in [
+            'Llamar al médico para pedir cita',
+            'Recoger a los niños del colegio',
+          ]) {
+            final tile = find.descendant(of: calendar, matching: row(title));
+            expect(tile, findsOneWidget, reason: title);
+            await showRow(tester, tile);
+            final text = find.descendant(of: tile, matching: find.text(title));
+            expect(text, findsOneWidget, reason: title);
+            expectWhole(tester, text, tile);
+          }
+          // Back to the row with notes: at 2× the list may have let it go.
+          await tester.scrollUntilVisible(
+            row('Llamar al médico para pedir cita'),
+            -100,
+            scrollable: find
+                .descendant(of: calendar, matching: find.byType(Scrollable))
+                .first,
+          );
+          await tester.pumpAndSettle();
+          final notes = find.descendant(
+            of: row('Llamar al médico para pedir cita'),
+            matching: find.text('Preguntar por los resultados de los análisis.'),
+          );
+          expect(notes, findsOneWidget);
+          await showRow(tester, notes);
+          expect(tester.widget<Text>(notes).maxLines, 1);
+          expect(lineCount(paragraphOf(tester, notes)), 1);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'UX-2305: es ${scale}x on 360×800, Tareas (tasks/tasks-tab.normal) shows a 70-character title whole, past two lines where it needs them',
+        (tester) async {
+          const long =
+              'Reunión con el tutor de Lucía para hablar del trimestre y de las notas';
+          await pageIn(
+            tester,
+            const HomeScreen(),
+            scale: scale,
+            tasks: [
+              Task(id: 20, title: long, dueDate: on(1, 9), priority: 1),
+              Task(
+                id: 2,
+                title: 'Llamar al médico para pedir cita',
+                dueDate: on(1, 10),
+                priority: 2,
+              ),
+            ],
+          );
+          for (final title in [long, 'Llamar al médico para pedir cita']) {
+            final tile = row(title);
+            expect(tile, findsOneWidget, reason: title);
+            await showRow(tester, tile);
+            expectWhole(
+              tester,
+              find.descendant(of: tile, matching: find.text(title)),
+              tile,
+            );
+          }
+          if (scale == 2) {
+            final lines = lineCount(
+              paragraphOf(
+                tester,
+                find.descendant(of: row(long), matching: find.text(long)),
+              ),
+            );
+            expect(lines, greaterThan(2), reason: 'it wraps on');
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    // ---- UX-1416: no swipe actions for TalkBack ----
+
+    /// Whether [node] or anything inside it offers a scroll left or right.
+    bool scrollsSideways(SemanticsNode node) {
+      final data = node.getSemanticsData();
+      var found =
+          data.hasAction(SemanticsAction.scrollLeft) ||
+          data.hasAction(SemanticsAction.scrollRight);
+      node.visitChildren((child) {
+        found = found || scrollsSideways(child);
+        return true;
+      });
+      return found;
+    }
+
+    List<String?> customActions(SemanticsNode node) => [
+      for (final id
+          in node.getSemanticsData().customSemanticsActionIds ?? const <int>[])
+        CustomSemanticsAction.getAction(id)!.label,
+    ];
+
+    List<Task> twoToday() => [
+      Task(id: 1, title: 'Comprar fruta', priority: 1, dueDate: on(0, 18)),
+      Task(id: 2, title: 'Llamar a la abuela', priority: 1, dueDate: on(0, 20)),
+    ];
+
+    bool completed(ProviderContainer container, int id) => container
+        .read(taskProvider)
+        .requireValue
+        .firstWhere((task) => task.id == id)
+        .isCompleted;
+
+    /// The swipe background can overflow a one-line row while dragging; known
+    /// and older than this run.
+    void dragOverflowOnly(WidgetTester tester) {
+      final swipe = tester.takeException();
+      expect(
+        swipe == null || '$swipe'.contains('RenderFlex overflowed'),
+        isTrue,
+        reason: '$swipe',
+      );
+    }
+
+    for (final where in ['Calendar', 'Tareas']) {
+      testWidgets(
+        'UX-1416: with accessible navigation on, $where rows have no scroll-left or scroll-right action, keep «Cambiar fecha», and the circle still completes',
+        (tester) async {
+          tester.platformDispatcher.accessibilityFeaturesTestValue =
+              const FakeAccessibilityFeatures(accessibleNavigation: true);
+          addTearDown(
+            tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+          );
+          final semantics = tester.ensureSemantics();
+          final container = where == 'Calendar'
+              ? await appIn(tester, tasks: twoToday())
+              : await pageIn(tester, const HomeScreen(), tasks: twoToday());
+          for (final title in ['Comprar fruta', 'Llamar a la abuela']) {
+            await showRow(tester, row(title));
+            final node = rowNode(tester, title);
+            expect(
+              scrollsSideways(node),
+              isFalse,
+              reason: '«$title» offers no scroll left or right',
+            );
+            expect(customActions(node), contains(es.reschedule), reason: title);
+          }
+          // The circle completes.
+          await tester.tap(inRow('Comprar fruta', find.byType(Checkbox)));
+          await tester.pumpAndSettle();
+          expect(completed(container, 1), isTrue);
+          // «Cambiar fecha» still opens the move sheet.
+          final node = rowNode(tester, 'Llamar a la abuela');
+          final id = node.getSemanticsData().customSemanticsActionIds!
+              .firstWhere(
+                (id) =>
+                    CustomSemanticsAction.getAction(id)!.label == es.reschedule,
+              );
+          tester
+              .renderObject(row('Llamar a la abuela'))
+              .owner!
+              .semanticsOwner!
+              .performAction(node.id, SemanticsAction.customAction, id);
+          await tester.pumpAndSettle();
+          expect(find.byType(BottomSheet), findsOneWidget);
+          expect(find.text(es.rescheduleTask), findsOneWidget);
+          expect(completed(container, 2), isFalse);
+          semantics.dispose();
+        },
+      );
+
+      testWidgets(
+        'UX-1416: with accessible navigation off, a $where row still swipes: right completes it, left opens «Cambiar fecha»',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          final container = where == 'Calendar'
+              ? await appIn(tester, tasks: twoToday())
+              : await pageIn(tester, const HomeScreen(), tasks: twoToday());
+          await showRow(tester, row('Comprar fruta'));
+          expect(
+            scrollsSideways(rowNode(tester, 'Comprar fruta')),
+            isTrue,
+            reason: 'without TalkBack the swipe is still there',
+          );
+          await tester.drag(row('Comprar fruta'), const Offset(300, 0));
+          await tester.pumpAndSettle();
+          dragOverflowOnly(tester);
+          expect(completed(container, 1), isTrue);
+          expect(find.byType(BottomSheet), findsNothing);
+          await showRow(tester, row('Llamar a la abuela'));
+          await tester.drag(row('Llamar a la abuela'), const Offset(-300, 0));
+          await tester.pumpAndSettle();
+          dragOverflowOnly(tester);
+          expect(find.byType(BottomSheet), findsOneWidget);
+          expect(find.text(es.rescheduleTask), findsOneWidget);
+          expect(completed(container, 2), isFalse);
+          semantics.dispose();
+        },
+      );
+    }
+
+    // ---- UX-2313: a passed deadline, said once, in the row's grey ----
+
+    /// Monday 26 October 2026, passed.
+    final mondayGone = DateTime(2026, 10, 26);
+    const renta = 'Entregar la declaración de la renta';
+    Task rentaTask() =>
+        Task(id: 90, title: renta, deadline: mondayGone, priority: 1);
+    final said = {
+      'es': 'Venció el lun, 26 oct',
+      'ca': 'Termini vençut: dl., 26 d’oct.',
+    };
+
+    for (final language in ['es', 'ca']) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets(
+          'UX-2313: $language ${scale}x on 360×800, Tareas: a row whose deadline passed on Mon 26 Oct reads «${said[language]}» once, in the row’s usual grey, and its page says the same',
+          (tester) async {
+            final semantics = tester.ensureSemantics();
+            final l = lIn(language);
+            await pageIn(
+              tester,
+              const HomeScreen(),
+              language: language,
+              scale: scale,
+              tasks: [rentaTask()],
+            );
+            final tile = row(renta);
+            expect(tile, findsOneWidget);
+            await showRow(tester, tile);
+            final context = tester.element(tile);
+            final date = context.weekdayDate(mondayGone);
+            final phrase = l.deadlinePassedOn(date);
+            // The plan wrote ES «Venció el lun, 26 de oct»; the app's weekday
+            // date (DateFormat.MMMEd, as «Vence …» gets it) is «lun, 26 oct».
+            expect(date, startsWith(language == 'es' ? 'lun, 26' : 'dl., 26'));
+            expect(phrase, said[language]);
+            final line = find.descendant(of: tile, matching: find.text(phrase));
+            expect(line, findsOneWidget, reason: 'the row reads «$phrase»');
+            // Once: the date and the «passed» words appear in one phrase.
+            final drawn = textsIn(tile).join(' | ');
+            expect(occurrences(drawn, date), 1, reason: drawn);
+            expect(drawn, isNot(contains(l.deadlineLabel(date))));
+            final heard = spoken(rowNode(tester, renta));
+            expect(occurrences(heard, date), 1, reason: heard);
+            // In the row's usual grey, and nothing in the error colour.
+            final colors = Theme.of(context).colorScheme;
+            expect(
+              textColors(paragraphOf(tester, line)),
+              {colors.onSurfaceVariant},
+            );
+            for (final element in find
+                .descendant(of: tile, matching: find.byType(RichText))
+                .evaluate()) {
+              final paragraph = element.renderObject! as RenderParagraph;
+              expect(
+                textColors(paragraph),
+                isNot(contains(colors.error)),
+                reason: '«${paragraph.text.toPlainText()}»',
+              );
+            }
+            // The task's page says the same phrase, not in the error colour.
+            await tester.tap(tile);
+            await tester.pumpAndSettle();
+            expect(find.byType(TaskDetailScreen), findsOneWidget);
+            final onPage = find.descendant(
+              of: find.byType(TaskDetailScreen),
+              matching: find.textContaining(phrase),
+            );
+            expect(onPage, findsOneWidget);
+            expect(
+              find.descendant(
+                of: find.byType(TaskDetailScreen),
+                matching: find.textContaining(l.deadlineLabel(date)),
+              ),
+              findsNothing,
+            );
+            expect(
+              textColors(paragraphOf(tester, onPage)),
+              isNot(contains(colors.error)),
+            );
+            expect(tester.takeException(), isNull);
+            semantics.dispose();
+          },
+        );
+      }
+    }
+
+    testWidgets(
+      'UX-2313: es, a passed deadline with a time keeps it, as «Vence …» does: «Venció el <weekday date> · 18:00»',
+      (tester) async {
+        final ahead = on(3, 18);
+        await pageIn(
+          tester,
+          const HomeScreen(),
+          size: const Size(360, 1400),
+          tasks: [
+            Task(
+              id: 91,
+              title: renta,
+              deadline: DateTime(2026, 10, 26, 18),
+              deadlineHasTime: true,
+              priority: 1,
+            ),
+            Task(
+              id: 92,
+              title: 'Pagar la factura del gas',
+              deadline: ahead,
+              deadlineHasTime: true,
+              priority: 1,
+            ),
+          ],
+        );
+        final context = tester.element(row(renta));
+        expect(
+          inRow(
+            renta,
+            find.text(
+              es.deadlinePassedOn(
+                '${context.weekdayDate(mondayGone)} · ${context.clockTime(DateTime(2026, 10, 26, 18))}',
+              ),
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          inRow(
+            'Pagar la factura del gas',
+            find.text(
+              es.deadlineLabel(
+                '${context.weekdayDate(ahead)} · ${context.clockTime(ahead)}',
+              ),
+            ),
+          ),
+          findsOneWidget,
+          reason: 'the same date format as a deadline still ahead',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2313: dark theme, es 1x: the passed deadline is in the row’s usual grey, not the error colour',
+      (tester) async {
+        await pageIn(
+          tester,
+          const HomeScreen(),
+          theme: AppTheme.dark,
+          tasks: [rentaTask()],
+        );
+        final tile = row(renta);
+        final context = tester.element(tile);
+        final colors = Theme.of(context).colorScheme;
+        final line = find.descendant(
+          of: tile,
+          matching: find.text(
+            es.deadlinePassedOn(context.weekdayDate(mondayGone)),
+          ),
+        );
+        expect(line, findsOneWidget);
+        expect(
+          textColors(paragraphOf(tester, line)),
+          {colors.onSurfaceVariant},
+        );
+        expect(colors.onSurfaceVariant, isNot(colors.error));
+      },
+    );
+
+    // ---- UX-2312 (a): priority in plain words ----
+
+    for (final language in ['es', 'ca', 'en']) {
+      for (final where in ['Calendar', 'Tareas']) {
+        testWidgets(
+          'UX-2312: $language, $where rows read the priority as a phrase («${lIn(language).priorityValue('high')}», «${lIn(language).priorityValue('medium')}»), and TalkBack reads the same',
+          (tester) async {
+            final semantics = tester.ensureSemantics();
+            final l = lIn(language);
+            final tasks = [
+              Task(
+                id: 4,
+                title: 'Recoger a los niños del colegio',
+                dueDate: on(0, 17),
+                priority: 3,
+              ),
+              Task(
+                id: 2,
+                title: 'Llamar al médico para pedir cita',
+                dueDate: on(0, 10),
+                priority: 2,
+              ),
+            ];
+            if (where == 'Calendar') {
+              await appIn(tester, tasks: tasks, language: language);
+            } else {
+              await pageIn(
+                tester,
+                const HomeScreen(),
+                tasks: tasks,
+                language: language,
+              );
+            }
+            for (final (title, level) in [
+              ('Recoger a los niños del colegio', 'high'),
+              ('Llamar al médico para pedir cita', 'medium'),
+            ]) {
+              final tile = row(title);
+              expect(tile, findsOneWidget, reason: title);
+              await showRow(tester, tile);
+              final phrase = l.priorityValue(level);
+              expect(
+                inRow(title, find.text(phrase)),
+                findsOneWidget,
+                reason: '«$title» reads «$phrase»',
+              );
+              final heard = spoken(rowNode(tester, title));
+              expect(heard, contains(phrase), reason: heard);
+              if (language != 'en') {
+                // Not the standalone name after «Prioridad»: «Prioridad Alta».
+                final name = level == 'high' ? l.high : l.medium;
+                expect(heard, isNot(contains(name)), reason: heard);
+                expect(textsIn(tile).join(' '), isNot(contains(name)));
+              }
+            }
+            expect(tester.takeException(), isNull);
+            semantics.dispose();
+          },
+        );
+      }
+    }
+
+    testWidgets(
+      'UX-2312: the task’s page keeps the standalone «Alta» for its priority',
+      (tester) async {
+        await pageIn(
+          tester,
+          const HomeScreen(),
+          tasks: [
+            Task(
+              id: 4,
+              title: 'Recoger a los niños del colegio',
+              dueDate: on(0, 17),
+              priority: 3,
+            ),
+          ],
+        );
+        await tester.tap(row('Recoger a los niños del colegio'));
+        await tester.pumpAndSettle();
+        final page = find.byType(TaskDetailScreen);
+        expect(page, findsOneWidget);
+        expect(es.high, 'Alta');
+        expect(
+          find.descendant(of: page, matching: find.text(es.high)),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: page,
+            matching: find.textContaining(es.priorityValue('high')),
+          ),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    // ---- UX-2312 (b): the day's count keeps each number with its words ----
+
+    for (final language in ['es', 'ca']) {
+      testWidgets(
+        'UX-2312: $language 2× on 360×800, Calendar (calendar/agenda.normal): the count keeps «4 … · 1 completada», each number on one line with its words',
+        (tester) async {
+          final l = lIn(language);
+          await appIn(
+            tester,
+            tasks: fx.normalDay(),
+            language: language,
+            scale: 2,
+          );
+          final count = find.descendant(
+            of: find.byType(CalendarScreen),
+            matching: find.text(l.agendaCounts(4, 1)),
+          );
+          expect(count, findsOneWidget);
+          final paragraph = paragraphOf(tester, count);
+          final text = paragraph.text.toPlainText();
+          final parts = text.split(' · ');
+          expect(parts, hasLength(2));
+          expect(parts.last, '1 completada');
+          for (final part in parts) {
+            final start = text.indexOf(part);
+            final boxes = paragraph.getBoxesForSelection(
+              TextSelection(baseOffset: start, extentOffset: start + part.length),
+            );
+            expect(boxes, isNotEmpty);
+            expect(
+              boxes.map((box) => box.top.round()).toSet(),
+              hasLength(1),
+              reason: '«$part» on one line',
+            );
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    for (final done in [1, 5]) {
+      testWidgets(
+        'UX-2312: es, a day on Calendar with $done done and nothing left reads «${es.agendaCounts(0, done)}», with no zero',
+        (tester) async {
+          await appIn(
+            tester,
+            size: const Size(360, 1400),
+            tasks: [
+              for (var i = 0; i < done; i++)
+                Task(
+                  id: 30 + i,
+                  title: 'Hecha $i',
+                  dueDate: on(0, 8 + i),
+                  priority: 1,
+                  isCompleted: true,
+                ),
+            ],
+          );
+          final calendar = find.byType(CalendarScreen);
+          expect(
+            find.descendant(
+              of: calendar,
+              matching: find.text(es.agendaCounts(0, done)),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(
+              of: calendar,
+              matching: find.textContaining(es.agendaCounts(0, 0)),
+            ),
+            findsNothing,
+          );
+          expect(es.agendaCounts(0, done), isNot(contains('0')));
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    // ---- UX-2312 (c): Completadas says «Toca» ----
+
+    for (final count in [1, 3]) {
+      testWidgets(
+        'UX-2312: es, Completadas with $count done reads «${es.completedTaskSummary(count)}»',
+        (tester) async {
+          await pageIn(
+            tester,
+            const CompletedTasksScreen(),
+            size: const Size(360, 1400),
+            tasks: [
+              for (var i = 0; i < count; i++)
+                Task(
+                  id: 50 + i,
+                  title: 'Tarea hecha $i',
+                  dueDate: on(-1, 9 + i),
+                  priority: 1,
+                  isCompleted: true,
+                ),
+            ],
+          );
+          expect(find.text(es.completedTaskSummary(count)), findsOneWidget);
+          expect(find.textContaining('Pulsa'), findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    // ---- UX-2616: «Necesita responsable» in the row's usual colour ----
+
+    for (final (language, scale) in [('es', 1.0), ('ca', 2.0)]) {
+      for (final (name, theme) in [
+        ('light', AppTheme.light),
+        ('dark', AppTheme.dark),
+      ]) {
+        testWidgets(
+          'UX-2616: $language ${scale}x $name on 360×800, a project’s page (tasks/project.many-people): «${lIn(language).assignmentNeeded}» is drawn in the row’s usual colour, not the error colour',
+          (tester) async {
+            final l = lIn(language);
+            await pageIn(
+              tester,
+              const HomeScreen(listId: 'excursion', isRoot: false),
+              language: language,
+              scale: scale,
+              theme: theme,
+              projects: fx.allProjects,
+              tasks: [
+                Task(
+                  id: 73,
+                  title: 'Comprar los bocadillos',
+                  dueDate: on(3, 10),
+                  priority: 1,
+                  listId: 'excursion',
+                  assignment: 'unassigned',
+                ),
+                Task(
+                  id: 70,
+                  title: 'Reservar el autobús',
+                  dueDate: on(2, 10),
+                  priority: 1,
+                  listId: 'excursion',
+                  assignment: 'member',
+                  assigneeId: fx.jordi,
+                  assigneeName: 'Jordi',
+                ),
+              ],
+            );
+            final tile = row('Comprar los bocadillos');
+            expect(tile, findsOneWidget);
+            await showRow(tester, tile);
+            final needed = inRow(
+              'Comprar los bocadillos',
+              find.text(l.assignmentNeeded),
+            );
+            expect(needed, findsOneWidget);
+            final colors = Theme.of(tester.element(tile)).colorScheme;
+            final usual = textColors(
+              paragraphOf(
+                tester,
+                inRow('Reservar el autobús', find.text('Jordi')),
+              ),
+            );
+            expect(usual, {colors.onSurfaceVariant});
+            expect(textColors(paragraphOf(tester, needed)), usual);
+            final icon = tester.widget<Icon>(
+              find
+                  .descendant(
+                    of: tile,
+                    matching: find.byIcon(Icons.person_outline),
+                  )
+                  .first,
+            );
+            expect(icon.color, isNot(colors.error));
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+
+    test('P279: the catalogs this group reads from', () {
+      expect(ca.priorityValue('medium'), 'Prioritat mitjana');
+      expect(en.priorityValue('high'), 'High priority');
+    });
+  });
 }
 
 class _GivenTasks extends DesignTaskNotifier {

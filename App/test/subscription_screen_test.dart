@@ -19,6 +19,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/billing_fixtures.dart';
+import 'support/button_label.dart';
+import 'support/icon_button_label.dart';
 import 'support/design_fixtures.dart';
 
 void main() {
@@ -706,6 +708,79 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+
+  // ---- UX loop 2026-10-28-app, round 1 · P289 (UX-2608, UX-2108) ----
+  group('P289 · padded, centred filled buttons', () {
+    for (final language in ['ca', 'es']) {
+      testWidgets(
+        'UX-2608 / UX-2108: $language at 2× on 360×800 (settings/pro.free.$language.light.2x), «Ver suscripción» is at least 58 dp tall, its wrapped lines centred with at least 8 dp above and below',
+        (tester) async {
+          await loadManrope();
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          final l = lookupAppLocalizations(Locale(language));
+          await openPro(
+            tester,
+            sdk: _CountingRevenueCat(),
+            language: language,
+            user: freeUser,
+            textScale: 2,
+          );
+          final offer = find.byKey(const ValueKey('subscription-paywall'));
+          expect(
+            tester.getRect(offer).height,
+            greaterThanOrEqualTo(58),
+            reason: 'the filled button is at least 58 dp tall',
+          );
+          // «Mostra la subscripció» wraps in the render; the Spanish may
+          // not, and is held to the same centring and room when it does.
+          expectCentredPaddedLabel(
+            tester,
+            offer,
+            l.billingViewPlans,
+            wraps: language == 'ca',
+          );
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+        },
+      );
+    }
+  });
+
+  // ---- UX loop 2026-10-28-app, round 2 · P304 (UX-2630) ----
+  group('P304 · icon buttons centre their wrapped labels', () {
+    for (final language in ['ca', 'es']) {
+      testWidgets(
+        'UX-2630: $language at 2× on 360×800 (settings/pro.free.$language.light.2x), the sparkle sits beside «${lookupAppLocalizations(Locale(language)).billingViewPlans}»’s longest line, and icon and label are centred in the button',
+        (tester) async {
+          await loadManrope();
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          final l = lookupAppLocalizations(Locale(language));
+          await openPro(
+            tester,
+            sdk: _CountingRevenueCat(),
+            language: language,
+            user: freeUser,
+            textScale: 2,
+          );
+          final offer = find.byKey(const ValueKey('subscription-paywall'));
+          if (language == 'ca') {
+            expect(
+              labelLines(tester, offer, l.billingViewPlans).length,
+              greaterThanOrEqualTo(2),
+              reason: 'the Catalan wraps here, as in the render',
+            );
+          }
+          expectIconBesideCentredLabel(tester, offer, l.billingViewPlans);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+        },
+      );
+    }
+  });
 }
 
 class _UserAuth extends AuthNotifier {

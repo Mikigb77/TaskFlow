@@ -498,8 +498,8 @@ void calendarPreviews() {
     preview(
       timeline,
       'busy',
-      'A busy day hour by hour, with overlaps side by side.',
-      [es1],
+      'A busy day hour by hour, with overlaps side by side: at 1× both lanes share the space beside the hours; at 2× each keeps 240 dp and they scroll sideways, with the bar showing along the bottom of the hours.',
+      [es1, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(p, tasks: busyDay(), projects: allProjects);
         await app.push('/timeline', arguments: previewToday);

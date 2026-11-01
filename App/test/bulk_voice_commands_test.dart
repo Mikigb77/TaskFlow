@@ -5811,7 +5811,7 @@ void _p235DeadlineOnly() {
       final row = _calendarRow('Pagar la factura del gas');
       expect(row, findsOneWidget);
       expect(tester.widget<TaskTile>(row).color, _litColor(tester));
-      expect(find.textContaining(es.deadlineOverdue), findsNothing);
+      expect(find.textContaining(es.deadlinePassedOn('')), findsNothing);
       expect(
         find.text(es.movedOccurrenceDate(_weekdayDate(tester, day(1)))),
         findsOneWidget,
@@ -6027,7 +6027,7 @@ void _p235DeadlineOnly() {
         find.text(es.commandTasksMovedTo(4, _weekdayDate(tester, day(1)))),
         findsOneWidget,
       );
-      expect(find.textContaining(es.deadlineOverdue), findsNothing);
+      expect(find.textContaining(es.deadlinePassedOn('')), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
@@ -6408,7 +6408,7 @@ void _p240DeadlineRow() {
         expect(
           find.descendant(
             of: gas,
-            matching: find.textContaining(es.deadlineOverdue),
+            matching: find.textContaining(es.deadlinePassedOn('')),
           ),
           findsNothing,
         );

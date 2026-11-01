@@ -81,6 +81,8 @@ class PreviewApp {
     List<TaskListInfo> projects = const [],
     bool hadTask = true,
     bool privacyShown = true,
+    // «A tu manera» has shown its privacy line on this phone.
+    bool reminderPrivacyShown = true,
     SpeechPermission mic = SpeechPermission.granted,
     bool notificationsAllowed = true,
     bool exactAlarms = true,
@@ -184,6 +186,7 @@ class PreviewApp {
               clock: ClockFormat.twentyFour,
               weekStart: 1,
               privacyShown: privacyShown,
+              reminderPrivacyShown: reminderPrivacyShown,
             ),
           ),
         ),

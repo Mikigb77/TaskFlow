@@ -35,7 +35,6 @@ class ListSharingScreen extends ConsumerStatefulWidget {
 
 class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
   bool _busy = false;
-  Object? _error;
   Future<void> _run(
     String action,
     Map<String, dynamic> data, {
@@ -66,17 +65,20 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
     });
   }
 
-  /// Runs [work] with the page busy; a failure shows above the page.
+  /// Runs [work] with the bar under the app bar; a failure comes as the
+  /// floating message, as on Projects, and the page stays as it was.
   Future<void> _guard(Future<void> Function() work) async {
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
+    final messenger = ScaffoldMessenger.of(context);
+    final strings = context.l10n;
+    setState(() => _busy = true);
     try {
       await work();
     } catch (error) {
-      if (mounted) {
-        setState(() => _error = error);
+      if (messenger.mounted) {
+        showFeedback(
+          messenger,
+          requestProblemText(strings, error, keptNote: false),
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -99,33 +101,38 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
         ref.invalidate(taskListsProvider);
       }
     });
-    final code =
-        action == 'invite/' && result is Map && result['code'] is String
-        ? result['code'] as String
-        : null;
-    // An invitation's code shows as soon as the server answers; the sync
-    // runs behind it.
-    if (code == null) {
+    if (deleting || leave) {
+      // The page closes once this phone has caught up.
       await synced;
       if (!mounted || ref.read(authProvider).account?.id != accountId) return;
-    } else {
-      unawaited(synced);
-    }
-    ref.invalidate(listSharingProvider(widget.listId));
-    if (code != null) {
-      // The work is done: no progress bar under “Invitation sent”.
-      setState(() => _busy = false);
-      await showInvitationSent(context, accountId: accountId, code: code);
-      // An account without a name is asked for one, once.
-      if (mounted) {
-        await askForNameOnce(Navigator.of(context), accountId: accountId);
-      }
-    }
-    if (mounted && (deleting || leave)) {
       final messenger = ScaffoldMessenger.of(context);
       // True tells the project page under this one to close as well.
       Navigator.pop(context, true);
       if (done != null) showFeedback(messenger, done);
+      return;
+    }
+    // The page shows the change as soon as the server answers; the sync
+    // runs behind it.
+    unawaited(synced);
+    final code =
+        action == 'invite/' && result is Map && result['code'] is String
+        ? result['code'] as String
+        : null;
+    ref.invalidate(listSharingProvider(widget.listId));
+    if (code == null) {
+      try {
+        await ref.read(listSharingProvider(widget.listId).future);
+      } catch (_) {
+        // The page says it couldn't load, with Retry.
+      }
+      return;
+    }
+    // The work is done: no progress bar under “Invitation sent”.
+    setState(() => _busy = false);
+    await showInvitationSent(context, accountId: accountId, code: code);
+    // An account without a name is asked for one, once.
+    if (mounted) {
+      await askForNameOnce(Navigator.of(context), accountId: accountId);
     }
   }
 
@@ -185,7 +192,11 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: MessageBanner(
-                        requestProblemText(context.l10n, error!),
+                        requestProblemText(
+                          context.l10n,
+                          error!,
+                          keptNote: false,
+                        ),
                         isError: true,
                       ),
                     ),
@@ -215,6 +226,8 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                 ],
               ),
             ),
+            // Stacked at large text, the buttons keep apart.
+            actionsOverflowButtonSpacing: 8,
             actions: [
               TextButton(
                 onPressed: sending ? null : () => Navigator.pop(context),
@@ -277,12 +290,11 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
     final role = member['role'] as String;
     final access = context.listRole(role);
     final danger = Theme.of(context).colorScheme.error;
+    final unnamed = name == null || name == email;
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      title: Text(name ?? email),
-      subtitle: Text(
-        name == null || name == email ? access : '$email · $access',
-      ),
+      title: unnamed ? _address(email) : Text(name),
+      subtitle: unnamed ? Text(access) : _address(email, after: ' · $access'),
       trailing: PopupMenuButton<String>(
         enabled: !_busy,
         tooltip: context.l10n.manageItem(name ?? email),
@@ -324,6 +336,13 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
     );
   }
 
+  /// [address], then [after], wrapping only after «@» or «.»; TalkBack
+  /// reads the address whole.
+  Widget _address(String address, {String after = ''}) => Text(
+    '${breakableAddress(address)}$after',
+    semanticsLabel: '$address$after',
+  );
+
   /// A shared project's own update choice, as a labelled row. A group's
   /// projects keep it in Projects ⋮.
   Widget? _updates(BuildContext context, TaskListInfo? project) {
@@ -352,140 +371,154 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
     appBar: CustomAppBar(
       title: shared ? context.l10n.people : context.l10n.listSharing,
     ),
-    body: ref
-        .watch(listSharingProvider(widget.listId))
-        .when(
-          skipLoadingOnRefresh: false,
-          skipLoadingOnReload: false,
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => ListView(
+    // While a change is on its way, a thin bar under the app bar, in view
+    // at any scroll; it covers the page's margin, so nothing moves.
+    body: Stack(
+      children: [
+        _page(context, shared: shared, local: local),
+        if (_busy)
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: LinearProgressIndicator(minHeight: 2),
+          ),
+      ],
+    ),
+  );
+
+  Widget _page(
+    BuildContext context, {
+    required bool shared,
+    TaskListInfo? local,
+  }) => ref
+      .watch(listSharingProvider(widget.listId))
+      .when(
+        // The page stays on screen while it fetches a change.
+        skipLoadingOnRefresh: true,
+        skipLoadingOnReload: false,
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => ListView(
+          padding: const EdgeInsets.all(24),
+          children: [
+            MessageBanner(
+              requestProblemText(context.l10n, error, keptNote: false),
+              isError: true,
+            ),
+            TextButton(
+              onPressed: () =>
+                  ref.invalidate(listSharingProvider(widget.listId)),
+              child: Text(context.l10n.retry),
+            ),
+          ],
+        ),
+        data: (data) {
+          final list = data['list'] as Map;
+          final owner = list['role'] == 'owner';
+          final danger = Theme.of(context).colorScheme.error;
+          final dangerButton = OutlinedButton.styleFrom(
+            foregroundColor: danger,
+            side: BorderSide(color: danger),
+          );
+          final updates = _updates(context, local);
+          // The sharing endpoint only knows emails; the project's people
+          // know names.
+          final people = local?.people ?? const <ProjectMember>[];
+          final names = {for (final person in people) person.id: person.name};
+          final account = ref.watch(authProvider).account;
+          return ListView(
             padding: const EdgeInsets.all(24),
             children: [
-              MessageBanner(
-                requestProblemText(context.l10n, error),
-                isError: true,
+              Text(
+                list['name'] as String,
+                style: Theme.of(context).textTheme.headlineMedium,
               ),
-              TextButton(
-                onPressed: () =>
-                    ref.invalidate(listSharingProvider(widget.listId)),
-                child: Text(context.l10n.retry),
-              ),
-            ],
-          ),
-          data: (data) {
-            final list = data['list'] as Map;
-            final owner = list['role'] == 'owner';
-            final danger = Theme.of(context).colorScheme.error;
-            final dangerButton = OutlinedButton.styleFrom(
-              foregroundColor: danger,
-              side: BorderSide(color: danger),
-            );
-            final updates = _updates(context, local);
-            // The sharing endpoint only knows emails; the project's people
-            // know names.
-            final people = local?.people ?? const <ProjectMember>[];
-            final names = {for (final person in people) person.id: person.name};
-            final account = ref.watch(authProvider).account;
-            return ListView(
-              padding: const EdgeInsets.all(24),
-              children: [
-                Text(
-                  list['name'] as String,
-                  style: Theme.of(context).textTheme.headlineMedium,
+              const SizedBox(height: 20),
+              if (owner) ...[
+                FilledButton.icon(
+                  key: const ValueKey('invite-person'),
+                  onPressed: _busy
+                      ? null
+                      : () => _invite(list['name'] as String),
+                  icon: const Icon(Icons.person_add_outlined),
+                  label: Text(context.l10n.invitePerson),
                 ),
-                if (_error != null)
-                  MessageBanner(
-                    requestProblemText(context.l10n, _error!),
-                    isError: true,
+                const SizedBox(height: 16),
+                // Once shared, the app bar already reads «Miembros».
+                if (!shared) SectionLabel(context.l10n.people),
+                if ((data['members'] as List).isEmpty)
+                  Text(context.l10n.noOtherMembers)
+                else if (account != null)
+                  // The owner first, so «Miembros · 3» shows 3 rows.
+                  _personRow(
+                    context,
+                    ProjectMember(
+                      id: account.id,
+                      name:
+                          names[account.id] ??
+                          (account.firstName.isEmpty
+                              ? account.email
+                              : account.firstName),
+                      role: 'owner',
+                    ),
+                    you: true,
                   ),
-                if (_busy) const LinearProgressIndicator(),
-                const SizedBox(height: 20),
-                if (owner) ...[
-                  FilledButton.icon(
-                    key: const ValueKey('invite-person'),
-                    onPressed: _busy
-                        ? null
-                        : () => _invite(list['name'] as String),
-                    icon: const Icon(Icons.person_add_outlined),
-                    label: Text(context.l10n.invitePerson),
-                  ),
-                  const SizedBox(height: 16),
-                  // Once shared, the app bar already reads «Miembros».
-                  if (!shared) SectionLabel(context.l10n.people),
-                  if ((data['members'] as List).isEmpty)
-                    Text(context.l10n.noOtherMembers)
-                  else if (account != null)
-                    // The owner first, so «Miembros · 3» shows 3 rows.
-                    _personRow(
-                      context,
-                      ProjectMember(
-                        id: account.id,
-                        name:
-                            names[account.id] ??
-                            (account.firstName.isEmpty
-                                ? account.email
-                                : account.firstName),
-                        role: 'owner',
+                for (final member in data['members'] as List)
+                  _memberRow(context, member as Map, names[member['user_id']]),
+                if ((data['invitations'] as List).isNotEmpty)
+                  SectionLabel(context.l10n.pendingInvitations),
+                for (final invitation in data['invitations'] as List)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: _address(invitation['email'] as String),
+                    subtitle: Text(
+                      context.l10n.pendingRole(
+                        context.listRole(invitation['role'] as String),
                       ),
-                      you: true,
                     ),
-                  for (final member in data['members'] as List)
-                    _memberRow(
-                      context,
-                      member as Map,
-                      names[member['user_id']],
-                    ),
-                  if ((data['invitations'] as List).isNotEmpty)
-                    SectionLabel(context.l10n.pendingInvitations),
-                  for (final invitation in data['invitations'] as List)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(invitation['email'] as String),
-                      subtitle: Text(
-                        context.l10n.pendingRole(
-                          context.listRole(invitation['role'] as String),
+                    trailing: PopupMenuButton<String>(
+                      enabled: !_busy,
+                      tooltip: context.l10n.manageItem(
+                        invitation['email'] as String,
+                      ),
+                      itemBuilder: (_) => [
+                        PopupMenuItem(
+                          value: 'again',
+                          child: Text(context.l10n.sendInvitationAgain),
                         ),
-                      ),
-                      trailing: PopupMenuButton<String>(
-                        enabled: !_busy,
-                        tooltip: context.l10n.manageItem(
-                          invitation['email'] as String,
+                        PopupMenuItem(
+                          value: 'cancel',
+                          child: Text(
+                            context.l10n.cancelInvitation,
+                            style: TextStyle(color: danger),
+                          ),
                         ),
-                        itemBuilder: (_) => [
-                          PopupMenuItem(
-                            value: 'again',
-                            child: Text(context.l10n.sendInvitationAgain),
-                          ),
-                          PopupMenuItem(
-                            value: 'cancel',
-                            child: Text(
-                              context.l10n.cancelInvitation,
-                              style: TextStyle(color: danger),
-                            ),
-                          ),
-                        ],
-                        onSelected: (action) => action == 'again'
-                            ? _run('invite/', {
-                                'email': invitation['email'],
-                                'role': invitation['role'],
-                              })
-                            : _run('revoke_invite/', {
-                                'invitation_id': invitation['id'],
-                              }),
-                      ),
+                      ],
+                      onSelected: (action) => action == 'again'
+                          ? _run('invite/', {
+                              'email': invitation['email'],
+                              'role': invitation['role'],
+                            })
+                          : _run('revoke_invite/', {
+                              'invitation_id': invitation['id'],
+                            }),
                     ),
-                  if (updates != null) updates,
-                  ExpansionTile(
-                    title: Text(context.l10n.howSharingWorks),
-                    tilePadding: EdgeInsets.zero,
-                    children: [
-                      Text(context.l10n.sharingRolesHelp),
-                      const SizedBox(height: 12),
-                      Text(context.l10n.sharedDataHelp),
-                      const SizedBox(height: 12),
-                      Text(context.l10n.sharingRemovalHelp),
-                    ],
                   ),
+                if (updates != null) updates,
+                ExpansionTile(
+                  title: Text(context.l10n.howSharingWorks),
+                  tilePadding: EdgeInsets.zero,
+                  children: [
+                    Text(context.l10n.sharingRolesHelp),
+                    const SizedBox(height: 12),
+                    Text(context.l10n.sharedDataHelp),
+                    const SizedBox(height: 12),
+                    Text(context.l10n.sharingRemovalHelp),
+                  ],
+                ),
+                // Deleting it for everyone ends the sharing, so it stays
+                // here; a project of one's own is deleted from its ⋮.
+                if (shared) ...[
                   const SizedBox(height: 24),
                   OutlinedButton(
                     style: dangerButton,
@@ -496,11 +529,7 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                             if (await groupConfirm(
                               context,
                               context.l10n.deleteList,
-                              shared
-                                  ? context.l10n.deleteListHelp
-                                  : context.l10n.deleteListPrivateHelp(
-                                      list['name'] as String,
-                                    ),
+                              context.l10n.deleteListHelp,
                               destructive: true,
                             )) {
                               if (mounted) {
@@ -513,49 +542,40 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                               }
                             }
                           },
-                    child: Text(
-                      shared
-                          ? context.l10n.deleteListForEveryone
-                          : context.l10n.deleteList,
-                    ),
-                  ),
-                ] else ...[
-                  // Names and roles only: the server gives emails to the
-                  // owner alone. The owner comes first.
-                  for (final person in people)
-                    _personRow(context, person, you: person.id == account?.id),
-                  const SizedBox(height: 16),
-                  if (updates != null) ...[updates, const SizedBox(height: 16)],
-                  OutlinedButton(
-                    style: dangerButton,
-                    onPressed: _busy
-                        ? null
-                        : () async {
-                            final left = context.l10n.youLeft(
-                              list['name'] as String,
-                            );
-                            if (await groupConfirm(
-                              context,
-                              context.l10n.leaveList,
-                              context.l10n.leaveListHelp,
-                              destructive: true,
-                            )) {
-                              if (mounted) {
-                                await _run(
-                                  'leave/',
-                                  {},
-                                  leave: true,
-                                  done: left,
-                                );
-                              }
-                            }
-                          },
-                    child: Text(context.l10n.leaveList),
+                    child: Text(context.l10n.deleteListForEveryone),
                   ),
                 ],
+              ] else ...[
+                // Names and roles only: the server gives emails to the
+                // owner alone. The owner comes first.
+                for (final person in people)
+                  _personRow(context, person, you: person.id == account?.id),
+                const SizedBox(height: 16),
+                if (updates != null) ...[updates, const SizedBox(height: 16)],
+                OutlinedButton(
+                  style: dangerButton,
+                  onPressed: _busy
+                      ? null
+                      : () async {
+                          final left = context.l10n.youLeft(
+                            list['name'] as String,
+                          );
+                          if (await groupConfirm(
+                            context,
+                            context.l10n.leaveList,
+                            context.l10n.leaveListHelp,
+                            destructive: true,
+                          )) {
+                            if (mounted) {
+                              await _run('leave/', {}, leave: true, done: left);
+                            }
+                          }
+                        },
+                  child: Text(context.l10n.leaveList),
+                ),
               ],
-            );
-          },
-        ),
-  );
+            ],
+          );
+        },
+      );
 }

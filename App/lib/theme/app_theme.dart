@@ -92,23 +92,36 @@ abstract final class AppTheme {
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide(color: scheme.primary, width: 2)),
       ),
+      // Filled buttons are the app's main taps: 60 dp tall (UX-2108), with
+      // 12 dp above and below a label that wraps (UX-2608). The density adds
+      // 12 dp to the 48 dp minimum and to the top and bottom padding, and
+      // leaves the default horizontal padding as it is. The form's one
+      // ElevatedButton («Añadir tarea», «Guardar cambios»), the confirming
+      // tap of every free account, matches it.
       filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
-              minimumSize: const Size(48, 52), shape: shape)),
+              minimumSize: const Size(48, 48),
+              visualDensity: const VisualDensity(vertical: 3),
+              shape: shape)),
       elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
               backgroundColor: scheme.primary,
               foregroundColor: scheme.onPrimary,
-              minimumSize: const Size(48, 54),
+              minimumSize: const Size(48, 48),
+              visualDensity: const VisualDensity(vertical: 3),
               elevation: 0,
               shape: shape,
               textStyle: const TextStyle(
                   fontFamily: 'Manrope',
                   fontSize: 15,
                   fontWeight: FontWeight.w700))),
+      // Outlined buttons stay 52 dp at one line: the density adds 8 dp to
+      // the 44 dp minimum, and 8 dp above and below a label that wraps
+      // (UX-2631).
       outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
-              minimumSize: const Size(48, 52),
+              minimumSize: const Size(48, 44),
+              visualDensity: const VisualDensity(vertical: 2),
               shape: shape,
               // `outline`, as chips and fields: a border that shows (3:1).
               side: BorderSide(color: scheme.outline))),

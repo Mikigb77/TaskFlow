@@ -446,7 +446,10 @@ void main() {
       billingLoadingProvider.overrideWithValue(false),
       apiClientProvider.overrideWithValue(api),
       authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
-      attachmentEntriesProvider.overrideWith((ref, taskId) async => []),
+      // A file kept only on the phone, which shows «Subir» (UX-2419).
+      attachmentEntriesProvider.overrideWith((ref, taskId) async => const [
+            AttachmentEntry('resultados.pdf', '/local/resultados.pdf', true)
+          ]),
       regionalStoreProvider.overrideWithValue(MemoryRegionalStore(
           const RegionalPreferences(
               language: 'es', clock: ClockFormat.twentyFour, weekStart: 1))),
@@ -509,7 +512,7 @@ void main() {
   // ---- b7 round 3 · P99 (UX-512): the file size limit says 6 MB everywhere ----
 
   test(
-      'UX-512: fileLocalHelp, fileLimit and requestError(fileLimit) say 6 MB and never MiB in EN, ES and CA; fileLimit still allows 20 files per task',
+      'UX-512: fileLimit and requestError(fileLimit) say 6 MB and never MiB in EN, ES and CA; fileLimit still allows 20 files per task',
       () {
     for (final (language, twenty) in [
       ('en', 'up to 20 files per task'),
@@ -518,7 +521,6 @@ void main() {
     ]) {
       final l = lookupAppLocalizations(Locale(language));
       for (final text in [
-        l.fileLocalHelp,
         l.fileLimit,
         l.requestError('fileLimit'),
       ]) {
@@ -529,12 +531,9 @@ void main() {
     }
     final en = lookupAppLocalizations(const Locale('en'));
     final ca = lookupAppLocalizations(const Locale('ca'));
-    expect(en.fileLocalHelp,
-        'Files stay on this device until you sign in and choose Upload in task details. Up to 6 MB per file.');
     expect(en.fileLimit,
         'Choose a non-empty file up to 6 MB. You can attach up to 20 files per task.');
     expect(en.requestError('fileLimit'), 'Choose a non-empty file up to 6 MB.');
-    expect(ca.fileLocalHelp, endsWith('Fins a 6 MB per fitxer.'));
     expect(ca.requestError('fileLimit'),
         'Tria un fitxer no buit de fins a 6 MB.');
   });
@@ -554,7 +553,7 @@ void main() {
 
   for (final signedIn in [false, true]) {
     testWidgets(
-        'UX-512: the task editor in Spanish, ${signedIn ? 'signed in, says new files upload up to 6 MB each' : 'signed out with a local file, ends its file help with Hasta 6 MB por archivo.'}',
+        'UX-512: the task editor in Spanish, ${signedIn ? 'signed in with a file kept only on the phone, says new files upload up to 6 MB each' : 'signed out with a local file, which offers no «Subir», shows no file help (UX-2419)'}',
         (tester) async {
       tester.view.physicalSize = const Size(390, 1600);
       tester.view.devicePixelRatio = 1;
@@ -567,7 +566,9 @@ void main() {
         apiClientProvider.overrideWithValue(api),
         authProvider.overrideWith((ref) =>
             signedIn ? SignedInFixtureAuth(api) : _SignedOutAuth(api)),
-        attachmentEntriesProvider.overrideWith((ref, taskId) async => []),
+        attachmentEntriesProvider.overrideWith((ref, taskId) async => const [
+              AttachmentEntry('resultados.pdf', '/local/resultados.pdf', true)
+            ]),
         regionalStoreProvider.overrideWithValue(MemoryRegionalStore(
             const RegionalPreferences(
                 language: 'es', clock: ClockFormat.twentyFour, weekStart: 1))),
@@ -604,24 +605,22 @@ void main() {
       await tester.tap(more);
       await tester.pumpAndSettle();
       // The file help shows in the attach sheet, not in the form.
-      final help =
-          find.text(signedIn ? es.fileUploadHelp : es.fileLocalHelp);
+      final help = find.text(es.fileUploadHelp);
       expect(help, findsNothing);
       final attach = find.text(es.addAttachment);
       await tester.scrollUntilVisible(attach, 200, scrollable: scroll);
       await tester.pumpAndSettle();
       await tester.tap(attach);
       await tester.pumpAndSettle();
-      expect(help, findsOneWidget);
-      final shown = tester.widget<Text>(help).data!;
+      expect(find.text(es.attachFile), findsOneWidget);
       if (signedIn) {
+        expect(help, findsOneWidget);
+        final shown = tester.widget<Text>(help).data!;
         expect(shown, contains('hasta 6 MB cada uno'));
-        expect(find.text(es.fileLocalHelp), findsNothing);
+        expect(shown, isNot(contains('MiB')));
       } else {
-        expect(shown, endsWith('Hasta 6 MB por archivo.'));
-        expect(find.text(es.fileUploadHelp), findsNothing);
+        expect(help, findsNothing);
       }
-      expect(shown, isNot(contains('MiB')));
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });
@@ -752,6 +751,129 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
+
+  // ---- Run 2026-10-28-app, round 1 · P281 (UX-2419): the attach sheet
+  // explains files only to a task with one kept only on the phone. ----
+  group('P281 · attach sheet', () {
+    const uploaded = TaskAttachment(
+        id: 'uploaded',
+        taskId: '7',
+        name: 'resultados.pdf',
+        size: 100,
+        sha256: '',
+        remote: true);
+
+    /// A signed-in account's saved task «Médico» in the Spanish edit form,
+    /// whose files are [entries]; its «Añadir adjunto» sheet open.
+    Future<void> openAttachSheet(
+        WidgetTester tester, List<AttachmentEntry> entries) async {
+      tester.view.physicalSize = const Size(390, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final api = OfflineApiClient();
+      final container = ProviderContainer(overrides: [
+        hasProProvider.overrideWithValue(false),
+        billingLoadingProvider.overrideWithValue(false),
+        apiClientProvider.overrideWithValue(api),
+        authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
+        attachmentEntriesProvider.overrideWith((ref, taskId) async => entries),
+        regionalStoreProvider.overrideWithValue(MemoryRegionalStore(
+            const RegionalPreferences(
+                language: 'es', clock: ClockFormat.twentyFour, weekStart: 1))),
+        pendingCapturesProvider.overrideWith((ref) async => []),
+        taskListsProvider.overrideWith((ref) async => []),
+        taskRepositoryProvider.overrideWithValue(_CloudTasks()),
+        taskProvider.overrideWith((ref) => DesignTaskNotifier()),
+        themeStoreProvider.overrideWithValue(MemoryThemeStore()),
+      ]);
+      addTearDown(api.close);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+              locale: const Locale('es'),
+              supportedLocales: AppLocalizations.supportedLocales,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              home: TaskEditor(
+                  task: Task(
+                      id: 7,
+                      title: 'Médico',
+                      priority: 3,
+                      filePaths: const ['/local/resultados.pdf'])))));
+      await tester.pumpAndSettle();
+      final scroll = find
+          .descendant(
+              of: find.byType(TaskEditor), matching: find.byType(Scrollable))
+          .first;
+      final more = find.byKey(const ValueKey('task-more-details'));
+      await tester.scrollUntilVisible(more, 200, scrollable: scroll);
+      await tester.pumpAndSettle();
+      await tester.tap(more);
+      await tester.pumpAndSettle();
+      final attach = find.text(
+          lookupAppLocalizations(const Locale('es')).addAttachment);
+      await tester.scrollUntilVisible(attach, 200, scrollable: scroll);
+      await tester.pumpAndSettle();
+      await tester.tap(attach);
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsOneWidget);
+    }
+
+    /// The sheet's texts, top to bottom.
+    List<String> sheetTexts(WidgetTester tester) => [
+          for (final element in find
+              .descendant(
+                  of: find.byType(BottomSheet), matching: find.byType(Text))
+              .evaluate())
+            (element.widget as Text).data ?? '',
+        ];
+
+    for (final (name, entries) in [
+      ('no files kept on the phone', const <AttachmentEntry>[]),
+      (
+        'only a file already in the account',
+        const [
+          AttachmentEntry('resultados.pdf', '/local/resultados.pdf', true,
+              item: uploaded)
+        ]
+      ),
+      (
+        'a phone-only file that is missing from the phone, so shows no «Subir»',
+        const [AttachmentEntry('resultados.pdf', null, false)]
+      ),
+    ]) {
+      testWidgets(
+          'UX-2419: «Añadir adjunto» on a saved task with $name shows its two rows and no paragraph',
+          (tester) async {
+        final es = lookupAppLocalizations(const Locale('es'));
+        await openAttachSheet(tester, entries);
+        expect(find.text(es.fileUploadHelp), findsNothing);
+        expect(sheetTexts(tester), [es.choosePhoto, es.attachFile]);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+
+    testWidgets(
+        'UX-2419: «Añadir adjunto» on a saved task with a file kept only on the phone, which shows «Subir», shows the paragraph above its two rows',
+        (tester) async {
+      final es = lookupAppLocalizations(const Locale('es'));
+      await openAttachSheet(tester, const [
+        AttachmentEntry('resultados.pdf', '/local/resultados.pdf', true,
+            item: uploaded),
+        AttachmentEntry('receta.pdf', '/local/receta.pdf', true),
+      ]);
+      expect(
+          find.descendant(
+              of: find.byType(BottomSheet),
+              matching: find.text(es.fileUploadHelp)),
+          findsOneWidget);
+      expect(sheetTexts(tester),
+          [es.fileUploadHelp, es.choosePhoto, es.attachFile]);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  });
 }
 
 /// Nobody is signed in: files stay on this phone.

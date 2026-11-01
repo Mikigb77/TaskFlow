@@ -55,6 +55,7 @@ Future<void> showInvitationSent(
                 ],
               )
             : Text(context.l10n.accountChanged),
+        actionsOverflowButtonSpacing: 8,
         actions: [
           if (sameAccount)
             TextButton(
@@ -141,7 +142,7 @@ Future<String?> groupTextDialog(
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: MessageBanner(
-                      requestProblemText(context.l10n, error!),
+                      requestProblemText(context.l10n, error!, keptNote: false),
                       isError: true,
                     ),
                   ),
@@ -155,6 +156,7 @@ Future<String?> groupTextDialog(
                   textInputAction: TextInputAction.done,
                   decoration: InputDecoration(
                     labelText: label ?? title,
+                    counterText: '',
                     // Room for the own-address line at large text.
                     errorMaxLines: 6,
                   ),
@@ -176,6 +178,8 @@ Future<String?> groupTextDialog(
               ],
             ),
           ),
+          // Stacked at large text, the buttons keep apart.
+          actionsOverflowButtonSpacing: 8,
           actions: [
             TextButton(
               onPressed: busy ? null : () => Navigator.pop(context),
@@ -213,6 +217,7 @@ Future<bool> groupConfirm(
   String title,
   String message, {
   bool destructive = false,
+  String? action,
 }) async =>
     await showDialog<bool>(
       context: context,
@@ -220,6 +225,7 @@ Future<bool> groupConfirm(
         scrollable: true,
         title: Text(title),
         content: Text(message),
+        actionsOverflowButtonSpacing: 8,
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -233,7 +239,7 @@ Future<bool> groupConfirm(
                   )
                 : null,
             onPressed: () => Navigator.pop(context, true),
-            child: Text(title),
+            child: Text(action ?? title),
           ),
         ],
       ),
@@ -356,22 +362,25 @@ class GroupScreen extends ConsumerStatefulWidget {
 
 class _GroupScreenState extends ConsumerState<GroupScreen> {
   bool _busy = false;
-  Object? _error;
 
-  /// Runs [work] with the page busy; a failure shows the server's reason
-  /// (already a member, the member limit) above the page.
+  /// Runs [work] with the bar under the app bar; a failure comes as the
+  /// floating message, as on Projects, with the server's reason (already a
+  /// member, the member limit), and the page fetches the group again. The
+  /// page keeps what it shows if that fails too.
   Future<void> _guard(Future<void> Function() work) async {
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
+    final messenger = ScaffoldMessenger.of(context);
+    final strings = context.l10n;
+    setState(() => _busy = true);
     try {
       await work();
     } catch (error) {
-      if (mounted) {
-        setState(() => _error = error);
-        ref.invalidate(groupDetailsProvider(widget.groupId));
+      if (messenger.mounted) {
+        showFeedback(
+          messenger,
+          requestProblemText(strings, error, keptNote: false),
+        );
       }
+      if (mounted) ref.invalidate(groupDetailsProvider(widget.groupId));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -418,29 +427,36 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
   }) async {
     if (!mounted || ref.read(authProvider).account?.id != accountId) return;
     ref.invalidate(groupsProvider);
-    ref.invalidate(groupDetailsProvider(widget.groupId));
     final synced = ref.read(taskProvider.notifier).loadTasks().then((_) {
       if (mounted && ref.read(authProvider).account?.id == accountId) {
         ref.invalidate(taskListsProvider);
       }
     });
-    final code = result is Map && result['code'] is String
-        ? result['code'] as String
-        : null;
-    // An invitation's code shows as soon as the server answers; the sync
-    // runs behind it.
-    if (code == null) {
+    if (leave) {
+      // The page closes once this phone has caught up.
       await synced;
       if (!mounted || ref.read(authProvider).account?.id != accountId) return;
-    } else {
-      unawaited(synced);
-    }
-    final messenger = ScaffoldMessenger.of(context);
-    if (leave) {
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.pop(context);
       if (done != null) showFeedback(messenger, done);
       return;
     }
+    // The page shows the change as soon as the server answers; the sync
+    // runs behind it.
+    unawaited(synced);
+    final code = result is Map && result['code'] is String
+        ? result['code'] as String
+        : null;
+    ref.invalidate(groupDetailsProvider(widget.groupId));
+    if (code == null) {
+      try {
+        await ref.read(groupDetailsProvider(widget.groupId).future);
+      } catch (_) {
+        // The page keeps what it shows.
+      }
+      if (!mounted || ref.read(authProvider).account?.id != accountId) return;
+    }
+    final messenger = ScaffoldMessenger.of(context);
     if (done != null) {
       showFeedback(
         messenger,
@@ -562,10 +578,7 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
         child: ListView(
           shrinkWrap: true,
           children: [
-            ListTile(
-              title: Text(context.l10n.groupTransfer),
-              subtitle: Text(context.l10n.groupTransferHelp),
-            ),
+            ListTile(title: Text(context.l10n.groupTransfer)),
             for (final member in group.people.where(
               (p) => p.id != group.ownerId,
             ))
@@ -580,8 +593,9 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
     if (person == null || !mounted) return;
     if (await groupConfirm(
           context,
-          '${context.l10n.groupTransfer}: ${person.name}',
+          context.l10n.groupTransferConfirm(group.name, person.name),
           context.l10n.groupTransferHelp,
+          action: context.l10n.groupTransferAction(person.name),
         ) &&
         mounted) {
       await _run('transfer/', {'user_id': person.id, 'version': group.version});
@@ -590,18 +604,54 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
 
   /// This member's own name for voice assignments. The owner's account name
   /// serves for them, so the server refuses one for the owner.
-  Future<void> _voiceName(ProjectMember me) async {
-    final name = await groupTextDialog(
+  Future<void> _voiceName(ProjectMember me) => _sendTyped(
+    context.l10n.groupVoiceName,
+    help: context.l10n.groupVoiceHelp,
+    value: me.voiceName,
+    allowEmpty: true,
+    maxLength: 60,
+    send: (name) => ('profile/', {'voice_name': name}, 'POST'),
+  );
+
+  Future<void> _rename(TaskGroupInfo group) => _sendTyped(
+    context.l10n.groupName,
+    value: group.name,
+    send: (name) => (
+      '',
+      {'name': name, 'archived': group.archived, 'version': group.version},
+      'PUT',
+    ),
+  );
+
+  /// A text step whose dialog sends [send]'s request itself, as `_invite`
+  /// does: it stays open until the server answers, so a failure keeps what
+  /// was typed and says why. Then the page refreshes.
+  Future<void> _sendTyped(
+    String title, {
+    required (String, Map<String, dynamic>, String) Function(String value) send,
+    String? help,
+    String value = '',
+    bool allowEmpty = false,
+    int maxLength = 80,
+  }) async {
+    final accountId = ref.read(authProvider).account?.id;
+    if (_busy || accountId == null) return;
+    Object? result;
+    final typed = await groupTextDialog(
       context,
-      context.l10n.groupVoiceName,
-      help: context.l10n.groupVoiceHelp,
-      value: me.voiceName,
-      allowEmpty: true,
-      maxLength: 60,
+      title,
+      help: help,
+      value: value,
+      allowEmpty: allowEmpty,
+      maxLength: maxLength,
+      submit: (text) async {
+        final (action, data, method) = send(text);
+        result = await _request(accountId, action, data, method: method);
+        return true;
+      },
     );
-    if (name != null && mounted) {
-      await _run('profile/', {'voice_name': name});
-    }
+    if (typed == null || !mounted) return;
+    await _guard(() => _applied(accountId, result));
   }
 
   /// The group's name: from its page or, while that loads, from the list.
@@ -620,301 +670,319 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: CustomAppBar(title: _title(context)),
-    body: ref
-        .watch(groupDetailsProvider(widget.groupId))
-        .when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              LoadFailed(
-                onRetry: () =>
-                    ref.invalidate(groupDetailsProvider(widget.groupId)),
-              ),
-            ],
+    // While a change is on its way, a thin bar under the app bar, in view
+    // at any scroll; it covers the page's margin, so nothing moves.
+    body: Stack(
+      children: [
+        _page(context),
+        if (_busy)
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: LinearProgressIndicator(minHeight: 2),
           ),
-          data: (details) {
-            final group = TaskGroupInfo.fromJson(
-              Map<String, dynamic>.from(details['group']),
-            );
-            final me = ref.watch(authProvider).account?.id;
-            final projects = (ref.watch(taskListsProvider).valueOrNull ?? [])
-                .where((p) => p.groupId == group.id);
-            final invitations = details['invitations'] as List? ?? [];
-            return RefreshIndicator(
-              onRefresh: () async {
-                ref.invalidate(groupDetailsProvider(widget.groupId));
-                await ref.read(taskProvider.notifier).loadTasks();
-              },
-              child: ListView(
-                padding: const EdgeInsets.all(24),
-                children: [
-                  if (_error != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: MessageBanner(
-                        requestProblemText(context.l10n, _error!),
-                        isError: true,
-                      ),
-                    ),
-                  if (_busy) const LinearProgressIndicator(),
-                  if (_error != null || _busy) const SizedBox(height: 20),
-                  Text(
+      ],
+    ),
+  );
+
+  Widget _page(BuildContext context) => ref
+      .watch(groupDetailsProvider(widget.groupId))
+      .when(
+        // A fetch that fails after a failed change keeps the page as it
+        // was; only a page that never loaded says so.
+        skipError: true,
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => ListView(
+          padding: const EdgeInsets.all(24),
+          children: [
+            LoadFailed(
+              onRetry: () =>
+                  ref.invalidate(groupDetailsProvider(widget.groupId)),
+            ),
+          ],
+        ),
+        data: (details) {
+          final group = TaskGroupInfo.fromJson(
+            Map<String, dynamic>.from(details['group']),
+          );
+          final me = ref.watch(authProvider).account?.id;
+          final projects = (ref.watch(taskListsProvider).valueOrNull ?? [])
+              .where((p) => p.groupId == group.id);
+          final invitations = details['invitations'] as List? ?? [];
+          return RefreshIndicator(
+            // Offline, the page keeps what it shows and says why, as an
+            // action's failure does.
+            onRefresh: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              final strings = context.l10n;
+              ref.invalidate(groupDetailsProvider(widget.groupId));
+              try {
+                await ref.read(groupDetailsProvider(widget.groupId).future);
+              } catch (error) {
+                if (mounted) {
+                  showFeedback(
+                    messenger,
+                    requestProblemText(strings, error, keptNote: false),
+                  );
+                }
+              }
+              await ref.read(taskProvider.notifier).loadTasks();
+            },
+            child: ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                // The page's main action first, as on a project's Miembros.
+                if (group.canManage) ...[
+                  FilledButton.icon(
+                    key: const ValueKey('invite-person'),
+                    onPressed: _busy ? null : () => _invite(group),
+                    icon: const Icon(Icons.person_add_outlined),
+                    label: Text(context.l10n.invitePerson),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+                Semantics(
+                  header: true,
+                  child: Text(
                     context.l10n.groupMembers,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
-                  for (final person in group.people)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.person_outline),
-                      title: Text(
-                        person.id == me
-                            ? context.l10n.personYou(person.name)
-                            : person.name,
-                      ),
-                      subtitle: Text(groupRoleLabel(context, person.role)),
-                      trailing: person.id == me && person.id != group.ownerId
-                          ? PopupMenuButton<String>(
-                              enabled: !_busy,
-                              tooltip: context.l10n.manageItem(person.name),
-                              itemBuilder: (_) => [
-                                PopupMenuItem(
-                                  value: 'voice',
-                                  child: Text(context.l10n.groupVoiceName),
-                                ),
-                              ],
-                              onSelected: (_) => _voiceName(person),
-                            )
-                          : group.canManage &&
-                                person.id != group.ownerId &&
-                                (group.role == 'owner' ||
-                                    person.role != 'admin')
-                          ? IconButton(
-                              tooltip: context.l10n.manageItem(person.name),
-                              icon: const Icon(Icons.manage_accounts_outlined),
-                              onPressed: _busy
-                                  ? null
-                                  : () => _member(group, person),
-                            )
-                          : null,
+                ),
+                for (final person in group.people)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.person_outline),
+                    title: Text(
+                      person.id == me
+                          ? context.l10n.personYou(person.name)
+                          : person.name,
                     ),
-                  if (invitations.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Text(
+                    subtitle: Text(groupRoleLabel(context, person.role)),
+                    trailing: person.id == me && person.id != group.ownerId
+                        ? PopupMenuButton<String>(
+                            enabled: !_busy,
+                            tooltip: context.l10n.manageItem(person.name),
+                            itemBuilder: (_) => [
+                              PopupMenuItem(
+                                value: 'voice',
+                                child: Text(context.l10n.groupVoiceName),
+                              ),
+                            ],
+                            onSelected: (_) => _voiceName(person),
+                          )
+                        : group.canManage &&
+                              person.id != group.ownerId &&
+                              (group.role == 'owner' || person.role != 'admin')
+                        ? IconButton(
+                            tooltip: context.l10n.manageItem(person.name),
+                            icon: const Icon(Icons.manage_accounts_outlined),
+                            onPressed: _busy
+                                ? null
+                                : () => _member(group, person),
+                          )
+                        : null,
+                  ),
+                if (invitations.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Semantics(
+                    header: true,
+                    child: Text(
                       context.l10n.groupInvited,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
-                    for (final invitation in invitations)
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.schedule_send_outlined),
-                        title: Text(invitation['email']),
-                        subtitle: Text(context.l10n.invitationPending),
-                        trailing: PopupMenuButton<String>(
-                          enabled: !_busy,
-                          tooltip: context.l10n.manageItem(
-                            invitation['email'] as String,
+                  ),
+                  for (final invitation in invitations)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.schedule_send_outlined),
+                      title: Text(
+                        breakableAddress(invitation['email'] as String),
+                        semanticsLabel: invitation['email'] as String,
+                      ),
+                      subtitle: Text(context.l10n.invitationPending),
+                      trailing: PopupMenuButton<String>(
+                        enabled: !_busy,
+                        tooltip: context.l10n.manageItem(
+                          invitation['email'] as String,
+                        ),
+                        itemBuilder: (_) => [
+                          PopupMenuItem(
+                            value: 'again',
+                            child: Text(context.l10n.sendInvitationAgain),
                           ),
-                          itemBuilder: (_) => [
-                            PopupMenuItem(
-                              value: 'again',
-                              child: Text(context.l10n.sendInvitationAgain),
-                            ),
-                            PopupMenuItem(
-                              value: 'cancel',
-                              child: Text(
-                                context.l10n.cancelInvitation,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.error,
-                                ),
+                          PopupMenuItem(
+                            value: 'cancel',
+                            child: Text(
+                              context.l10n.cancelInvitation,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
                               ),
                             ),
-                          ],
-                          onSelected: (action) => action == 'again'
-                              ? _run('invite/', {
-                                  'email': invitation['email'],
-                                  'role': invitation['role'] ?? 'editor',
-                                })
-                              : _run('revoke_invite/', {
-                                  'invitation_id': invitation['id'],
-                                }),
-                        ),
+                          ),
+                        ],
+                        onSelected: (action) => action == 'again'
+                            ? _run('invite/', {
+                                'email': invitation['email'],
+                                'role': invitation['role'] ?? 'editor',
+                              })
+                            : _run('revoke_invite/', {
+                                'invitation_id': invitation['id'],
+                              }),
                       ),
-                  ],
-                  if (group.canManage) ...[
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: _busy ? null : () => _invite(group),
-                      icon: const Icon(Icons.person_add_outlined),
-                      label: Text(context.l10n.invitePerson),
                     ),
-                  ],
-                  const SizedBox(height: 24),
-                  Text(
+                ],
+                const SizedBox(height: 24),
+                Semantics(
+                  header: true,
+                  child: Text(
                     context.l10n.groupProjects,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
-                  for (final project in projects)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.folder_outlined),
-                      title: Text(project.name),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              HomeScreen(isRoot: false, listId: project.id),
-                        ),
+                ),
+                for (final project in projects)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.folder_outlined),
+                    title: Text(project.name),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            HomeScreen(isRoot: false, listId: project.id),
                       ),
                     ),
-                  if (group.canManage && !group.archived)
-                    TextButton.icon(
-                      onPressed: () async {
-                        try {
-                          await ref.read(groupsProvider.future);
-                        } catch (_) {
-                          // The form says when the group can't be reached.
-                        }
-                        if (context.mounted) {
-                          await createProject(context, ref, groupId: group.id);
-                        }
-                      },
-                      icon: const Icon(Icons.add),
-                      label: Text(context.l10n.newList),
+                  ),
+                if (group.canManage && !group.archived)
+                  TextButton.icon(
+                    onPressed: () async {
+                      try {
+                        await ref.read(groupsProvider.future);
+                      } catch (_) {
+                        // The form says when the group can't be reached.
+                      }
+                      if (context.mounted) {
+                        await createProject(context, ref, groupId: group.id);
+                      }
+                    },
+                    icon: const Icon(Icons.add),
+                    label: Text(context.l10n.newList),
+                  ),
+                const Divider(height: 40),
+                if (group.canManage) ...[
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(context.l10n.groupRename),
+                    leading: const Icon(Icons.edit_outlined),
+                    onTap: _busy ? null : () => _rename(group),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      group.archived
+                          ? context.l10n.groupRestore
+                          : context.l10n.groupArchive,
                     ),
-                  const Divider(height: 40),
-                  if (group.canManage) ...[
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(context.l10n.groupRename),
-                      leading: const Icon(Icons.edit_outlined),
-                      onTap: _busy
-                          ? null
-                          : () async {
-                              final name = await groupTextDialog(
-                                context,
-                                context.l10n.groupName,
-                                value: group.name,
-                              );
-                              if (name != null && mounted) {
-                                await _run('', {
-                                  'name': name,
-                                  'archived': group.archived,
-                                  'version': group.version,
-                                }, method: 'PUT');
-                              }
+                    leading: const Icon(Icons.inventory_2_outlined),
+                    onTap: _busy
+                        ? null
+                        : () => _run(
+                            '',
+                            {
+                              'name': group.name,
+                              'archived': !group.archived,
+                              'version': group.version,
                             },
-                    ),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        group.archived
-                            ? context.l10n.groupRestore
-                            : context.l10n.groupArchive,
-                      ),
-                      leading: const Icon(Icons.inventory_2_outlined),
-                      onTap: _busy
-                          ? null
-                          : () => _run(
-                              '',
-                              {
+                            method: 'PUT',
+                            done: group.archived
+                                ? null
+                                : context.l10n.groupArchivedForEveryone(
+                                    group.name,
+                                  ),
+                            undo: (result) {
+                              if (!mounted || result is! Map) return;
+                              _run('', {
                                 'name': group.name,
-                                'archived': !group.archived,
-                                'version': group.version,
-                              },
-                              method: 'PUT',
-                              done: group.archived
-                                  ? null
-                                  : context.l10n.groupArchivedForEveryone(
-                                      group.name,
-                                    ),
-                              undo: (result) {
-                                if (!mounted || result is! Map) return;
-                                _run('', {
-                                  'name': group.name,
-                                  'archived': false,
-                                  'version': result['version'],
-                                }, method: 'PUT');
-                              },
-                            ),
-                    ),
-                  ],
-                  if (group.role == 'owner') ...[
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(context.l10n.groupTransfer),
-                      leading: const Icon(Icons.swap_horiz),
-                      onTap: _busy ? null : () => _transfer(group),
-                    ),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        context.l10n.delete,
-                        style: group.projectCount == 0
-                            ? TextStyle(
-                                color: Theme.of(context).colorScheme.error,
-                              )
-                            : null,
-                      ),
-                      subtitle: Text(context.l10n.groupDeleteHelp),
-                      leading: Icon(
-                        Icons.delete_outline,
-                        color: group.projectCount == 0
-                            ? Theme.of(context).colorScheme.error
-                            : null,
-                      ),
-                      onTap: _busy || group.projectCount != 0
-                          ? null
-                          : () async {
-                              final deleted = context.l10n.groupDeleted;
-                              if (await groupConfirm(
-                                    context,
-                                    context.l10n.delete,
-                                    context.l10n.groupDeleteHelp,
-                                    destructive: true,
-                                  ) &&
-                                  mounted) {
-                                await _run(
-                                  '',
-                                  {'version': group.version},
-                                  method: 'DELETE',
-                                  leave: true,
-                                  done: deleted,
-                                );
-                              }
+                                'archived': false,
+                                'version': result['version'],
+                              }, method: 'PUT');
                             },
-                    ),
-                  ] else
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      textColor: Theme.of(context).colorScheme.error,
-                      iconColor: Theme.of(context).colorScheme.error,
-                      title: Text(context.l10n.groupLeave),
-                      leading: const Icon(Icons.logout),
-                      onTap: _busy
-                          ? null
-                          : () async {
-                              final left = context.l10n.youLeft(group.name);
-                              if (await groupConfirm(
-                                    context,
-                                    context.l10n.groupLeave,
-                                    context.l10n.groupLeaveHelp,
-                                    destructive: true,
-                                  ) &&
-                                  mounted) {
-                                await _run(
-                                  'leave/',
-                                  {},
-                                  leave: true,
-                                  done: left,
-                                );
-                              }
-                            },
-                    ),
+                          ),
+                  ),
                 ],
-              ),
-            );
-          },
-        ),
-  );
+                if (group.role == 'owner') ...[
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(context.l10n.groupTransfer),
+                    leading: const Icon(Icons.swap_horiz),
+                    onTap: _busy ? null : () => _transfer(group),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      context.l10n.groupDeleteAction,
+                      style: group.projectCount == 0
+                          ? TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            )
+                          : null,
+                    ),
+                    // Why the row is off; an empty group needs no reason.
+                    subtitle: group.projectCount == 0
+                        ? null
+                        : Text(context.l10n.groupDeleteHelp),
+                    leading: Icon(
+                      Icons.delete_outline,
+                      color: group.projectCount == 0
+                          ? Theme.of(context).colorScheme.error
+                          : null,
+                    ),
+                    onTap: _busy || group.projectCount != 0
+                        ? null
+                        : () async {
+                            final deleted = context.l10n.groupDeleted;
+                            if (await groupConfirm(
+                                  context,
+                                  context.l10n.groupDeleteAction,
+                                  context.l10n.groupDeleteConfirm(group.name),
+                                  destructive: true,
+                                ) &&
+                                mounted) {
+                              await _run(
+                                '',
+                                {'version': group.version},
+                                method: 'DELETE',
+                                leave: true,
+                                done: deleted,
+                              );
+                            }
+                          },
+                  ),
+                ] else
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    textColor: Theme.of(context).colorScheme.error,
+                    iconColor: Theme.of(context).colorScheme.error,
+                    title: Text(context.l10n.groupLeave),
+                    leading: const Icon(Icons.logout),
+                    onTap: _busy
+                        ? null
+                        : () async {
+                            final left = context.l10n.youLeft(group.name);
+                            if (await groupConfirm(
+                                  context,
+                                  context.l10n.groupLeave,
+                                  context.l10n.groupLeaveHelp,
+                                  destructive: true,
+                                ) &&
+                                mounted) {
+                              await _run('leave/', {}, leave: true, done: left);
+                            }
+                          },
+                  ),
+              ],
+            ),
+          );
+        },
+      );
 }

@@ -19,6 +19,7 @@ class RegionalPreferences {
     this.speechLanguage = sameAsApp,
     this.speechOnline = false,
     this.privacyShown = false,
+    this.reminderPrivacyShown = false,
   });
 
   /// [speechLanguage] when speech follows the app's language.
@@ -39,6 +40,10 @@ class RegionalPreferences {
   /// The capture sheet has shown its privacy line, the first time the
   /// microphone was used on this device.
   final bool privacyShown;
+
+  /// The reminder sheet has shown the same line under «A tu manera»'s field,
+  /// the first time it was opened on this device (Pro).
+  final bool reminderPrivacyShown;
   Map<String, dynamic> toJson() => {
         'language': language,
         'clock': clock.name,
@@ -47,6 +52,7 @@ class RegionalPreferences {
         'speechLanguage': speechLanguage,
         'speechOnline': speechOnline,
         'privacyShown': privacyShown,
+        'reminderPrivacyShown': reminderPrivacyShown,
       };
   factory RegionalPreferences.fromJson(Map<String, dynamic> json) =>
       RegionalPreferences(
@@ -71,6 +77,7 @@ class RegionalPreferences {
             : sameAsApp,
         speechOnline: json['speechOnline'] == true,
         privacyShown: json['privacyShown'] == true,
+        reminderPrivacyShown: json['reminderPrivacyShown'] == true,
       );
   RegionalPreferences _copy({
     String? language,
@@ -80,6 +87,7 @@ class RegionalPreferences {
     String? speechLanguage,
     bool? speechOnline,
     bool? privacyShown,
+    bool? reminderPrivacyShown,
   }) =>
       RegionalPreferences(
         language: language ?? this.language,
@@ -90,6 +98,8 @@ class RegionalPreferences {
         speechLanguage: speechLanguage ?? this.speechLanguage,
         speechOnline: speechOnline ?? this.speechOnline,
         privacyShown: privacyShown ?? this.privacyShown,
+        reminderPrivacyShown:
+            reminderPrivacyShown ?? this.reminderPrivacyShown,
       );
   RegionalPreferences withLanguage(String value) => _copy(language: value);
   RegionalPreferences withClock(ClockFormat value) => _copy(clock: value);
@@ -102,6 +112,8 @@ class RegionalPreferences {
   RegionalPreferences withSpeechOnline(bool value) =>
       _copy(speechOnline: value);
   RegionalPreferences withPrivacyShown() => _copy(privacyShown: true);
+  RegionalPreferences withReminderPrivacyShown() =>
+      _copy(reminderPrivacyShown: true);
   Locale localeFor(List<Locale>? devices) =>
       AppLanguages.resolve(language, devices);
 }

@@ -759,77 +759,6 @@ void main() {
     },
   );
 
-  testWidgets(
-    'UX-1639: at 2x on 360×800, a date-only task saved from Thursday’s Día view, below another «Sin hora» row, lights whole inside «Sin hora», on screen, with Thursday’s 08:30 task still showing',
-    (tester) async {
-      tester.platformDispatcher.textScaleFactorTestValue = 2;
-      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-      final start = monday();
-      final thursday = plus(start, 3);
-      await _App.open(
-        tester,
-        clock: start,
-        size: const Size(360, 800),
-        tasks: [
-          Task(
-            id: 1,
-            title: 'Paseo por el parque',
-            dueDate: DateTime(thursday.year, thursday.month, thursday.day, 8, 30),
-            priority: 1,
-          ),
-          Task(
-            id: 2,
-            title: 'Pagar la factura de la luz',
-            dueDate: thursday,
-            hasTime: false,
-            priority: 2,
-          ),
-        ],
-      );
-      unawaited(
-        Navigator.of(
-          tester.element(find.byType(CalendarScreen)),
-        ).pushNamed('/timeline', arguments: thursday),
-      );
-      await tester.pumpAndSettle();
-      final timeline = find.byType(DayTimelineScreen);
-      expect(timeline, findsOneWidget);
-      await openForm(tester);
-      expect(selected(tester, 'new-task-pick-day'), isTrue);
-      await typeTitle(tester, 'Regar las plantas');
-      await tapSave(tester);
-
-      expect(timeline.hitTestable(), findsWidgets);
-      final untimed = find.byKey(const ValueKey('timeline-untimed'));
-      final saved = find.descendant(
-        of: untimed,
-        matching: row('Regar las plantas'),
-      );
-      expect(saved, findsOneWidget, reason: 'listed under «Sin hora»');
-      expect(tester.widget<TaskTile>(saved).color, lit(tester));
-      final area = tester.getRect(untimed);
-      final rect = tester.getRect(saved);
-      expect(
-        rect.top >= area.top - 0.5 && rect.bottom <= area.bottom + 0.5,
-        isTrue,
-        reason: 'the whole lit row inside «Sin hora»: row $rect, area $area',
-      );
-      final actions = tester.getRect(
-        find.descendant(of: timeline, matching: find.byType(TaskActions)),
-      );
-      expect(rect.bottom, lessThanOrEqualTo(actions.top + 0.5),
-          reason: 'above the add button');
-      final walk = find.byTooltip('Paseo por el parque, 08:30');
-      expect(walk, findsOneWidget);
-      final hours = tester.getRect(find.byKey(const ValueKey('timeline-scroll')));
-      final block = tester.getRect(walk);
-      expect(block.top >= hours.top - 0.5 && block.bottom <= hours.bottom + 0.5,
-          isTrue,
-          reason: 'the 08:30 task still shows: block $block, hours $hours');
-      expect(tester.takeException(), isNull);
-    },
-  );
-
   // D7: a task added under a person's chip is theirs, and stays under it.
   Future<_App> openFamiliaOnAna(WidgetTester tester) async {
     final app = await _App.open(
@@ -1064,7 +993,6 @@ void main() {
       final sheet = find.byType(BottomSheet);
       expect(sheet, findsOneWidget);
       expect(find.text(es.fileUploadHelp), findsNothing);
-      expect(find.text(es.fileLocalHelp), findsNothing);
       expect(
         find.descendant(of: sheet, matching: find.text(es.choosePhoto)),
         findsOneWidget,
@@ -1729,7 +1657,12 @@ void main() {
         layout = titleLayout(tester);
         expect(layout.lines, 4);
         expect(layout.whole, isTrue, reason: 'all of it shows');
-        final first = tester.getRect(title());
+        // The words' first line, under the field's label: the 8 dp between
+        // the day chips' rows (UX-2413) may scroll the label's top edge by
+        // a few dp, never the words.
+        final first = tester.getRect(
+          find.descendant(of: title(), matching: find.byType(EditableText)),
+        );
         expect(first.top, greaterThanOrEqualTo(0), reason: '«Llamar» shows');
 
         await tester.showKeyboard(title());
@@ -2163,7 +2096,7 @@ void main() {
     );
 
     testWidgets(
-      'UX-1006: an existing task’s «Añadir adjunto» sheet still explains its files in a paragraph',
+      'UX-1006, UX-2419: an existing task’s «Añadir adjunto» sheet with no file kept only on the phone is its two rows, with no paragraph',
       (tester) async {
         await _App.open(
           tester,
@@ -2183,16 +2116,10 @@ void main() {
         await tester.pumpAndSettle();
         final sheet = find.byType(BottomSheet);
         expect(sheet, findsOneWidget);
-        final paragraphs =
-            find
-                .descendant(of: sheet, matching: find.text(es.fileLocalHelp))
-                .evaluate()
-                .length +
-            find
-                .descendant(of: sheet, matching: find.text(es.fileUploadHelp))
-                .evaluate()
-                .length;
-        expect(paragraphs, 1);
+        expect(
+          find.descendant(of: sheet, matching: find.text(es.fileUploadHelp)),
+          findsNothing,
+        );
         expect(
           find.descendant(of: sheet, matching: find.text(es.attachFile)),
           findsOneWidget,
@@ -2510,6 +2437,406 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  });
+
+  // ---- Run 2026-10-28-app, round 1 · P281 (UX-2406, UX-2413, UX-2414):
+  // the edit form keeps its edits when Android closes the app, the day
+  // chips sit 8 dp apart, and the title's keyboard key never saves. ----
+  group('P281 · task form', () {
+    void leaveApp(WidgetTester tester) {
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+    }
+
+    void returnToApp(WidgetTester tester) {
+      for (final state in [
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+    }
+
+    Task doctor() =>
+        Task(id: 1, title: 'Médico', priority: 1, dueDate: tomorrow);
+
+    Future<void> openEdit(WidgetTester tester) async {
+      unawaited(
+        Navigator.of(
+          tester.element(find.byType(CalendarScreen)),
+        ).pushNamed('/editTask', arguments: 1),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(TaskEditor), findsOneWidget);
+    }
+
+    Task stored(_App app) =>
+        app.tasks.state.requireValue.singleWhere((task) => task.id == 1);
+
+    String shownTitle(WidgetTester tester) => tester
+        .widget<EditableText>(
+          find.descendant(of: title(), matching: find.byType(EditableText)),
+        )
+        .controller
+        .text;
+
+    testWidgets(
+      'UX-2406: editing a saved task, a new title is saved when the app goes to the background, with no message; back in the app the form is still open with it; Back says «Cambios guardados» with Deshacer, and Deshacer brings back the title the form opened with',
+      (tester) async {
+        final app = await _App.open(tester, tasks: [doctor()]);
+        await openEdit(tester);
+        await typeTitle(tester, 'Médico a las 10');
+        expect(stored(app).title, 'Médico', reason: 'typing saves nothing');
+
+        leaveApp(tester);
+        await tester.pumpAndSettle();
+        expect(stored(app).title, 'Médico a las 10', reason: 'saved on pause');
+        expect(find.byType(SnackBar), findsNothing, reason: 'it says nothing');
+
+        returnToApp(tester);
+        await tester.pumpAndSettle();
+        expect(find.byType(TaskEditor), findsOneWidget, reason: 'still open');
+        expect(shownTitle(tester), 'Médico a las 10');
+
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byType(TaskEditor), findsNothing);
+        final message = find.byType(SnackBar);
+        expect(
+          find.descendant(of: message, matching: find.text(es.changesSaved)),
+          findsOneWidget,
+        );
+        final undo = find.descendant(of: message, matching: find.text(es.undo));
+        expect(undo, findsOneWidget);
+        expect(stored(app).title, 'Médico a las 10');
+
+        await tester.tap(undo);
+        await tester.pumpAndSettle();
+        expect(
+          stored(app).title,
+          'Médico',
+          reason:
+              'Deshacer restores the task as the form opened it, not as '
+              'the background save left it',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2406: an untouched edit form, and one whose title was emptied, save nothing when the app goes to the background',
+      (tester) async {
+        final original = doctor();
+        final app = await _App.open(tester, tasks: [original]);
+        await openEdit(tester);
+
+        leaveApp(tester);
+        await tester.pumpAndSettle();
+        returnToApp(tester);
+        await tester.pumpAndSettle();
+        expect(
+          identical(stored(app), original),
+          isTrue,
+          reason: 'an untouched form saves nothing',
+        );
+        expect(find.byType(TaskEditor), findsOneWidget);
+
+        await typeTitle(tester, '');
+        leaveApp(tester);
+        await tester.pumpAndSettle();
+        returnToApp(tester);
+        await tester.pumpAndSettle();
+        expect(
+          identical(stored(app), original),
+          isTrue,
+          reason: 'a form with no title saves nothing',
+        );
+        expect(stored(app).title, 'Médico');
+        expect(find.byType(TaskEditor), findsOneWidget);
+        expect(find.byType(SnackBar), findsNothing);
+
+        await typeTitle(tester, '   ');
+        leaveApp(tester);
+        await tester.pumpAndSettle();
+        expect(identical(stored(app), original), isTrue, reason: 'spaces');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2414: in the edit form, the keyboard’s Done key on the title closes the keyboard and leaves the form open, saving nothing',
+      (tester) async {
+        final original = doctor();
+        final app = await _App.open(tester, tasks: [original]);
+        await openEdit(tester);
+        await tester.showKeyboard(title());
+        await tester.enterText(title(), 'Médico de cabecera');
+        await tester.pumpAndSettle();
+        expect(focused(tester), isTrue);
+
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        expect(find.byType(TaskEditor), findsOneWidget, reason: 'still open');
+        expect(focused(tester), isFalse, reason: 'the keyboard is down');
+        expect(tester.testTextInput.hasAnyClients, isFalse);
+        expect(shownTitle(tester), 'Médico de cabecera');
+        expect(identical(stored(app), original), isTrue, reason: 'not saved');
+        expect(find.text(es.changesSaved), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2414: in the new form, the keyboard’s Done key on the title still only closes the keyboard',
+      (tester) async {
+        final app = await _App.open(tester);
+        await openForm(tester);
+        expect(focused(tester), isTrue);
+        await typeTitle(tester, 'Regar las plantas');
+
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        expect(find.byType(TaskEditor), findsOneWidget, reason: 'still open');
+        expect(focused(tester), isFalse, reason: 'the keyboard is down');
+        expect(tester.testTextInput.hasAnyClients, isFalse);
+        expect(shownTitle(tester), 'Regar las plantas');
+        expect(app.tasks.state.requireValue, isEmpty, reason: 'not saved');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    /// No two of [chips] closer than 8 dp: side by side in a row, or one
+    /// row above the next.
+    void expectGaps(WidgetTester tester, Finder chips, String reason) {
+      final rects = [
+        for (final element in chips.evaluate())
+          tester.getRect(find.byWidget(element.widget)),
+      ];
+      expect(rects.length, greaterThan(1), reason: reason);
+      for (var i = 0; i < rects.length; i++) {
+        for (var j = i + 1; j < rects.length; j++) {
+          final a = rects[i];
+          final b = rects[j];
+          final sameRow = a.top < b.bottom && b.top < a.bottom;
+          final gap = sameRow
+              ? (a.left < b.left ? b.left - a.right : a.left - b.right)
+              : (a.top < b.top ? b.top - a.bottom : a.top - b.bottom);
+          expect(
+            gap,
+            greaterThanOrEqualTo(8 - 0.01),
+            reason:
+                '$reason: chips $i and $j are ${gap.toStringAsFixed(1)} '
+                'dp apart (${sameRow ? 'side by side' : 'between rows'})',
+          );
+        }
+      }
+    }
+
+    for (final (language, scale) in [('es', 1.3), ('es', 2.0), ('ca', 2.0)]) {
+      testWidgets(
+        'UX-2413: the filled new form ($language, ${scale}x, 360 dp) keeps Hoy, Mañana and Elegir día at least 8 dp apart, and the Elegir día sheet’s day chips too',
+        (tester) async {
+          final l = strings(language);
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          await _App.open(
+            tester,
+            language: language,
+            size: const Size(360, 800),
+          );
+          await openForm(tester, l);
+          await typeTitle(tester, 'Llamar al médico');
+          await tester.tap(chip('new-task-tomorrow'));
+          await tester.pumpAndSettle();
+          expect(selected(tester, 'new-task-tomorrow'), isTrue);
+          final days = find.byWidgetPredicate(
+            (widget) =>
+                widget is ChoiceChip &&
+                [
+                  const ValueKey('new-task-today'),
+                  const ValueKey('new-task-tomorrow'),
+                  const ValueKey('new-task-pick-day'),
+                ].contains(widget.key),
+          );
+          expect(days, findsNWidgets(3));
+          expectGaps(tester, days, 'the form’s day chips');
+
+          await tester.ensureVisible(chip('new-task-pick-day'));
+          await tester.pumpAndSettle();
+          await tester.tap(chip('new-task-pick-day'));
+          await tester.pumpAndSettle();
+          final sheetDays = find.descendant(
+            of: find.byType(BottomSheet),
+            matching: find.byType(ChoiceChip),
+          );
+          expectGaps(tester, sheetDays, 'the Elegir día sheet’s day chips');
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  });
+
+  // P289: the taller «Añadir tarea» (60 dp, padded) wraps in the test font at
+  // 2×, which a phone never does; so this measures with Manrope, as the
+  // phone does.
+  group('P289 · UX-1639 with Manrope', () {
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    });
+
+    testWidgets(
+      'UX-1639: at 2x on 360×800, a date-only task saved from Thursday’s Día view, below another «Sin hora» row, lights whole inside «Sin hora», on screen, with Thursday’s 08:30 task still showing',
+      (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final start = monday();
+        final thursday = plus(start, 3);
+        await _App.open(
+          tester,
+          clock: start,
+          size: const Size(360, 800),
+          tasks: [
+            Task(
+              id: 1,
+              title: 'Paseo por el parque',
+              dueDate: DateTime(thursday.year, thursday.month, thursday.day, 8, 30),
+              priority: 1,
+            ),
+            Task(
+              id: 2,
+              title: 'Pagar la factura de la luz',
+              dueDate: thursday,
+              hasTime: false,
+              priority: 2,
+            ),
+          ],
+        );
+        unawaited(
+          Navigator.of(
+            tester.element(find.byType(CalendarScreen)),
+          ).pushNamed('/timeline', arguments: thursday),
+        );
+        await tester.pumpAndSettle();
+        final timeline = find.byType(DayTimelineScreen);
+        expect(timeline, findsOneWidget);
+        await openForm(tester);
+        expect(selected(tester, 'new-task-pick-day'), isTrue);
+        await typeTitle(tester, 'Regar las plantas');
+        await tapSave(tester);
+
+        expect(timeline.hitTestable(), findsWidgets);
+        final untimed = find.byKey(const ValueKey('timeline-untimed'));
+        final saved = find.descendant(
+          of: untimed,
+          matching: row('Regar las plantas'),
+        );
+        expect(saved, findsOneWidget, reason: 'listed under «Sin hora»');
+        expect(tester.widget<TaskTile>(saved).color, lit(tester));
+        final area = tester.getRect(untimed);
+        final rect = tester.getRect(saved);
+        expect(
+          rect.top >= area.top - 0.5 && rect.bottom <= area.bottom + 0.5,
+          isTrue,
+          reason: 'the whole lit row inside «Sin hora»: row $rect, area $area',
+        );
+        final actions = tester.getRect(
+          find.descendant(of: timeline, matching: find.byType(TaskActions)),
+        );
+        expect(rect.bottom, lessThanOrEqualTo(actions.top + 0.5),
+            reason: 'above the add button');
+        final walk = find.byTooltip('Paseo por el parque, 08:30');
+        expect(walk, findsOneWidget);
+        final hours = tester.getRect(find.byKey(const ValueKey('timeline-scroll')));
+        final block = tester.getRect(walk);
+        expect(block.top >= hours.top - 0.5 && block.bottom <= hours.bottom + 0.5,
+            isTrue,
+            reason: 'the 08:30 task still shows: block $block, hours $hours');
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- UX loop 2026-10-28-app, round 2 · P304 (UX-2108) ----
+  group('P304 · the form’s primary is 60 dp', () {
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    });
+
+    testWidgets(
+      'UX-2108: es 1× on 360×800 (form/new-task.empty, .filled), «Añadir tarea» and then «Añadir al calendario» are at least 58 dp tall, and as tall as Nueva tarea’s filled button',
+      (tester) async {
+        await _App.open(tester, size: const Size(360, 800));
+        final newTask = find.widgetWithText(FilledButton, es.newTask);
+        expect(newTask, findsOneWidget);
+        final filled = tester.getRect(newTask).height;
+        expect(filled, greaterThanOrEqualTo(58));
+        await openForm(tester);
+        expect(buttonLabel(tester), es.captureAddTask);
+        expect(tester.getRect(save()).height, greaterThanOrEqualTo(58));
+        expect(tester.getRect(save()).height, closeTo(filled, 0.5));
+        await typeTitle(tester, 'Llamar al médico');
+        await tester.tap(chip('new-task-tomorrow'));
+        await tester.pumpAndSettle();
+        expect(buttonLabel(tester), es.captureAddToCalendar,
+            reason: 'with a day the button says where the task goes');
+        expect(tester.getRect(save()).height, greaterThanOrEqualTo(58));
+        expect(save().hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final language in ['es', 'ca']) {
+      testWidgets(
+        'UX-2108: $language 2× on 360×740 with a 300 dp keyboard up and a title typed (form/new-task.keyboard), the title field and the 60 dp «${strings(language).captureAddTask}» both show above the keyboard and can be tapped',
+        (tester) async {
+          tester.platformDispatcher.textScaleFactorTestValue = 2;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          const size = Size(360, 740);
+          final l = strings(language);
+          await _App.open(tester, language: language, size: size);
+          await openForm(tester, l);
+          tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+          addTearDown(tester.view.resetViewInsets);
+          await tester.pumpAndSettle();
+          await typeTitle(tester, 'Llamar al médico');
+          expect(focused(tester), isTrue);
+          expect(tester.testTextInput.isVisible, isTrue, reason: 'keyboard up');
+          const keyboardTop = 740.0 - 300;
+          final field = tester.getRect(
+            find.descendant(of: title(), matching: find.byType(EditableText)),
+          );
+          expect(field.top, greaterThanOrEqualTo(0), reason: 'title $field');
+          expect(field.bottom, lessThanOrEqualTo(keyboardTop + 0.5),
+              reason: 'title $field above the keyboard');
+          expect(find.text('Llamar al médico').hitTestable(), findsOneWidget);
+          final add = tester.getRect(save());
+          expect(buttonLabel(tester), l.captureAddTask);
+          expect(add.height, greaterThanOrEqualTo(58), reason: 'button $add');
+          expect(add.top, greaterThanOrEqualTo(field.bottom - 0.5),
+              reason: 'the button doesn’t cover the title');
+          expect(add.bottom, lessThanOrEqualTo(keyboardTop + 0.5),
+              reason: 'button $add above the keyboard');
+          expect(save().hitTestable(), findsOneWidget);
+          expect(tester.takeException(), isNull, reason: 'no overflow');
+        },
+      );
+    }
   });
 }
 

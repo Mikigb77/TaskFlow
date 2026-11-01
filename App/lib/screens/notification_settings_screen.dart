@@ -251,7 +251,8 @@ class _NotificationSettingsScreenState
                     FilledButton(
                         onPressed:
                             _busy ? null : access.openNotificationSettings,
-                        child: Text(context.l10n.allowNotifications))
+                        child: Text(context.l10n.allowNotifications,
+                            textAlign: TextAlign.center))
                   )
             : !_capability.exact
                 ? (
@@ -263,7 +264,8 @@ class _NotificationSettingsScreenState
                                 await access.requestExactAccess();
                                 if (mounted) _load();
                               },
-                        child: Text(context.l10n.allowPreciseAlarms))
+                        child: Text(context.l10n.allowPreciseAlarms,
+                            textAlign: TextAlign.center))
                   )
                 : (null, null);
     return Scaffold(

@@ -1,3 +1,4 @@
+import 'package:agenda/l10n/region.dart';
 import 'package:agenda/l10n/request_locale.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -8,6 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/design_fixtures.dart';
+import 'support/address_wrap.dart';
+import 'support/no_counter.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/groups_provider.dart';
@@ -77,7 +80,9 @@ void main() {
         await tester.pumpAndSettle();
         expect(api.accepted, isNull);
         expect(
-          find.text('Signed in as design@example.invalid'),
+          find.text(
+            'Signed in as ${breakableAddress('design@example.invalid')}',
+          ),
           findsOneWidget,
         );
         if (available) {
@@ -348,7 +353,7 @@ void main() {
       expect(find.byType(InvitationReviewScreen), findsOneWidget);
       expect(find.text(es.invitationReviewHelp), findsOneWidget);
       expect(
-        find.text(es.signedInAs('design@example.invalid')),
+        find.text(es.signedInAs(breakableAddress('design@example.invalid'))),
         findsOneWidget,
       );
       expect(find.textContaining('a continuación'), findsNothing);
@@ -707,7 +712,7 @@ void main() {
       final dialog = find.byType(AlertDialog);
       expect(dialog, findsOneWidget);
       expect(codeInField(tester), pasted);
-      final problem = requestProblemText(es, failure);
+      final problem = requestProblemText(es, failure, keptNote: false);
       expect(problem, isNotEmpty);
       expect(errorUnderField(tester), problem);
       expect(
@@ -1082,6 +1087,150 @@ void main() {
       },
     );
   }
+
+  group('P284 · invitation page', () {
+    // Measure wrapping in the app's own font, not the square test font.
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+    });
+
+    /// The button whose label is [label], on the invitation page.
+    Finder button(String label) => find.ancestor(
+      of: inReview(find.text(label)),
+      matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+    );
+
+    void expectApart(WidgetTester tester, Finder upper, Finder lower) {
+      expect(upper, findsOneWidget);
+      expect(lower, findsOneWidget);
+      final a = tester.getRect(upper);
+      final b = tester.getRect(lower);
+      expect(
+        b.top - a.bottom,
+        greaterThanOrEqualTo(7.99),
+        reason: 'the buttons stand ${(b.top - a.bottom).toStringAsFixed(1)} dp apart',
+      );
+    }
+
+    testWidgets(
+      'UX-2511: the offline invitation page reads «No hay conexión. Revisa el wifi o los datos móviles e inténtalo de nuevo.» with nothing after it',
+      (tester) async {
+        const network =
+            'No hay conexión. Revisa el wifi o los datos móviles e inténtalo de nuevo.';
+        expect(es.requestError('network'), network);
+        await _openApp(tester, _OfflineInvitations(), link: comprasLink);
+        expect(find.byType(InvitationReviewScreen), findsOneWidget);
+        expect(inReview(find.text(network)), findsOneWidget);
+        expect(
+          inReview(find.textContaining('Tus tareas siguen guardadas')),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'UX-2518: (es, ${scale}x, 360x800) «Aceptar invitación» and «Ahora no» stand 8 dp or more apart',
+        (tester) async {
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          await _openApp(
+            tester,
+            _Invitations(lists: [anaInvitation]),
+            link: comprasLink,
+          );
+          tester.view.physicalSize = const Size(360, 800);
+          await tester.pumpAndSettle();
+          expect(find.byType(InvitationReviewScreen), findsOneWidget);
+          expectApart(
+            tester,
+            button(es.acceptInvitation),
+            button(es.invitationNotNow),
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+
+      testWidgets(
+        'UX-2518: (es, ${scale}x, 360x800) offline, «Reintentar» and «Ahora no» stand 8 dp or more apart',
+        (tester) async {
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          await _openApp(tester, _OfflineInvitations(), link: comprasLink);
+          tester.view.physicalSize = const Size(360, 800);
+          await tester.pumpAndSettle();
+          expect(find.byType(InvitationReviewScreen), findsOneWidget);
+          expectApart(
+            tester,
+            button(es.tryAgain),
+            button(es.invitationNotNow),
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+
+      testWidgets(
+        'UX-2513: (es, ${scale}x, 360x800) «Sesión iniciada como …» wraps the address only after «@» or «.», and TalkBack reads it whole',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          await _openApp(
+            tester,
+            _Invitations(lists: [anaInvitation]),
+            link: comprasLink,
+          );
+          tester.view.physicalSize = const Size(360, 800);
+          await tester.pumpAndSettle();
+          const address = 'design@example.invalid';
+          final line = inReview(
+            find.text(es.signedInAs(breakableAddress(address))),
+          );
+          expect(line, findsOneWidget);
+          expectAddressWrapsWhole(tester, line, address);
+          expect(spokenLabel(tester, line), es.signedInAs(address));
+          expect(tester.getRect(line).right, lessThanOrEqualTo(360.5));
+          semantics.dispose();
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  });
+
+  group('P285 · invitation code shows no counter', () {
+    testWidgets(
+      'UX-2505: the join dialog’s code field shows no 0/128 or 43/128 counter, reads out no Quedan … caracteres, and still stops at 128',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await _openApp(tester, _Invitations(lists: [comprasInvitation]));
+        await tester.tap(card('Compras'));
+        await tester.pumpAndSettle();
+        final dialog = find.byType(AlertDialog);
+        final field = find.descendant(
+          of: dialog,
+          matching: find.byKey(const ValueKey('accept-invitation-code')),
+        );
+        expect(field, findsOneWidget);
+        // A link's code is 43 characters: it would have read «43/128».
+        await tester.enterText(field, 'c' * 43);
+        await tester.pump();
+        expect(find.text('43/128'), findsNothing);
+        expect(
+          find.descendant(of: dialog, matching: find.textContaining(counterText)),
+          findsNothing,
+        );
+        expect(find.bySemanticsLabel(counterSpeech), findsNothing);
+        await tester.enterText(field, '');
+        await tester.pump();
+        await expectNoCounter(tester, 128);
+        semantics.dispose();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }
 
 /// The server can't be reached: every request fails as offline.

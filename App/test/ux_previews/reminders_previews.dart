@@ -117,10 +117,12 @@ Future<PreviewApp> _detail(
   int? hour,
   Task? task,
   DateTime? at,
+  bool reminderPrivacyShown = true,
 }) async {
   final app = await PreviewApp.open(
     p,
     pro: pro,
+    reminderPrivacyShown: reminderPrivacyShown,
     user: pro ? null : account(freeLeft: 4),
     billing: pro ? null : (FakeRevenueCat()..info = billingInfo()),
     tasks: [
@@ -187,7 +189,7 @@ void remindersPreviews() {
     preview(
       planSheet,
       'strength',
-      '«Hasta la fecha límite» tapped: Suave · Normal · Intenso with Normal chosen, the plan in words, the strip of dots from today to the day, the count and the next reminder («13 avisos · próximo: mañana, 09:00»), and Listo.',
+      '«Hasta la fecha límite» tapped: Suave · Normal · Intenso with Normal chosen, the plan in words, the strip of dots from today to the day, the count and the next reminder («13 avisos · próximo: mañana, 09:00»), and Listo. On this personal task «Recordatorio» stays at the top as the sheet opens scrolled to the plan, with a thin line under it and no «solo para ti» line.',
       [es1, es2, esDark, ca2, en2],
       (p) async {
         final app = await _detail(p);
@@ -213,10 +215,10 @@ void remindersPreviews() {
     preview(
       planSheet,
       'your-way',
-      '«A tu manera» with Pro: the words typed, as the assistant read them (the field\'s example, «Por ejemplo: …», gives way to the plan), with what the plan gives and Listo, brought into view by the sheet itself.',
+      '«A tu manera» with Pro, opened for the first time on this phone: the words typed, as the assistant read them (the field\'s example, «Por ejemplo: …», gives way to the plan), and under the field the line «Tus palabras van a la IA de Google. Más en Otros ajustes › Voz.», with what the plan gives and Listo, brought into view by the sheet itself. «Recordatorio» stays at the top, with a thin line under it.',
       [es1, es2, ca2],
       (p) async {
-        final app = await _detail(p);
+        final app = await _detail(p, reminderPrivacyShown: false);
         app.api.handlers['POST ai/reminder-plan/'] = (data) => {
           'reminder_plan': _ownWords(data!['text'] as String),
         };

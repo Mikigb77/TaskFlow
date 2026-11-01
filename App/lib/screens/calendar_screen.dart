@@ -74,6 +74,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   Timer? _recheck;
   bool _revealing = false;
   bool _watchQueued = false;
+  // Where a return to today put the agenda, while it checks it stays there.
+  double? _heldTop;
   // The gap after the last row. It grows to the save message's height while
   // a landing lasts, so the last rows can scroll clear of the message.
   double _end = 20;
@@ -287,6 +289,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
 
   /// A scroll can bring a lit row into view: look once it's laid out.
   void _scrolled() {
+    // The person scrolled: a return to today no longer holds the top.
+    if (_heldTop != null && _scroll.position.pixels != _heldTop) {
+      _heldTop = null;
+    }
     if (!_highlight || _revealing || _watchQueued) return;
     _watchQueued = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -411,11 +417,28 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     }
     _picked = false;
     _select(Task.day(now));
-    // Jump, never animate: the person wasn't looking.
+    _holdTop();
+  }
+
+  /// Jumps the agenda to its top after the next frame; jump, never animate:
+  /// the person wasn't looking. The rows built for the day shown before keep
+  /// their old places until the list lays them out again from the top, and
+  /// it then corrects the offset, silently and by an amount that depends on
+  /// every row's height. So the jump is checked on the frame after, and made
+  /// again while such a correction moved it and the person hasn't scrolled.
+  void _holdTop({int tries = 3, bool check = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _scroll.hasClients) {
-        _scroll.jumpTo(_scroll.position.minScrollExtent);
-      }
+      if (!mounted || !_scroll.hasClients) return;
+      final position = _scroll.position;
+      final held = _heldTop;
+      _heldTop = null;
+      // It stayed, or the person has scrolled since: their offset stays.
+      if (check && (held == null || position.pixels == held)) return;
+      if (tries == 0) return;
+      final top = position.minScrollExtent;
+      _heldTop = top;
+      _scroll.jumpTo(top);
+      _holdTop(tries: tries - 1, check: true);
     });
   }
 

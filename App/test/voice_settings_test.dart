@@ -1196,8 +1196,7 @@ void main() {
         reason: 'paragraph $end, scroll view ${viewport()}',
       );
 
-      // Scrolled back to the paragraph's top: its first line is whole, and so
-      // is the whole new sentence, at once.
+      // Scrolled back to the paragraph's top: its first line is whole.
       await tester.ensureVisible(privacy);
       await tester.pumpAndSettle();
       final top = tester.getRect(privacy);
@@ -1207,6 +1206,17 @@ void main() {
         reason: 'paragraph $top, scroll view ${viewport()}',
       );
       expect(inside(boxes(0, 1).first, viewport()), isTrue);
+      // Scrolled on to the new sentence's first line (since P282 it names
+      // reminders too, and at 2× on 320 dp it starts low): the whole
+      // sentence shows at once.
+      final position = tester.state<ScrollableState>(scrollable).position;
+      final lead = boxes(start, start + 1).first.top - viewport().top;
+      if (lead > 0) {
+        position.jumpTo(
+          (position.pixels + lead).clamp(0.0, position.maxScrollExtent),
+        );
+        await tester.pumpAndSettle();
+      }
       for (final box in boxes(start, start + sentence.length)) {
         expect(
           inside(box, viewport()),
@@ -1218,27 +1228,28 @@ void main() {
     }
 
     testWidgets(
-      'UX-1720: Voz in Spanish at 2× text on 320×640, scrolled down, shows the whole privacy paragraph with Para añadir, buscar o cambiar tareas, tus palabras van por internet a la IA de Google. and nothing overflows',
+      'UX-1720: Voz in Spanish at 2× text on 320×640, scrolled down, shows the whole privacy paragraph with Para añadir, buscar o cambiar tareas, o pedir recordatorios a tu manera, tus palabras van por internet a la IA de Google. and nothing overflows',
       (tester) async {
         await expectWholeParagraph(
           tester,
           es,
           'es',
-          'Para añadir, buscar o cambiar tareas, tus palabras van por internet '
-              'a la IA de Google.',
+          'Para añadir, buscar o cambiar tareas, o pedir recordatorios a tu '
+              'manera, tus palabras van por internet a la IA de Google.',
         );
       },
     );
 
     testWidgets(
-      'UX-1720: Voz in Catalan at 2× text on 320×640, scrolled down, shows the whole privacy paragraph with Per afegir, cercar o canviar tasques, les teves paraules van per internet a la IA de Google. and nothing overflows',
+      'UX-1720: Voz in Catalan at 2× text on 320×640, scrolled down, shows the whole privacy paragraph with Per afegir, cercar o canviar tasques, o demanar recordatoris a la teva manera, les teves paraules van per internet a la IA de Google. and nothing overflows',
       (tester) async {
         await expectWholeParagraph(
           tester,
           ca,
           'ca',
-          'Per afegir, cercar o canviar tasques, les teves paraules van per '
-              'internet a la IA de Google.',
+          'Per afegir, cercar o canviar tasques, o demanar recordatoris a la '
+              'teva manera, les teves paraules van per internet a la IA de '
+              'Google.',
         );
       },
     );
@@ -1297,6 +1308,62 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // UX-2405: Voz's privacy note names reminders asked for «a tu manera» too;
+  // its other sentences stay.
+  group('P282 · UX-2405', () {
+    const second = <String, String>{
+      'en':
+          'To add, find or change tasks, or to ask for reminders your way, '
+          'your words go over the internet to Google’s AI.',
+      'es':
+          'Para añadir, buscar o cambiar tareas, o pedir recordatorios a tu '
+          'manera, tus palabras van por internet a la IA de Google.',
+      'ca':
+          'Per afegir, cercar o canviar tasques, o demanar recordatoris a la '
+          'teva manera, les teves paraules van per internet a la IA de '
+          'Google.',
+    };
+    for (final language in const ['en', 'es', 'ca']) {
+      testWidgets(
+        'UX-2405: Ajustes › Otros ajustes › Voz in $language shows the '
+        'privacy note with «${second[language]}» as its second sentence',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          await openApp(
+            tester,
+            _JsonRegionalStore(RegionalPreferences(language: language)),
+            _Speech(),
+          );
+          await openVoice(tester, l);
+          final page = find.byType(VoiceSettingsScreen);
+          final note = find.descendant(
+            of: page,
+            matching: find.text(l.capturePrivacy),
+          );
+          await tester.scrollUntilVisible(
+            note,
+            200,
+            scrollable: find
+                .descendant(of: page, matching: find.byType(Scrollable))
+                .first,
+          );
+          await tester.pumpAndSettle();
+          expect(note, findsOneWidget);
+          final shown = tester.widget<Text>(note).data!;
+          final sentences = shown.split(RegExp(r'(?<=\.) '));
+          expect(sentences, hasLength(4), reason: shown);
+          expect(sentences[1], second[language]);
+          // The old second sentence, without reminders, is gone.
+          expect(
+            shown.contains(RegExp(r'(tasks|tareas|tasques), (your|tus|les)')),
+            isFalse,
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  });
 }
 
 /// Preferences written as JSON and read back, as the phone's store does

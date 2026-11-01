@@ -2106,6 +2106,255 @@ void main() {
       },
     );
   });
+
+  // ---- UX loop 2026-10-28-app, round 2 · P305 (UX-2629): Return to today
+  // lands at the top again, whatever the heights ----
+  group('P305 · back to today at the top, whatever the heights', () {
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    });
+
+    DateTime at(int days, int hour, [int minute = 0]) =>
+        DateTime(now.year, now.month, now.day + days, hour, minute);
+
+    /// Today, long enough at large text that a kept offset would show.
+    List<Task> today() => [
+      Task(
+        id: 1,
+        title: 'Paseo por el parque',
+        dueDate: at(0, 8, 30),
+        priority: 1,
+        isCompleted: true,
+      ),
+      Task(
+        id: 2,
+        title: 'Llamar al médico para pedir cita',
+        dueDate: at(0, 10),
+        priority: 2,
+        notes: 'Preguntar por los resultados de los análisis.',
+      ),
+      Task(id: 3, title: 'Comer con Ana', dueDate: at(0, 13, 30), priority: 1),
+      Task(
+        id: 4,
+        title: 'Recoger a los niños del colegio',
+        dueDate: at(0, 17),
+        priority: 3,
+        reminderMinutes: 30,
+      ),
+      Task(
+        id: 5,
+        title: 'Clase de yoga',
+        dueDate: at(0, 19, 30),
+        priority: 1,
+        recurrence: 'weekly',
+      ),
+      Task(id: 6, title: 'Comprar pilas para el mando', priority: 1),
+    ];
+
+    /// Eight tasks on [date] before 17:00, so a 17:00 landing scrolls.
+    List<Task> busy(DateTime date, int firstId) => [
+      for (var hour = 8; hour < 16; hour++)
+        Task(
+          id: firstId + hour,
+          title: 'Tarea de las $hour',
+          dueDate: DateTime(date.year, date.month, date.day, hour),
+          priority: 1,
+        ),
+    ];
+
+    Finder agenda() => find
+        .descendant(
+          of: find.descendant(
+            of: find.byType(CalendarScreen),
+            matching: find.byType(CustomScrollView),
+          ),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+
+    ScrollPosition agendaScroll(WidgetTester tester) =>
+        tester.state<ScrollableState>(agenda()).position;
+
+    /// The titles of the agenda's rows built now.
+    List<String> rows(WidgetTester tester) => [
+      for (final element in find
+          .descendant(
+            of: find.byType(CalendarScreen),
+            matching: find.byWidgetPredicate(
+              (widget) => widget is TaskTile || widget is LandedTaskTile,
+            ),
+          )
+          .evaluate())
+        switch (element.widget) {
+          TaskTile(:final task) => task.title,
+          LandedTaskTile(:final task) => task.title,
+          _ => '',
+        },
+    ];
+
+    /// The app leaves for the background, and comes back after [away].
+    Future<void> awayFor(
+      WidgetTester tester,
+      Duration away,
+      void Function(Duration) advance,
+    ) async {
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      await tester.pump();
+      advance(away);
+      for (final state in [
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      await tester.pumpAndSettle();
+    }
+
+    /// Lands «Llevar el coche al taller» at 17:00 on a busy Friday, waits
+    /// for the message to go, and returns the offset the landing left.
+    Future<double> landLowOnFriday(
+      WidgetTester tester,
+      DateTime Function() clock, {
+      required Size size,
+      required double textScale,
+    }) async {
+      final day = friday();
+      final app = await _App.open(
+        tester,
+        [...today(), ...busy(day, 100)],
+        clock: clock,
+        size: size,
+        textScale: textScale,
+      );
+      app.api.found = [
+        found(
+          'Llevar el coche al taller',
+          at: DateTime(day.year, day.month, day.day, 17),
+        ),
+      ];
+      await app.say(tester, 'Llevar el coche al taller el viernes a las 17');
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 11));
+      await tester.pumpAndSettle();
+      expect(rows(tester), contains('Llevar el coche al taller'));
+      expect(rows(tester), isNot(contains('Comer con Ana')));
+      final position = agendaScroll(tester);
+      expect(
+        position.pixels,
+        greaterThan(position.minScrollExtent),
+        reason: 'the landing scrolled the agenda',
+      );
+      return position.pixels;
+    }
+
+    /// Today is shown with «Agenda de hoy» whole inside the agenda, and the
+    /// agenda at its minimum offset.
+    void expectTodayAtTop(WidgetTester tester) {
+      final header = find.text(es.todayAgenda);
+      expect(header, findsOneWidget);
+      final position = agendaScroll(tester);
+      expect(
+        position.pixels,
+        moreOrLessEquals(position.minScrollExtent, epsilon: 0.5),
+        reason: 'the agenda starts at the top',
+      );
+      final rect = tester.getRect(header);
+      final area = tester.getRect(agenda());
+      expect(rect.top, greaterThanOrEqualTo(area.top - 0.5), reason: '$rect in $area');
+      expect(
+        rect.bottom,
+        lessThanOrEqualTo(area.bottom + 0.5),
+        reason: '$rect in $area',
+      );
+    }
+
+    // Each size and text scale gives the bottom bar, the rows and the
+    // viewport other heights; the return to today must not depend on them.
+    for (final (size, textScale) in [
+      (const Size(360, 800), 2.0),
+      (const Size(360, 740), 2.0),
+      (const Size(320, 800), 2.0),
+      (const Size(412, 915), 2.0),
+      (const Size(360, 800), 1.5),
+      (const Size(360, 640), 1.3),
+    ]) {
+      testWidgets(
+        'UX-2629: ES ${textScale}x on '
+        '${size.width.round()}×${size.height.round()}, after a Friday '
+        'landing that scrolled the agenda, resuming 31 minutes later shows '
+        'today at its minimum offset with «Agenda de hoy» in view, and it '
+        'stays there',
+        (tester) async {
+          var clock = DateTime.now();
+          await landLowOnFriday(
+            tester,
+            () => clock,
+            size: size,
+            textScale: textScale,
+          );
+          await awayFor(
+            tester,
+            const Duration(minutes: 31),
+            (away) => clock = clock.add(away),
+          );
+          expect(
+            find.text(DateFormat.MMMMEEEEd('es').format(friday())),
+            findsNothing,
+          );
+          expect(rows(tester), contains('Llamar al médico para pedir cita'));
+          expect(rows(tester), isNot(contains('Llevar el coche al taller')));
+          // Today is long enough that a kept offset would show.
+          expect(agendaScroll(tester).maxScrollExtent, greaterThan(0));
+          expectTodayAtTop(tester);
+          // Nothing left over from the landing moves it later.
+          await tester.pump(const Duration(seconds: 2));
+          await tester.pumpAndSettle();
+          expectTodayAtTop(tester);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2629: ES 2.0x on 360×740, resuming 5 minutes after the Friday '
+      'landing keeps Friday and its scroll',
+      (tester) async {
+        var clock = DateTime.now();
+        final offset = await landLowOnFriday(
+          tester,
+          () => clock,
+          size: const Size(360, 740),
+          textScale: 2,
+        );
+        await awayFor(
+          tester,
+          const Duration(minutes: 5),
+          (away) => clock = clock.add(away),
+        );
+        expect(rows(tester), contains('Llevar el coche al taller'));
+        expect(rows(tester), isNot(contains('Comer con Ana')));
+        expect(find.text(es.todayAgenda), findsNothing);
+        expect(
+          agendaScroll(tester).pixels,
+          moreOrLessEquals(offset, epsilon: 0.5),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }
 
 /// The app in Spanish with a 24-hour clock, on Calendar, with capture

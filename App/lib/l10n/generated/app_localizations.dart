@@ -358,12 +358,6 @@ abstract class AppLocalizations {
   /// **'Your notes are still on this phone.'**
   String get notesSavedOnDevice;
 
-  /// Option of the Notes project filter that shows the notes of every project.
-  ///
-  /// In en, this message translates to:
-  /// **'All notes'**
-  String get allNotes;
-
   /// Banner on a note in a project the person can only view: who to ask to make changes.
   ///
   /// In en, this message translates to:
@@ -448,12 +442,6 @@ abstract class AppLocalizations {
   /// **'Deadline time'**
   String get deadlineTime;
 
-  /// No description provided for @deadlineEndDay.
-  ///
-  /// In en, this message translates to:
-  /// **'By the end of the day'**
-  String get deadlineEndDay;
-
   /// No description provided for @removeDeadline.
   ///
   /// In en, this message translates to:
@@ -472,17 +460,17 @@ abstract class AppLocalizations {
   /// **'This plan finishes after the deadline. Check the start or duration.'**
   String get deadlineLatePlan;
 
-  /// No description provided for @deadlineOverdue.
-  ///
-  /// In en, this message translates to:
-  /// **'Deadline passed'**
-  String get deadlineOverdue;
-
   /// No description provided for @deadlineLabel.
   ///
   /// In en, this message translates to:
   /// **'Due {date}'**
   String deadlineLabel(String date);
+
+  /// On a task's row and its page, in place of deadlineLabel once the deadline has passed: said once, in the row's usual grey. {date} is the weekday date, and the time when the deadline has one, as deadlineLabel gets it.
+  ///
+  /// In en, this message translates to:
+  /// **'Was due {date}'**
+  String deadlinePassedOn(String date);
 
   /// No description provided for @reminderAnchor.
   ///
@@ -976,12 +964,6 @@ abstract class AppLocalizations {
   /// **'Delete'**
   String get delete;
 
-  /// No description provided for @keepChanges.
-  ///
-  /// In en, this message translates to:
-  /// **'Keep changes'**
-  String get keepChanges;
-
   /// No description provided for @taskTitle.
   ///
   /// In en, this message translates to:
@@ -1359,6 +1341,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Find a task…'**
   String get findTask;
+
+  /// Tooltip and screen-reader label of the ✕ at the end of a search field (tasks, notes, projects, the project picker) while it holds text: one tap empties the search and shows the whole list again.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get clearSearch;
 
   /// No description provided for @allTasks.
   ///
@@ -1786,13 +1774,13 @@ abstract class AppLocalizations {
   /// **'Keep'**
   String get keep;
 
-  /// The full voice privacy note at the end of the Voice screen in Settings: on-device or online transcription, why the words go to Google’s AI, saved audio, and what stays on the phone. capturePrivacyLine is its short form in the capture sheet.
+  /// The full voice privacy note at the end of the Voice screen in Settings: on-device or online transcription, why the words go to Google’s AI (adding, finding or changing tasks, and reminders asked for in «Your way», reminderPlanYourWay), saved audio, and what stays on the phone. capturePrivacyLine is its short form in the capture sheet and the reminder sheet.
   ///
   /// In en, this message translates to:
-  /// **'Live transcription uses on-device speech where available; no audio is retained in that mode. To add, find or change tasks, your words go over the internet to Google’s AI. Saved audio is transcribed online. Anything not saved yet stays on this phone until you save or discard it.'**
+  /// **'Live transcription uses on-device speech where available; no audio is retained in that mode. To add, find or change tasks, or to ask for reminders your way, your words go over the internet to Google’s AI. Saved audio is transcribed online. Anything not saved yet stays on this phone until you save or discard it.'**
   String get capturePrivacy;
 
-  /// One short line under the words in the capture sheet, shown only the first time the microphone is used on this phone: says the words go to Google’s AI and names where the full note is (Other settings › Voice, as otherSettings and voiceSettings read; keep them identical).
+  /// One short line, shown once in each of two places: under the words in the capture sheet, the first time the microphone is used on this phone; and under the field of «Your way» (reminderPlanYourWay, Pro) in the reminder sheet, the first time it is opened on this phone. Says the words go to Google’s AI and names where the full note is (Other settings › Voice, as otherSettings and voiceSettings read; keep them identical).
   ///
   /// In en, this message translates to:
   /// **'Your words go to Google’s AI. More in Other settings › Voice.'**
@@ -1828,10 +1816,10 @@ abstract class AppLocalizations {
   /// **'I’ve checked this task'**
   String get confirmedDetails;
 
-  /// The day's count under its heading on Calendar. With nothing completed it is the open count alone.
+  /// The day's count under its heading on Calendar. With nothing completed it is the open count alone; with nothing left, the completed count alone. Keep a no-break space between each number and its words, and inside “to do”, so a count never wraps apart.
   ///
   /// In en, this message translates to:
-  /// **'{done, plural, =0{{remaining} to do} other{{remaining} to do · {done} completed}}'**
+  /// **'{remaining, plural, =0{{done} completed} other{{done, plural, =0{{remaining} to do} other{{remaining} to do · {done} completed}}}}'**
   String agendaCounts(int remaining, int done);
 
   /// Date line of an open task whose day has passed, in Tareas and on project pages. {date} is the row's date, such as Sat, 17 Oct.
@@ -1888,11 +1876,11 @@ abstract class AppLocalizations {
   /// **'Until {date}'**
   String untilDate(String date);
 
-  /// No description provided for @priorityValue.
+  /// A task's priority as a phrase, on its row, the dictation's result card and the form's summary: «Prioridad alta», not the standalone «Alta». level is high, medium or low.
   ///
   /// In en, this message translates to:
-  /// **'{priority} priority'**
-  String priorityValue(String priority);
+  /// **'{level, select, high{High priority} medium{Medium priority} other{Low priority}}'**
+  String priorityValue(String level);
 
   /// No description provided for @pickDate.
   ///
@@ -3124,10 +3112,10 @@ abstract class AppLocalizations {
   /// **'Enter an email address.'**
   String get enterEmailAddress;
 
-  /// No description provided for @sharingRolesHelp.
+  /// Sharing screen, under “How sharing works”: what editors and the owner can do, and that shared tasks stay in the project.
   ///
   /// In en, this message translates to:
-  /// **'Editors can add, change, complete and delete tasks and files. Only the owner manages the project and people. Shared tasks stay in this project; exporting creates a personal copy.'**
+  /// **'Editors can add, change, complete and delete tasks and files. Only the owner manages the project and people. Shared tasks stay in this project.'**
   String get sharingRolesHelp;
 
   /// No description provided for @listSharing.
@@ -3184,10 +3172,10 @@ abstract class AppLocalizations {
   /// **'Remove access'**
   String get removeAccess;
 
-  /// No description provided for @removeAccessHelp.
+  /// Sharing screen, the “Remove access” confirmation: what the person loses. Plain words, no sync jargon: edits they haven’t sent yet are lost.
   ///
   /// In en, this message translates to:
-  /// **'This person will lose access to this project and its tasks, notes and files. Their unsent shared edits will be removed on the next successful sync.'**
+  /// **'This person will lose access to this project and its tasks, notes and files. Changes they haven’t sent yet will be lost.'**
   String get removeAccessHelp;
 
   /// No description provided for @pendingInvitations.
@@ -3214,10 +3202,10 @@ abstract class AppLocalizations {
   /// **'Tasks, notes and uploaded files are shared. Editors can change or remove them; viewers can read them. Reminders aren’t shared: each person has their own.'**
   String get sharedDataHelp;
 
-  /// No description provided for @sharingRemovalHelp.
+  /// Sharing screen, under “How sharing works”: what happens to a shared project on this phone after leaving or losing access. Plain words, no sync jargon.
   ///
   /// In en, this message translates to:
-  /// **'Leaving or losing access removes this phone’s shared tasks, notes, pending edits and downloaded copies at the next successful sync. Offline devices and copies already exported cannot be remotely erased.'**
+  /// **'When you leave or lose access, the project leaves this phone the next time it connects. Copies you exported stay.'**
   String get sharingRemovalHelp;
 
   /// No description provided for @deleteList.
@@ -3387,12 +3375,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New files upload to your account after saving, up to 6 MB each. Older local files stay on this device until you choose Upload in task details.'**
   String get fileUploadHelp;
-
-  /// No description provided for @fileLocalHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Files stay on this device until you sign in and choose Upload in task details. Up to 6 MB per file.'**
-  String get fileLocalHelp;
 
   /// No description provided for @fileLimit.
   ///
@@ -5314,6 +5296,30 @@ abstract class AppLocalizations {
   /// **'Only an empty group can be deleted. Archive a group to keep its projects and content.'**
   String get groupDeleteHelp;
 
+  /// The group page’s delete row and the red button that confirms it.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete group'**
+  String get groupDeleteAction;
+
+  /// Text of the confirmation before an empty group is deleted. {name} is the group’s name.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete “{name}”? Its members will lose it. This can’t be undone.'**
+  String groupDeleteConfirm(String name);
+
+  /// Title of the confirmation before the owner gives a group to another member. {group} is the group’s name, {person} the member’s.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer “{group}” to {person}?'**
+  String groupTransferConfirm(String group, String person);
+
+  /// The button that confirms giving the group to {person}, a member’s name.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer to {person}'**
+  String groupTransferAction(String person);
+
   /// No description provided for @groupActionError.
   ///
   /// In en, this message translates to:
@@ -5386,10 +5392,10 @@ abstract class AppLocalizations {
   /// **'All changes'**
   String get updatesAll;
 
-  /// No description provided for @updatesAssigned.
+  /// A shared project’s update choice: only updates about tasks for this person. Matches the app’s “For me” wording.
   ///
   /// In en, this message translates to:
-  /// **'My assignments'**
+  /// **'Only what’s for me'**
   String get updatesAssigned;
 
   /// No description provided for @updatesMuted.
@@ -5428,11 +5434,17 @@ abstract class AppLocalizations {
   /// **'Created a task'**
   String get activityCreated;
 
-  /// No description provided for @activityUpdated.
+  /// A task’s history (task details, Activity section): the entry for an edit to the task other than a move. The person’s name and the date show under it.
   ///
   /// In en, this message translates to:
-  /// **'Updated a task'**
+  /// **'Updated the task'**
   String get activityUpdated;
+
+  /// A task’s history (task details, Activity section): the entry for an edit that changed only the task’s day (its date or due date). The person’s name and the date show under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Moved the task'**
+  String get activityMoved;
 
   /// No description provided for @activityAssigned.
   ///
@@ -5470,7 +5482,7 @@ abstract class AppLocalizations {
   /// **'TaskFlow'**
   String get activitySystem;
 
-  /// Title of the screen that lists what others did in every shared project, and the tooltip of the header button (people icon) that opens it.
+  /// Title of the screen that lists what others did in every shared project, and the tooltip of the header button (feed icon) that opens it.
   ///
   /// In en, this message translates to:
   /// **'Updates'**
@@ -5488,10 +5500,10 @@ abstract class AppLocalizations {
   /// **'Finding the task…'**
   String get activityFindingTask;
 
-  /// One activity row: who did what to which task. action is an internal code; actor is a person’s name; title is the task title.
+  /// One activity row: who did what to which task. action is an internal code (moved: an edit that changed only the task’s day); actor is a person’s name; title is the task title.
   ///
   /// In en, this message translates to:
-  /// **'{action, select, created{{actor} created: {title}} assigned{{actor} changed who’s responsible for: {title}} unassigned{{actor} removed the assignee of: {title}} completed{{actor} completed: {title}} reopened{{actor} reopened: {title}} deleted{{actor} deleted: {title}} shared{{actor} shared: {title}} other{{actor} updated: {title}}}'**
+  /// **'{action, select, created{{actor} created: {title}} assigned{{actor} changed who’s responsible for: {title}} unassigned{{actor} removed the assignee of: {title}} completed{{actor} completed: {title}} reopened{{actor} reopened: {title}} moved{{actor} moved: {title}} deleted{{actor} deleted: {title}} shared{{actor} shared: {title}} other{{actor} updated: {title}}}'**
   String activityEntry(String action, String actor, String title);
 
   /// An Updates row when someone made the reader responsible for a task. actor is that person’s name; title is the task title.

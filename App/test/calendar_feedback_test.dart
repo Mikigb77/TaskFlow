@@ -1376,7 +1376,7 @@ void main() {
   });
 
   testWidgets(
-    'UX-226: a passed deadline reads “· Fecha límite vencida” on the tile and on the detail',
+    'UX-226, UX-2313: a passed deadline reads «Venció el …» once on the tile and on the detail',
     (tester) async {
       final now = DateTime.now();
       await openCalendar(tester, [
@@ -1394,7 +1394,7 @@ void main() {
       expect(
         find.descendant(
           of: row,
-          matching: find.textContaining(' · ${l.deadlineOverdue}'),
+          matching: find.textContaining(l.deadlinePassedOn('')),
         ),
         findsOneWidget,
       );
@@ -1402,7 +1402,7 @@ void main() {
           .state<NavigatorState>(find.byType(Navigator))
           .pushNamed('/taskDetails', arguments: 1);
       await tester.pumpAndSettle();
-      expect(find.textContaining(' · ${l.deadlineOverdue}'), findsOneWidget);
+      expect(find.textContaining(l.deadlinePassedOn('')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -3624,7 +3624,7 @@ void main() {
         size: const Size(360, 800),
         overrides: [calendarClockProvider.overrideWithValue(() => october20)],
       );
-      expect(find.text('10 pendientes · 1 completada'), findsOneWidget);
+      expect(find.text('10\u00a0pendientes · 1\u00a0completada'), findsOneWidget);
       expect(dayValues(tester), contains('hoy · 10 tareas'));
       expect(dayValues(tester), isNot(contains('hoy · 9 tareas')));
       semantics.dispose();

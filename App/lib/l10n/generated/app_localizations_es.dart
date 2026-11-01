@@ -228,9 +228,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get notesSavedOnDevice => 'Tus notas siguen en este teléfono.';
 
   @override
-  String get allNotes => 'Todas las notas';
-
-  @override
   String get viewOnlyNote =>
       'Nota de solo lectura. Si quieres hacer cambios, pídeselo al propietario del proyecto.';
 
@@ -278,9 +275,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get deadlineTime => 'Hora límite';
 
   @override
-  String get deadlineEndDay => 'Antes de que termine el día';
-
-  @override
   String get removeDeadline => 'Quitar fecha límite';
 
   @override
@@ -292,11 +286,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'El plan termina después de la fecha límite. Revisa el inicio o la duración.';
 
   @override
-  String get deadlineOverdue => 'Fecha límite vencida';
-
-  @override
   String deadlineLabel(String date) {
     return 'Vence $date';
+  }
+
+  @override
+  String deadlinePassedOn(String date) {
+    return 'Venció el $date';
   }
 
   @override
@@ -568,9 +564,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get delete => 'Eliminar';
 
   @override
-  String get keepChanges => 'Guardar cambios';
-
-  @override
   String get taskTitle => 'Título de la tarea';
 
   @override
@@ -783,6 +776,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get findTask => 'Buscar una tarea…';
+
+  @override
+  String get clearSearch => 'Borrar búsqueda';
 
   @override
   String get allTasks => 'Todas las tareas';
@@ -1015,7 +1011,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get capturePrivacy =>
-      'La transcripción en directo usa el reconocimiento local cuando está disponible; ese modo no conserva audio. Para añadir, buscar o cambiar tareas, tus palabras van por internet a la IA de Google. El audio guardado se transcribe en línea. Lo que aún no has guardado se queda en este teléfono hasta que lo guardes o lo descartes.';
+      'La transcripción en directo usa el reconocimiento local cuando está disponible; ese modo no conserva audio. Para añadir, buscar o cambiar tareas, o pedir recordatorios a tu manera, tus palabras van por internet a la IA de Google. El audio guardado se transcribe en línea. Lo que aún no has guardado se queda en este teléfono hasta que lo guardes o lo descartes.';
 
   @override
   String get capturePrivacyLine =>
@@ -1039,28 +1035,30 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String agendaCounts(int remaining, int done) {
     String _temp0 = intl.Intl.pluralLogic(
-      remaining,
-      locale: localeName,
-      other: '$remaining pendientes',
-      one: '1 pendiente',
-    );
-    String _temp1 = intl.Intl.pluralLogic(
-      remaining,
-      locale: localeName,
-      other: '$remaining pendientes',
-      one: '1 pendiente',
-    );
-    String _temp2 = intl.Intl.pluralLogic(
-      remaining,
-      locale: localeName,
-      other: '$remaining pendientes',
-      one: '1 pendiente',
-    );
-    String _temp3 = intl.Intl.pluralLogic(
       done,
       locale: localeName,
-      other: '$_temp0 · $done completadas',
-      one: '$_temp1 · 1 completada',
+      other: '$remaining pendientes · $done completadas',
+      one: '$remaining pendientes · 1 completada',
+      zero: '$remaining pendientes',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      done,
+      locale: localeName,
+      other: '1 pendiente · $done completadas',
+      one: '1 pendiente · 1 completada',
+      zero: '1 pendiente',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      done,
+      locale: localeName,
+      other: '$done completadas',
+      one: '1 completada',
+    );
+    String _temp3 = intl.Intl.pluralLogic(
+      remaining,
+      locale: localeName,
+      other: '$_temp0',
+      one: '$_temp1',
       zero: '$_temp2',
     );
     return '$_temp3';
@@ -1148,8 +1146,13 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String priorityValue(String priority) {
-    return 'Prioridad $priority';
+  String priorityValue(String level) {
+    String _temp0 = intl.Intl.selectLogic(level, {
+      'high': 'Prioridad alta',
+      'medium': 'Prioridad media',
+      'other': 'Prioridad baja',
+    });
+    return '$_temp0';
   }
 
   @override
@@ -1917,7 +1920,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get sharingRolesHelp =>
-      'Los editores pueden añadir, cambiar, completar y eliminar tareas y archivos. Solo el propietario gestiona el proyecto y las personas. Las tareas compartidas permanecen en este proyecto; al exportarlas se crea una copia personal.';
+      'Los editores pueden añadir, cambiar, completar y eliminar tareas y archivos. Solo el propietario gestiona el proyecto y las personas. Las tareas compartidas se quedan en este proyecto.';
 
   @override
   String get listSharing => 'Compartir proyecto';
@@ -1948,7 +1951,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get removeAccessHelp =>
-      'Esta persona perderá el acceso al proyecto y a sus tareas, notas y archivos. Sus cambios compartidos pendientes se eliminarán en la próxima sincronización correcta.';
+      'Esta persona perderá el acceso al proyecto y a sus tareas, notas y archivos. Los cambios que aún no haya enviado se perderán.';
 
   @override
   String get pendingInvitations => 'Invitaciones pendientes';
@@ -1967,7 +1970,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get sharingRemovalHelp =>
-      'Al salir o perder el acceso, las tareas y notas compartidas, los cambios pendientes y las copias descargadas se eliminarán de este teléfono en la próxima sincronización correcta. No se pueden borrar a distancia los dispositivos sin conexión ni las copias ya exportadas.';
+      'Al salir o perder el acceso, el proyecto desaparece de este teléfono la próxima vez que se conecte. Las copias que hayas exportado se quedan.';
 
   @override
   String get deleteList => 'Eliminar proyecto';
@@ -2078,10 +2081,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get fileUploadHelp =>
       'Los archivos nuevos se suben a tu cuenta al guardar, hasta 6 MB cada uno. Los archivos locales anteriores permanecen aquí hasta que elijas Subir en los detalles de la tarea.';
-
-  @override
-  String get fileLocalHelp =>
-      'Los archivos permanecen en este dispositivo hasta que inicies sesión y elijas Subir en los detalles de la tarea. Hasta 6 MB por archivo.';
 
   @override
   String get fileLimit =>
@@ -3089,8 +3088,8 @@ class AppLocalizationsEs extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count tareas completadas. Pulsa una casilla para reabrir una.',
-      one: '1 tarea completada. Pulsa su casilla para reabrirla.',
+      other: '$count tareas completadas. Toca una casilla para reabrir una.',
+      one: '1 tarea completada. Toca su casilla para reabrirla.',
     );
     return '$_temp0';
   }
@@ -3547,6 +3546,24 @@ class AppLocalizationsEs extends AppLocalizations {
       'Solo puedes eliminar un grupo vacío. Archívalo para conservar sus proyectos y contenido.';
 
   @override
+  String get groupDeleteAction => 'Eliminar grupo';
+
+  @override
+  String groupDeleteConfirm(String name) {
+    return '¿Eliminar «$name»? Sus miembros dejarán de verlo. No se puede deshacer.';
+  }
+
+  @override
+  String groupTransferConfirm(String group, String person) {
+    return '¿Transferir «$group» a $person?';
+  }
+
+  @override
+  String groupTransferAction(String person) {
+    return 'Transferir a $person';
+  }
+
+  @override
   String get groupActionError =>
       'No se ha podido guardar el cambio. Comprueba la conexión y actualiza; los permisos pueden haber cambiado.';
 
@@ -3587,7 +3604,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get updatesAll => 'Todos los cambios';
 
   @override
-  String get updatesAssigned => 'Mis asignaciones';
+  String get updatesAssigned => 'Solo lo que es para mí';
 
   @override
   String get updatesMuted => 'Silenciado: sin novedades ni recordatorios';
@@ -3609,7 +3626,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get activityCreated => 'Ha creado una tarea';
 
   @override
-  String get activityUpdated => 'Ha actualizado una tarea';
+  String get activityUpdated => 'Ha actualizado la tarea';
+
+  @override
+  String get activityMoved => 'Ha movido la tarea';
 
   @override
   String get activityAssigned => 'Ha cambiado el responsable';
@@ -3646,6 +3666,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'unassigned': '$actor ha quitado el responsable de: $title',
       'completed': '$actor ha completado: $title',
       'reopened': '$actor ha reabierto: $title',
+      'moved': '$actor ha movido: $title',
       'deleted': '$actor ha eliminado: $title',
       'shared': '$actor ha compartido: $title',
       'other': '$actor ha actualizado: $title',

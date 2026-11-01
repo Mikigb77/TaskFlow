@@ -67,13 +67,13 @@ class RepeatRuleControl extends StatelessWidget {
                                   Navigator.pop(context, int.parse(value));
                                 }
                               },
-                              child: Text(context.l10n.keepChanges))
+                              child: Text(context.l10n.done))
                         ]));
             if (result != null) onChanged(result, weekdays);
           }),
       if (recurrence == 'weekly') ...[
         Text(context.l10n.repeatOn),
-        Wrap(spacing: 6, children: [
+        Wrap(spacing: 8, runSpacing: 8, children: [
           for (final day in List.generate(
               7,
               (offset) =>
@@ -113,34 +113,70 @@ class _RepeatSheet extends StatefulWidget {
 
 class _RepeatSheetState extends State<_RepeatSheet> {
   late Task _task = widget.task;
+  // Listo stays pinned under the choices as they scroll, as the reminder
+  // sheet's title stays above them, so it is always in view, even at large
+  // text with a repeat's details open (UX-2622). While the details go on
+  // below it, a scrollbar thumb and a line above Listo say so (UX-2632).
+  final _scroll = ScrollController();
+  bool _overflows = false;
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  bool _onMetrics(ScrollMetricsNotification n) {
+    final overflows = n.metrics.maxScrollExtent > 0;
+    if (overflows != _overflows) setState(() => _overflows = overflows);
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) => SafeArea(
-      child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
           child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+            Flexible(
+                child: NotificationListener<ScrollMetricsNotification>(
+                    onNotification: _onMetrics,
+                    child: Scrollbar(
+                controller: _scroll,
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                    controller: _scroll,
+                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                    child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                 Text(context.l10n.repeat,
                     style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                    initialValue: _task.recurrence,
-                    isExpanded: true,
-                    items: Task.repeats.entries
-                        .map((entry) => DropdownMenuItem(
-                            value: entry.key,
-                            child: Text(context.repeatName(entry.key))))
-                        .toList(),
-                    onChanged: (value) => setState(() => _task = _task.copyWith(
-                        recurrence: value,
-                        repeatInterval:
-                            value == 'none' ? 1 : _task.repeatInterval,
-                        repeatWeekdays:
-                            value == 'weekly' ? _task.repeatWeekdays : [],
-                        repeatUntil:
-                            value == 'none' ? null : _task.repeatUntil))),
+                // Every choice in sight, one tap each, the chosen one
+                // ticked, as the reminder sheet's rows are; Listo applies.
+                for (final value in Task.repeats.keys)
+                  ListTile(
+                      key: ValueKey('repeat-$value'),
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(context.repeatName(value)),
+                      selected: value == _task.recurrence,
+                      trailing: value == _task.recurrence
+                          ? const Icon(Icons.check_rounded)
+                          : null,
+                      onTap: () => setState(() => _task = _task.copyWith(
+                          recurrence: value,
+                          repeatInterval:
+                              value == 'none' ? 1 : _task.repeatInterval,
+                          repeatWeekdays:
+                              value == 'weekly' ? _task.repeatWeekdays : [],
+                          repeatUntil:
+                              value == 'none' ? null : _task.repeatUntil))),
                 if (_task.isRecurring) ...[
+                  // Sets the ticked repeat's details apart from the choices,
+                  // so the interval row isn't read as a sixth one (UX-2621).
+                  const Divider(height: 24),
                   RepeatRuleControl(
                       recurrence: _task.recurrence,
                       interval: _task.repeatInterval,
@@ -174,9 +210,17 @@ class _RepeatSheetState extends State<_RepeatSheet> {
                         }
                       }),
                 ],
-                const SizedBox(height: 16),
-                FilledButton(
+              ]))))),
+            // Kept, transparent, when nothing scrolls, so the sheet doesn't
+            // jump by a line as the details open.
+            Divider(
+                height: 1,
+                key: const ValueKey('repeat-sheet-foot-edge'),
+                color: _overflows ? null : Colors.transparent),
+            Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                child: FilledButton(
                     onPressed: () => Navigator.pop(context, _task),
-                    child: Text(context.l10n.done)),
-              ])));
+                    child: Text(context.l10n.done))),
+          ]));
 }

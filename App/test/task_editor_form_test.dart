@@ -2,17 +2,21 @@
 // form parts of P22 (UX-225): the edit form starts with the title, keeps
 // Más detalles short and ordered by use, and adds steps in place.
 import 'package:agenda/l10n/generated/app_localizations.dart';
+import 'package:agenda/l10n/region.dart';
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/regional_provider.dart';
+import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/reminder_control.dart';
 import 'package:agenda/widgets/task_assignment_picker.dart';
 import 'package:agenda/widgets/task_editor.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'support/design_fixtures.dart';
 
 void main() {
@@ -236,7 +240,6 @@ void main() {
         'Debe estar terminada para esta fecha. Cambiar el inicio previsto mantiene esta fecha límite.',
         'Abre los detalles de la tarea para descargar, subir o eliminar archivos de tu cuenta.',
         es.fileUploadHelp,
-        es.fileLocalHelp,
       ]) {
         expect(find.textContaining(gone), findsNothing, reason: gone);
       }
@@ -248,7 +251,9 @@ void main() {
       await tester.tap(attach);
       await tester.pumpAndSettle();
       expect(find.textContaining('MiB'), findsNothing);
-      expect(find.textContaining('6 MB'), findsWidgets);
+      // UX-2419: with no file kept only on the phone, the sheet is its two
+      // rows, with no paragraph.
+      expect(find.text(es.fileUploadHelp), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -256,7 +261,7 @@ void main() {
   test('UX-216: no catalog writes MiB in the file help or limit', () {
     for (final language in ['en', 'es', 'ca']) {
       final l = lookupAppLocalizations(Locale(language));
-      for (final text in [l.fileUploadHelp, l.fileLocalHelp, l.fileLimit]) {
+      for (final text in [l.fileUploadHelp, l.fileLimit]) {
         expect(text, isNot(contains('MiB')), reason: '$language: $text');
         expect(text, contains('MB'), reason: '$language: $text');
       }
@@ -745,4 +750,380 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  // ---- Run 2026-10-28-app, round 1 · P281 (UX-2407, UX-2413): the repeat
+  // sheet's five choices are one-tap rows, the interval dialog says Listo,
+  // and the weekday chips sit 8 dp apart. ----
+  group('P281 · repeat sheet', () {
+    // A Tuesday.
+    final day = DateTime(2026, 11, 10);
+    Task regar() => Task(id: 30, title: 'Regar', priority: 1, dueDate: day);
+    Finder sheet() => find.byType(BottomSheet);
+    Finder inSheet(Finder finder) =>
+        find.descendant(of: sheet(), matching: finder);
+    Finder row(String value) => find.byKey(ValueKey('repeat-$value'));
+    bool ticked(String value) => find
+        .descendant(of: row(value), matching: find.byIcon(Icons.check_rounded))
+        .evaluate()
+        .isNotEmpty;
+    const values = ['none', 'daily', 'weekly', 'monthly', 'yearly'];
+
+    Future<void> tapShown(WidgetTester tester, Finder target) async {
+      await tester.ensureVisible(target);
+      await tester.pumpAndSettle();
+      await tester.tap(target);
+      await tester.pumpAndSettle();
+    }
+
+    String repeatSubtitle(WidgetTester tester) {
+      final tile = tester.widget<ListTile>(
+        find.byKey(const ValueKey('task-repeat')),
+      );
+      return (tile.subtitle! as Text).data!;
+    }
+
+    testWidgets(
+      'UX-2407: after Más detalles, Repetir → «Cada día» → Listo sets a daily repeat in 3 taps; the five choices show as rows, «No se repite» ticked first and then «Cada día» alone, with no dropdown',
+      (tester) async {
+        await openEditor(tester, regar());
+        await showDetails(tester);
+        expect(repeatSubtitle(tester), es.neverRepeat);
+        var taps = 0;
+
+        await tapShown(tester, find.byKey(const ValueKey('task-repeat')));
+        taps++;
+        expect(sheet(), findsOneWidget);
+        expect(inSheet(find.byType(DropdownButton<String>)), findsNothing);
+        for (final (value, label) in [
+          ('none', es.neverRepeat),
+          ('daily', es.daily),
+          ('weekly', es.weekly),
+          ('monthly', es.monthly),
+          ('yearly', es.yearly),
+        ]) {
+          expect(inSheet(row(value)), findsOneWidget, reason: value);
+          expect(
+            find.descendant(of: row(value), matching: find.text(label)),
+            findsOneWidget,
+            reason: value,
+          );
+          expect(ticked(value), value == 'none', reason: value);
+        }
+
+        await tapShown(tester, row('daily'));
+        taps++;
+        for (final value in values) {
+          expect(ticked(value), value == 'daily', reason: value);
+        }
+        expect(sheet(), findsOneWidget, reason: 'a row only chooses');
+
+        await tapShown(
+          tester,
+          inSheet(find.widgetWithText(FilledButton, es.done)),
+        );
+        taps++;
+        expect(sheet(), findsNothing);
+        expect(repeatSubtitle(tester), es.daily);
+        expect(taps, 3);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2407: under the rows, «Cada semana»’s weekday chips and the end date still work, and Listo applies them',
+      (tester) async {
+        await openEditor(tester, regar());
+        await showDetails(tester);
+        await tapShown(tester, find.byKey(const ValueKey('task-repeat')));
+        await tapShown(tester, row('weekly'));
+        expect(ticked('weekly'), isTrue);
+        final context = tester.element(find.byType(TaskEditor));
+        final wednesday = DateFormat.E('es').format(DateTime(2024, 1, 3));
+        final chip = inSheet(find.widgetWithText(FilterChip, wednesday));
+        expect(chip, findsOneWidget);
+        expect(tester.widget<FilterChip>(chip).selected, isFalse);
+        await tapShown(tester, chip);
+        expect(tester.widget<FilterChip>(chip).selected, isTrue);
+
+        await tapShown(tester, inSheet(find.text(es.noEndDate)));
+        expect(find.byType(DatePickerDialog), findsOneWidget);
+        await tester.tap(
+          find.descendant(
+            of: find.byType(DatePickerDialog),
+            matching: find.text('20'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final ok = MaterialLocalizations.of(
+          tester.element(find.byType(DatePickerDialog)),
+        ).okButtonLabel;
+        await tester.tap(
+          find.descendant(
+            of: find.byType(DatePickerDialog),
+            matching: find.text(ok),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final until = es.untilDate(context.shortDate(DateTime(2026, 11, 20)));
+        expect(inSheet(find.text(until)), findsOneWidget);
+        expect(ticked('weekly'), isTrue, reason: 'still the chosen row');
+
+        await tapShown(
+          tester,
+          inSheet(find.widgetWithText(FilledButton, es.done)),
+        );
+        expect(sheet(), findsNothing);
+        final subtitle = repeatSubtitle(tester);
+        expect(subtitle, contains(es.repeatEvery(1, 'weekly')));
+        expect(subtitle, contains(wednesday));
+        expect(subtitle, contains(until));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final (language, label) in [
+      ('es', 'Listo'),
+      ('en', 'Done'),
+      ('ca', 'Fet'),
+    ]) {
+      testWidgets(
+        'UX-2407: the repeat interval dialog’s button reads «$label» ($language)',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          expect(l.done, label);
+          await openEditor(tester, regar(), language: language);
+          await showDetails(tester);
+          await tapShown(tester, find.byKey(const ValueKey('task-repeat')));
+          await tapShown(tester, row('daily'));
+          await tapShown(tester, inSheet(find.text(l.repeatInterval)));
+          final dialog = find.byType(AlertDialog);
+          expect(dialog, findsOneWidget);
+          expect(
+            find.descendant(
+              of: dialog,
+              matching: find.widgetWithText(FilledButton, label),
+            ),
+            findsOneWidget,
+          );
+          for (final gone in [
+            'Guardar cambios',
+            'Keep changes',
+            'Conserva els canvis',
+          ]) {
+            expect(
+              find.descendant(of: dialog, matching: find.text(gone)),
+              findsNothing,
+              reason: gone,
+            );
+          }
+          // Listo sets the number in the sheet and closes only the dialog.
+          await tester.enterText(
+            find.byKey(const ValueKey('repeat-interval')),
+            '2',
+          );
+          await tester.tap(
+            find.descendant(
+              of: dialog,
+              matching: find.widgetWithText(FilledButton, label),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(dialog, findsNothing);
+          expect(sheet(), findsOneWidget);
+          expect(inSheet(find.text(l.repeatEvery(2, 'daily'))), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    for (final language in ['es', 'ca']) {
+      testWidgets(
+        'UX-2407, UX-2413: the repeat sheet at 2x on 360 dp ($language) shows every row whole, and its weekday chips are at least 8 dp apart side by side and between rows',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          await openEditor(
+            tester,
+            regar(),
+            language: language,
+            size: const Size(360, 800),
+            textScale: 2,
+          );
+          await showDetails(tester);
+          await tapShown(tester, find.byKey(const ValueKey('task-repeat')));
+          await tapShown(tester, row('weekly'));
+          for (final (value, name) in [
+            ('none', l.neverRepeat),
+            ('daily', l.daily),
+            ('weekly', l.weekly),
+            ('monthly', l.monthly),
+            ('yearly', l.yearly),
+          ]) {
+            final text = find.descendant(
+              of: row(value),
+              matching: find.text(name),
+            );
+            expect(text, findsOneWidget, reason: value);
+            await tester.ensureVisible(row(value));
+            await tester.pumpAndSettle();
+            final paragraph = tester.renderObject<RenderParagraph>(
+              find.descendant(of: text, matching: find.byType(RichText)),
+            );
+            expect(paragraph.didExceedMaxLines, isFalse, reason: value);
+            final rect = tester.getRect(text);
+            expect(rect.left, greaterThanOrEqualTo(0), reason: value);
+            expect(rect.right, lessThanOrEqualTo(360), reason: value);
+            expect(rect.top, greaterThanOrEqualTo(0), reason: value);
+            expect(rect.bottom, lessThanOrEqualTo(800), reason: value);
+            expect(
+              tester.getSize(row(value)).height,
+              greaterThanOrEqualTo(48),
+              reason: '$value is a whole tap target',
+            );
+          }
+
+          final chips = inSheet(find.byType(FilterChip));
+          expect(chips, findsNWidgets(7));
+          final rects = [
+            for (final element in chips.evaluate())
+              tester.getRect(find.byWidget(element.widget)),
+          ];
+          final rows = <double>{for (final rect in rects) rect.top}.length;
+          expect(rows, greaterThan(1), reason: 'at 2x the chips wrap');
+          for (var i = 0; i < rects.length; i++) {
+            for (var j = i + 1; j < rects.length; j++) {
+              final a = rects[i];
+              final b = rects[j];
+              final sameRow = a.top < b.bottom && b.top < a.bottom;
+              final gap = sameRow
+                  ? (a.left < b.left ? b.left - a.right : a.left - b.right)
+                  : (a.top < b.top ? b.top - a.bottom : a.top - b.bottom);
+              expect(
+                gap,
+                greaterThanOrEqualTo(8 - 0.01),
+                reason:
+                    'weekday chips $i and $j: '
+                    '${gap.toStringAsFixed(1)} dp '
+                    '(${sameRow ? 'side by side' : 'between rows'})',
+              );
+            }
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  });
+
+  // ---- Run 2026-10-28-app, round 1 · P279 (UX-2312): the form's summary
+  // says the priority as a phrase ----
+
+  group('P279 · priority phrase in the form', () {
+    for (final language in ['es', 'ca', 'en']) {
+      for (final (priority, level) in [(3, 'high'), (2, 'medium')]) {
+        testWidgets(
+          'UX-2312: $language, the form’s summary under Más detalles reads «${lookupAppLocalizations(Locale(language)).priorityValue(level)}» for priority $level',
+          (tester) async {
+            final l = lookupAppLocalizations(Locale(language));
+            await openEditor(
+              tester,
+              Task(id: 9, title: 'Revisión', priority: priority, dueDate: dated),
+              language: language,
+            );
+            final phrase = l.priorityValue(level);
+            expect(inEditor(find.textContaining(phrase)), findsOneWidget);
+            if (language != 'en') {
+              final name = level == 'high' ? l.high : l.medium;
+              expect(
+                inEditor(find.textContaining('${l.priority} $name')),
+                findsNothing,
+              );
+            }
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  });
+
+  // ---- UX loop 2026-10-28-app, round 2 · P304 (UX-2108) ----
+  group('P304 · the form’s primary is 60 dp', () {
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+    });
+
+    /// The edit form for a dated task, in the app's own theme.
+    Future<void> openThemedEditor(
+      WidgetTester tester, {
+      required ThemeData theme,
+      double textScale = 1,
+    }) async {
+      tester.view.physicalSize = const Size(360, 740);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final container = designContainer(
+        regionalStore: MemoryRegionalStore(
+          const RegionalPreferences(
+            language: 'es',
+            clock: ClockFormat.twentyFour,
+            weekStart: 1,
+          ),
+        ),
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: theme,
+            locale: const Locale('es'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(textScale)),
+              child: child!,
+            ),
+            home: TaskEditor(
+              task: Task(
+                id: 30,
+                title: 'Pedir cita en el ayuntamiento',
+                priority: 1,
+                dueDate: dated,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    for (final (name, theme) in [
+      ('light', AppTheme.light),
+      ('dark', AppTheme.dark),
+    ]) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets(
+          'UX-2108: es ${scale.toStringAsFixed(0)}× on 360×740 in the $name theme (form/edit-task.existing), «Guardar cambios» is at least 58 dp tall, inside the screen and can be tapped',
+          (tester) async {
+            await openThemedEditor(tester, theme: theme, textScale: scale);
+            final save = find.byKey(const ValueKey('task-save'));
+            expect(save, findsOneWidget);
+            expect(
+              find.descendant(of: save, matching: find.text(es.saveChangesSentence)),
+              findsOneWidget,
+            );
+            final rect = tester.getRect(save);
+            expect(rect.height, greaterThanOrEqualTo(58), reason: '$rect');
+            expect(rect.bottom, lessThanOrEqualTo(740.5));
+            expect(rect.left, greaterThanOrEqualTo(0));
+            expect(rect.right, lessThanOrEqualTo(360.5));
+            expect(save.hitTestable(), findsOneWidget);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  });
 }

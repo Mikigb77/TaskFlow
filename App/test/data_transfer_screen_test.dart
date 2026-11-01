@@ -12,6 +12,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uuid/uuid.dart';
+import 'package:agenda/theme/app_theme.dart';
+import 'support/button_label.dart';
+import 'support/icon_button_label.dart';
 import 'support/design_fixtures.dart';
 
 void main() {
@@ -457,6 +460,129 @@ void main() {
     });
   }
 
+
+  // ---- UX loop 2026-10-28-app, round 1 · P289 (UX-2608, UX-2108) ----
+  group('P289 · padded, centred filled buttons', () {
+    for (final language in ['es', 'ca']) {
+      testWidgets(
+          'UX-2608 / UX-2108: $language 2× on 320×640, «Exportar archivo TaskFlow» is at least 58 dp tall, its lines centred with at least 8 dp above and below',
+          (tester) async {
+        await loadManrope();
+        tester.view.physicalSize = const Size(320, 640);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final l = lookupAppLocalizations(Locale(language));
+        final parent = designContainer();
+        addTearDown(parent.dispose);
+        final container = ProviderContainer(parent: parent, overrides: [
+          archiveFilesProvider.overrideWithValue(_Files()),
+          archiveStoreProvider.overrideWithValue(_Store())
+        ]);
+        addTearDown(container.dispose);
+        await tester.pumpWidget(UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+                locale: Locale(language),
+                localizationsDelegates:
+                    AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                theme: AppTheme.light,
+                builder: (context, child) => MediaQuery(
+                    data: MediaQuery.of(context)
+                        .copyWith(textScaler: const TextScaler.linear(2)),
+                    child: child!),
+                home: const DataTransferScreen())));
+        await tester.pumpAndSettle();
+        final export = filledButtonWithText(l.exportTaskFlowFile);
+        await tester.ensureVisible(export);
+        await tester.pumpAndSettle();
+        expect(tester.getRect(export).height, greaterThanOrEqualTo(58));
+        expectCentredPaddedLabel(tester, export, l.exportTaskFlowFile);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  });
+
+  // ---- UX loop 2026-10-28-app, round 2 · P304 (UX-2630, UX-2631, UX-2108) ----
+  group('P304 · icon buttons centre their wrapped labels', () {
+    /// Exportar e importar in [language] at [scale] on 360×800.
+    Future<void> pumpTransfer(
+        WidgetTester tester, String language, double scale) async {
+      await loadManrope();
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final parent = designContainer();
+      addTearDown(parent.dispose);
+      final container = ProviderContainer(parent: parent, overrides: [
+        archiveFilesProvider.overrideWithValue(_Files()),
+        archiveStoreProvider.overrideWithValue(_Store())
+      ]);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+              locale: Locale(language),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              theme: AppTheme.light,
+              builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(context)
+                      .copyWith(textScaler: TextScaler.linear(scale)),
+                  child: child!),
+              home: const DataTransferScreen())));
+      await tester.pumpAndSettle();
+    }
+
+    for (final language in ['es', 'ca']) {
+      testWidgets(
+          'UX-2630: $language 2× on 360×800 (settings/data-transfer.start.$language.light.2x), the download icon sits beside «Exportar archivo TaskFlow»’s longest line, and icon and label are centred in the button',
+          (tester) async {
+        await pumpTransfer(tester, language, 2);
+        final l = lookupAppLocalizations(Locale(language));
+        final export = filledButtonWithText(l.exportTaskFlowFile);
+        await tester.ensureVisible(export);
+        await tester.pumpAndSettle();
+        expect(labelLines(tester, export, l.exportTaskFlowFile).length,
+            greaterThanOrEqualTo(2),
+            reason: 'the label wraps here, as in the render');
+        expectIconBesideCentredLabel(tester, export, l.exportTaskFlowFile);
+        expectCentredPaddedLabel(tester, export, l.exportTaskFlowFile);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets(
+          'UX-2631: $language 2× on 360×800, «Elegir archivo para importar» is centred with its icon, its lines centred, with at least 8 dp between its text and the button’s top and bottom edges',
+          (tester) async {
+        await pumpTransfer(tester, language, 2);
+        final l = lookupAppLocalizations(Locale(language));
+        final import = outlinedButtonWithText(l.chooseImportFile);
+        await tester.ensureVisible(import);
+        await tester.pumpAndSettle();
+        // Measured against the visible outline, not the tap target.
+        expectCentredPaddedLabel(
+            tester, visibleButton(import), l.chooseImportFile,
+            wraps: language == 'es');
+        expectIconBesideCentredLabel(tester, import, l.chooseImportFile);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets(
+        'UX-2631 / UX-2108: es 1× on 360×800, the one-line «Elegir archivo para importar» stays 52 dp tall and «Exportar archivo TaskFlow» 60 dp',
+        (tester) async {
+      await pumpTransfer(tester, 'es', 1);
+      final l = lookupAppLocalizations(const Locale('es'));
+      final import = outlinedButtonWithText(l.chooseImportFile);
+      final export = filledButtonWithText(l.exportTaskFlowFile);
+      expect(labelLines(tester, import, l.chooseImportFile), hasLength(1),
+          reason: 'one line at 1×');
+      // The visible buttons; the tap target is measured apart.
+      expect(tester.getRect(visibleButton(import)).height, closeTo(52, 0.5));
+      expect(tester.getRect(visibleButton(export)).height, closeTo(60, 0.5));
+      expect(tester.takeException(), isNull);
+    });
+  });
 }
 
 

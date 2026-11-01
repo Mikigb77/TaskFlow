@@ -261,7 +261,7 @@ class _ScheduleEditorState extends State<_ScheduleEditor> {
                         const SizedBox(height: 12),
                         Wrap(
                           spacing: 8,
-                          runSpacing: 4,
+                          runSpacing: 8,
                           children: [
                             for (final entry in [
                               (l.today, today),

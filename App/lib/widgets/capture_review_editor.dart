@@ -632,7 +632,7 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
     );
     final optionsSummary = [
       if (task.priority > 1)
-        l.priorityValue(context.priorityName(task.priority)),
+        context.priorityPhrase(task.priority),
       if (task.isRecurring) context.repeatLabel(task),
     ];
     final repair = [
@@ -824,7 +824,7 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
                 if (task.priority > 1)
                   Chip(
                     label: Text(
-                      l.priorityValue(context.priorityName(task.priority)),
+                      context.priorityPhrase(task.priority),
                     ),
                   ),
                 if (task.isRecurring)

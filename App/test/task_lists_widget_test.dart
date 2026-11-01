@@ -24,6 +24,8 @@ import 'package:agenda/providers/subscription_provider.dart';
 import 'support/capture_fixtures.dart';
 import 'support/design_fixtures.dart';
 import 'support/hanging_sync.dart';
+import 'support/no_counter.dart';
+import 'support/search_clear.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/task_list_picker.dart';
@@ -723,7 +725,7 @@ void main() {
   });
 
   testWidgets(
-      'UX-329: a new account’s Projects screen has no headline, help line, refresh button or search box: Grupos and Nuevo proyecto are its only buttons',
+      'UX-329: a new account’s Projects screen has no headline, help line, refresh button or search box: Nuevo proyecto is its only button, and Grupos waits until something is shared (P286)',
       (tester) async {
     await openProjects(tester, []);
     final screen = find.byType(TaskListsScreen);
@@ -747,8 +749,8 @@ void main() {
         .widgetList(inScreen(find.byWidgetPredicate(
             (w) => w is ButtonStyleButton || w is IconButton)))
         .toList();
-    expect(buttons, hasLength(2), reason: '$buttons');
-    expect(inScreen(find.widgetWithText(TextButton, es.groups)), findsOneWidget);
+    expect(buttons, hasLength(1), reason: '$buttons');
+    expect(inScreen(find.widgetWithText(TextButton, es.groups)), findsNothing);
     expect(find.byKey(const ValueKey('new-list')), findsOneWidget);
     expect(inScreen(find.byType(LinearProgressIndicator)), findsNothing);
     expect(tester.takeException(), isNull);
@@ -868,7 +870,12 @@ void main() {
   testWidgets(
       'UX-329: at 320 dp and 2× text in Spanish, Proyectos and Grupos each stay on one line, unbroken, with no overflow',
       (tester) async {
-    await openProjects(tester, [TaskListInfo(id: 'casa', name: 'Casa')]);
+    // In a group, so Grupos shows (P286).
+    await openProjects(tester, [TaskListInfo(id: 'casa', name: 'Casa')],
+        groups: const [
+          TaskGroupInfo(
+              id: 'master', name: 'Máster', ownerId: 1, version: 1, role: 'owner'),
+        ]);
     tester.view.physicalSize = const Size(320, 568);
     tester.platformDispatcher.textScaleFactorTestValue = 2;
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
@@ -998,9 +1005,10 @@ void main() {
   });
 
   testWidgets('UX-1522: Grupos comes after the last project', (tester) async {
+    // Obra is shared, so Grupos shows (P286).
     await openProjectsWith(tester, [
       TaskListInfo(id: 'casa', name: 'Casa', version: 2),
-      TaskListInfo(id: 'obra', name: 'Obra', version: 2),
+      TaskListInfo(id: 'obra', name: 'Obra', version: 2, shared: true),
       TaskListInfo(id: 'viaje', name: 'Viaje', version: 2),
     ]);
     final groups = find.widgetWithText(TextButton, es.groups);
@@ -1052,8 +1060,9 @@ void main() {
   testWidgets(
       'UX-1522: offline, with invitations failing to load, neither Proyectos nor Grupos shows Reintentar invitaciones',
       (tester) async {
-    await openProjectsWith(
-        tester, [TaskListInfo(id: 'casa', name: 'Casa', version: 2)],
+    // Shared, so Grupos shows (P286).
+    await openProjectsWith(tester,
+        [TaskListInfo(id: 'casa', name: 'Casa', version: 2, shared: true)],
         invitations: () async => throw ApiException(0, 'offline'));
     expect(find.textContaining('Reintentar invitaciones'), findsNothing);
     expect(find.textContaining('invitaciones'), findsNothing);
@@ -1228,6 +1237,630 @@ void main() {
         findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  group('P285 · project name dialogs show no character counter', () {
+    /// A Spanish page whose button runs [open] with the app's providers.
+    Future<void> pumpOpener(WidgetTester tester,
+        Future<void> Function(BuildContext context, WidgetRef ref) open) async {
+      final store = _Lists()
+        ..lists = [TaskListInfo(id: 'casa', name: 'Casa', version: 2)];
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWith((ref) => OfflineApiClient()),
+          taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+          taskProvider.overrideWith((ref) => DesignTaskNotifier()),
+          taskListStoreProvider.overrideWithValue(store),
+          groupsProvider.overrideWith((ref) async => []),
+        ],
+        child: MaterialApp(
+          locale: const Locale('es'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          home: Scaffold(
+            body: Consumer(
+              builder: (context, ref, _) {
+                ref.watch(taskListsProvider);
+                ref.watch(groupsProvider);
+                return TextButton(
+                  onPressed: () => open(context, ref),
+                  child: const Text('Abrir'),
+                );
+              },
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Abrir'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+        'UX-2505: the new project dialog shows no 0/80 counter and still stops at 80',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      await pumpOpener(tester, (context, ref) => editTaskList(context, ref));
+      expect(find.text(es.newList), findsWidgets);
+      await expectNoCounter(tester, 80);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    });
+
+    testWidgets(
+        'UX-2505: editing a project’s name shows no counter and still stops at 80',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      await pumpOpener(
+          tester,
+          (context, ref) => editTaskList(context, ref,
+              list: TaskListInfo(id: 'casa', name: 'Casa', version: 2)));
+      expect(find.text(es.editList), findsOneWidget);
+      // «Casa» would have read «4/80».
+      await expectNoCounter(tester, 80);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    });
+
+    testWidgets(
+        'UX-2505: correcting a dictated project’s name shows no counter and still stops at 80',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      await pumpOpener(
+          tester,
+          (context, ref) => chooseTaskList(context, ref,
+              newName: 'Excursión', onRename: (_) {}));
+      await tester.tap(find.text(es.commandNewProject('Excursión')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('new-project-name')), findsOneWidget);
+      await expectNoCounter(tester, 80);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    });
+  });
+
+  group('P286 · a project’s page manages it; Grupos once it matters', () {
+    const me = ProjectMember(id: 1, name: 'Yo', role: 'owner');
+    const ana = ProjectMember(id: 2, name: 'Ana', role: 'editor');
+
+    /// The texts of the ⋮ menu that's open, top to bottom.
+    List<String> menuTexts(WidgetTester tester) => tester
+        .widgetList<PopupMenuItem<String>>(find.byType(PopupMenuItem<String>))
+        .map((item) => (item.child! as Text).data!)
+        .toList();
+
+    /// What Proyectos ⋮ offers for [name], then that project's page open.
+    Future<List<String>> projectsMenuThenPage(
+        WidgetTester tester, String name) async {
+      await openMenu(tester, name);
+      final offered = menuTexts(tester);
+      // Closes the menu without choosing.
+      await tester.tapAt(const Offset(8, 420));
+      await tester.pumpAndSettle();
+      expect(find.byType(PopupMenuItem<String>), findsNothing);
+      await tester.tap(find.widgetWithText(ListTile, name));
+      await tester.pumpAndSettle();
+      return offered;
+    }
+
+    Finder pageOf(String id) => find.byWidgetPredicate(
+        (w) => w is HomeScreen && w.listId == id,
+        skipOffstage: false);
+
+    Finder inAppBar(Finder finder) => find.descendant(
+        of: find.descendant(of: pageOf('casa'), matching: find.byType(AppBar)),
+        matching: finder);
+
+    testWidgets(
+        'UX-2503: «Casa»’s page (owner) has a ⋮ after ✓, «Gestionar Casa», listing what Proyectos ⋮ offers for Casa, in its order (its own Compartir button and pinning aside)',
+        (tester) async {
+      await openProjects(
+          tester, [TaskListInfo(id: 'casa', name: 'Casa', version: 2)]);
+      final offered = await projectsMenuThenPage(tester, 'Casa');
+      expect(offered, [
+        es.pinProject,
+        es.editList,
+        es.archiveList,
+        es.shareProject,
+        es.deleteList,
+      ]);
+      expect(pageOf('casa'), findsOneWidget);
+      final done = inAppBar(find.byTooltip(es.completedTasks));
+      final manage = inAppBar(find.byTooltip(es.manageItem('Casa')));
+      expect(done, findsOneWidget);
+      expect(manage, findsOneWidget);
+      expect(tester.getCenter(manage).dx, greaterThan(tester.getCenter(done).dx),
+          reason: '⋮ comes after ✓');
+      expect(tester.getSize(manage).width, greaterThanOrEqualTo(48));
+      await tester.tap(manage);
+      await tester.pumpAndSettle();
+      // The same items, in the same order; «Compartir» is the page's own
+      // button under the app bar, so ⋮ doesn't repeat it, and pinning only
+      // reorders Proyectos, so the page doesn't offer it (P303, UX-2628).
+      expect(menuTexts(tester), [
+        for (final item in offered)
+          if (item != es.shareProject && item != es.pinProject) item
+      ]);
+      expect(find.widgetWithText(TextButton, es.shareProject), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    for (final (role, expected) in [
+      ('owner', [
+        es.pinProject,
+        es.projectNotifications,
+        es.editList,
+        es.archiveList,
+        es.deleteListForEveryone,
+      ]),
+      ('editor', [es.pinProject, es.projectNotifications]),
+      ('viewer', [es.pinProject, es.projectNotifications]),
+    ]) {
+      testWidgets(
+          'UX-2503: a shared project’s page ($role) lists in its ⋮ what Proyectos ⋮ offers that role, in its order (Miembros is the page’s own button; pinning stays on Proyectos)',
+          (tester) async {
+        await openProjects(tester, [
+          TaskListInfo(
+              id: 'casa',
+              name: 'Casa',
+              version: 2,
+              shared: true,
+              role: role,
+              ownerId: role == 'owner' ? 1 : 2,
+              people: const [me, ana]),
+        ]);
+        final offered = await projectsMenuThenPage(tester, 'Casa');
+        // On Proyectos, Miembros comes before the owner's delete.
+        final members = role == 'owner' ? 4 : 2;
+        expect(offered, [
+          ...expected.take(members),
+          es.people,
+          ...expected.skip(members),
+        ]);
+        await tester.tap(inAppBar(find.byTooltip(es.manageItem('Casa'))));
+        await tester.pumpAndSettle();
+        // Pinning only reorders Proyectos: the page doesn't offer it
+        // (P303, UX-2628).
+        expect(menuTexts(tester),
+            [for (final item in expected) if (item != es.pinProject) item]);
+        expect(menuTexts(tester), [
+          for (final item in offered)
+            if (item != es.people && item != es.pinProject) item
+        ]);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets(
+        'UX-2503: renaming «Casa» to «Casaa» from its page takes 3 taps (⋮, Editar proyecto, Guardar proyecto) plus typing, and the page says Casaa',
+        (tester) async {
+      final (store, _, _) = await openProjects(
+          tester, [TaskListInfo(id: 'casa', name: 'Casa', version: 2)]);
+      await tester.tap(find.widgetWithText(ListTile, 'Casa'));
+      await tester.pumpAndSettle();
+      var taps = 0;
+      Future<void> tap(Finder finder) async {
+        expect(finder, findsOneWidget);
+        await tester.tap(finder);
+        await tester.pumpAndSettle();
+        taps++;
+      }
+
+      await tap(inAppBar(find.byTooltip(es.manageItem('Casa'))));
+      await tap(find.text(es.editList));
+      await tester.enterText(find.byKey(const ValueKey('list-name')), 'Casaa');
+      await tap(find.widgetWithText(FilledButton, es.saveList));
+      expect(taps, 3);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(store.lists.single.name, 'Casaa');
+      expect(pageOf('casa'), findsOneWidget);
+      expect(
+          ModalRoute.of(tester.element(pageOf('casa')))!.isCurrent, isTrue,
+          reason: 'still on the project’s page');
+      expect(inAppBar(find.text('Casaa')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'UX-2503: Eliminar proyecto from «Casa»’s page closes it and shows Proyecto eliminado on Proyectos, without Casa',
+        (tester) async {
+      final (_, _, api) = await openProjects(tester, [
+        TaskListInfo(id: 'casa', name: 'Casa', version: 2),
+        TaskListInfo(id: 'obra', name: 'Obra', version: 2),
+      ]);
+      await tester.tap(find.widgetWithText(ListTile, 'Casa'));
+      await tester.pumpAndSettle();
+      await tester.tap(inAppBar(find.byTooltip(es.manageItem('Casa'))));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(es.deleteList));
+      await tester.pumpAndSettle();
+      // It still asks first.
+      await tester.tap(find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.widgetWithText(FilledButton, es.deleteList)));
+      await tester.pumpAndSettle();
+      expect(api.calls, contains(('DELETE', 'lists/casa/')));
+      expect(pageOf('casa'), findsNothing, reason: 'the page is closed');
+      final projects = find.byType(TaskListsScreen);
+      expect(ModalRoute.of(tester.element(projects))!.isCurrent, isTrue);
+      expect(find.text(es.projectDeleted).hitTestable(), findsOneWidget);
+      expect(find.widgetWithText(ListTile, 'Casa'), findsNothing);
+      expect(find.widgetWithText(ListTile, 'Obra'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'UX-2516: a new account’s Proyectos, opened from another screen, has no Grupos: its only buttons are Atrás and Nuevo proyecto',
+        (tester) async {
+      await openProjects(tester, []);
+      tester.state<NavigatorState>(find.byType(Navigator)).push(
+          MaterialPageRoute<void>(builder: (_) => const TaskListsScreen()));
+      await tester.pumpAndSettle();
+      final top = find.byType(TaskListsScreen);
+      expect(top, findsOneWidget, reason: 'the one below is offstage');
+      expect(find.text(es.groups), findsNothing);
+      expect(find.byIcon(Icons.groups_outlined), findsNothing);
+      // Each button once: BackButton wraps an IconButton, which wraps a
+      // button of its own.
+      final buttons = find.descendant(
+          of: top,
+          matching: find.byWidgetPredicate((w) =>
+              w.runtimeType == IconButton ||
+              w is FilledButton ||
+              w is TextButton ||
+              w is OutlinedButton ||
+              w is ElevatedButton));
+      expect(buttons, findsNWidgets(2), reason: '${tester.widgetList(buttons)}');
+      final back = MaterialLocalizations.of(tester.element(top))
+          .backButtonTooltip;
+      expect(find.descendant(of: top, matching: find.byTooltip(back)),
+          findsOneWidget);
+      expect(
+          find.descendant(
+              of: top, matching: find.byKey(const ValueKey('new-list'))),
+          findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'UX-2516: projects of one’s own, none shared and no group, still show no Grupos',
+        (tester) async {
+      await openProjects(tester, [
+        TaskListInfo(id: 'casa', name: 'Casa', version: 2),
+        TaskListInfo(id: 'obra', name: 'Obra', version: 2),
+      ]);
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -600));
+      await tester.pumpAndSettle();
+      expect(find.text(es.groups), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    Future<void> expectGroupsShown(WidgetTester tester) async {
+      final groups = find.widgetWithText(TextButton, es.groups);
+      await tester.scrollUntilVisible(groups, 200,
+          scrollable: find.byType(Scrollable).first);
+      await tester.pumpAndSettle();
+      expect(groups, findsOneWidget);
+      await tester.tap(groups);
+      await tester.pumpAndSettle();
+      expect(find.byType(GroupsScreen), findsOneWidget);
+    }
+
+    testWidgets('UX-2516: with a shared project, Grupos shows and opens Grupos',
+        (tester) async {
+      await openProjects(tester, [
+        TaskListInfo(
+            id: 'casa',
+            name: 'Casa',
+            version: 2,
+            shared: true,
+            ownerId: 1,
+            people: const [me, ana]),
+      ]);
+      await expectGroupsShown(tester);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-2516: in a group, Grupos shows and opens Grupos',
+        (tester) async {
+      await openProjects(tester, [],
+          groups: const [
+            TaskGroupInfo(
+                id: 'master',
+                name: 'Máster',
+                ownerId: 1,
+                version: 1,
+                role: 'owner'),
+          ]);
+      await expectGroupsShown(tester);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'UX-2516: with a pending group invitation (its card on Proyectos), Grupos shows',
+        (tester) async {
+      await openProjectsWith(tester, [],
+          invitations: () async => const [
+                PendingInvitation(
+                    kind: 'group',
+                    id: 'inv-1',
+                    name: 'Máster',
+                    targetId: 'master',
+                    role: 'member'),
+              ]);
+      expect(find.textContaining('Máster'), findsWidgets,
+          reason: 'the invitation’s card shows');
+      final groups = find.widgetWithText(TextButton, es.groups);
+      await tester.scrollUntilVisible(groups, 200,
+          scrollable: find.byType(Scrollable).first);
+      expect(groups, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  // ---- P288 (UX-2509): every search clears in one tap ----
+
+  group('P288 · Proyectos search clears in one tap', () {
+    // The search box shows from 8 projects.
+    const names = [
+      'Casa', 'Trabajo', 'Gimnasio', 'Viajes', 'Lectura', 'Dentista',
+      'Compras', 'Huerto',
+    ];
+
+    Future<void> show(WidgetTester tester, String language) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final store = _Lists()
+        ..lists = [for (final name in names) TaskListInfo(id: name, name: name)];
+      final container = ProviderContainer(overrides: [
+        apiClientProvider.overrideWith((ref) => OfflineApiClient()),
+        taskProvider.overrideWith((ref) => DesignTaskNotifier()),
+        taskListStoreProvider.overrideWithValue(store),
+        pendingInvitationsProvider.overrideWith((ref) async => []),
+        themeStoreProvider.overrideWithValue(MemoryThemeStore()),
+      ]);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+              locale: Locale(language),
+              theme: AppTheme.light,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: const TaskListsScreen())));
+      await tester.pumpAndSettle();
+    }
+
+    Finder row(String name) => find.widgetWithText(ListTile, name);
+
+    for (final language in ['es', 'en', 'ca']) {
+      testWidgets(
+          'UX-2509: ($language, 1×, 360×800) Proyectos: an empty search has no ✕; typing «dent» shows a 48 dp ✕ read as «Borrar búsqueda»; one tap clears it and every project comes back',
+          (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        final semantics = tester.ensureSemantics();
+        await show(tester, language);
+        final field = searchField();
+        expect(field, findsOneWidget);
+        expectNoClear(field, l);
+        expect(row('Casa'), findsOneWidget);
+
+        await tester.enterText(field, 'dent');
+        await tester.pumpAndSettle();
+        expect(row('Dentista'), findsOneWidget);
+        expect(row('Casa'), findsNothing);
+        expect(row('Trabajo'), findsNothing);
+        expectClear(tester, field, l);
+
+        await tapClear(tester, field, l);
+        expect(searchText(tester, field), isEmpty);
+        expect(row('Casa'), findsOneWidget);
+        expect(row('Trabajo'), findsOneWidget);
+        expectNoClear(field, l);
+        // Every project is listed again, the last one at the end.
+        await tester.scrollUntilVisible(row('Huerto'), 200,
+            scrollable: find.byType(Scrollable).first);
+        expect(row('Huerto'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      });
+    }
+
+    testWidgets(
+        'UX-2509: (es, 1×, 360×800) Proyectos with no match: the ✕ is in view and brings the projects back',
+        (tester) async {
+      final es = lookupAppLocalizations(const Locale('es'));
+      final semantics = tester.ensureSemantics();
+      await show(tester, 'es');
+      final field = searchField();
+      await tester.enterText(field, 'zanahorias');
+      await tester.pumpAndSettle();
+      expect(find.text(es.projectsNoneFound), findsOneWidget);
+      expect(row('Casa'), findsNothing);
+      expectClear(tester, field, es);
+
+      await tapClear(tester, field, es);
+      expect(find.text(es.projectsNoneFound), findsNothing);
+      expect(row('Casa'), findsOneWidget);
+      expectNoClear(field, es);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    });
+  });
+
+  // ---- Run 2026-10-28-app, round 2 · P303 (UX-2628) ----
+
+  group('P303 · pinning stays on Proyectos', () {
+    const me = ProjectMember(id: 1, name: 'Yo', role: 'owner');
+    const ana = ProjectMember(id: 2, name: 'Ana', role: 'editor');
+
+    /// The texts of the ⋮ menu that's open, top to bottom.
+    List<String> menuTexts(WidgetTester tester) => tester
+        .widgetList<PopupMenuItem<String>>(find.byType(PopupMenuItem<String>))
+        .map((item) => (item.child! as Text).data!)
+        .toList();
+
+    Finder pageOf(String id) => find.byWidgetPredicate(
+        (w) => w is HomeScreen && w.listId == id,
+        skipOffstage: false);
+
+    Finder inAppBarOf(String id, Finder finder) => find.descendant(
+        of: find.descendant(of: pageOf(id), matching: find.byType(AppBar)),
+        matching: finder);
+
+    Future<void> closeMenu(WidgetTester tester) async {
+      await tester.tapAt(const Offset(8, 420));
+      await tester.pumpAndSettle();
+      expect(find.byType(PopupMenuItem<String>), findsNothing);
+    }
+
+    /// Projects in Spanish, signed in, with [lists] in a store that pins
+    /// and orders them as the phone's database does.
+    Future<_PinningLists> openPinning(
+        WidgetTester tester, List<TaskListInfo> lists) async {
+      platform.setMockMethodCallHandler(timeoutChannel, (_) async => 10000);
+      addTearDown(
+          () => platform.setMockMethodCallHandler(timeoutChannel, null));
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final store = _PinningLists()..lists = lists;
+      final api = _DeleteApi();
+      final container = ProviderContainer(overrides: [
+        apiClientProvider.overrideWithValue(api),
+        authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
+        taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+        taskProvider.overrideWith((ref) => _CountingTasks()),
+        taskListStoreProvider.overrideWithValue(store),
+        pendingInvitationsProvider.overrideWith((ref) async => []),
+        groupsProvider.overrideWith((ref) async => []),
+        themeStoreProvider.overrideWithValue(MemoryThemeStore()),
+      ]);
+      addTearDown(container.dispose);
+      addTearDown(api.close);
+      await tester.pumpWidget(UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+              locale: const Locale('es'),
+              theme: AppTheme.light,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: const TaskListsScreen())));
+      await tester.pumpAndSettle();
+      return store;
+    }
+
+    for (final pinned in [false, true]) {
+      for (final (label, shared, role) in [
+        ('owner, personal', false, 'owner'),
+        ('owner, shared', true, 'owner'),
+        ('editor', true, 'editor'),
+        ('viewer', true, 'viewer'),
+      ]) {
+        testWidgets(
+            'UX-2628: «Casa»’s page ($label${pinned ? ', pinned' : ''}) lists neither Fijar nor Desfijar proyecto in its ⋮; Proyectos’ ⋮ for Casa still lists ${pinned ? 'Desfijar' : 'Fijar'} proyecto',
+            (tester) async {
+          await openPinning(tester, [
+            TaskListInfo(
+                id: 'casa',
+                name: 'Casa',
+                version: 2,
+                pinned: pinned,
+                shared: shared,
+                role: role,
+                ownerId: role == 'owner' ? 1 : 2,
+                people: shared ? const [me, ana] : const []),
+          ]);
+          await openMenu(tester, 'Casa');
+          expect(menuTexts(tester),
+              contains(pinned ? es.unpinProject : es.pinProject));
+          await closeMenu(tester);
+          await tester.tap(find.widgetWithText(ListTile, 'Casa'));
+          await tester.pumpAndSettle();
+          expect(pageOf('casa'), findsOneWidget);
+          final manage =
+              inAppBarOf('casa', find.byTooltip(es.manageItem('Casa')));
+          expect(manage, findsOneWidget);
+          await tester.tap(manage);
+          await tester.pumpAndSettle();
+          final items = menuTexts(tester);
+          expect(items, isNotEmpty);
+          expect(items, isNot(contains(es.pinProject)));
+          expect(items, isNot(contains(es.unpinProject)));
+          expect(find.text(es.pinProject), findsNothing);
+          expect(find.text(es.unpinProject), findsNothing);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+
+    testWidgets(
+        'UX-2628: on Proyectos, Fijar proyecto in «Obra»’s ⋮ moves its row to the top, marked Fijado, and its ⋮ then offers Desfijar proyecto; Obra’s page still offers neither',
+        (tester) async {
+      final store = await openPinning(tester, [
+        TaskListInfo(id: 'casa', name: 'Casa', version: 2),
+        TaskListInfo(id: 'obra', name: 'Obra', version: 2),
+      ]);
+      Finder row(String name) => find.widgetWithText(ListTile, name);
+      expect(tester.getTopLeft(row('Casa')).dy,
+          lessThan(tester.getTopLeft(row('Obra')).dy));
+      expect(
+          find.descendant(
+              of: row('Obra'), matching: find.byIcon(Icons.push_pin_outlined)),
+          findsNothing);
+
+      await openMenu(tester, 'Obra');
+      await tester.tap(find.text(es.pinProject));
+      await tester.pumpAndSettle();
+
+      expect(store.lists.singleWhere((l) => l.id == 'obra').pinned, isTrue);
+      // Obra now leads the list, with the pin that reads Fijado.
+      expect(tester.getTopLeft(row('Obra')).dy,
+          lessThan(tester.getTopLeft(row('Casa')).dy));
+      final handle = tester.ensureSemantics();
+      expect(
+          find.descendant(
+              of: row('Obra'), matching: find.byIcon(Icons.push_pin_outlined)),
+          findsOneWidget);
+      expect(tester.getSemantics(row('Obra')).label,
+          contains(es.projectPinned));
+      handle.dispose();
+      await openMenu(tester, 'Obra');
+      expect(menuTexts(tester).first, es.unpinProject);
+      await closeMenu(tester);
+
+      // Its own page doesn't offer pinning, pinned or not.
+      await tester.tap(row('Obra'));
+      await tester.pumpAndSettle();
+      await tester
+          .tap(inAppBarOf('obra', find.byTooltip(es.manageItem('Obra'))));
+      await tester.pumpAndSettle();
+      expect(menuTexts(tester), isNotEmpty);
+      expect(find.text(es.pinProject), findsNothing);
+      expect(find.text(es.unpinProject), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  });
+}
+
+/// P303: the phone's projects, pinned and ordered as its database does:
+/// archived last, pinned first, then by name.
+class _PinningLists extends _Lists {
+  @override
+  Future<List<TaskListInfo>> all() async => [...lists]..sort((a, b) {
+      if (a.archived != b.archived) return a.archived ? 1 : -1;
+      if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+
+  @override
+  Future<void> preferences(String id,
+      {bool? pinned, String? notifications}) async {
+    lists = [
+      for (final list in lists)
+        list.id == id && pinned != null ? list.copyWith(pinned: pinned) : list,
+    ];
+  }
 }
 
 /// Projects' server: a DELETE waits for [answer]; anything else goes

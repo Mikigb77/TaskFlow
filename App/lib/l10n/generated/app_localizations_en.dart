@@ -224,9 +224,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notesSavedOnDevice => 'Your notes are still on this phone.';
 
   @override
-  String get allNotes => 'All notes';
-
-  @override
   String get viewOnlyNote =>
       'View-only note. To make changes, ask the project’s owner.';
 
@@ -274,9 +271,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deadlineTime => 'Deadline time';
 
   @override
-  String get deadlineEndDay => 'By the end of the day';
-
-  @override
   String get removeDeadline => 'Remove deadline';
 
   @override
@@ -287,11 +281,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'This plan finishes after the deadline. Check the start or duration.';
 
   @override
-  String get deadlineOverdue => 'Deadline passed';
-
-  @override
   String deadlineLabel(String date) {
     return 'Due $date';
+  }
+
+  @override
+  String deadlinePassedOn(String date) {
+    return 'Was due $date';
   }
 
   @override
@@ -560,9 +556,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get delete => 'Delete';
 
   @override
-  String get keepChanges => 'Keep changes';
-
-  @override
   String get taskTitle => 'Task title';
 
   @override
@@ -773,6 +766,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get findTask => 'Find a task…';
+
+  @override
+  String get clearSearch => 'Clear search';
 
   @override
   String get allTasks => 'All tasks';
@@ -1000,7 +996,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get capturePrivacy =>
-      'Live transcription uses on-device speech where available; no audio is retained in that mode. To add, find or change tasks, your words go over the internet to Google’s AI. Saved audio is transcribed online. Anything not saved yet stays on this phone until you save or discard it.';
+      'Live transcription uses on-device speech where available; no audio is retained in that mode. To add, find or change tasks, or to ask for reminders your way, your words go over the internet to Google’s AI. Saved audio is transcribed online. Anything not saved yet stays on this phone until you save or discard it.';
 
   @override
   String get capturePrivacyLine =>
@@ -1026,10 +1022,16 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       done,
       locale: localeName,
-      other: '$remaining to do · $done completed',
-      zero: '$remaining to do',
+      other: '$remaining to do · $done completed',
+      zero: '$remaining to do',
     );
-    return '$_temp0';
+    String _temp1 = intl.Intl.pluralLogic(
+      remaining,
+      locale: localeName,
+      other: '$_temp0',
+      zero: '$done completed',
+    );
+    return '$_temp1';
   }
 
   @override
@@ -1113,8 +1115,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String priorityValue(String priority) {
-    return '$priority priority';
+  String priorityValue(String level) {
+    String _temp0 = intl.Intl.selectLogic(level, {
+      'high': 'High priority',
+      'medium': 'Medium priority',
+      'other': 'Low priority',
+    });
+    return '$_temp0';
   }
 
   @override
@@ -1870,7 +1877,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sharingRolesHelp =>
-      'Editors can add, change, complete and delete tasks and files. Only the owner manages the project and people. Shared tasks stay in this project; exporting creates a personal copy.';
+      'Editors can add, change, complete and delete tasks and files. Only the owner manages the project and people. Shared tasks stay in this project.';
 
   @override
   String get listSharing => 'Project sharing';
@@ -1901,7 +1908,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get removeAccessHelp =>
-      'This person will lose access to this project and its tasks, notes and files. Their unsent shared edits will be removed on the next successful sync.';
+      'This person will lose access to this project and its tasks, notes and files. Changes they haven’t sent yet will be lost.';
 
   @override
   String get pendingInvitations => 'Pending invitations';
@@ -1920,7 +1927,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sharingRemovalHelp =>
-      'Leaving or losing access removes this phone’s shared tasks, notes, pending edits and downloaded copies at the next successful sync. Offline devices and copies already exported cannot be remotely erased.';
+      'When you leave or lose access, the project leaves this phone the next time it connects. Copies you exported stay.';
 
   @override
   String get deleteList => 'Delete project';
@@ -2031,10 +2038,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get fileUploadHelp =>
       'New files upload to your account after saving, up to 6 MB each. Older local files stay on this device until you choose Upload in task details.';
-
-  @override
-  String get fileLocalHelp =>
-      'Files stay on this device until you sign in and choose Upload in task details. Up to 6 MB per file.';
 
   @override
   String get fileLimit =>
@@ -3455,6 +3458,24 @@ class AppLocalizationsEn extends AppLocalizations {
       'Only an empty group can be deleted. Archive a group to keep its projects and content.';
 
   @override
+  String get groupDeleteAction => 'Delete group';
+
+  @override
+  String groupDeleteConfirm(String name) {
+    return 'Delete “$name”? Its members will lose it. This can’t be undone.';
+  }
+
+  @override
+  String groupTransferConfirm(String group, String person) {
+    return 'Transfer “$group” to $person?';
+  }
+
+  @override
+  String groupTransferAction(String person) {
+    return 'Transfer to $person';
+  }
+
+  @override
   String get groupActionError =>
       'This change could not be saved. Check your connection and refresh; permissions may have changed.';
 
@@ -3495,7 +3516,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get updatesAll => 'All changes';
 
   @override
-  String get updatesAssigned => 'My assignments';
+  String get updatesAssigned => 'Only what’s for me';
 
   @override
   String get updatesMuted => 'Muted — no updates or reminders';
@@ -3517,7 +3538,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get activityCreated => 'Created a task';
 
   @override
-  String get activityUpdated => 'Updated a task';
+  String get activityUpdated => 'Updated the task';
+
+  @override
+  String get activityMoved => 'Moved the task';
 
   @override
   String get activityAssigned => 'Changed responsibility';
@@ -3554,6 +3578,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'unassigned': '$actor removed the assignee of: $title',
       'completed': '$actor completed: $title',
       'reopened': '$actor reopened: $title',
+      'moved': '$actor moved: $title',
       'deleted': '$actor deleted: $title',
       'shared': '$actor shared: $title',
       'other': '$actor updated: $title',

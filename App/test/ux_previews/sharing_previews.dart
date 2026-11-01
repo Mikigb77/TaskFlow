@@ -131,16 +131,20 @@ const _colegio = TaskGroupInfo(
 );
 
 /// «Familia López», opened as its owner María, with one pending invitation.
-Future<PreviewApp> _openFamilia(Preview p) async {
+/// [group] swaps in another state of it, such as one with no projects.
+Future<PreviewApp> _openFamilia(
+  Preview p, {
+  TaskGroupInfo group = _familia,
+}) async {
   final app = await PreviewApp.open(
     p,
     tasks: normalDay(),
     projects: allProjects,
-    groups: const [_familia, _colegio],
+    groups: [group, _colegio],
     overrides: [
       groupDetailsProvider('familia').overrideWith(
         (ref) async => {
-          'group': _groupJson(_familia),
+          'group': _groupJson(group),
           'invitations': [
             {'id': 'gi-1', 'email': 'carmen.lopez@example.com'},
           ],
@@ -391,7 +395,7 @@ void sharingPreviews() {
     preview(
       groupDetail,
       'owner',
-      '«Familia López» as its owner: its people, yours marked «(tú)», a pending invitation, Invitar a una persona.',
+      '«Familia López» as its owner: Invitar a una persona first, filled; its people, yours marked «(tú)», a pending invitation.',
       everywhere,
       (p) async {
         await _openFamilia(p);
@@ -411,18 +415,55 @@ void sharingPreviews() {
       },
     );
 
+    // P285 (UX-2504): what deleting and giving away a group do.
+    preview(
+      groupDetail,
+      'delete-confirm',
+      'Eliminar grupo on an empty «Familia López»: «¿Eliminar «Familia López»? Sus miembros dejarán de verlo. No se puede deshacer.», and a red Eliminar grupo.',
+      [es2],
+      (p) async {
+        final app = await _openFamilia(
+          p,
+          group: TaskGroupInfo(
+            id: _familia.id,
+            name: _familia.name,
+            ownerId: _familia.ownerId,
+            version: _familia.version,
+            role: _familia.role,
+            projectCount: 0,
+            people: _familia.people,
+          ),
+        );
+        await app.tap(p.l.groupDeleteAction);
+        await p.shoot();
+      },
+    );
+
+    preview(
+      groupDetail,
+      'transfer-confirm',
+      'Transferir propiedad to Paul: «¿Transferir «Familia López» a Paul?», what the new owner controls, and Transferir a Paul.',
+      [es1],
+      (p) async {
+        final app = await _openFamilia(p);
+        await app.tap(p.l.groupTransfer);
+        await app.tap('Paul');
+        await p.shoot();
+      },
+    );
+
     // ---------------------------------------------------------- activity
     preview(
       activity,
       'list',
-      'What others did in shared projects: unread first, in bold.',
+      'What others did in shared projects: unread first, in bold; a moved task says «ha movido».',
       everywhere,
       (p) async {
         final app = await PreviewApp.open(
           p,
           tasks: normalDay(),
           projects: allProjects,
-          unread: 2,
+          unread: 3,
           activity: [
             {
               'id': 'a1',
@@ -432,6 +473,17 @@ void sharingPreviews() {
               'project_name': 'Matemáticas',
               'created_at': previewNow.subtract(const Duration(minutes: 40)).toUtc().toIso8601String(),
               'read_at': null,
+            },
+            {
+              'id': 'a4',
+              'action': 'updated',
+              'actor_name': 'Ana',
+              'task_title': 'Recoger a los niños',
+              'project_name': 'Excursión de fin de curso',
+              'created_at': previewNow.subtract(const Duration(hours: 2)).toUtc().toIso8601String(),
+              'read_at': null,
+              // Only its day changed (UX-2508): «Ana ha movido: …».
+              'fields': ['scheduled_date'],
             },
             {
               'id': 'a2',

@@ -24,6 +24,7 @@ import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
+import 'support/button_label.dart';
 import 'support/design_fixtures.dart';
 import 'support/phone_alerts.dart';
 import 'support/reminder_fixtures.dart';
@@ -3136,6 +3137,135 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P289 (UX-2608, UX-2108) ----
+  group('P289 · padded, centred filled buttons', () {
+    const timeoutChannel = MethodChannel('taskflow/accessibility');
+    final platform =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    setUp(
+      () =>
+          platform.setMockMethodCallHandler(timeoutChannel, (_) async => null),
+    );
+    tearDown(() => platform.setMockMethodCallHandler(timeoutChannel, null));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    final timed = Task(
+      id: 1,
+      title: 'Médico',
+      priority: 1,
+      dueDate: DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 10),
+    );
+
+    Future<void> open(
+      WidgetTester tester,
+      FakeReminderAccess access,
+      Widget home, {
+      MemoryReminderStore? store,
+    }) async {
+      await loadManrope();
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            ...reminderOverrides(store ?? MemoryReminderStore(), access),
+            taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+          ],
+          child: MaterialApp(
+            locale: const Locale('es'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: AppTheme.light,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: const TextScaler.linear(2)),
+              child: child!,
+            ),
+            home: home,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+      'UX-2608 / UX-2108: ES 2× on 360×800, the exact-alarms sheet’s «Permitir «Alarmas y recordatorios»» is at least 58 dp tall, its wrapped lines centred with at least 8 dp above and below',
+      (tester) async {
+        final task = ValueNotifier(timed);
+        addTearDown(task.dispose);
+        await open(
+          tester,
+          FakeReminderAccess(exact: false),
+          Scaffold(
+            body: Padding(
+              padding: const EdgeInsets.all(24),
+              child: ValueListenableBuilder<Task>(
+                valueListenable: task,
+                builder: (context, value, _) => ReminderChip(
+                  task: value,
+                  onChanged: (changed) => task.value = changed,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.byType(ReminderChip));
+        await tester.pumpAndSettle();
+        final allow = find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.widgetWithText(FilledButton, es.allowPreciseAlarms),
+        );
+        expect(allow, findsOneWidget);
+        await tester.ensureVisible(allow);
+        await tester.pumpAndSettle();
+        expect(tester.getRect(allow).height, greaterThanOrEqualTo(58));
+        expectCentredPaddedLabel(tester, allow, es.allowPreciseAlarms);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final (problem, access, label) in [
+      (
+        'exact alarms are off',
+        FakeReminderAccess(allowed: true, exact: false),
+        es.allowPreciseAlarms,
+      ),
+      (
+        'notifications are off',
+        FakeReminderAccess(allowed: false),
+        es.allowNotifications,
+      ),
+    ]) {
+      testWidgets(
+        'UX-2608 / UX-2108: ES 2× on 360×800, when $problem Recordatorios’ «$label» is at least 58 dp tall, centred, with at least 8 dp above and below its text',
+        (tester) async {
+          await open(
+            tester,
+            access,
+            const NotificationSettingsScreen(),
+            store: MemoryReminderStore(
+              const ReminderPreferences(enabled: true, asked: true),
+            ),
+          );
+          final fix = find.widgetWithText(FilledButton, label);
+          expect(fix, findsOneWidget);
+          await tester.ensureVisible(fix);
+          await tester.pumpAndSettle();
+          expect(tester.getRect(fix).height, greaterThanOrEqualTo(58));
+          expectCentredPaddedLabel(
+            tester,
+            fix,
+            label,
+            wraps: label == es.allowPreciseAlarms,
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
   });
 }
 

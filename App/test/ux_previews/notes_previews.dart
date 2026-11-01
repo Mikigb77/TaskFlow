@@ -2,6 +2,7 @@
 // in the capture sheet.
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/task_list_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -92,6 +93,21 @@ List<Task> _notes() => [
   ),
 ];
 
+/// Ana's shared project, which this account can only view.
+final _choirToView = TaskListInfo(
+  id: 'coro',
+  name: 'Coro',
+  color: 'rose',
+  version: 1,
+  role: 'viewer',
+  shared: true,
+  ownerId: ana,
+  people: const [
+    ProjectMember(id: ana, name: 'Ana', role: 'owner'),
+    ProjectMember(id: me, name: 'María', role: 'viewer'),
+  ],
+);
+
 void notesPreviews() {
   previewArea('notes', 'Notas', () {
     preview(
@@ -162,6 +178,53 @@ void notesPreviews() {
         await p.shoot('result');
       },
       then: {'result': 'Listo: the note as it will be saved, with Guardar nota.'},
+    );
+
+    preview(
+      notesTab,
+      'viewer-project',
+      'Notas filtered to Ana’s «Coro», which this account can only view: its note, and the read-only bar in place of Añadir nota.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [
+            ...normalDay(),
+            ..._notes(),
+            Task(
+              id: 85,
+              kind: 'note',
+              title: 'Repertorio del concierto de Navidad',
+              notes: 'Noche de paz, El tamborilero y Adeste fideles.',
+              priority: 1,
+              listId: 'coro',
+            ),
+          ],
+          projects: [...allProjects, _choirToView],
+        );
+        await app.tab(p.l.notes);
+        await p.tester.tap(find.byType(DropdownButtonFormField<String>));
+        await p.tester.pumpAndSettle();
+        await p.tester.tap(find.text('Coro').last);
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      notesTab,
+      'empty-with-project',
+      'No notes yet on an account with projects: no Proyecto filter and no search, just the empty line and Añadir nota.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          projects: allProjects,
+        );
+        await app.tab(p.l.notes);
+        await p.shoot();
+      },
     );
 
     preview(

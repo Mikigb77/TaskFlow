@@ -152,7 +152,10 @@ class _ProjectNameDialogState extends State<_ProjectNameDialog> {
       controller: _name,
       maxLength: 80,
       autofocus: true,
-      decoration: InputDecoration(labelText: context.l10n.listName),
+      decoration: InputDecoration(
+        labelText: context.l10n.listName,
+        counterText: '',
+      ),
     ),
     actions: [
       TextButton(

@@ -228,9 +228,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get notesSavedOnDevice => 'Les notes continuen en aquest telèfon.';
 
   @override
-  String get allNotes => 'Totes les notes';
-
-  @override
   String get viewOnlyNote =>
       'Nota de només lectura. Si vols fer canvis, demana-ho al propietari del projecte.';
 
@@ -278,9 +275,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get deadlineTime => 'Hora límit';
 
   @override
-  String get deadlineEndDay => 'Abans que acabi el dia';
-
-  @override
   String get removeDeadline => 'Treu el termini';
 
   @override
@@ -291,11 +285,13 @@ class AppLocalizationsCa extends AppLocalizations {
       'Aquesta planificació acaba després del termini. Revisa l’inici o la durada.';
 
   @override
-  String get deadlineOverdue => 'Termini vençut';
-
-  @override
   String deadlineLabel(String date) {
     return 'Termini: $date';
+  }
+
+  @override
+  String deadlinePassedOn(String date) {
+    return 'Termini vençut: $date';
   }
 
   @override
@@ -567,9 +563,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get delete => 'Suprimeix';
 
   @override
-  String get keepChanges => 'Conserva els canvis';
-
-  @override
   String get taskTitle => 'Títol de la tasca';
 
   @override
@@ -782,6 +775,9 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get findTask => 'Cerca una tasca…';
+
+  @override
+  String get clearSearch => 'Esborra la cerca';
 
   @override
   String get allTasks => 'Totes les tasques';
@@ -1015,7 +1011,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get capturePrivacy =>
-      'La transcripció en directe utilitza el reconeixement local quan està disponible; en aquest mode no es conserva l’àudio. Per afegir, cercar o canviar tasques, les teves paraules van per internet a la IA de Google. L’àudio desat es transcriu en línia. El que encara no has desat es queda en aquest telèfon fins que ho desis o ho descartis.';
+      'La transcripció en directe utilitza el reconeixement local quan està disponible; en aquest mode no es conserva l’àudio. Per afegir, cercar o canviar tasques, o demanar recordatoris a la teva manera, les teves paraules van per internet a la IA de Google. L’àudio desat es transcriu en línia. El que encara no has desat es queda en aquest telèfon fins que ho desis o ho descartis.';
 
   @override
   String get capturePrivacyLine =>
@@ -1042,11 +1038,23 @@ class AppLocalizationsCa extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       done,
       locale: localeName,
-      other: '$remaining per fer · $done completades',
-      one: '$remaining per fer · 1 completada',
-      zero: '$remaining per fer',
+      other: '$remaining per fer · $done completades',
+      one: '$remaining per fer · 1 completada',
+      zero: '$remaining per fer',
     );
-    return '$_temp0';
+    String _temp1 = intl.Intl.pluralLogic(
+      done,
+      locale: localeName,
+      other: '$done completades',
+      one: '1 completada',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      remaining,
+      locale: localeName,
+      other: '$_temp0',
+      zero: '$_temp1',
+    );
+    return '$_temp2';
   }
 
   @override
@@ -1131,8 +1139,13 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
-  String priorityValue(String priority) {
-    return 'Prioritat $priority';
+  String priorityValue(String level) {
+    String _temp0 = intl.Intl.selectLogic(level, {
+      'high': 'Prioritat alta',
+      'medium': 'Prioritat mitjana',
+      'other': 'Prioritat baixa',
+    });
+    return '$_temp0';
   }
 
   @override
@@ -1902,7 +1915,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get sharingRolesHelp =>
-      'Els editors poden afegir, modificar, completar i suprimir tasques i fitxers. Només el propietari gestiona el projecte i les persones. Les tasques compartides es queden en aquest projecte; exportar-les crea una còpia personal.';
+      'Els editors poden afegir, modificar, completar i suprimir tasques i fitxers. Només el propietari gestiona el projecte i les persones. Les tasques compartides es queden en aquest projecte.';
 
   @override
   String get listSharing => 'Comparteix el projecte';
@@ -1933,7 +1946,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get removeAccessHelp =>
-      'Aquesta persona perdrà l’accés al projecte i a les seves tasques, notes i fitxers. Els canvis compartits pendents d’enviar se suprimiran en la pròxima sincronització correcta.';
+      'Aquesta persona perdrà l’accés al projecte i a les seves tasques, notes i fitxers. Els canvis que encara no hagi enviat es perdran.';
 
   @override
   String get pendingInvitations => 'Invitacions pendents';
@@ -1952,7 +1965,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get sharingRemovalHelp =>
-      'Sortir del projecte o perdre-hi l’accés elimina les tasques, notes, canvis pendents i còpies baixades d’aquest telèfon en la pròxima sincronització correcta. Els dispositius sense connexió i les còpies ja exportades no es poden esborrar remotament.';
+      'Quan surts del projecte o en perds l’accés, el projecte desapareix d’aquest telèfon el pròxim cop que es connecti. Les còpies que hagis exportat es queden.';
 
   @override
   String get deleteList => 'Suprimeix el projecte';
@@ -2064,10 +2077,6 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get fileUploadHelp =>
       'Els fitxers nous es pugen al compte després de desar, fins a 6 MB cadascun. Els fitxers locals anteriors es queden al dispositiu fins que triïs Puja als detalls de la tasca.';
-
-  @override
-  String get fileLocalHelp =>
-      'Els fitxers es queden en aquest dispositiu fins que iniciïs la sessió i triïs Puja als detalls de la tasca. Fins a 6 MB per fitxer.';
 
   @override
   String get fileLimit =>
@@ -3525,6 +3534,24 @@ class AppLocalizationsCa extends AppLocalizations {
       'Només pots suprimir un grup buit. Arxiva’l per conservar-ne els projectes i el contingut.';
 
   @override
+  String get groupDeleteAction => 'Suprimeix el grup';
+
+  @override
+  String groupDeleteConfirm(String name) {
+    return 'Vols suprimir «$name»? Els membres el deixaran de veure. No es pot desfer.';
+  }
+
+  @override
+  String groupTransferConfirm(String group, String person) {
+    return 'Vols transferir «$group» a $person?';
+  }
+
+  @override
+  String groupTransferAction(String person) {
+    return 'Transfereix a $person';
+  }
+
+  @override
   String get groupActionError =>
       'No s’ha pogut desar el canvi. Comprova la connexió i actualitza; els permisos poden haver canviat.';
 
@@ -3565,7 +3592,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get updatesAll => 'Tots els canvis';
 
   @override
-  String get updatesAssigned => 'Les meves assignacions';
+  String get updatesAssigned => 'Només el que és per a mi';
 
   @override
   String get updatesMuted => 'Silenciat: sense novetats ni recordatoris';
@@ -3587,7 +3614,10 @@ class AppLocalizationsCa extends AppLocalizations {
   String get activityCreated => 'Ha creat una tasca';
 
   @override
-  String get activityUpdated => 'Ha actualitzat una tasca';
+  String get activityUpdated => 'Ha actualitzat la tasca';
+
+  @override
+  String get activityMoved => 'Ha mogut la tasca';
 
   @override
   String get activityAssigned => 'Ha canviat el responsable';
@@ -3624,6 +3654,7 @@ class AppLocalizationsCa extends AppLocalizations {
       'unassigned': '$actor ha tret el responsable de: $title',
       'completed': '$actor ha completat: $title',
       'reopened': '$actor ha reobert: $title',
+      'moved': '$actor ha mogut: $title',
       'deleted': '$actor ha suprimit: $title',
       'shared': '$actor ha compartit: $title',
       'other': '$actor ha actualitzat: $title',

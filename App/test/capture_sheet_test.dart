@@ -51,6 +51,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 
+import 'support/button_label.dart';
 import 'support/capture_fixtures.dart' show SilentRecorder;
 import 'support/design_fixtures.dart';
 
@@ -3171,6 +3172,254 @@ void main() {
           tester.state<ScrollableState>(wordsScroll).position.maxScrollExtent,
           greaterThan(0),
           reason: 'the words run out of room and scroll',
+        );
+        expect(tester.takeException(), isNull, reason: 'no overflow');
+      },
+    );
+  });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P289 (UX-2108): the capture taps
+  // are 60 dp tall, with Manrope ----
+
+  group('P289 · 60 dp capture taps', () {
+    void at2x(WidgetTester tester) {
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    }
+
+    void expectTall(WidgetTester tester, Finder button, String what) {
+      expect(button, findsOneWidget, reason: what);
+      expect(
+        tester.getRect(button).height,
+        greaterThanOrEqualTo(58),
+        reason: '$what is at least 58 dp tall',
+      );
+    }
+
+    /// Listening in the sheet, opened from Calendar's «Añadir tarea», with
+    /// words heard so «Listo» sends them.
+    Future<_App> listen(
+      WidgetTester tester, {
+      Size size = const Size(360, 800),
+      List<Map<String, dynamic>> found = const [],
+    }) async {
+      final app = await _App.open(tester, pro: true, size: size);
+      app.api.found = found;
+      await tester.tap(filledButtonWithText(es.addTask));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(app.speech.starts, 1, reason: 'listening');
+      app.speech.send('ready');
+      app.speech.send('segment', text: 'Llamar al médico mañana a las 5');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      return app;
+    }
+
+    /// [finder] is whole on the [screen], inside every scroll view around
+    /// it, and what a tap at its centre reaches: no scrolling needed.
+    void expectInViewWithoutScrolling(
+      WidgetTester tester,
+      Finder finder,
+      Size screen,
+      String what,
+    ) {
+      final rect = tester.getRect(finder);
+      expect(rect.top, greaterThanOrEqualTo(-0.5), reason: what);
+      expect(rect.bottom, lessThanOrEqualTo(screen.height + 0.5), reason: what);
+      for (final element in find
+          .ancestor(of: finder, matching: find.byType(Scrollable))
+          .evaluate()) {
+        final view = tester.getRect(find.byWidget(element.widget));
+        expect(
+          rect.top >= view.top - 0.5 && rect.bottom <= view.bottom + 0.5,
+          isTrue,
+          reason: '$what whole in its scroll view ($rect in $view)',
+        );
+      }
+      expect(finder.hitTestable(), findsOneWidget, reason: what);
+    }
+
+    testWidgets(
+      'UX-2108: ES 1× on 360×800, Calendar’s «Añadir tarea» is at least 58 dp tall, with the tab bar still 12 dp under it',
+      (tester) async {
+        await loadManrope();
+        await _App.open(tester, pro: true, size: const Size(360, 800));
+        final add = filledButtonWithText(es.addTask);
+        expectTall(tester, add, '«Añadir tarea»');
+        expect(add.hitTestable(), findsOneWidget);
+        final bar = tester.getRect(find.byType(NavigationBar));
+        expect(
+          bar.top - tester.getRect(add).bottom,
+          moreOrLessEquals(12, epsilon: 0.5),
+          reason: 'the 12 dp gap under «Añadir tarea» is unchanged',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2108: ES 1× on 360×800, while listening «Listo» is at least 58 dp tall, with «Cancelar» and «Escribir» still 12 dp under it',
+      (tester) async {
+        await loadManrope();
+        await listen(tester);
+        final done = inSheet(find.widgetWithText(FilledButton, es.done));
+        expectTall(tester, done, '«Listo»');
+        final rect = tester.getRect(done);
+        final cancel = inSheet(find.widgetWithText(TextButton, es.cancel));
+        final type = find.byKey(const ValueKey('capture-type-instead'));
+        expect(cancel, findsOneWidget);
+        expect(type, findsOneWidget);
+        for (final (what, under) in [('«Cancelar»', cancel), ('«Escribir»', type)]) {
+          expect(
+            tester.getRect(under).top - rect.bottom,
+            moreOrLessEquals(12, epsilon: 0.5),
+            reason: 'the 12 dp gap between «Listo» and $what is unchanged',
+          );
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2108: ES 1× on 360×800, «Empezar a hablar» in a sheet that waits to listen is at least 58 dp tall',
+      (tester) async {
+        await loadManrope();
+        await _App.open(tester, pro: true, size: const Size(360, 800));
+        unawaited(
+          showCaptureSheet(
+            tester.element(find.byType(CalendarScreen)),
+            startListening: false,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expectTall(
+          tester,
+          inSheet(find.widgetWithText(FilledButton, es.captureStartTalking)),
+          '«Empezar a hablar»',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2108: ES 1× on 360×800, after a pause «Seguir» and «Listo» are each at least 58 dp tall',
+      (tester) async {
+        await loadManrope();
+        await listen(tester);
+        for (final state in [
+          AppLifecycleState.inactive,
+          AppLifecycleState.hidden,
+          AppLifecycleState.paused,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        await tester.pumpAndSettle();
+        for (final state in [
+          AppLifecycleState.hidden,
+          AppLifecycleState.inactive,
+          AppLifecycleState.resumed,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        await tester.pumpAndSettle();
+        expectTall(
+          tester,
+          inSheet(filledButtonWithText(es.captureContinue)),
+          '«Seguir»',
+        );
+        expectTall(
+          tester,
+          inSheet(find.widgetWithText(FilledButton, es.done)),
+          '«Listo»',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2108: ES 1× on 360×800, after a failure «Reintentar» and «Guardar como tarea» are each at least 58 dp tall',
+      (tester) async {
+        await loadManrope();
+        await typeAndSend(
+          tester,
+          'es',
+          'Mañana, llamar al dentista',
+          size: const Size(360, 800),
+          failure: ApiException(503, 'Service unavailable'),
+        );
+        await tester.pumpAndSettle();
+        expectTall(
+          tester,
+          inSheet(filledButtonWithText(es.tryAgain)),
+          '«Reintentar»',
+        );
+        expectTall(
+          tester,
+          inSheet(filledButtonWithText(es.captureSaveAsWritten)),
+          '«Guardar como tarea»',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2108: ES 1× on 360×800, a one-task result’s «Añadir al calendario» is at least 58 dp tall',
+      (tester) async {
+        await loadManrope();
+        final now = DateTime.now();
+        await listen(
+          tester,
+          found: [
+            dated(
+              'Llamar al médico',
+              DateTime(now.year, now.month, now.day + 1, 17),
+            ),
+          ],
+        );
+        await tester.tap(inSheet(find.widgetWithText(FilledButton, es.done)));
+        await tester.pumpAndSettle();
+        expect(find.byType(CaptureResult), findsOneWidget);
+        final save = find.byKey(const ValueKey('save-drafts'));
+        expect(
+          find.descendant(of: save, matching: find.text(es.captureAddToCalendar)),
+          findsOneWidget,
+        );
+        expectTall(tester, save, '«Añadir al calendario»');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2108 / UX-1302: ES 2× on 360×740, the sheet’s primary shows whole without scrolling while listening («Listo») and on a one-task result («Añadir al calendario»)',
+      (tester) async {
+        await loadManrope();
+        at2x(tester);
+        const screen = Size(360, 740);
+        final now = DateTime.now();
+        await listen(
+          tester,
+          size: screen,
+          found: [
+            dated(
+              'Llamar al médico',
+              DateTime(now.year, now.month, now.day + 1, 17),
+            ),
+          ],
+        );
+        final done = inSheet(find.widgetWithText(FilledButton, es.done));
+        expectTall(tester, done, '«Listo»');
+        expectInViewWithoutScrolling(tester, done, screen, '«Listo»');
+        await tester.tap(done);
+        await tester.pumpAndSettle();
+        expect(find.byType(CaptureResult), findsOneWidget);
+        final save = find.byKey(const ValueKey('save-drafts'));
+        expectTall(tester, save, '«Añadir al calendario»');
+        expectInViewWithoutScrolling(
+          tester,
+          save,
+          screen,
+          '«Añadir al calendario»',
         );
         expect(tester.takeException(), isNull, reason: 'no overflow');
       },

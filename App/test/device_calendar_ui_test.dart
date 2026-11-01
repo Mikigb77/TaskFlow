@@ -20,6 +20,8 @@ import 'device_calendar_test.dart'
         calendarEvent,
         homeCalendar,
         workCalendar;
+import 'support/button_label.dart';
+import 'support/icon_button_label.dart';
 import 'support/design_fixtures.dart';
 
 void main() {
@@ -772,6 +774,91 @@ void main() {
             reason: 'calendarReadRetry unchanged ($language)');
       }
     });
+  });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P289 (UX-2608, UX-2108) ----
+  group('P289 · padded, centred filled buttons', () {
+    for (final language in ['es', 'ca']) {
+      testWidgets(
+          'UX-2608 / UX-2108: $language 2× on 360×800, before access «Conectar calendarios del teléfono» is at least 58 dp tall, its lines centred with at least 8 dp above and below',
+          (tester) async {
+        await loadManrope();
+        final l = lookupAppLocalizations(Locale(language));
+        final bridge = FakeDeviceCalendars()..access = CalendarAccess.denied;
+        addTearDown(bridge.close);
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final container = ProviderContainer(overrides: [
+          deviceCalendarsProvider.overrideWithValue(bridge),
+          calendarPreferenceStoreProvider
+              .overrideWithValue(MemoryCalendarPreferences()),
+        ]);
+        addTearDown(container.dispose);
+        await tester.pumpWidget(UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+                locale: Locale(language),
+                supportedLocales: AppLocalizations.supportedLocales,
+                localizationsDelegates:
+                    AppLocalizations.localizationsDelegates,
+                theme: AppTheme.light,
+                builder: (context, child) => MediaQuery(
+                    data: MediaQuery.of(context)
+                        .copyWith(textScaler: const TextScaler.linear(2)),
+                    child: child!),
+                home: const DeviceCalendarsScreen())));
+        await tester.pumpAndSettle();
+        final button = find.byKey(const ValueKey('calendar-connect'));
+        expect(button, findsOneWidget);
+        expect(tester.getRect(button).height, greaterThanOrEqualTo(58));
+        expectCentredPaddedLabel(tester, button, l.calendarEnable);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  });
+
+  // ---- UX loop 2026-10-28-app, round 2 · P304 (UX-2630) ----
+  group('P304 · icon buttons centre their wrapped labels', () {
+    for (final language in ['ca', 'es']) {
+      testWidgets(
+          'UX-2630: $language 2× on 360×800 (first-run/phone-calendars.not-allowed.$language.light.2x), the calendar icon sits beside «Conectar calendarios del teléfono»’s longest line, and icon and label are centred in the button',
+          (tester) async {
+        await loadManrope();
+        final l = lookupAppLocalizations(Locale(language));
+        final bridge = FakeDeviceCalendars()..access = CalendarAccess.denied;
+        addTearDown(bridge.close);
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final container = ProviderContainer(overrides: [
+          deviceCalendarsProvider.overrideWithValue(bridge),
+          calendarPreferenceStoreProvider
+              .overrideWithValue(MemoryCalendarPreferences()),
+        ]);
+        addTearDown(container.dispose);
+        await tester.pumpWidget(UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+                locale: Locale(language),
+                supportedLocales: AppLocalizations.supportedLocales,
+                localizationsDelegates:
+                    AppLocalizations.localizationsDelegates,
+                theme: AppTheme.light,
+                builder: (context, child) => MediaQuery(
+                    data: MediaQuery.of(context)
+                        .copyWith(textScaler: const TextScaler.linear(2)),
+                    child: child!),
+                home: const DeviceCalendarsScreen())));
+        await tester.pumpAndSettle();
+        final button = find.byKey(const ValueKey('calendar-connect'));
+        expect(labelLines(tester, button, l.calendarEnable).length,
+            greaterThanOrEqualTo(2),
+            reason: 'the label wraps here, as in the render');
+        expectIconBesideCentredLabel(tester, button, l.calendarEnable);
+        expect(tester.takeException(), isNull);
+      });
+    }
   });
 }
 

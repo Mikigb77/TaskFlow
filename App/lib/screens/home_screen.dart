@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/widgets/app_components.dart';
+import 'package:agenda/widgets/search_clear.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/task_list.dart';
 import 'package:agenda/widgets/task_actions.dart';
@@ -76,6 +77,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   // its place, struck through, until the person leaves the tab or the page,
   // or changes the search or a filter: Calendar's rule.
   final _openHere = <String>{};
+  // The project's DELETE is on its way: a spinner stands in for its ⋮.
+  bool _deletingProject = false;
 
   @override
   void initState() {
@@ -401,6 +404,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return box.size.height + 8;
   }
 
+  /// Whether this page has its own button for [list]'s members, or for
+  /// sharing it: the owner can share a project of their own from here.
+  bool _sharesHere(TaskListInfo list) =>
+      list.shared || (list.groupId == null && list.role == 'owner');
+
+  /// Deletes the project after asking, then closes its page and says so on
+  /// the one below, as leaving it does.
+  Future<void> _deleteProject(TaskListInfo list) async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final strings = context.l10n;
+    final tasks = ref.read(taskProvider.notifier);
+    final container = ProviderScope.containerOf(context, listen: false);
+    final gone = await deleteProject(
+      context,
+      ref,
+      list,
+      onSending: () => setState(() => _deletingProject = true),
+    );
+    if (!mounted) return;
+    if (!gone) {
+      setState(() => _deletingProject = false);
+      return;
+    }
+    // True tells Proyectos to drop the row before the sync catches up.
+    navigator.pop(true);
+    showFeedback(messenger, strings.projectDeleted);
+    // The sync takes the project's tasks off this phone behind it.
+    unawaited(
+      tasks.loadTasks().then((_) => container.invalidate(taskListsProvider)),
+    );
+  }
+
   /// Scrolls the header first, then the list, by [need] pixels in all.
   Future<void> _scrollBy(double need, bool instant) async {
     final nested = _nested.currentState;
@@ -475,7 +511,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         (widget.listId != null && (!_team || _personShown != null));
     // Nothing to search or filter yet: the empty state says what to do. A
     // row ticked moments ago still counts, so the header doesn't jump.
-    final quiet = widget.isRoot && !filtering && rows?.isEmpty != false;
+    final quiet =
+        (widget.isRoot || widget.listId != null) &&
+        !filtering &&
+        rows?.isEmpty != false;
     // «Prioridad alta» only while it would find something, or is chosen.
     final urgent =
         _filter == 2 ||
@@ -516,12 +555,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final addTo = ref.watch(listCanEditProvider(scope.projectId))
         ? scope.projectId
         : null;
+    // The page's ⋮: its own button opens the members or sharing, and
+    // pinning only reorders Proyectos. With nothing left, there's no ⋮.
+    final menu = list == null
+        ? const <PopupMenuEntry<String>>[]
+        : projectMenuItems(
+            context,
+            ref,
+            list,
+            people: !_sharesHere(list),
+            pin: false,
+          );
     return Scaffold(
       key: _page,
       appBar: CustomAppBar(
         title: title,
         isRoot: widget.isRoot,
-        actions: [if (widget.listId != null) completed],
+        actions: [
+          if (widget.listId != null) completed,
+          // 8 dp apart, so a tap meant for ✓ doesn't open the menu.
+          if (menu.isNotEmpty) const SizedBox(width: 8),
+          if (list != null && menu.isNotEmpty)
+            _deletingProject
+                ? const ProjectDeleting()
+                : PopupMenuButton<String>(
+                    tooltip: context.l10n.manageItem(list.name),
+                    itemBuilder: (_) => menu,
+                    onSelected: (action) async {
+                      final gone = await runProjectAction(
+                        context,
+                        ref,
+                        list,
+                        action,
+                        delete: () => _deleteProject(list),
+                      );
+                      if (gone && context.mounted) Navigator.pop(context);
+                    },
+                  ),
+        ],
       ),
       body: NestedScrollView(
         key: _nested,
@@ -603,10 +674,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             children: [
                               // The owner can share a project of their own
                               // from here.
-                              if (list != null &&
-                                  (list.shared ||
-                                      (list.groupId == null &&
-                                          list.role == 'owner')))
+                              if (list != null && _sharesHere(list))
                                 TextButton.icon(
                                   icon: Icon(
                                     list.shared
@@ -656,7 +724,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           const SizedBox(height: 8),
                         ],
                         if (!quiet) ...[
-                          TextField(
+                          SearchField(
                             controller: _search,
                             onChanged: (value) =>
                                 _refilter(() => _query = value.trim()),

@@ -289,3 +289,82 @@ You answered D1 and D2 «both yes, as recommended» (DECISIONS.md, 2026-10-31 (l
 2. D2 stores a new piece of data on the server: when each task was completed. The website's privacy text already lists «completion history» (`../TaskFlowWeb/src/content/legal/en.ts:30`); the `/ux-web` changes run in RESUME.md should confirm that covers it.
 3. U7's phone check gains a tap: in airplane mode, «Guardar como tarea» now shows the card, and «Añadir al calendario» saves it.
 4. plan.json's shared conventions, written 2026-10-31, still call D1 and D2 open. P299's and P300's briefs say they're answered, and no other package touches either one.
+
+## Round 2 (b2)
+
+Round 1 of batch 2 ran P278–P289. The reviewers found one finding only partly fixed: UX-2108, failing for the first time (the form's primary is still 54 dp). They also found 11 regressions, now UX-2621 to UX-2631. The round check failed on one app test, UX-1628's 31-minute return at ES 2×, which the tester bisected to P289's taller button; that failure is UX-2629. Its two other failures were tests P280 rightly broke, already updated.
+Round 2 has five packages, P301–P305, all S2 at most. They share no app file, so they can run side by side. There are no new decisions and nothing is escalated.
+
+The briefs are in `plan-b2-r2.json`.
+
+### Settled here
+- **Completar holds the page for 300 ms, and «Añadir tarea» ignores taps while a page above it is leaving** (UX-2623). The reviewer offered either; the page's hold alone can't cover a tap at 400 ms, because the page's exit transition that follows still lets taps through. The second half is one check in TaskActions, with no timer and no new state, and it covers Calendar, Tareas and the Día view.
+- **The three icon buttons keep their icons** (UX-2630). The reviewer's subtract-first alternative was to drop them. Download and upload name the two directions on Exportar e importar, so `textWidthBasis: longestLine` centres icon and label instead.
+- **The form's ElevatedButton stays an ElevatedButton** (UX-2108). Only its theme gets the filled theme's 60 dp, so its tests and look don't move.
+- **Pinning stays on Proyectos only** (UX-2628). It's removed from the project page's ⋮, where nothing visible happened.
+
+### Packages, in run order
+
+#### P301 · The repeat sheet: the choices set apart from their details, and Listo always in view · B · S · after P281
+- **UX-2621** (S2; R1B1-1). The interval row «Cada semana / Intervalo de repetición» read as a sixth choice. Now a divider separates the five choices from the ticked one's details.
+- **UX-2622** (S2; R1B1-2). At 2× with «Cada semana», Listo was about 200 dp below the screen. Now Listo is pinned under the scrolling part.
+
+#### P302 · A task's page: a second tap on Completar lands on nothing, and the time wraps with its dot · B · M · after P280
+- **UX-2623** (S2; R1B2-1). A second tap on Completar landed on Calendar's «Añadir tarea» and started listening. Now the button stays disabled as «✓ Completar» for 300 ms before the page closes, and «Añadir tarea» ignores taps while a page above it is still leaving.
+- **UX-2624** (S1; R1B2-2). «domingo, 1 de noviembre ·» / «21:00». Now a no-break space after the dot wraps «· 21:00» as one piece.
+
+#### P303 · Novedades gets an icon of its own; a gone project, an offline refresh and pinning on a project's page say what happened · C · M · after P283, P284, P286, P287
+- **UX-2625** (S2; R1C1-1). `feed_outlined` looked like the Notas tab's icon. Now it's `campaign_outlined`, a megaphone the app doesn't use anywhere else.
+- **UX-2626** (S1; R1C1-2). Notas called a project that's gone «solo lectura». Now the bar shows only for a project the account sees but can't edit, and «Añadir nota» saves with no project.
+- **UX-2627** (S1; R1C1-3). The group page's pull-to-refresh failed silently offline. Now it shows the network message and keeps the page.
+- **UX-2628** (S1; R1C2-1). «Fijar proyecto» on a project's page changed nothing visible. Now it's left out of the page's ⋮ and stays on Proyectos.
+
+#### P304 · Every primary is 60 dp, and wrapped button labels centre with their icon and clear their edges · D · M · after P289
+- **UX-2108** (S2; partly fixed, failed once). Round 1 made every FilledButton 60 dp. The form's primary is an ElevatedButton and was still 54 dp, flagged in form/* and tasks/project.person-form. Now its theme is 60 dp too.
+- **UX-2630** (S1; R1D-2). At 2× the icon of three centred labels sat at the left edge. Now each label hugs its longest line, so icon and label centre together.
+- **UX-2631** (S1; R1D-3). «Elegir archivo para importar» touched its edges at 2×. Now outlined buttons get 8 dp above and below a wrapped label, still 52 dp at one line, and that label is centred.
+
+#### P305 · Return to today lands at the top again, whatever the bottom bar's height · D · S · after P289
+- **UX-2629** (S2; R1D-1; it breaks UX-1628). After a Friday landing, a return 31 minutes later left today's agenda at 321 dp at 2×. Now `_comeBack` cancels any landing reveal and is the last thing to set the offset. The 60 dp button stays.
+
+### Escalated
+None. UX-2108 has failed once.
+
+### For the main session (noted by the implementers, not by a reviewer, so not planned)
+- P289's implementer: two FilledButtons wrap their label in their own `Padding(vertical: 12)` (delete_account_screen.dart:440, device_calendar_events.dart:354), so they're now about 69 dp. That inner padding could go.
+- P289's implementer: `App/test/support/button_label.dart` is untracked, as are P285's `App/test/support/no_counter.dart`. Both go in the round's commit.
+- P287's implementer: Novedades reads «ha movido» only once the server sends `fields` on 'updated' items (Backend/core/group_views.py ~:325). RESUME.md says UX-2508's server half is committed in 85d7408, so check that before the device check.
+- P284's implementer: on the sharing page, the owner's own row (`_personRow`) falls back to the account email, and that email doesn't go through `breakableAddress`.
+- P282's implementer: words said or typed in «A tu manera» go to the server's AI (ai/reminder-plan/). The app now says so. The website's privacy text should agree (the `/ux-web` changes run).
+- P279's and P285's implementers: worktrees wf_85968df4-719-2 to -8 and -25 are still under .claude/worktrees/. Every b2 package was found in the main checkout, so they can probably be cleaned up.
+- Catalan native reads still pending: UX-2504's and UX-2511's new strings (P284, P285).
+
+## Round 3 (b2)
+
+Round 2 of batch 2 ran P301–P305. The reviewers found all its findings fixed, and the round check passed. Two new problems came from this round's changes, both in area B: UX-2632 and UX-2633.
+Round 3 has two packages, P306 and P307, both S2 and size S. They share no file, so they can run side by side. There are no new decisions, and nothing is escalated.
+
+The briefs are in `plan-b2-r3.json`.
+
+### Settled here
+- **The repeat sheet's foot edge tracks overflow, not position** (UX-2632). The reviewer marked the 1 dp line as optional. It's in, because the reviewer's verify step looks for it. It shows whenever the details can scroll and is transparent otherwise, so the sheet never jumps by 1 dp.
+- **The whole task page is inert during the hold, app bar included** (UX-2633). The reviewer named the body and the bottom bar, but ✏ is in the app bar. One `AbsorbPointer` round the page's Scaffold covers all three. After the wait, the page pops if its route is current. If something opened over it (TalkBack can still reach it), the page clears the hold and shows the ticked task. If Back already popped it, it does nothing.
+
+### Packages, in run order
+
+#### P306 · The repeat sheet shows that its details go on under Listo · B · S · after P301
+- **UX-2632** (S2; R2B-1). At CA 2× the sheet's scroll ends under «dl. dt. dc. dj.», and nothing shows that more follows. Now a scrollbar thumb shows while the details overflow, with a 1 dp line above Listo. At 1×, where everything fits, neither shows.
+
+#### P307 · A task's page is inert while Completar closes it, and never stays frozen · B · S · after P302
+- **UX-2633** (S2; R2B-2). If ✏ or a row opened something during the 300 ms hold, the page stayed frozen with Completar greyed out. Now the whole page ignores taps for those 300 ms, and if something did open over it, the page clears the hold and shows «Reabrir».
+
+### Escalated
+None.
+
+### For the main session (noted by the implementers, not by a reviewer, so not planned)
+- P302's implementer: `App/test/capture_landing_test.dart` UX-1628 failed on the seed code too, probably because of today's date. P305 has since fixed its cause (the round check passed), but it's worth re-running it on another day.
+- P305's implementer: if someone leaves the app during a landing's reveal and comes back 30 minutes or more later, the reveal's paused loop could resume and jump down a screen at a time. A guard of a line or two in `_scrollToLit` would close it (for example, return when `_landedIds` is empty and no inbox row landed). It isn't a reviewer finding, so it isn't planned.
+- P304's implementer: the form's wrapped primary label at 2× is left-aligned with its icon, not centred like the filled buttons. If centring is wanted, it's the same two-property pairing on its label. Also, `task_editor.dart`'s form body bottom padding went from 32 to 16 dp (outside P304's file list) to keep UX-1003's 2× fit.
+- P304's implementer: the inner `Padding(vertical: 12)` on two FilledButtons (delete_account_screen.dart:440, device_calendar_events.dart:354) is still there, as noted in round 2.
+- P301's implementer: AUDIT still flags 0 dp gaps between the repeat sheet's five rows, and weekday chips under 48 dp at 2×. Both predate P301.
+- The verify note (B, round 2): screens without TaskActions under a leaving task page (Activity, the Notas list, Tasks with files) have no leaving guard. Only a tap more than 300 ms after Completar could reach them. Not a regression.

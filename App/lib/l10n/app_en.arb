@@ -106,10 +106,6 @@
   "noteTitleRequired": "Give your note a title",
   "noteNoMatches": "No matching notes",
   "notesSavedOnDevice": "Your notes are still on this phone.",
-  "allNotes": "All notes",
-  "@allNotes": {
-    "description": "Option of the Notes project filter that shows the notes of every project."
-  },
   "viewOnlyNote": "View-only note. To make changes, ask the project’s owner.",
   "@viewOnlyNote": {
     "description": "Banner on a note in a project the person can only view: who to ask to make changes."
@@ -134,13 +130,20 @@
   "deadline": "Deadline",
   "deadlineUnset": "No deadline",
   "deadlineTime": "Deadline time",
-  "deadlineEndDay": "By the end of the day",
   "removeDeadline": "Remove deadline",
   "deadlineRecurringHelp": "Each repeat has its own deadline.",
   "deadlineLatePlan": "This plan finishes after the deadline. Check the start or duration.",
-  "deadlineOverdue": "Deadline passed",
   "deadlineLabel": "Due {date}",
   "@deadlineLabel": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "deadlinePassedOn": "Was due {date}",
+  "@deadlinePassedOn": {
+    "description": "On a task's row and its page, in place of deadlineLabel once the deadline has passed: said once, in the row's usual grey. {date} is the weekday date, and the time when the deadline has one, as deadlineLabel gets it.",
     "placeholders": {
       "date": {
         "type": "String"
@@ -279,7 +282,6 @@
   "cancel": "Cancel",
   "save": "Save",
   "delete": "Delete",
-  "keepChanges": "Keep changes",
   "taskTitle": "Task title",
   "additionalNotes": "Additional Notes",
   "moreDetails": "More details",
@@ -424,6 +426,10 @@
   },
   "yourTasks": "Your tasks",
   "findTask": "Find a task…",
+  "clearSearch": "Clear search",
+  "@clearSearch": {
+    "description": "Tooltip and screen-reader label of the ✕ at the end of a search field (tasks, notes, projects, the project picker) while it holds text: one tap empties the search and shows the whole list again."
+  },
   "allTasks": "All tasks",
   "highPriority": "High priority",
   "filterLabel": "Filter by label",
@@ -533,22 +539,22 @@
   },
   "discard": "Discard",
   "keep": "Keep",
-  "capturePrivacy": "Live transcription uses on-device speech where available; no audio is retained in that mode. To add, find or change tasks, your words go over the internet to Google’s AI. Saved audio is transcribed online. Anything not saved yet stays on this phone until you save or discard it.",
+  "capturePrivacy": "Live transcription uses on-device speech where available; no audio is retained in that mode. To add, find or change tasks, or to ask for reminders your way, your words go over the internet to Google’s AI. Saved audio is transcribed online. Anything not saved yet stays on this phone until you save or discard it.",
   "@capturePrivacy": {
-    "description": "The full voice privacy note at the end of the Voice screen in Settings: on-device or online transcription, why the words go to Google’s AI, saved audio, and what stays on the phone. capturePrivacyLine is its short form in the capture sheet."
+    "description": "The full voice privacy note at the end of the Voice screen in Settings: on-device or online transcription, why the words go to Google’s AI (adding, finding or changing tasks, and reminders asked for in «Your way», reminderPlanYourWay), saved audio, and what stays on the phone. capturePrivacyLine is its short form in the capture sheet and the reminder sheet."
   },
   "capturePrivacyLine": "Your words go to Google’s AI. More in Other settings › Voice.",
   "@capturePrivacyLine": {
-    "description": "One short line under the words in the capture sheet, shown only the first time the microphone is used on this phone: says the words go to Google’s AI and names where the full note is (Other settings › Voice, as otherSettings and voiceSettings read; keep them identical)."
+    "description": "One short line, shown once in each of two places: under the words in the capture sheet, the first time the microphone is used on this phone; and under the field of «Your way» (reminderPlanYourWay, Pro) in the reminder sheet, the first time it is opened on this phone. Says the words go to Google’s AI and names where the full note is (Other settings › Voice, as otherSettings and voiceSettings read; keep them identical)."
   },
   "lookRight": "Look right?",
   "finalSay": "Tap a detail to change it. You have the final say.",
   "changePriority": "Change priority",
   "changeRepeat": "Change repeat",
   "confirmedDetails": "I’ve checked this task",
-  "agendaCounts": "{done, plural, =0{{remaining} to do} other{{remaining} to do · {done} completed}}",
+  "agendaCounts": "{remaining, plural, =0{{done} completed} other{{done, plural, =0{{remaining} to do} other{{remaining} to do · {done} completed}}}}",
   "@agendaCounts": {
-    "description": "The day's count under its heading on Calendar. With nothing completed it is the open count alone.",
+    "description": "The day's count under its heading on Calendar. With nothing completed it is the open count alone; with nothing left, the completed count alone. Keep a no-break space between each number and its words, and inside “to do”, so a count never wraps apart.",
     "placeholders": {
       "remaining": {
         "type": "int"
@@ -638,10 +644,11 @@
       }
     }
   },
-  "priorityValue": "{priority} priority",
+  "priorityValue": "{level, select, high{High priority} medium{Medium priority} other{Low priority}}",
   "@priorityValue": {
+    "description": "A task's priority as a phrase, on its row, the dictation's result card and the form's summary: «Prioridad alta», not the standalone «Alta». level is high, medium or low.",
     "placeholders": {
-      "priority": {
+      "level": {
         "type": "String"
       }
     }
@@ -1178,7 +1185,10 @@
   "sendInvitationAgain": "Send again",
   "cancelInvitation": "Cancel invitation",
   "enterEmailAddress": "Enter an email address.",
-  "sharingRolesHelp": "Editors can add, change, complete and delete tasks and files. Only the owner manages the project and people. Shared tasks stay in this project; exporting creates a personal copy.",
+  "sharingRolesHelp": "Editors can add, change, complete and delete tasks and files. Only the owner manages the project and people. Shared tasks stay in this project.",
+  "@sharingRolesHelp": {
+    "description": "Sharing screen, under “How sharing works”: what editors and the owner can do, and that shared tasks stay in the project."
+  },
   "listSharing": "Project sharing",
   "sharingLoadError": "Could not load sharing.",
   "retry": "Retry",
@@ -1188,7 +1198,10 @@
   "makeEditor": "Make editor",
   "makeViewer": "Make viewer",
   "removeAccess": "Remove access",
-  "removeAccessHelp": "This person will lose access to this project and its tasks, notes and files. Their unsent shared edits will be removed on the next successful sync.",
+  "removeAccessHelp": "This person will lose access to this project and its tasks, notes and files. Changes they haven’t sent yet will be lost.",
+  "@removeAccessHelp": {
+    "description": "Sharing screen, the “Remove access” confirmation: what the person loses. Plain words, no sync jargon: edits they haven’t sent yet are lost."
+  },
   "pendingInvitations": "Pending invitations",
   "pendingRole": "{role} · pending",
   "@pendingRole": {
@@ -1203,7 +1216,10 @@
   "@sharedDataHelp": {
     "description": "Sharing screen, under “How sharing works”: what a shared project shares. Reminders are each person’s own (none of their values reaches anyone else), so the last sentence says they aren’t shared."
   },
-  "sharingRemovalHelp": "Leaving or losing access removes this phone’s shared tasks, notes, pending edits and downloaded copies at the next successful sync. Offline devices and copies already exported cannot be remotely erased.",
+  "sharingRemovalHelp": "When you leave or lose access, the project leaves this phone the next time it connects. Copies you exported stay.",
+  "@sharingRemovalHelp": {
+    "description": "Sharing screen, under “How sharing works”: what happens to a shared project on this phone after leaving or losing access. Plain words, no sync jargon."
+  },
   "deleteList": "Delete project",
   "deleteListHelp": "Delete this project and all its tasks, notes and uploaded files for everyone? This cannot be undone.",
   "deleteListPrivateHelp": "Delete {name} with all its tasks, notes and files? This can’t be undone.",
@@ -1301,7 +1317,6 @@
   "fileActionError": "Could not complete this action. Your task is saved; please retry.",
   "fileSignInHelp": "Sign in to upload your files and restore them on another device.",
   "fileUploadHelp": "New files upload to your account after saving, up to 6 MB each. Older local files stay on this device until you choose Upload in task details.",
-  "fileLocalHelp": "Files stay on this device until you sign in and choose Upload in task details. Up to 6 MB per file.",
   "fileLimit": "Choose a non-empty file up to 6 MB. You can attach up to 20 files per task.",
   "@reminderValue": {
     "placeholders": {
@@ -2228,6 +2243,40 @@
     }
   },
   "groupDeleteHelp": "Only an empty group can be deleted. Archive a group to keep its projects and content.",
+  "groupDeleteAction": "Delete group",
+  "@groupDeleteAction": {
+    "description": "The group page’s delete row and the red button that confirms it."
+  },
+  "groupDeleteConfirm": "Delete “{name}”? Its members will lose it. This can’t be undone.",
+  "@groupDeleteConfirm": {
+    "description": "Text of the confirmation before an empty group is deleted. {name} is the group’s name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "groupTransferConfirm": "Transfer “{group}” to {person}?",
+  "@groupTransferConfirm": {
+    "description": "Title of the confirmation before the owner gives a group to another member. {group} is the group’s name, {person} the member’s.",
+    "placeholders": {
+      "group": {
+        "type": "String"
+      },
+      "person": {
+        "type": "String"
+      }
+    }
+  },
+  "groupTransferAction": "Transfer to {person}",
+  "@groupTransferAction": {
+    "description": "The button that confirms giving the group to {person}, a member’s name.",
+    "placeholders": {
+      "person": {
+        "type": "String"
+      }
+    }
+  },
   "groupActionError": "This change could not be saved. Check your connection and refresh; permissions may have changed.",
   "groupVoiceName": "Name for voice assignments",
   "groupVoiceHelp": "An optional name others can use when assigning tasks by voice.",
@@ -2247,14 +2296,24 @@
   "projectDestination": "Where does this project belong?",
   "projectNotifications": "Project updates",
   "updatesAll": "All changes",
-  "updatesAssigned": "My assignments",
+  "updatesAssigned": "Only what’s for me",
+  "@updatesAssigned": {
+    "description": "A shared project’s update choice: only updates about tasks for this person. Matches the app’s “For me” wording."
+  },
   "updatesMuted": "Muted — no updates or reminders",
   "activity": "Activity",
   "activityEmpty": "You’re up to date.",
   "activityHelp": "Assignments and updates from your shared projects appear here.",
   "activityMarkRead": "Mark all as read",
   "activityCreated": "Created a task",
-  "activityUpdated": "Updated a task",
+  "activityUpdated": "Updated the task",
+  "@activityUpdated": {
+    "description": "A task’s history (task details, Activity section): the entry for an edit to the task other than a move. The person’s name and the date show under it."
+  },
+  "activityMoved": "Moved the task",
+  "@activityMoved": {
+    "description": "A task’s history (task details, Activity section): the entry for an edit that changed only the task’s day (its date or due date). The person’s name and the date show under it."
+  },
   "activityAssigned": "Changed responsibility",
   "activityCompleted": "Completed a task",
   "activityReopened": "Reopened a task",
@@ -2266,7 +2325,7 @@
   "activitySystem": "TaskFlow",
   "groupActivity": "Updates",
   "@groupActivity": {
-    "description": "Title of the screen that lists what others did in every shared project, and the tooltip of the header button (people icon) that opens it."
+    "description": "Title of the screen that lists what others did in every shared project, and the tooltip of the header button (feed icon) that opens it."
   },
   "activityUnread": "Unread",
   "@activityUnread": {
@@ -2276,9 +2335,9 @@
   "@activityFindingTask": {
     "description": "Activity: read by TalkBack, and the label of the thin progress bar, on an entry whose task isn’t on the phone yet, while the app fetches it. Keep it short."
   },
-  "activityEntry": "{action, select, created{{actor} created: {title}} assigned{{actor} changed who’s responsible for: {title}} unassigned{{actor} removed the assignee of: {title}} completed{{actor} completed: {title}} reopened{{actor} reopened: {title}} deleted{{actor} deleted: {title}} shared{{actor} shared: {title}} other{{actor} updated: {title}}}",
+  "activityEntry": "{action, select, created{{actor} created: {title}} assigned{{actor} changed who’s responsible for: {title}} unassigned{{actor} removed the assignee of: {title}} completed{{actor} completed: {title}} reopened{{actor} reopened: {title}} moved{{actor} moved: {title}} deleted{{actor} deleted: {title}} shared{{actor} shared: {title}} other{{actor} updated: {title}}}",
   "@activityEntry": {
-    "description": "One activity row: who did what to which task. action is an internal code; actor is a person’s name; title is the task title.",
+    "description": "One activity row: who did what to which task. action is an internal code (moved: an edit that changed only the task’s day); actor is a person’s name; title is the task title.",
     "placeholders": {
       "action": {
         "type": "String"
