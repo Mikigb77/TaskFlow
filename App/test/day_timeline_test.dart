@@ -21,6 +21,7 @@ import 'device_calendar_test.dart'
 import 'package:agenda/providers/device_calendar_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/services/device_calendars.dart';
+import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/task_tile.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
@@ -549,7 +550,7 @@ void main() {
     (
       'the phone calendar’s read failing',
       () => _UnreadableCalendars() as FakeDeviceCalendars,
-      (AppLocalizations l) => l.calendarReadError,
+      (AppLocalizations l) => l.calendarReadRetry,
     ),
     (
       'calendar access missing',
@@ -974,6 +975,125 @@ void main() {
       });
     }
   });
+
+  // ---- Run 2026-10-28-app, round 1 · P277 (UX-2310): a failed event read on
+  // the Día view offers Calendar's retry you can tap ----
+
+  group('P277 · Día view event read retry', () {
+    final line = onDay(find.byKey(const ValueKey('calendar-events-line')));
+    Finder spinner() =>
+        find.descendant(of: line, matching: find.byType(CircularProgressIndicator));
+
+    for (final calendars in [false, true]) {
+      final what = calendars ? 'the phone calendars' : 'the day’s events';
+      // At 2× a failed calendars read also shows «calendarDenied» under the
+      // retry line, and the notices overflow the Día view's header; that was
+      // so before P277 too (584 dp then, 324 dp now) and isn't this package's.
+      for (final scale in calendars ? [1.0] : [1.0, 2.0]) {
+        testWidgets(
+            'UX-2310: at ${scale}x on 360×800, with $what failing to read, the Día view says «No se pudieron leer los eventos. Toca para reintentar.»; a tap reads again, busy meanwhile, and then shows the event',
+            (tester) async {
+          final bridge = _GatedCalendars()
+            ..failEvents = !calendars
+            ..failCalendars = calendars
+            ..data = [
+              DeviceCalendarEvent(
+                  id: '80',
+                  calendarId: workCalendar.id,
+                  title: 'Reunión de equipo',
+                  start: at(0, 10),
+                  end: at(0, 11),
+                  allDay: false),
+            ];
+          addTearDown(bridge.close);
+          await openDay(tester,
+              tasks: normalDay(),
+              clock: at(0, 9, 41),
+              scale: scale,
+              overrides: [
+                deviceCalendarsProvider.overrideWithValue(bridge),
+                calendarPreferenceStoreProvider.overrideWithValue(
+                    MemoryCalendarPreferences(CalendarPreferences(
+                        enabled: true,
+                        selected: {workCalendar.selectionKey}))),
+              ]);
+          expect(es.calendarReadRetry,
+              'No se pudieron leer los eventos. Toca para reintentar.');
+          expect(tester.takeException(), isNull, reason: 'on arrival');
+          final text = onDay(find.text(es.calendarReadRetry));
+          expect(text, findsOneWidget);
+          // Calendar's own line, not a red banner.
+          expect(find.ancestor(of: text, matching: find.byType(MessageBanner)),
+              findsNothing);
+          expect(line, findsOneWidget);
+          expect(find.descendant(of: line, matching: text), findsOneWidget);
+          expect(line.hitTestable(), findsOneWidget);
+          expect(onScreen(tester, line), isTrue);
+          expect(tester.getSize(line).height, greaterThanOrEqualTo(48));
+          expect(tester.widget<InkWell>(line).onTap, isNotNull);
+          expect(spinner(), findsNothing);
+          final block = onDay(find.byWidgetPredicate((widget) =>
+              widget is Tooltip &&
+              (widget.message ?? '').startsWith('Reunión de equipo, ')));
+          expect(block, findsNothing);
+
+          // A tap reads again: the line stays, busy, and takes no tap.
+          bridge.held = 0;
+          final gate = bridge.gate = Completer<void>();
+          bridge.failEvents = false;
+          bridge.failCalendars = false;
+          await tester.tap(line);
+          for (var i = 0; i < 3; i++) {
+            await tester.pump();
+          }
+          expect(bridge.held, greaterThanOrEqualTo(1), reason: 'read again');
+          expect(line, findsOneWidget);
+          expect(find.descendant(of: line, matching: text), findsOneWidget);
+          expect(spinner(), findsOneWidget);
+          expect(tester.widget<InkWell>(line).onTap, isNull);
+          expect(tester.takeException(), isNull, reason: 'while reading');
+          bridge.gate = null;
+          gate.complete();
+          await tester.pumpAndSettle();
+
+          // Read: the line goes, and the event shows on the day.
+          expect(line, findsNothing);
+          expect(onDay(find.text(es.calendarReadRetry)), findsNothing);
+          expect(block, findsOneWidget);
+          expect(tester.takeException(), isNull);
+        });
+      }
+
+      testWidgets(
+          'UX-2310: with $what failing again after a tap, the Día view’s retry line comes back, tappable',
+          (tester) async {
+        final bridge = _GatedCalendars()
+          ..failEvents = !calendars
+          ..failCalendars = calendars;
+        addTearDown(bridge.close);
+        await openDay(tester,
+            tasks: normalDay(),
+            clock: at(0, 9, 41),
+            overrides: [
+              deviceCalendarsProvider.overrideWithValue(bridge),
+              calendarPreferenceStoreProvider.overrideWithValue(
+                  MemoryCalendarPreferences(CalendarPreferences(
+                      enabled: true, selected: {workCalendar.selectionKey}))),
+            ]);
+        final reads = bridge.eventReads + bridge.calendarReads;
+        await tester.tap(line);
+        await tester.pumpAndSettle();
+        expect(bridge.eventReads + bridge.calendarReads, greaterThan(reads),
+            reason: 'read again');
+        expect(find.descendant(
+                of: line, matching: find.text(es.calendarReadRetry)),
+            findsOneWidget);
+        expect(tester.widget<InkWell>(line).onTap, isNotNull);
+        expect(spinner(), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  });
 }
 
 class _GivenTasks extends DesignTaskNotifier {
@@ -998,6 +1118,37 @@ class _UnreadableCalendars extends FakeDeviceCalendars {
   @override
   Future<CalendarRead<DeviceCalendarEvent>> events(
       Set<String> ids, DateTime day) async {
+    eventReads++;
+    throw PlatformException(code: 'read_failed');
+  }
+}
+
+/// P277: phone calendars whose reads can fail, and can be held at [gate] so
+/// a test can look at the screen with a read still pending.
+class _GatedCalendars extends FakeDeviceCalendars {
+  bool failEvents = false, failCalendars = false;
+  int calendarReads = 0, held = 0;
+  Completer<void>? gate;
+
+  @override
+  Future<CalendarRead<DeviceCalendar>> calendars() async {
+    calendarReads++;
+    if (gate != null) {
+      held++;
+      await gate!.future;
+    }
+    if (failCalendars) throw PlatformException(code: 'read_failed');
+    return super.calendars();
+  }
+
+  @override
+  Future<CalendarRead<DeviceCalendarEvent>> events(
+      Set<String> ids, DateTime day) async {
+    if (gate != null) {
+      held++;
+      await gate!.future;
+    }
+    if (!failEvents) return super.events(ids, day);
     eventReads++;
     throw PlatformException(code: 'read_failed');
   }

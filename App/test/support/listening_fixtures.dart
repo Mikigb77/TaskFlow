@@ -194,10 +194,13 @@ class MemoryCaptures extends CaptureStore {
 }
 
 /// The server, out of reach: every request fails as offline, after [hold]
-/// when it is set.
+/// when it is set. The assistant (`ai/…`) may instead answer [answer], or
+/// fail with [failure].
 class UnreachableApi extends OfflineApiClient {
   Completer<void>? hold;
   int requests = 0;
+  Map<String, dynamic>? answer;
+  Object? failure;
   @override
   Future<dynamic> request(
     String method,
@@ -212,6 +215,10 @@ class UnreachableApi extends OfflineApiClient {
       requests++;
       final gate = hold;
       if (gate != null) await gate.future;
+      final error = failure;
+      if (error != null) throw error;
+      final reply = answer;
+      if (reply != null) return reply;
     }
     throw ApiException(0, 'Offline. Retry when connected.');
   }

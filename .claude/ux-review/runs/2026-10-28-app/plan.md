@@ -218,3 +218,33 @@ Six, as the fix workflow will plan them:
 4. P275, P277, P280, P283
 5. P288, P289
 6. P294
+
+## Round 2 (b1)
+
+Round 1 of batch 1 ran P266–P277. The reviewers found 2 findings only partly fixed: UX-2203 and UX-2032, each failing for the first time. They also found three regressions, now UX-2618 to UX-2620. The round check failed on one app test: UX-2203 at ES 1× on 360×800. The other failure was the date-dependent UX-1405 test, which fails only on Sundays and is already fixed.
+Round 2 has three packages, P296 (S3), P297 (S2) and P298 (S2). They share no app file, so they can run side by side. There are no new decisions and nothing is escalated. D1's and D2's packages from the re-plan now start at P299.
+
+The briefs are in `plan-b1-r2.json`.
+
+### Settled here
+- **UX-2203's 360×800 check changes.** At 360×800 the day heading and both lit rows need 474 px, and only about 429 px sit above the message. P274's brief already let the heading scroll away when it doesn't fit. So the day is now named in the message instead, using the reviewer's fix with no new copy. The tester's 360×800 heading assertion becomes a message assertion. 393×852 keeps the heading check.
+
+### Packages, in run order
+
+#### P296 · D9: a reader's reminder choice is sent, never copied, even when the owner changed the task first · B · M · after P271
+- **UX-2032** (S1; the gap is S3; partly fixed, failed once). Round 1 is verified for the reader's page, the banner and the chip, and for the 200 path and the 409-between-GET-and-PUT path. The problem is the stale case. A reader's row is sent only when everything except its reminders still equals the server's copy. So when the owner changed the task before this phone pulled the change, the reader got a «(copia local)» task and the red notice. Now a persisted marker set by `updateOwnReminders` (and cleared by any other write) sends a reminders-only row with `_sendReminders` whatever else differs. On 200 the row takes the server's task and keeps the reader's reminders (`acceptKeepingReminders`, not `acknowledge`, which would have kept the old title under the new version). A demoted editor's real edit keeps today's copy-and-notice path.
+
+#### P297 · After a voice save or Deshacer: the message names the landing day, Deshacer lands on what came back, and «¿Cuál…?» opens at its top · A · M · after P274, P267
+- **UX-2203** (S2; partly fixed, failed once). Part 1 holds. At 360×800 the heading still scrolls away, and «3 tareas añadidas · también el vie, …» names no day for the lit rows. Now a save across several days starts with the landing day: «2 tareas añadidas al dom, 1 de nov · también el vie, 6 de nov» (`captureTasksAddedOn` / `taskAddedOn` plus `captureAlsoOn`). The same applies on the command path. The landing scroll is unchanged.
+- **UX-2619** (S2; R1A1-2). Deshacer on a voice deletion or change of a task on another day changed nothing on screen. Now Deshacer sets `CalendarFocus` on the earliest day of what came back, so Calendar lands on those tasks, lit, as a save does.
+- **UX-2618** (S1; R1A1-1). At 2×, «¿Cuál…?» opened past its top, with the ✕ at 48 × 32 dp. Now a `_Choice` card is revealed at its top (`alignment: 0`), as a set's heading is.
+
+#### P298 · «Añade una fecha para repetir» opens the date sheet · A · S · after P275
+- **UX-2620** (S2; R1A2-1). With no day, the repeat row in «Más opciones» gave an instruction but had no tap. Now it opens the date sheet, with a chevron, as «Para recordártelo, ponle un día.» does.
+
+### Escalated
+None: no finding has failed twice.
+
+### For the main session (noted by the implementers, not by a reviewer, so not planned)
+- P269's implementer: Tareas' `_openHere` (`home_screen.dart:446`) checks only TickerMode, so a row ticked on Tareas stays in place across a switch to Calendar and back. The same `Visibility.of` check would fix it.
+- P275's implementer: AUDIT still counts 0 dp vertical gaps between a collapsed row's title and its «Fecha y hora» line in `capture/result · several`. The reviewer judged this outside UX-2205.

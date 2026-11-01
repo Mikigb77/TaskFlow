@@ -360,7 +360,7 @@ class QuestionBox extends StatelessWidget {
 
 /// A [QuestionBox]'s panel, around its line and its answers.
 class _QuestionPanel extends StatelessWidget {
-  const _QuestionPanel({required this.child});
+  const _QuestionPanel({super.key, required this.child});
   final Widget child;
 
   @override
@@ -1238,10 +1238,11 @@ class _ChoiceState extends State<_Choice> {
     );
     // The answers to the card's first line, in a question box's panel,
     // which spans the card as the other questions' do. The line isn't
-    // repeated in the panel (UX-2204).
+    // repeated in the panel (UX-2204). Its key opens the card at its top.
     return Padding(
       padding: const EdgeInsets.only(right: 10, top: 4, bottom: 8),
       child: _QuestionPanel(
+        key: const ValueKey('command-choice'),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

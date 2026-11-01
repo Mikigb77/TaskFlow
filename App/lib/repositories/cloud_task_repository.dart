@@ -118,7 +118,9 @@ class CloudTaskRepository extends TaskRepository {
   /// reminders chosen on this phone ([data]). The server saves them for this
   /// account alone, with no new version, and answers with the task; when the
   /// task changed meanwhile it saves them all the same, then answers 409 with
-  /// the task as it is now. Never a copy, never a notice.
+  /// the task as it is now. Either answer becomes the row, with these
+  /// reminders kept, so an owner's change this phone hadn't pulled yet comes
+  /// in too. Never a copy, never a notice.
   Future<void> _sendReminders(
     Map<String, dynamic> row,
     Map<String, dynamic> data,
@@ -137,7 +139,7 @@ class CloudTaskRepository extends TaskRepository {
         },
         accountId: accountId,
       );
-      await database.acknowledge(
+      await database.acceptKeepingReminders(
         ownerKey,
         row,
         Map<String, dynamic>.from(saved as Map),
@@ -214,8 +216,11 @@ class CloudTaskRepository extends TaskRepository {
                   await database.acknowledge(ownerKey, row, remote);
                   continue;
                 }
-                // A reader's own reminders are theirs to choose (D9).
-                if (_sameContent({...data, ..._reminders(remote)}, remote)) {
+                // A reader's own reminders are theirs to choose (D9): sent
+                // when they are the row's only change, even if the owner
+                // changed the task before this phone pulled it.
+                if (row['own_reminders_pending'] == 1 ||
+                    _sameContent({...data, ..._reminders(remote)}, remote)) {
                   await _sendReminders(row, data, remote);
                   continue;
                 }

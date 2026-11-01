@@ -8,9 +8,8 @@
   "reviewOptions": "Más opciones",
   "reviewOriginal": "Ver lo que dije",
   "reviewOriginalText": "Texto original",
-  "reviewRemove": "Quitar",
   "reviewRemoved": "Quitada",
-  "reviewUndoSaved": "Han vuelto aquí, sin guardar.",
+  "reviewUndoSaved": "{count, plural, =1{Ha vuelto aquí, sin guardar.} other{Han vuelto aquí, sin guardar.}}",
   "reviewUndoChanged": "Esta tarea ha cambiado. Las tareas guardadas se han conservado.",
   "reviewRepair": "Corregir texto",
   "reviewRepairHelp": "Este texto puede tener acentos dañados. Revisa la corrección antes de guardar.",
@@ -106,7 +105,6 @@
   "calendarSettings": "Abrir ajustes de la aplicación",
   "calendarEmptySources": "No hay calendarios visibles sincronizados en este teléfono. Conecta una cuenta en tu aplicación de calendario y actualiza aquí.",
   "calendarRefresh": "Actualizar calendarios",
-  "calendarReadError": "No se pudieron leer los eventos. Actualiza para volver a intentarlo; pueden faltar compromisos en esta vista.",
   "calendarReadRetry": "No se pudieron leer los eventos. Toca para reintentar.",
   "changeView": "Cambiar vista",
   "calendarPreferenceError": "No se pudo guardar esa selección. Vuelve a intentarlo. Puedes elegir hasta 50 calendarios.",
@@ -115,7 +113,7 @@
   "calendarReadOnly": "Evento del calendario · solo lectura",
   "calendarNoSelection": "Elige calendarios para mostrar tus compromisos existentes.",
   "calendarAllDay": "Todo el día",
-  "calendarEventCount": "{count, plural, one{1 evento} other{{count} eventos}}",
+  "calendarSeeAllEvents": "Ver los {count} eventos",
   "calendarOffline": "Sin conexión: tus tareas están guardadas en este teléfono.",
   "calendarUntitled": "Evento sin título",
   "calendarOpenEvent": "Abrir en la aplicación de calendario",
@@ -968,6 +966,7 @@
       }
     }
   },
+  "captureTasksAddedOn": "{count, plural, =1{1 tarea añadida al {date}} other{{count} tareas añadidas al {date}}}",
   "captureKeptForReview": "{count, plural, one {1 pendiente de revisar} other {{count} pendientes de revisar}}",
   "@captureKeptForReview": {
     "placeholders": {
@@ -1331,6 +1330,7 @@
   "commandAmbiguousMember": "Hay varias personas que se llaman {name}.",
   "commandTasksChanged": "{count, plural, =1{Tarea cambiada} other{{count} tareas cambiadas}}",
   "commandTasksDeleted": "{count, plural, =1{Tarea eliminada} other{{count} tareas eliminadas}}",
+  "commandDeletedTitle": "Eliminada: {title}",
   "commandProjectsCreated": "{count, plural, =1{Proyecto creado} other{{count} proyectos creados}}",
   "commandChangeSemantics": "{label}: de {before} a {after}",
   "commandChangeLine": "{label}: {before} → {after}",

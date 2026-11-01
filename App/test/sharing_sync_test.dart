@@ -404,6 +404,296 @@ void main() {
       );
     });
   });
+
+  // ---- 2026-10-28-app · P296 (UX-2032, D9): a reader's reminder choice is
+  // sent, never copied, even when the owner changed the task first ----
+
+  group('P296 · a reader’s reminders after the owner’s change', () {
+    late _ReaderApi reader;
+    final suffixes = [
+      for (final language in ['es', 'ca', 'en'])
+        lookupAppLocalizations(Locale(language)).syncCopySuffix,
+    ];
+
+    /// Points the repository and store at [next], as the app does on start.
+    void useDatabase(TaskDatabase next) {
+      database = next;
+      repository = CloudTaskRepository(database, api, 1);
+      store = TaskListStore(database, repository.ownerKey, files: files);
+    }
+
+    setUp(() async {
+      // The same server, answering as D9's does (bc80025), with «Household»
+      // shared with this account as a «lector».
+      api.close();
+      api = reader = _ReaderApi();
+      reader.tasks[taskId] = {...reader.tasks[taskId]!, 'is_deleted': false};
+      useDatabase(database);
+      reader.role = 'viewer';
+      await repository.sync();
+      expect((await store.all()).single.canEdit, isFalse);
+      expect(await database.pending(repository.ownerKey), isEmpty);
+    });
+
+    /// The owner renames the task on their phone, which raises its version,
+    /// before this phone's sync reads it.
+    void ownerRenames(String title, int version) => reader.tasks[taskId] = {
+      ...reader.tasks[taskId]!,
+      'title': title,
+      'version': version,
+    };
+
+    Future<List<Map<String, dynamic>>> rowsFor(String syncId) async =>
+        (await database.database).query(
+          'tasks',
+          where: 'owner_key = ? AND sync_id = ?',
+          whereArgs: [repository.ownerKey, syncId],
+        );
+
+    /// The end state the reader must see after the sync: the shared task,
+    /// once, as the owner left it, with the reader's own «1 hora antes»; no
+    /// «(copia local)»; no notice; nothing left to send.
+    Future<void> expectSentAndUpToDate({
+      required String title,
+      required int version,
+    }) async {
+      final rows = await rowsFor(taskId);
+      expect(rows, hasLength(1), reason: 'exactly one task with that sync_id');
+      expect(rows.single['title'], title, reason: 'the owner’s change came in');
+      expect(rows.single['listId'], listId);
+      expect(rows.single['reminderMinutes'], 60, reason: 'the reader’s own');
+      expect(rows.single['sync_pending'], 0);
+      expect(rows.single['remote_version'], version);
+      final tasks = await repository.getAllTasks();
+      expect(tasks, hasLength(1), reason: 'no personal copy');
+      expect(tasks.single.title, title);
+      expect(tasks.single.reminderMinutes, 60);
+      for (final suffix in suffixes) {
+        expect(
+          tasks.where((task) => task.title.contains(suffix)),
+          isEmpty,
+          reason: 'no task titled with $suffix',
+        );
+      }
+      expect(tasks.where((task) => task.listId == null), isEmpty);
+      expect(repository.syncError, isNull, reason: 'no read-only notice');
+      expect(await database.pending(repository.ownerKey), isEmpty);
+    }
+
+    test(
+      'UX-2032: the reader sets «1 hora antes», the owner renames the task before the sync reads it: one task, the new title, the reader’s reminder, no copy, no notice',
+      () async {
+        final task = (await repository.getAllTasks()).single;
+        await repository.updateOwnReminders(task.id!, minutes: 60);
+        ownerRenames('Ensayo general', 2);
+
+        await repository.sync();
+        expect(reader.puts, hasLength(1), reason: 'the reminder was sent');
+        expect(reader.answers, [200]);
+        expect(reader.own['reminder_minutes'], 60, reason: 'saved for them');
+        expect(reader.tasks[taskId]!['title'], 'Ensayo general');
+        expect(reader.tasks[taskId]!['version'], 2, reason: 'no new version');
+        await expectSentAndUpToDate(title: 'Ensayo general', version: 2);
+
+        // Nothing is left to send, and nothing changes on the next sync.
+        await repository.sync();
+        expect(reader.puts, hasLength(1));
+        await expectSentAndUpToDate(title: 'Ensayo general', version: 2);
+      },
+    );
+
+    test(
+      'UX-2032: that PUT carries the server’s title, fields and version, with the reader’s reminder_minutes, reminder_time and reminder_plan and the server’s reminder_anchor',
+      () async {
+        final task = (await repository.getAllTasks()).single;
+        await repository.updateOwnReminders(task.id!, minutes: 60);
+        ownerRenames('Ensayo general', 2);
+        final server = Map<String, dynamic>.from(
+          reader.clone(reader.tasks[taskId]) as Map,
+        );
+        final phone = (await rowsFor(taskId)).single;
+
+        await repository.sync();
+        final sent = reader.puts.single;
+        expect(sent['title'], 'Ensayo general');
+        expect(sent['version'], 2, reason: 'the server’s version');
+        expect(sent['list_id'], listId);
+        expect(sent['reminder_minutes'], 60);
+        expect(sent['reminder_time'], phone['reminderTime']);
+        expect(sent['reminder_plan'], phone['reminderPlan']);
+        expect(sent['reminder_anchor'], server['reminder_anchor']);
+        const readers = {'reminder_minutes', 'reminder_time', 'reminder_plan'};
+        for (final key in server.keys.where((key) => !readers.contains(key))) {
+          expect(
+            jsonEncode(sent[key]),
+            jsonEncode(server[key]),
+            reason: '$key is the server’s',
+          );
+        }
+        for (final key in sent.keys.where((key) => !readers.contains(key))) {
+          expect(
+            server.containsKey(key),
+            isTrue,
+            reason: '$key is the server’s',
+          );
+        }
+      },
+    );
+
+    test(
+      'UX-2032: the same case when the server answers 409 with a newer current: the task becomes current with «1 hora antes» kept, no copy, no notice',
+      () async {
+        final task = (await repository.getAllTasks()).single;
+        await repository.updateOwnReminders(task.id!, minutes: 60);
+        ownerRenames('Ensayo general', 2);
+        // The owner changes it again between this phone's read and its PUT.
+        reader.beforePut = () =>
+            ownerRenames('Ensayo general en la iglesia', 3);
+
+        await repository.sync();
+        expect(reader.answers, [409]);
+        expect(reader.own['reminder_minutes'], 60, reason: 'saved first');
+        await expectSentAndUpToDate(
+          title: 'Ensayo general en la iglesia',
+          version: 3,
+        );
+
+        await repository.sync();
+        expect(reader.puts, hasLength(1), reason: 'nothing is sent again');
+        await expectSentAndUpToDate(
+          title: 'Ensayo general en la iglesia',
+          version: 3,
+        );
+      },
+    );
+
+    test(
+      'UX-2032: the reader’s choice survives a restart: a new TaskDatabase on the same file, then a sync, gives the same end state',
+      () async {
+        final task = (await repository.getAllTasks()).single;
+        await repository.updateOwnReminders(task.id!, minutes: 60);
+        // The app is closed before it syncs, and opened again.
+        await database.close();
+        final reopened = await databaseFactoryFfi.openDatabase(
+          p.join(directory.path, 'data.db'),
+        );
+        useDatabase(TaskDatabase.forTesting(reopened));
+        expect(await database.pending(repository.ownerKey), hasLength(1));
+        expect((await repository.getAllTasks()).single.reminderMinutes, 60);
+        ownerRenames('Ensayo general', 2);
+
+        await repository.sync();
+        expect(reader.answers, [200]);
+        expect(reader.own['reminder_minutes'], 60);
+        await expectSentAndUpToDate(title: 'Ensayo general', version: 2);
+      },
+    );
+
+    test(
+      'UX-2032: an editor’s offline title edit, then made «lector», then a reminder on that task: still a personal copy and the read-only notice',
+      () async {
+        reader.role = 'editor';
+        await repository.sync();
+        final task = (await repository.getAllTasks()).single;
+        await repository.updateTask(task.copyWith(title: 'Offline milk'));
+        // Made «lector»; this phone learns it before it sends the edit.
+        reader.role = 'viewer';
+        await store.refreshAccess(api, 1);
+        expect((await store.all()).single.canEdit, isFalse);
+        await repository.updateOwnReminders(task.id!, minutes: 60);
+
+        await repository.sync();
+        expect(reader.puts, isEmpty, reason: 'the title edit is not sent');
+        expect(reader.tasks[taskId]!['title'], 'Buy milk');
+        final tasks = await repository.getAllTasks();
+        expect(tasks.singleWhere((t) => t.listId == listId).title, 'Buy milk');
+        expect(tasks.where((t) => t.listId == null).map((t) => t.title), [
+          'Offline milk '
+              '${lookupAppLocalizations(const Locale('en')).syncCopySuffix}',
+        ]);
+        expect(repository.syncError, isNotNull, reason: 'the notice');
+      },
+    );
+
+    group('a phone still at schema 19', () {
+      /// The phone as round 1 left it: schema 19, the reader's «1 hora
+      /// antes» waiting to be sent. Then the update opens it at schema 20.
+      Future<Database> upgradedFrom19() async {
+        final current = await database.database;
+        final old = await databaseFactoryFfi.openDatabase(
+          p.join(directory.path, 'schema19.db'),
+        );
+        await old.execute(
+          'CREATE TABLE tasks(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, dueDate TEXT, priority INTEGER, isCompleted INTEGER, notes TEXT, filePaths TEXT, imagePaths TEXT)',
+        );
+        await TaskDatabase.upgrade(old, 3, 19);
+        final oldColumns = <String, Set<String>>{};
+        for (final table in await old.rawQuery(
+          "SELECT name FROM sqlite_master WHERE type = 'table' "
+          "AND name NOT LIKE 'sqlite_%'",
+        )) {
+          final name = table['name'] as String;
+          oldColumns[name] = {
+            for (final column in await old.rawQuery('PRAGMA table_info($name)'))
+              column['name'] as String,
+          };
+        }
+        expect(oldColumns['tasks'], isNot(contains('own_reminders_pending')));
+        // The synced list and task, as they were on this phone.
+        for (final entry in oldColumns.entries) {
+          for (final row in await current.query(entry.key)) {
+            await old.insert(entry.key, {
+              for (final column in row.entries)
+                if (entry.value.contains(column.key)) column.key: column.value,
+            });
+          }
+        }
+        // Round 1's updateOwnReminders: pending, a new revision, no marker.
+        await old.rawUpdate(
+          'UPDATE tasks SET reminderMinutes = 60, sync_pending = 1, '
+          'revision = revision + 1 WHERE sync_id = ?',
+          [taskId],
+        );
+        await database.close();
+
+        await TaskDatabase.upgrade(old, 19, TaskDatabase.schemaVersion);
+        useDatabase(TaskDatabase.forTesting(old));
+        final rows = await rowsFor(taskId);
+        expect(rows.single['own_reminders_pending'], 0, reason: 'unmarked');
+        expect(rows.single['sync_pending'], 1, reason: 'still to send');
+        expect(rows.single['reminderMinutes'], 60);
+        return old;
+      }
+
+      test(
+        'UX-2032: it opens and upgrades; its reader’s unmarked row is sent as before when the task is as the server has it',
+        () async {
+          await upgradedFrom19();
+          await repository.sync();
+          expect(reader.answers, [200]);
+          expect(reader.own['reminder_minutes'], 60);
+          await expectSentAndUpToDate(title: 'Buy milk', version: 1);
+        },
+      );
+
+      test(
+        'UX-2032: it opens and upgrades; its unmarked row keeps today’s order when the owner changed the task first (a personal copy and the notice)',
+        () async {
+          await upgradedFrom19();
+          ownerRenames('Ensayo general', 2);
+          await repository.sync();
+          expect(reader.puts, isEmpty);
+          final tasks = await repository.getAllTasks();
+          expect(
+            tasks.singleWhere((t) => t.listId == listId).title,
+            'Ensayo general',
+          );
+          expect(tasks.where((t) => t.listId == null), hasLength(1));
+          expect(repository.syncError, isNotNull);
+        },
+      );
+    });
+  });
 }
 
 class _SharingApi extends ApiClient {

@@ -49,7 +49,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   final _page = GlobalKey();
   final _scroll = ScrollController();
   // Tasks seen open on the selected day. Completing one keeps its place
-  // until the day changes or Calendar is covered.
+  // until the day changes or Calendar is left (covered, or another tab).
   final _openOnDay = <String>{};
   // Today's overdue tasks seen open while today was shown. One ticked keeps
   // its place under «Atrasadas», struck through, by the same rule.
@@ -65,6 +65,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   // row is 'inbox'. Each fades 1.5 s after it is first seen whole.
   final _litRows = <String, GlobalKey>{};
   final _inboxRow = GlobalKey();
+  // The day's heading, kept in view by a landing when it fits.
+  final _dayHeading = GlobalKey();
   List<String> _litOrder = const [];
   final _seen = <String>{};
   final _faded = <String>{};
@@ -173,7 +175,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   }
 
   /// Brings the new tasks' rows into view, clear of the save message: all
-  /// of them when they fit, or else the first. Then each fades once seen.
+  /// of them when they fit, or else the first, under the day's heading when
+  /// that fits too. Then each fades once seen.
   Future<void> _reveal() async {
     _revealing = true;
     try {
@@ -233,10 +236,17 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
           ? null
           : viewport.getOffsetToReveal(last, 1).offset + room;
       final end = lastEnd != null && lastEnd <= top ? lastEnd : firstEnd;
-      final target = position.pixels > top
-          ? top
+      // The day's heading stays in view when it fits with those rows above
+      // the message, so a line on screen names their day.
+      final heading = _dayHeading.currentContext?.findRenderObject();
+      final headingTop = heading == null
+          ? null
+          : viewport.getOffsetToReveal(heading, 0).offset;
+      final upTo = headingTop != null && end <= headingTop ? headingTop : top;
+      final target = position.pixels > upTo
+          ? upTo
           : position.pixels < end
-          ? math.min(end, top)
+          ? math.min(end, upTo)
           : position.pixels;
       final offset = target.clamp(
         position.minScrollExtent,
@@ -667,12 +677,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     _followToday();
     // Calendar is covered by another screen: the user has left it.
     final shown = TickerMode.valuesOf(context).enabled;
-    if (!shown) {
+    // Another tab is shown: the shell keeps Calendar's tickers running, so
+    // only its visibility says the user has left it too.
+    if (!shown || !Visibility.of(context)) {
       _openOnDay.clear();
       _overdueSeen.clear();
-      // Leaving Calendar ends a landing's room for the save message.
-      _end = 20;
     }
+    // Leaving Calendar ends a landing's room for the save message.
+    if (!shown) _end = 20;
     final colors = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final tasksState = ref.watch(taskProvider);
@@ -939,6 +951,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
               padding: const EdgeInsets.fromLTRB(24, 12, 24, 12),
               sliver: SliverToBoxAdapter(
                 child: Column(
+                  key: _dayHeading,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(

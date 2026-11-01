@@ -14,7 +14,7 @@ import 'package:agenda/services/reminder_copy.dart';
 enum ReminderBlock { archived, muted, notForAccount }
 
 class TaskDatabase {
-  static const schemaVersion = 19;
+  static const schemaVersion = 20;
   static final TaskDatabase _instance = TaskDatabase._internal();
   Database? _database;
   Future<Database>? _opening;
@@ -72,7 +72,8 @@ class TaskDatabase {
           repeatWeekdays TEXT NOT NULL DEFAULT '[]', exceptions TEXT NOT NULL DEFAULT '[]',
           owner_key TEXT NOT NULL DEFAULT 'local', sync_id TEXT,
           remote_version INTEGER NOT NULL DEFAULT 0, revision INTEGER NOT NULL DEFAULT 0,
-          sync_pending INTEGER NOT NULL DEFAULT 0, is_deleted INTEGER NOT NULL DEFAULT 0
+          sync_pending INTEGER NOT NULL DEFAULT 0, is_deleted INTEGER NOT NULL DEFAULT 0,
+          own_reminders_pending INTEGER NOT NULL DEFAULT 0
         )''');
           await db.execute(
             'CREATE UNIQUE INDEX task_sync_owner ON tasks(owner_key, sync_id)',
@@ -243,6 +244,14 @@ class TaskDatabase {
       // A reminder plan, as its JSON (Backend/docs/REMINDER_PLANS.md).
       // Every task keeps its single reminder: none has a plan yet.
       await db.execute('ALTER TABLE tasks ADD COLUMN reminderPlan TEXT');
+    }
+    if (oldVersion < 20 && newVersion >= 20) {
+      // Whether a row's unsent change is only this account's own reminders
+      // ([updateOwnReminders]), which a «lector» sends whatever else the
+      // owner changed meanwhile (D9). Rows pending today keep their change.
+      await db.execute(
+        'ALTER TABLE tasks ADD COLUMN own_reminders_pending INTEGER NOT NULL DEFAULT 0',
+      );
     }
   }
 
@@ -550,7 +559,11 @@ class TaskDatabase {
       final values = task.toMap()..remove('id');
       final count = await tx.update(
         'tasks',
-        {...values, 'sync_pending': ownerKey == 'local' ? 0 : 1},
+        {
+          ...values,
+          'sync_pending': ownerKey == 'local' ? 0 : 1,
+          'own_reminders_pending': 0,
+        },
         where: 'id = ? AND owner_key = ? AND is_deleted = 0',
         whereArgs: [task.id, ownerKey],
       );
@@ -579,6 +592,10 @@ class TaskDatabase {
   /// «lector» project takes from a reader (D9), so it skips [validateList]'s
   /// read-only refusal; nothing else of the task changes. The row goes
   /// pending, and the sync sends it as a change to these reminders alone.
+  /// When nothing else was waiting to be sent, the row is marked
+  /// `own_reminders_pending`, so the sync sends these reminders even after
+  /// the owner changed the task first; a row already pending with another
+  /// change stays unmarked, and every other write clears the mark.
   Future<int> updateOwnReminders(
     int taskId, {
     String ownerKey = 'local',
@@ -588,13 +605,16 @@ class TaskDatabase {
   }) async {
     final count = await (await database).rawUpdate(
       '''UPDATE tasks SET reminderMinutes = ?, reminderTime = ?, reminderPlan = ?,
-      sync_pending = ?, revision = revision + 1
+      sync_pending = ?, revision = revision + 1,
+      own_reminders_pending = CASE WHEN ? = 1
+        AND (sync_pending = 0 OR own_reminders_pending = 1) THEN 1 ELSE 0 END
       WHERE id = ? AND owner_key = ? AND is_deleted = 0
         AND (kind IS NULL OR kind != 'note')''',
       [
         minutes,
         time,
         plan?.encode(),
+        ownerKey == 'local' ? 0 : 1,
         ownerKey == 'local' ? 0 : 1,
         taskId,
         ownerKey,
@@ -624,7 +644,7 @@ class TaskDatabase {
       if (rows.isEmpty) return 0;
       await validateList(tx, Task.fromMap(rows.single), ownerKey);
       return tx.rawUpdate(
-        'UPDATE tasks SET is_deleted = 1, sync_pending = 1, revision = revision + 1 WHERE id = ? AND owner_key = ?',
+        'UPDATE tasks SET is_deleted = 1, sync_pending = 1, own_reminders_pending = 0, revision = revision + 1 WHERE id = ? AND owner_key = ?',
         [id, ownerKey],
       );
     });
@@ -645,7 +665,7 @@ class TaskDatabase {
         final paths = task.toMap();
         await tx.rawUpdate(
           '''UPDATE tasks SET is_deleted = 0, sync_pending = ?, revision = revision + 1,
-          filePaths = ?, imagePaths = ? WHERE id = ? AND owner_key = ?''',
+          own_reminders_pending = 0, filePaths = ?, imagePaths = ? WHERE id = ? AND owner_key = ?''',
           [
             ownerKey == 'local' ? 0 : 1,
             paths['filePaths'],
@@ -703,7 +723,7 @@ class TaskDatabase {
     await (await database).rawUpdate(
       '''UPDATE tasks SET listId = NULL, assignment = 'personal', assigneeId = NULL,
         assigneeName = NULL, createdBy = NULL, createdByName = NULL,
-        revision = revision + 1
+        own_reminders_pending = 0, revision = revision + 1
       WHERE owner_key = ? AND id = ? AND remote_version = 0 AND sync_pending = 1
       ${revision == null ? '' : 'AND revision = ?'}
       ${assignmentChanged ? '' : "AND listId IN (SELECT id FROM task_lists WHERE owner_key = ? AND role = 'viewer')"}''',
@@ -724,17 +744,25 @@ class TaskDatabase {
     // A user may edit while an upload is in flight. Never clear that newer edit.
     await (await database).rawUpdate(
       '''UPDATE tasks SET remote_version = ?,
-      sync_pending = CASE WHEN revision = ? THEN 0 ELSE 1 END
+      sync_pending = CASE WHEN revision = ? THEN 0 ELSE 1 END,
+      own_reminders_pending = CASE WHEN revision = ? THEN 0
+        ELSE own_reminders_pending END
       WHERE id = ? AND owner_key = ?''',
-      [remote['version'], sent['revision'], sent['id'], ownerKey],
+      [
+        remote['version'],
+        sent['revision'],
+        sent['revision'],
+        sent['id'],
+        ownerKey,
+      ],
     );
   }
 
   /// Takes [remote] as task [sent]'s server copy, keeping the reminders this
   /// account chose on the phone ([updateOwnReminders]): a reader's were saved
-  /// on the server before it answered that the task had changed meanwhile
-  /// (D9). The anchor is the server's, which a reader never sets. A choice
-  /// made since [sent] went out stays pending.
+  /// on the server, which answered with the task as it is, or with 409 when
+  /// it had changed meanwhile (D9). The anchor is the server's, which a
+  /// reader never sets. A choice made since [sent] went out stays pending.
   Future<void> acceptKeepingReminders(
     String ownerKey,
     Map<String, dynamic> sent,
@@ -747,14 +775,17 @@ class TaskDatabase {
           ..remove('reminderMinutes')
           ..remove('reminderTime')
           ..remove('reminderPlan')
-          ..remove('sync_pending'),
+          ..remove('sync_pending')
+          ..remove('own_reminders_pending'),
         where: 'id = ? AND owner_key = ?',
         whereArgs: [sent['id'], ownerKey],
       );
       await tx.rawUpdate(
-        '''UPDATE tasks SET sync_pending = CASE WHEN revision = ? THEN 0 ELSE 1 END
+        '''UPDATE tasks SET sync_pending = CASE WHEN revision = ? THEN 0 ELSE 1 END,
+        own_reminders_pending = CASE WHEN revision = ? THEN 0
+          ELSE own_reminders_pending END
         WHERE id = ? AND owner_key = ?''',
-        [sent['revision'], sent['id'], ownerKey],
+        [sent['revision'], sent['revision'], sent['id'], ownerKey],
       );
     });
   }
@@ -772,6 +803,7 @@ class TaskDatabase {
     'is_deleted': remote['is_deleted'] == true ? 1 : 0,
     'remote_version': remote['version'],
     'sync_pending': 0,
+    'own_reminders_pending': 0,
   };
 
   Future<void> mergeRemote(String ownerKey, Map<String, dynamic> remote) async {
@@ -864,6 +896,7 @@ class TaskDatabase {
           'remote_version': 0,
           'revision': 0,
           'sync_pending': 1,
+          'own_reminders_pending': 0,
         });
       }
       await tx.update(

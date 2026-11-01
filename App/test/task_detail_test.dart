@@ -791,7 +791,11 @@ void main() {
           overrides: [
             attachmentEntriesProvider.overrideWith(
               (ref, id) async => [
-                const AttachmentEntry('Volante.pdf', '/local/volante.pdf', true),
+                const AttachmentEntry(
+                  'Volante.pdf',
+                  '/local/volante.pdf',
+                  true,
+                ),
               ],
             ),
           ],
@@ -845,11 +849,9 @@ void main() {
     (tester) async {
       tester.platformDispatcher.textScaleFactorTestValue = 1.3;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-      await _App.open(
-        tester,
-        [withNotesAndSteps()],
-        size: const Size(360, 800),
-      );
+      await _App.open(tester, [
+        withNotesAndSteps(),
+      ], size: const Size(360, 800));
       await _App.detail(tester, 76);
       final detail = find.byType(TaskDetailScreen);
       final scaffold = tester.widget<Scaffold>(
@@ -930,7 +932,10 @@ void main() {
         await tester.pumpAndSettle();
         await _App.detail(tester, 2);
         expect(
-          find.descendant(of: find.byType(AppBar), matching: find.text(es.note)),
+          find.descendant(
+            of: find.byType(AppBar),
+            matching: find.text(es.note),
+          ),
           findsOneWidget,
         );
         expect(es.note, 'Nota');
@@ -1247,6 +1252,36 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+
+    testWidgets(
+      'UX-2032: a file on the reader’s «Todos» task can be opened but not removed or sent, and tapping it opens no editor',
+      (tester) async {
+        final phone = await _ReaderPhone.open(
+          tester,
+          choirTask(),
+          files: const [
+            AttachmentEntry('Partitura.pdf', '/local/partitura.pdf', true),
+          ],
+        );
+        await phone.detail();
+        final file = find.text('Partitura.pdf');
+        await tester.ensureVisible(file);
+        await tester.pumpAndSettle();
+        expect(file, findsOneWidget);
+        expect(find.text(es.fileOpen), findsOneWidget);
+        expect(find.text(es.fileRemove), findsNothing);
+        expect(find.text(es.fileUpload), findsNothing);
+
+        await tester.tap(file, warnIfMissed: false);
+        await tester.pumpAndSettle();
+        expect(find.byType(TaskEditor), findsNothing);
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(find.byType(TaskDetailScreen), findsOneWidget);
+        expect((await phone.row())['sync_pending'], 0, reason: 'no write');
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }
 
@@ -1360,8 +1395,18 @@ class _Unreachable extends OfflineApiClient {
 /// The app at 360×800, signed in as account 1, over a real task database in
 /// a file, where «Coro» is a project this account can only view.
 class _ReaderPhone {
-  _ReaderPhone(this.tester, this.path, this.sql, this.repository, this.api);
+  _ReaderPhone(
+    this.tester,
+    this.path,
+    this.sql,
+    this.repository,
+    this.api, {
+    this.files = const [],
+  });
   final WidgetTester tester;
+
+  /// The task's files, as the attachment list shows them.
+  final List<AttachmentEntry> files;
   final String path;
   final Database sql;
   final CloudTaskRepository repository;
@@ -1372,6 +1417,7 @@ class _ReaderPhone {
     WidgetTester tester,
     Map<String, dynamic> task, {
     String language = 'es',
+    List<AttachmentEntry> files = const [],
   }) async {
     final directory = Directory.systemTemp.createTempSync('taskflow-reader-');
     addTearDown(() => directory.deleteSync(recursive: true));
@@ -1397,7 +1443,14 @@ class _ReaderPhone {
       return (sql, repository, api);
     }))!;
     addTearDown(() => tester.runAsync(sql.close));
-    final phone = _ReaderPhone(tester, path, sql, repository, api);
+    final phone = _ReaderPhone(
+      tester,
+      path,
+      sql,
+      repository,
+      api,
+      files: files,
+    );
     await phone._start(language);
     return phone;
   }
@@ -1414,20 +1467,31 @@ class _ReaderPhone {
         TaskListInfo(id: _choir, name: 'Coro', role: 'viewer', shared: true),
       ],
       tasks: () => TaskNotifier(repository),
-      overrides: reminderOverrides(
-        MemoryReminderStore(
-          const ReminderPreferences(
-            enabled: true,
-            dateOnlyTime: 540,
-            asked: true,
+      overrides: [
+        ...reminderOverrides(
+          MemoryReminderStore(
+            const ReminderPreferences(
+              enabled: true,
+              dateOnlyTime: 540,
+              asked: true,
+            ),
           ),
+          FakeReminderAccess(allowed: true),
         ),
-        FakeReminderAccess(allowed: true),
-      ),
+      ],
     );
     addTearDown(container.dispose);
     await tester.pumpWidget(
-      UncontrolledProviderScope(container: container, child: const MyApp()),
+      UncontrolledProviderScope(
+        container: container,
+        // The design fixtures list no files; this phone's own win here.
+        child: ProviderScope(
+          overrides: [
+            attachmentEntriesProvider.overrideWith((ref, id) async => files),
+          ],
+          child: const MyApp(),
+        ),
+      ),
     );
     await tester.pumpAndSettle();
     id = (await sql.query('tasks', columns: ['id'])).single['id'] as int;

@@ -2748,7 +2748,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
 
 /// The capture's result, inside the capture sheet: each thing to add with its
 /// date as the main line, and one button that adds them. Saving closes the
-/// sheet; an Undo after that reopens it on the restored result.
+/// sheet; an Undo after that reopens it on the restored result when it added
+/// tasks, and only takes back the rest.
 class CaptureResult extends ConsumerStatefulWidget {
   const CaptureResult({
     super.key,
@@ -2910,16 +2911,24 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
   /// above the buttons; with nothing open, the task the button deletes, or
   /// the set it deletes with its heading at the top of the view. A set is
   /// revealed by its card, not by a question it has answered, so its heading
-  /// and ✕ stay in view. Otherwise the scroll stays where it is.
+  /// and ✕ stay in view; so is a «¿Cuál…?» card, whose choices can run
+  /// taller than the view. Otherwise the scroll stays where it is.
   void _reveal() {
     final open = _firstOpen();
     if (open == null) return;
     final card = open.card;
+    final top =
+        open.heading ||
+        _firstIn(
+              card,
+              (widget) => widget.key == const ValueKey('command-choice'),
+            ) !=
+            null;
     final still = MediaQuery.disableAnimationsOf(context);
     unawaited(
       Scrollable.ensureVisible(
-        open.heading ? card : (_questionIn(card) ?? card),
-        alignment: open.heading ? 0 : 1,
+        top ? card : (_questionIn(card) ?? card),
+        alignment: top ? 0 : 1,
         duration: still ? Duration.zero : const Duration(milliseconds: 250),
         curve: Curves.easeOutCubic,
       ),
@@ -3348,8 +3357,50 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
             ..sort();
       final day = ready.length == 1 ? ready.single.task.dueDate : null;
       final due = ready.length == 1 ? ready.single.task.deadline : null;
-      final added = ready.length > 1
-          ? strings.captureTasksAdded(ready.length)
+      // Several tasks, every one on the same day: that day is named, as a
+      // moved set's is.
+      final allOn =
+          days.length == 1 &&
+              tasks.length == ready.length &&
+              tasks.every(
+                (item) => (item.task.dueDate ?? item.task.deadline) != null,
+              )
+          ? days.single
+          : null;
+      // Several tasks, every one dated, on several days, all saved: Calendar
+      // lands on the earliest, so that day is named with its own tasks.
+      final first =
+          ready.length > 1 &&
+              allOn == null &&
+              days.length > 1 &&
+              remaining == 0 &&
+              tasks.length == ready.length &&
+              tasks.every(
+                (item) => (item.task.dueDate ?? item.task.deadline) != null,
+              )
+          ? [
+              for (final item in tasks)
+                if (Task.day(item.task.dueDate ?? item.task.deadline!) ==
+                    days.first)
+                  item.task,
+            ]
+          : null;
+      final added = first != null
+          ? first.length > 1
+                ? strings.captureTasksAddedOn(
+                    first.length,
+                    context.weekdayDate(days.first),
+                  )
+                : first.single.dueDate == null
+                ? strings.taskAddedDue(context.weekdayDate(days.first))
+                : strings.taskAddedOn(context.weekdayDate(days.first))
+          : ready.length > 1
+          ? allOn != null
+                ? strings.captureTasksAddedOn(
+                    ready.length,
+                    context.weekdayDate(allOn),
+                  )
+                : strings.captureTasksAdded(ready.length)
           : day != null
           ? strings.taskAddedOn(context.weekdayDate(day))
           : due != null
@@ -3438,7 +3489,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                 unawaited(
                   showFeedback(
                     messenger,
-                    strings.reviewUndoSaved,
+                    strings.reviewUndoSaved(ready.length),
                     margin: margin(),
                   ),
                 );
@@ -3883,9 +3934,38 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
           : null;
       final day = ready.length == 1 ? ready.single.task.dueDate : null;
       final due = ready.length == 1 ? ready.single.task.deadline : null;
+      // Several new tasks, every one on the same day: that day is named.
+      final addedDays = {
+        for (final item in tasks) ?landing(item.task),
+      }.map(Task.day).toSet();
+      final allOn =
+          ready.length > 1 &&
+              tasks.length == ready.length &&
+              tasks.every((item) => landing(item.task) != null) &&
+              addedDays.length == 1
+          ? addedDays.single
+          : null;
+      // Several new tasks, every one dated, on several days, all done: the
+      // earliest of them is named with its own new tasks.
+      final firstAdded =
+          ready.length > 1 &&
+              allOn == null &&
+              addedDays.length > 1 &&
+              remaining == 0 &&
+              tasks.length == ready.length &&
+              tasks.every((item) => landing(item.task) != null)
+          ? (addedDays.toList()..sort()).first
+          : null;
+      final firstTasks = [
+        if (firstAdded != null)
+          for (final item in tasks)
+            if (Task.day(landing(item.task)!) == firstAdded) item.task,
+      ];
       // The days the message names already.
       final named = {
         if (day ?? due case final date?) Task.day(date),
+        ?allOn,
+        ?firstAdded,
         if (moving?.date case final date?) Task.day(date),
         ?movedTo,
       };
@@ -3893,7 +3973,21 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         if (applied.projects.isNotEmpty)
           strings.commandProjectsCreated(applied.projects.length),
         if (ready.isNotEmpty)
-          ready.length > 1
+          firstAdded != null
+              ? firstTasks.length > 1
+                    ? strings.captureTasksAddedOn(
+                        firstTasks.length,
+                        context.weekdayDate(firstAdded),
+                      )
+                    : firstTasks.single.displayDate == null
+                    ? strings.taskAddedDue(context.weekdayDate(firstAdded))
+                    : strings.taskAddedOn(context.weekdayDate(firstAdded))
+              : allOn != null
+              ? strings.captureTasksAddedOn(
+                  ready.length,
+                  context.weekdayDate(allOn),
+                )
+              : ready.length > 1
               ? strings.captureTasksAdded(ready.length)
               : day != null
               ? strings.taskAddedOn(context.weekdayDate(day))
@@ -3927,8 +4021,11 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                   applied.completed.single.before.title,
                 )
               : strings.commandTasksCompleted(applied.completedCount),
+        // One task deleted is named too: «Eliminada: Dentista».
         if (applied.deleted.isNotEmpty)
-          strings.commandTasksDeleted(applied.deleted.length),
+          applied.deleted.length == 1
+              ? strings.commandDeletedTitle(applied.deleted.single.title)
+              : strings.commandTasksDeleted(applied.deleted.length),
       ];
       // One new project, with only its own new tasks and no changes: its
       // page opens, as making one by hand does, with the tasks lit.
@@ -4001,13 +4098,22 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
               return;
             }
             await _writes;
+            // The sheet closed on a result that added nothing (changes,
+            // completions, deletions, sets): Deshacer takes back what it did
+            // and stops, as on a task's own page, and the result stays done.
+            // One that added tasks or a project comes back, to fix one
+            // misheard.
+            final takesBackOnly =
+                !mounted && ready.isEmpty && applied.projects.isEmpty;
             final changesBack = await runner.undoChanges(applied);
             // The tasks come out of the new projects before those go; the
             // result comes back as it was before the tap.
-            final back = await _store.undoSave(
-              written.copyWith(commands: before.commands),
-              undoIds,
-            );
+            final back = takesBackOnly
+                ? null
+                : await _store.undoSave(
+                    written.copyWith(commands: before.commands),
+                    undoIds,
+                  );
             CaptureSession? restored;
             if (back != null) {
               restored = back.copyWith(
@@ -4039,6 +4145,47 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
             await container.read(taskProvider.notifier).showLocal();
             container.invalidate(pendingCapturesProvider);
             final whole = changesBack && projectsBack;
+            if (takesBackOnly) {
+              if (whole) {
+                narrowAfterUndo(container, focus);
+                // Calendar lands on what came back, lit, as after a save:
+                // a task back on a day out of sight is shown there.
+                final back = [
+                  for (final task in applied.deleted)
+                    (task.id, [?landing(task)]),
+                  for (final update in applied.updates)
+                    (update.before.id, [?landing(update.before)]),
+                  for (final completion in applied.completed)
+                    (
+                      completion.before.id,
+                      completion.days.isNotEmpty
+                          ? completion.days
+                          : [?landing(completion.before)],
+                    ),
+                ];
+                final backIds = {for (final (id, _) in back) ?id};
+                if (backIds.isNotEmpty) {
+                  final backDays = [
+                    for (final (id, dates) in back)
+                      for (final date in dates) onToday(id, date),
+                  ].map(Task.day).toList()..sort();
+                  container
+                      .read(calendarFocusProvider.notifier)
+                      .state = CalendarFocus(
+                    backDays.firstOrNull,
+                    backIds,
+                    page: origin?.page,
+                    showCalendar: origin?.showCalendar ?? false,
+                    undated: back.any((entry) => entry.$2.isEmpty),
+                  );
+                }
+              } else if (messenger.mounted) {
+                unawaited(
+                  showFeedback(messenger, strings.undoError, margin: margin()),
+                );
+              }
+              return;
+            }
             if (whole && restored != null) narrowAfterUndo(container, focus);
             if (restored == null || !whole) {
               if (messenger.mounted) {
@@ -4066,7 +4213,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                 unawaited(
                   showFeedback(
                     messenger,
-                    strings.reviewUndoSaved,
+                    // What came back: the tasks, and the cards applied.
+                    strings.reviewUndoSaved(ready.length + actionable.length),
                     margin: margin(),
                   ),
                 );

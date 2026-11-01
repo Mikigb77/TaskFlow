@@ -3,6 +3,7 @@ import 'package:agenda/providers/device_calendar_provider.dart';
 import 'package:agenda/services/device_calendars.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
+import 'package:agenda/widgets/device_calendar_events.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -90,7 +91,11 @@ class _DeviceCalendarsScreenState extends ConsumerState<DeviceCalendarsScreen>
           if (lead != null) ...[Text(lead), const SizedBox(height: 16)],
           if (_busy || state.access == CalendarAccess.checking)
             const LinearProgressIndicator(),
-          if (state.error) MessageBanner(l.calendarReadError, isError: true),
+          if (state.error)
+            CalendarReadRetryLine(
+                inset: 0,
+                busy: _busy,
+                onRetry: () => _run(() => controller.refresh(browse: true))),
           if (state.access != CalendarAccess.unavailable) ...[
             if (state.access == CalendarAccess.blocked)
               OutlinedButton(

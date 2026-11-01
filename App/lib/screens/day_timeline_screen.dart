@@ -25,7 +25,7 @@ class DayTimelineScreen extends ConsumerStatefulWidget {
 }
 
 class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, CalendarReadRetry {
   late DateTime _day = Task.day(widget.day);
   final _scroll = ScrollController();
   final _untimed = ScrollController();
@@ -159,6 +159,12 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
         ref.read(taskProvider.notifier).loadTasks(),
         ref.read(deviceCalendarProvider.notifier).refresh(),
       ]);
+
+  /// The retry line's tap: the phone's calendars again when reading them
+  /// failed, otherwise this day's events.
+  Future<void> _readEventsAgain() => ref.read(deviceCalendarProvider).error
+      ? ref.read(deviceCalendarProvider.notifier).refresh()
+      : readDayEventsAgain(ref, Task.dateKey(_day));
   @override
   Widget build(BuildContext context) {
     // Capture opened here shows what it saved here (or on Calendar).
@@ -255,11 +261,21 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
                                     if (tasks.hasError)
                                       MessageBanner(l.loadTasksError,
                                           isError: true),
-                                    if (access.preferences.enabled &&
-                                        (access.error ||
-                                            eventRead?.hasError == true))
-                                      MessageBanner(l.calendarReadError,
-                                          isError: true),
+                                    // Calendar's own retry line, 8 dp under
+                                    // the day's arrows: a tap reads again,
+                                    // busy until the read settles.
+                                    if (retrying ||
+                                        access.preferences.enabled &&
+                                            (access.error ||
+                                                eventRead?.hasError == true))
+                                      Padding(
+                                          padding:
+                                              const EdgeInsets.only(top: 8),
+                                          child: CalendarReadRetryLine(
+                                              inset: 0,
+                                              busy: retrying,
+                                              onRetry: () =>
+                                                  retry(_readEventsAgain))),
                                     if (access.preferences.enabled &&
                                         access.access !=
                                             CalendarAccess.granted &&

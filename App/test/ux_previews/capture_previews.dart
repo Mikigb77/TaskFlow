@@ -711,10 +711,10 @@ void capturePreviews() {
         app.api.answer = {
           'transcript': 'Recoger el coche del taller el jueves a las cinco',
           'tasks': [
+            // The server sends the day and no time when it asks which.
             serverTask(
               'Recoger el coche del taller',
-              date: next(DateTime.thursday).add(const Duration(hours: 17)),
-              time: true,
+              date: next(DateTime.thursday),
               questions: [question],
               clarifications: [
                 {
@@ -745,6 +745,33 @@ void capturePreviews() {
           'commands': [],
         };
         await speak(app, 'Comprar pilas para el mando');
+        await p.shoot();
+      },
+    );
+
+    preview(
+      result,
+      'more-no-day',
+      'One task said without a day, Más opciones open: the repeat row asks for a day, with a chevron; it opens the date sheet.',
+      [es1, ca2],
+      (p) async {
+        final app = await PreviewApp.open(p, tasks: normalDay());
+        app.api.answer = {
+          'transcript': 'Comprar pilas para el mando',
+          'tasks': [serverTask('Comprar pilas para el mando')],
+          'commands': [],
+        };
+        await speak(app, 'Comprar pilas para el mando');
+        await p.tester.tap(find.text(p.l.reviewOptions).hitTestable());
+        await p.tester.pumpAndSettle();
+        // «Más opciones» at the top, then just enough to show the row.
+        await p.tester.ensureVisible(find.text(p.l.reviewOptions));
+        await p.tester.pumpAndSettle();
+        await Scrollable.ensureVisible(
+          p.tester.element(find.text(p.l.repeatNeedsDate)),
+          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+        );
+        await p.tester.pumpAndSettle();
         await p.shoot();
       },
     );

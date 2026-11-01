@@ -132,6 +132,7 @@ void main() {
   _p239OverdueLanding();
   _p240DeadlineRow();
   _p267CommandCards();
+  _p274AfterTheTap();
 }
 
 // ---------------------------------------------------------------- parsing
@@ -1156,8 +1157,8 @@ void _cards() {
       await tester.pumpAndSettle();
       expect(app.tasks.byId(1)!.dueDate, day(-1, 9));
       expect(app.tasks.byId(2)!.dueDate, day(-1, 12));
-      // The result is back as it was, with the task still unticked.
-      expect(_buttonLabel(tester), es.commandBulkMove(2));
+      // Deshacer puts them back and stops: no sheet (UX-2202).
+      expect(find.byType(CaptureResult), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
@@ -3042,7 +3043,7 @@ void _round20261021() {
     // ---------------------------------------------------- P226 · UX-1711
     testWidgets('UX-1711: «Ya he ido a la peluquería» marked done: Calendar '
         'on its Saturday, the row ticked and lit, «Completada: Ir a la '
-        'peluquería»; Deshacer reopens the result, the task open', (
+        'peluquería»; Deshacer opens the task again, with no sheet', (
       tester,
     ) async {
       final saturday = day(_ahead(DateTime.saturday), 10);
@@ -3079,7 +3080,8 @@ void _round20261021() {
 
       await tester.tap(find.text(es.undo));
       await tester.pumpAndSettle();
-      expect(find.byType(CaptureResult), findsOneWidget);
+      // UX-2202: the task is open again, and no sheet asks again.
+      expect(find.byType(CaptureResult), findsNothing);
       expect(app.tasks.byId(40)!.isCompleted, isFalse);
     });
 
@@ -3215,28 +3217,28 @@ void _round20261021() {
         );
       });
 
-      Future<bool> reopensWithin(WidgetTester tester, String headline) async {
-        for (var step = 0; step < 10; step++) {
-          await tester.pump(const Duration(milliseconds: 100));
-          final head = _inResult(
-            find.byKey(const ValueKey('command-headline')),
-          );
-          if (head.evaluate().isNotEmpty && _headline(tester) == headline) {
-            return true;
-          }
-        }
-        return false;
-      }
-
       List<String> listed(_App app) => [
         for (final task
             in app.container.read(taskProvider).valueOrNull ?? <Task>[])
           task.title,
       ];
 
+      // UX-2202: a result that added nothing doesn't reopen after Deshacer.
+      Future<bool> restoredWithin(
+        WidgetTester tester,
+        _App app,
+        Iterable<String> titles,
+      ) async {
+        for (var step = 0; step < 10; step++) {
+          await tester.pump(const Duration(milliseconds: 100));
+          if (listed(app).toSet().containsAll(titles)) return true;
+        }
+        return false;
+      }
+
       testWidgets('UX-1707: a set deletion’s Deshacer, with a sync that never '
-          'completes: within 1 s the tasks are back and the result reopens '
-          'at «Eliminar 3 tareas»', (tester) async {
+          'completes: within 1 s the tasks are back, with no sheet '
+          '(UX-2202)', (tester) async {
         final cloud = NeverSyncingTasks(_doneLastWeek());
         final app = await _App.open(tester, repository: cloud);
         await app.showResult(tester, [
@@ -3248,20 +3250,20 @@ void _round20261021() {
         expect(find.byType(CaptureResult), findsNothing);
         await tester.tap(find.text(es.undo));
         expect(
-          await reopensWithin(tester, es.commandBulkDelete(3)),
+          await restoredWithin(tester, app, [
+            for (final task in _doneLastWeek()) task.title,
+          ]),
           isTrue,
-          reason: 'the result is open again within 1 s',
+          reason: 'the tasks are back within 1 s',
         );
         expect(cloud.finished, 0, reason: 'the sync is still running');
-        expect(
-          listed(app),
-          containsAll([for (final task in _doneLastWeek()) task.title]),
-        );
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(find.byType(CaptureResult), findsNothing);
         expect(cloud.rows, hasLength(3));
       });
 
-      testWidgets('UX-1707: a one-task deletion’s Deshacer reopens the result '
-          'at once, while the sync runs', (tester) async {
+      testWidgets('UX-1707: a one-task deletion’s Deshacer restores it at '
+          'once, while the sync runs, with no sheet (UX-2202)', (tester) async {
         final cloud = NeverSyncingTasks([
           Task(id: 9, title: 'Dentista', priority: 1, dueDate: day(2, 9)),
         ]);
@@ -3274,17 +3276,17 @@ void _round20261021() {
             },
           }),
         ], transcript: 'Borra el dentista');
-        final headline = _headline(tester);
         await _confirm(tester);
         expect(cloud.rows, isEmpty);
         await tester.tap(find.text(es.undo));
         expect(
-          await reopensWithin(tester, headline),
+          await restoredWithin(tester, app, ['Dentista']),
           isTrue,
-          reason: 'the result is open again within 1 s',
+          reason: 'the task is back within 1 s',
         );
         expect(cloud.finished, 0);
-        expect(listed(app), contains('Dentista'));
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(find.byType(CaptureResult), findsNothing);
       });
     });
 
@@ -3359,8 +3361,8 @@ void _round20261021() {
       expect(_buttonLabel(tester), es.commandBulkMove(3));
     });
 
-    testWidgets('UX-1714: after Deshacer the set is back, and unticking a '
-        'task changes the heading’s and the button’s count', (tester) async {
+    testWidgets('UX-1714 / UX-2202: after Deshacer the set is back on its '
+        'day, and the result doesn’t reopen', (tester) async {
       final app = await _App.open(
         tester,
         tasks: _fourYesterday(),
@@ -3369,20 +3371,12 @@ void _round20261021() {
       await app.showResult(tester, [_moveYesterdayToTomorrow()]);
       await _confirm(tester);
       expect(find.byType(CaptureResult), findsNothing);
+      expect(app.tasks.byId(3)!.dueDate, day(1));
       await tester.tap(find.text(es.undo));
       await tester.pumpAndSettle();
-      expect(find.byType(CaptureResult), findsOneWidget);
-      expect(
-        _headline(tester),
-        es.commandBulkMoveTo(4, 'tomorrow', _short(day(1), 'es')),
-      );
-      await tester.tap(_setRow('Comprar el regalo'));
-      await tester.pumpAndSettle();
-      expect(
-        _headline(tester),
-        es.commandBulkMoveTo(3, 'tomorrow', _short(day(1), 'es')),
-      );
-      expect(_buttonLabel(tester), es.commandBulkMove(3));
+      expect(find.byType(CaptureResult), findsNothing);
+      expect(app.tasks.byId(1)!.dueDate, day(-1, 9));
+      expect(app.tasks.byId(3)!.dueDate, day(-1));
     });
 
     // ---------------------------------------------------- P228 · UX-1709
@@ -4577,7 +4571,8 @@ void _plan2Round1() {
       }
       await tester.tap(find.text(es.undo));
       await tester.pumpAndSettle();
-      expect(find.byType(CaptureResult), findsOneWidget);
+      // UX-2202: they're open again, with no sheet.
+      expect(find.byType(CaptureResult), findsNothing);
       for (final id in [1, 2, 3, 4, 5]) {
         expect(app.tasks.byId(id)!.isCompleted, isFalse, reason: 'task $id');
       }
@@ -4783,7 +4778,7 @@ void _plan2Round1() {
 
     testWidgets('UX-1716: the chip opens «Elegir día» (Hoy, Mañana selected, '
         'the calendar, no «Sin fecha»); a day 3 ahead moves the set there; '
-        'the tap moves the 4 and Deshacer brings the day back', (tester) async {
+        'the tap moves the 4 and Deshacer puts them back', (tester) async {
       final app = await _App.open(
         tester,
         tasks: _fourYesterday(),
@@ -4823,9 +4818,8 @@ void _plan2Round1() {
       await tester.pumpAndSettle();
       expect(app.tasks.byId(1)!.dueDate, day(-1, 9));
       expect(app.tasks.byId(4)!.dueDate, day(-1, 18));
-      expect(find.byType(CaptureResult), findsOneWidget);
-      expect(_chipLabel(tester), picked);
-      expect(_headline(tester), es.commandBulkMoveTo(4, 'other', picked));
+      // UX-2202: Deshacer puts them back and stops, with no sheet.
+      expect(find.byType(CaptureResult), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
@@ -6879,5 +6873,185 @@ void _p267CommandCards() {
         },
       );
     }
+  });
+}
+
+// UX loop 2026-10-28-app, round 1 · P274 (UX-2202): a result that added
+// nothing is done once tapped; Deshacer takes it back and stops.
+void _p274AfterTheTap() {
+  group('P274 · after the tap', () {
+    Task dentist() =>
+        Task(id: 9, title: 'Dentista', priority: 1, dueDate: day(2, 9));
+
+    CaptureCommand dentistCommand(
+      String kind, [
+      Map<String, dynamic> changes = const {},
+    ]) => command({
+      'kind': kind,
+      'target': {
+        'words': ['dentista'],
+      },
+      if (changes.isNotEmpty) 'changes': changes,
+    });
+
+    /// Deshacer, then [restored] holds within 1 s, and no result comes back
+    /// on screen at any step of it, nor after.
+    Future<void> undoRestoresWithNoSheet(
+      WidgetTester tester,
+      AppLocalizations l,
+      bool Function() restored,
+    ) async {
+      await tester.tap(find.text(l.undo));
+      var back = false;
+      for (var step = 0; step < 10 && !back; step++) {
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(
+          find.byType(CaptureResult),
+          findsNothing,
+          reason: 'no sheet at ${(step + 1) * 100} ms',
+        );
+        back = restored();
+      }
+      expect(back, isTrue, reason: 'restored within 1 s');
+      await tester.pumpAndSettle();
+      expect(find.byType(CaptureResult), findsNothing);
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(tester.takeException(), isNull);
+    }
+
+    for (final (language, l, said) in [
+      ('es', es, 'Eliminada: Dentista'),
+      ('en', en, 'Deleted: Dentista'),
+      ('ca', ca, 'Suprimida: Dentista'),
+    ]) {
+      testWidgets('UX-2202: $language, «Borra el dentista» → Eliminar → '
+          '«$said» with ${l.undo}; ${l.undo} brings «Dentista» back within '
+          '1 s, no result on screen, nothing announces «${l.commandWillDelete('')}»', (
+        tester,
+      ) async {
+        final semantics = tester.ensureSemantics();
+        final app = await _App.open(
+          tester,
+          tasks: [dentist()],
+          language: language,
+        );
+        await app.showResult(tester, [
+          dentistCommand('delete'),
+        ], transcript: 'Borra el dentista');
+        await _confirm(tester);
+        expect(app.tasks.byId(9), isNull);
+        expect(find.byType(CaptureResult), findsNothing);
+        expect(l.commandDeletedTitle('Dentista'), said);
+        expect(
+          find.descendant(
+            of: find.byType(SnackBar),
+            matching: find.text(said),
+          ),
+          findsOneWidget,
+        );
+        expect(find.text(l.commandTasksDeleted(1)), findsNothing);
+        expect(
+          find.descendant(
+            of: find.byType(SnackBar),
+            matching: find.text(l.undo),
+          ),
+          findsOneWidget,
+        );
+        tester.takeAnnouncements();
+        await undoRestoresWithNoSheet(
+          tester,
+          l,
+          () => app.tasks.byId(9)?.title == 'Dentista',
+        );
+        expect(app.tasks.byId(9)!.dueDate, day(2, 9));
+        final heard = tester.takeAnnouncements().map((a) => a.message);
+        expect(
+          heard.where(
+            (message) => message.startsWith(l.commandWillDelete('')),
+          ),
+          isEmpty,
+          reason: 'heard: $heard',
+        );
+        semantics.dispose();
+      });
+    }
+
+    testWidgets('UX-2202: a change («Cambia el dentista al viernes»): '
+        'Deshacer puts the day back, with no sheet', (tester) async {
+      final friday = day(_ahead(DateTime.friday));
+      final app = await _App.open(tester, tasks: [dentist()]);
+      await app.showResult(tester, [
+        dentistCommand('update', {'date': key(friday)}),
+      ], transcript: 'Cambia el dentista al viernes');
+      await _confirm(tester);
+      expect(Task.day(app.tasks.byId(9)!.dueDate!), friday);
+      expect(find.byType(CaptureResult), findsNothing);
+      await undoRestoresWithNoSheet(
+        tester,
+        es,
+        () => app.tasks.byId(9)!.dueDate == day(2, 9),
+      );
+    });
+
+    testWidgets('UX-2202: a completion («Ya he ido al dentista»): Deshacer '
+        'opens it again, with no sheet', (tester) async {
+      final app = await _App.open(tester, tasks: [dentist()]);
+      await app.showResult(tester, [
+        dentistCommand('complete'),
+      ], transcript: 'Ya he ido al dentista');
+      await _confirm(tester);
+      expect(app.tasks.byId(9)!.isCompleted, isTrue);
+      expect(find.byType(CaptureResult), findsNothing);
+      await undoRestoresWithNoSheet(
+        tester,
+        es,
+        () => !app.tasks.byId(9)!.isCompleted,
+      );
+    });
+
+    testWidgets('UX-2202: a set deleted («3 tareas eliminadas»): Deshacer '
+        'brings the three back, with no sheet', (tester) async {
+      final app = await _App.open(tester, tasks: _doneLastWeek());
+      await app.showResult(tester, [
+        _deleteDoneLastWeek(),
+      ], transcript: 'Borra todas las completadas de la semana pasada');
+      await _confirm(tester);
+      expect(app.tasks.byId(80), isNull);
+      // Sets keep their count.
+      expect(
+        find.descendant(
+          of: find.byType(SnackBar),
+          matching: find.text(es.commandTasksDeleted(3)),
+        ),
+        findsOneWidget,
+      );
+      expect(es.commandTasksDeleted(3), '3 tareas eliminadas');
+      await undoRestoresWithNoSheet(
+        tester,
+        es,
+        () => [80, 81, 82].every((id) => app.tasks.byId(id) != null),
+      );
+    });
+
+    testWidgets('UX-2202: a set moved to tomorrow: Deshacer puts the four '
+        'back on yesterday, with no sheet', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: _fourYesterday(),
+        projects: [_casa],
+      );
+      await app.showResult(tester, [_moveYesterdayToTomorrow()]);
+      await _confirm(tester);
+      expect(app.tasks.byId(1)!.dueDate, day(1, 9));
+      await undoRestoresWithNoSheet(
+        tester,
+        es,
+        () =>
+            app.tasks.byId(1)!.dueDate == day(-1, 9) &&
+            app.tasks.byId(4)!.dueDate == day(-1, 18),
+      );
+      expect(app.tasks.byId(2)!.dueDate, day(-1, 12));
+      expect(app.tasks.byId(3)!.dueDate, day(-1));
+    });
   });
 }

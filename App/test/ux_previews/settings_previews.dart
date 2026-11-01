@@ -7,6 +7,7 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/screens/account_screen.dart';
 import 'package:agenda/screens/other_settings_screen.dart';
 import 'package:agenda/services/capture_problem.dart';
+import 'package:agenda/services/reminder_preferences.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
@@ -407,13 +408,30 @@ void settingsPreviews() {
     preview(
       remindersScreen,
       'blocked',
-      'The phone blocks notifications: one plain line, and Permitir avisos to TaskFlow\'s notifications page.',
+      'Reminders on, but the phone blocks notifications: one plain line, and Permitir avisos to TaskFlow\'s notifications page.',
       [...everywhere, ca2],
       (p) async {
         final app = await PreviewApp.open(
           p,
           tasks: normalDay(),
           notificationsAllowed: false,
+        );
+        await app.push('/notifications');
+        await p.shoot();
+      },
+    );
+
+    preview(
+      remindersScreen,
+      'off-blocked',
+      'Reminders off and the phone blocks notifications: the switch alone, the one way in (it asks the phone, or offers its page).',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          notificationsAllowed: false,
+          reminders: const ReminderPreferences(asked: true),
         );
         await app.push('/notifications');
         await p.shoot();

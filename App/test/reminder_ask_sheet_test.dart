@@ -14,6 +14,7 @@ import 'package:agenda/screens/notes_screen.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/feedback_timeout.dart';
+import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/task_editor.dart';
 import 'package:agenda/widgets/task_tile.dart';
@@ -1314,6 +1315,159 @@ void main() {
       },
     );
   });
+
+  group('P272 · allowing notifications in Android finishes the job', () {
+    void leaveApp(WidgetTester tester) {
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+    }
+
+    void returnToApp(WidgetTester tester) {
+      for (final state in [
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+    }
+
+    /// The first dated save → «Sí, recuérdamelo» → Android's «No permitir»
+    /// → the message's «Permitir avisos», which opens the notifications
+    /// page; the person is now in Android's settings.
+    Future<void> refuseThenAllowNotifications(
+      WidgetTester tester,
+      MemoryReminderStore store,
+      _CountingAccess access,
+    ) async {
+      final l = strings(tester);
+      await typeDatedTask(tester, 'Comprar pan');
+      await letSaveMessageClose(tester);
+      expect(question(l), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, l.reminderAskYes));
+      await tester.pumpAndSettle();
+      expect(access.permissionRequests, 1);
+      expect(store.value.enabled, isFalse);
+      expect(
+        find.descendant(
+          of: find.byType(SnackBar),
+          matching: find.text(l.notificationPermissionOff),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.widgetWithText(SnackBarAction, l.allowNotifications),
+      );
+      await tester.pump();
+      expect(access.notificationSettingsOpened, 1);
+      leaveApp(tester);
+      await tester.pump();
+    }
+
+    for (final chosen in [null, 600]) {
+      testWidgets(
+        'UX-2601: Sí → No permitir → Permitir avisos → allowed in Android → back: reminders on, ${chosen == null ? '9:00' : 'the time already chosen'} for tasks without a time, asked, alerts set, and Listo. Recordatorios activados.',
+        (tester) async {
+          final store = MemoryReminderStore(
+            ReminderPreferences(dateOnlyTime: chosen),
+          );
+          final access = _CountingAccess();
+          await openApp(tester, store, access);
+          final l = strings(tester);
+          await refuseThenAllowNotifications(tester, store, access);
+
+          // In Android's page, the person switches notifications on.
+          access.allowed = true;
+          final reconcilesBefore = access.reconciles;
+          returnToApp(tester);
+          await tester.pumpAndSettle();
+
+          expect(store.value.enabled, isTrue);
+          expect(store.value.dateOnlyTime, chosen ?? 540);
+          expect(store.value.asked, isTrue);
+          expect(access.reconciles, greaterThan(reconcilesBefore));
+          expect(
+            find.descendant(
+              of: find.byType(SnackBar),
+              matching: find.text(l.remindersOnConfirmation),
+            ),
+            findsOneWidget,
+          );
+          expect(find.text(l.notificationPermissionOff), findsNothing);
+          // Exact alarms are allowed here: no sheet about them.
+          expect(find.text(l.exactAlarmsNextScreen), findsNothing);
+          expect(access.permissionRequests, 1);
+
+          // Done, so forgotten: a later trip out and back says nothing.
+          await tester.pump(FeedbackTimeout.defaultDuration);
+          await tester.pumpAndSettle();
+          expect(find.byType(SnackBar), findsNothing);
+          leaveApp(tester);
+          await tester.pump();
+          returnToApp(tester);
+          await tester.pumpAndSettle();
+          expect(find.byType(SnackBar), findsNothing);
+          expect(store.value.enabled, isTrue);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2601: back from Android still refusing: preferences unchanged, no second message, and the request is forgotten',
+      (tester) async {
+        final store = MemoryReminderStore();
+        final access = _CountingAccess();
+        await openApp(tester, store, access);
+        final l = strings(tester);
+        await refuseThenAllowNotifications(tester, store, access);
+        final before = store.value;
+
+        // The person comes back without switching notifications on.
+        returnToApp(tester);
+        await tester.pumpAndSettle();
+        expect(store.value.enabled, before.enabled);
+        expect(store.value.enabled, isFalse);
+        expect(store.value.dateOnlyTime, before.dateOnlyTime);
+        expect(store.value.leadMinutes, before.leadMinutes);
+        expect(store.value.asked, before.asked);
+        expect(find.byType(SnackBar), findsNothing);
+        expect(find.text(l.notificationPermissionOff), findsNothing);
+        expect(find.text(l.remindersOnConfirmation), findsNothing);
+        expect(access.permissionRequests, 1);
+        expect(access.notificationSettingsOpened, 1);
+
+        // Forgotten: allowing later, outside the app, and coming back
+        // turns nothing on by itself.
+        leaveApp(tester);
+        await tester.pump();
+        access.allowed = true;
+        returnToApp(tester);
+        await tester.pumpAndSettle();
+        expect(store.value.enabled, isFalse);
+        expect(store.value.dateOnlyTime, before.dateOnlyTime);
+        expect(find.byType(SnackBar), findsNothing);
+        expect(find.text(l.remindersOnConfirmation), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+}
+
+/// P272: the phone refuses notifications until a test allows them, and
+/// counts each setting of the alerts.
+class _CountingAccess extends FakeReminderAccess {
+  _CountingAccess() : super(grant: false);
+  int reconciles = 0;
+  @override
+  Future<void> reconcile(String owner) async {
+    reconciles++;
+  }
 }
 
 class _GivenTasks extends DesignTaskNotifier {

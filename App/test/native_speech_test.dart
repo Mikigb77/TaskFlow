@@ -3538,6 +3538,97 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+
+    // ---- UX-2106: the ring after the assistant fails or finds nothing,
+    // and while the sighted flow starts ----
+
+    for (final (name, failure, answer)
+        in <(String, Object?, Map<String, dynamic>?)>[
+          (
+            'error-unavailable (503)',
+            ApiException(503, 'Service unavailable'),
+            null,
+          ),
+          (
+            'error-limit-recording (429)',
+            ApiException(
+              429,
+              'Daily limit reached.',
+              null,
+              const Duration(seconds: 3600),
+            ),
+            null,
+          ),
+          (
+            'error-nothing-understood',
+            null,
+            <String, dynamic>{
+              'transcript': 'Bueno, a ver, no sé',
+              'tasks': <dynamic>[],
+              'commands': <dynamic>[],
+            },
+          ),
+        ]) {
+      testWidgets(
+        'UX-2106: ES 1× on 360×800, online path, $name after Listo: no microphone ring and nothing in its place; a control that acts shows',
+        (tester) async {
+          final app = await ListeningApp.open(tester, online: true);
+          app.api.failure = failure;
+          app.api.answer = answer;
+          await openCapture(tester, es);
+          await levels(tester, app, [-60, -22, -18]);
+          expect(ring(), findsOneWidget, reason: 'listening');
+          await tester.tap(inSheet(find.widgetWithText(FilledButton, es.done)));
+          await until(tester, () => app.api.requests == 1);
+          for (var i = 0; i < 20; i++) {
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 5)),
+            );
+            await tester.pump();
+          }
+          await tester.pumpAndSettle();
+          expect(find.byType(VoiceTaskScreen), findsOneWidget);
+          expect(
+            inSheet(find.text(es.captureUnderstanding)),
+            findsNothing,
+            reason: 'no longer understanding',
+          );
+          expect(ring(), findsNothing, reason: name);
+          expect(mic(), findsNothing, reason: name);
+          final buttons = inSheet(
+            find.byWidgetPredicate(
+              (widget) =>
+                  widget is ButtonStyleButton && widget.onPressed != null,
+            ),
+          );
+          expect(buttons.hitTestable(), findsWidgets, reason: name);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2106: without TalkBack, the starting state (Un momento…) still shows the ring, as before',
+      (tester) async {
+        final app = await ListeningApp.open(tester, online: true);
+        await tester.tap(find.text(es.addTask).hitTestable());
+        var sawStarting = false;
+        for (var frame = 0; frame < 20 && app.log.isEmpty; frame++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          if (inSheet(find.text(es.captureStarting)).evaluate().isNotEmpty) {
+            sawStarting = true;
+            expect(ring(), findsOneWidget, reason: 'starting');
+          }
+        }
+        expect(sawStarting, isTrue, reason: 'Un momento… shows while starting');
+        await tester.pumpAndSettle();
+        await levels(tester, app, [-20]);
+        expect(ring(), findsOneWidget, reason: 'listening');
+        await tester.tap(inSheet(find.widgetWithText(TextButton, es.cancel)));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }
 

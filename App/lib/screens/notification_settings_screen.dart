@@ -54,9 +54,27 @@ class _NotificationSettingsScreenState
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
+    // Back from «Permitir avisos»: reminders finish turning on first, then
+    // the screen reads what that left.
+    final request = ref.read(reminderRequestsProvider)[_owner];
+    if (request != null) {
+      _awaitRequest(request);
+      return;
+    }
     // Back from Android's settings: read the permission at once, even while
     // turning reminders on.
     _busy ? _readCapability() : _load();
+  }
+
+  Future<void> _awaitRequest(Future<void> request) async {
+    setState(() => _busy = true);
+    try {
+      await request;
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    // The alerts are set by now; this only reads the outcome.
+    if (mounted) await _load(refresh: false);
   }
 
   Future<void> _readCapability() async {
@@ -222,15 +240,19 @@ class _NotificationSettingsScreenState
               },
         child: Text(context.l10n.tryAgain));
     // One line in the person's words, and the one button that fixes it.
+    // With reminders off the switch is the one way in: it asks the phone.
     final (String? line, Widget? fix) = !supported
         ? (context.l10n.mobileNotificationsOnly, null)
         : !_capability.allowed
-            ? (
-                context.l10n.notificationPermissionOff,
-                FilledButton(
-                    onPressed: _busy ? null : access.openNotificationSettings,
-                    child: Text(context.l10n.allowNotifications))
-              )
+            ? settings?.enabled != true
+                ? (null, null)
+                : (
+                    context.l10n.notificationPermissionOff,
+                    FilledButton(
+                        onPressed:
+                            _busy ? null : access.openNotificationSettings,
+                        child: Text(context.l10n.allowNotifications))
+                  )
             : !_capability.exact
                 ? (
                     context.l10n.exactAlarmsNeeded,

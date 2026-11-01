@@ -878,6 +878,7 @@ class ReminderEngine {
           {
             ...values,
             'sync_pending': owner == 'local' ? 0 : 1,
+            'own_reminders_pending': 0,
             'revision': (rows.single['revision'] as int) + 1,
           },
           where: 'id = ? AND owner_key = ?',

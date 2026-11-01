@@ -36,13 +36,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reviewOriginalText => 'Original text';
 
   @override
-  String get reviewRemove => 'Remove';
-
-  @override
   String get reviewRemoved => 'Removed';
 
   @override
-  String get reviewUndoSaved => 'They’re back here, not saved yet.';
+  String reviewUndoSaved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'They’re back here, not saved yet.',
+      one: 'It’s back here, not saved yet.',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get reviewUndoChanged =>
@@ -360,10 +365,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get calendarRefresh => 'Refresh calendars';
 
   @override
-  String get calendarReadError =>
-      'Calendar events could not be read. Refresh to try again; this view may be missing commitments.';
-
-  @override
   String get calendarReadRetry =>
       'Couldn’t read your events. Tap to try again.';
 
@@ -392,14 +393,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get calendarAllDay => 'All day';
 
   @override
-  String calendarEventCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count events',
-      one: '1 event',
-    );
-    return '$_temp0';
+  String calendarSeeAllEvents(int count) {
+    return 'See all $count events';
   }
 
   @override
@@ -2896,6 +2891,17 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String captureTasksAddedOn(int count, String date) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasks added to $date',
+      one: '1 task added to $date',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String captureKeptForReview(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -4227,6 +4233,11 @@ class AppLocalizationsEn extends AppLocalizations {
       one: 'Task deleted',
     );
     return '$_temp0';
+  }
+
+  @override
+  String commandDeletedTitle(String title) {
+    return 'Deleted: $title';
   }
 
   @override

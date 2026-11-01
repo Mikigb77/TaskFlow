@@ -2,6 +2,7 @@ import 'package:agenda/l10n/region.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/reminder_plan_words.dart';
 import 'package:agenda/models/reminder_plan.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -279,25 +280,106 @@ String _clock(BuildContext context, int minute) =>
 /// reminders ended up on; false when the phone refused or it failed.
 /// [onScheduling] gets the background setting of the alerts, which completes
 /// once they're set or a failure is recorded, for a screen that lists them.
+/// After a refusal, the message's «Permitir avisos» finishes the job once the
+/// person is back from the phone's settings ([_finishOnReturn]).
 Future<bool> turnOnReminders(
   BuildContext context, {
   void Function(Future<void> scheduling)? onScheduling,
 }) async {
   final container = ProviderScope.containerOf(context, listen: false);
   final messenger = ScaffoldMessenger.of(context);
+  final navigator = Navigator.of(context, rootNavigator: true);
   final strings = context.l10n;
   final access = container.read(reminderAccessProvider);
-  var exact = false;
   try {
     if (!await access.requestPermission()) {
       showFeedback(
         messenger,
         strings.notificationPermissionOff,
         actionLabel: strings.allowNotifications,
-        onAction: access.openNotificationSettings,
+        onAction: () => _finishOnReturn(container, navigator),
       );
+      container.invalidate(reminderCapabilityProvider);
       return false;
     }
+  } catch (_) {
+    showFeedback(messenger, strings.notificationSaveError);
+    container.invalidate(reminderCapabilityProvider);
+    return false;
+  }
+  return _switchOn(
+    container,
+    navigator,
+    messenger,
+    strings,
+    onScheduling: onScheduling,
+  );
+}
+
+/// «Permitir avisos» after the phone refused: opens its notifications page
+/// and remembers that this account asked for reminders. Back in the app,
+/// whatever screen shows, reminders turn on as [turnOnReminders] does if the
+/// phone now allows them; still refused, nothing more is said. Forgotten
+/// either way ([reminderRequestsProvider]).
+Future<void> _finishOnReturn(
+  ProviderContainer container,
+  NavigatorState navigator,
+) async {
+  final access = container.read(reminderAccessProvider);
+  final owner = container.read(taskRepositoryProvider).ownerKey;
+  final requests = container.read(reminderRequestsProvider);
+  if (!requests.containsKey(owner)) {
+    final settled = Completer<void>();
+    requests[owner] = settled.future;
+    late final AppLifecycleListener listener;
+    listener = AppLifecycleListener(
+      onResume: () async {
+        listener.dispose();
+        try {
+          if (container.read(taskRepositoryProvider).ownerKey == owner &&
+              (await access.capability()).allowed &&
+              navigator.mounted) {
+            final messenger = ScaffoldMessenger.maybeOf(navigator.context);
+            if (messenger != null) {
+              Future<void>? scheduling;
+              if (await _switchOn(
+                container,
+                navigator,
+                messenger,
+                navigator.context.l10n,
+                onScheduling: (future) => scheduling = future,
+              )) {
+                // A screen waiting on the request lists the alerts set.
+                await scheduling;
+              }
+            }
+          }
+        } catch (_) {
+          // Not finished: the switch in Ajustes › Recordatorios still is.
+        } finally {
+          requests.remove(owner);
+          settled.complete();
+        }
+      },
+    );
+  }
+  await access.openNotificationSettings();
+}
+
+/// Turns reminders on once the phone allows notifications: the switch, 9:00
+/// for tasks without a time, exact alarms when Android needs them, the alerts
+/// and the confirmation. False when it failed. The sheet about exact alarms
+/// opens on [navigator] while it's still there.
+Future<bool> _switchOn(
+  ProviderContainer container,
+  NavigatorState navigator,
+  ScaffoldMessengerState messenger,
+  AppLocalizations strings, {
+  void Function(Future<void> scheduling)? onScheduling,
+}) async {
+  final access = container.read(reminderAccessProvider);
+  var exact = false;
+  try {
     final owner = container.read(taskRepositoryProvider).ownerKey;
     final store = container.read(reminderPreferenceStoreProvider);
     final settings = await store.read(owner);
@@ -318,9 +400,9 @@ Future<bool> turnOnReminders(
     }
     container.invalidate(reminderPreferencesProvider);
     exact = (await access.capability()).exact;
-    if (!exact && context.mounted) {
+    if (!exact && navigator.mounted) {
       final allow = await showModalBottomSheet<bool>(
-        context: context,
+        context: navigator.context,
         isScrollControlled: true,
         builder: (context) => SafeArea(
           child: SingleChildScrollView(
@@ -860,11 +942,15 @@ class ReminderControl extends ConsumerWidget {
           Text(context.l10n.reminderDefaultsError),
         if (preferences.isLoading && !person)
           Text(context.l10n.loadingReminders),
+        // 8 dp from the row above and whatever comes next (UX-2205).
         if (blocked)
-          TextButton.icon(
-            onPressed: () => turnOnReminders(context),
-            icon: const Icon(Icons.notifications_off_outlined, size: 18),
-            label: Text(context.l10n.enableReminders),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: TextButton.icon(
+              onPressed: () => turnOnReminders(context),
+              icon: const Icon(Icons.notifications_off_outlined, size: 18),
+              label: Text(context.l10n.enableReminders),
+            ),
           ),
       ],
     );

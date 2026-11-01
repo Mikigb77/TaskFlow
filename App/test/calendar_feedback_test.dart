@@ -1172,7 +1172,7 @@ void main() {
   }
 
   testWidgets(
-    'UX-217: with four phone events the tasks come first, and one 4 eventos · … line under them opens every event',
+    'UX-217: with four phone events the tasks come first, then three events by name and a «Ver los 4 eventos» row that opens every event',
     (tester) async {
       final now = DateTime.now();
       DateTime at(int hour, int minute) =>
@@ -1215,31 +1215,25 @@ void main() {
       );
       final context = tester.element(find.byType(CalendarScreen));
       final l = context.l10n;
-      final line = find.byKey(const ValueKey('calendar-events-line'));
+      final line = find.byKey(const ValueKey('calendar-events-all'));
       await reveal(tester, line);
       expect(line, findsOneWidget);
       expect(
-        find.descendant(
-          of: line,
-          matching: find.text(
-            [
-              l.calendarEventCount(4),
-              context.clockTime(at(9, 0)),
-              context.clockTime(at(11, 30)),
-              context.clockTime(at(16, 0)),
-            ].join(' · '),
-          ),
-        ),
+        find.descendant(of: line, matching: find.text(l.calendarSeeAllEvents(4))),
         findsOneWidget,
       );
-      // The events aren't listed in the agenda; the tasks come first.
-      expect(find.text('Cita 0'), findsNothing);
-      for (final title in ['Comprar pan', 'Llamar a mamá']) {
-        expect(
-          tester.getBottomLeft(find.widgetWithText(TaskTile, title)).dy,
-          lessThanOrEqualTo(tester.getTopLeft(line).dy),
-        );
+      // The first three events show by name; the tasks come first.
+      for (final (i, start) in [at(9, 0), at(11, 30), at(16, 0)].indexed) {
+        final row = find.text('Cita $i · ${context.clockTime(start)}');
+        expect(row, findsOneWidget);
+        for (final title in ['Comprar pan', 'Llamar a mamá']) {
+          expect(
+            tester.getBottomLeft(find.widgetWithText(TaskTile, title)).dy,
+            lessThanOrEqualTo(tester.getTopLeft(row).dy),
+          );
+        }
       }
+      expect(find.textContaining('Cita 3'), findsNothing);
       await tester.tap(line);
       await tester.pumpAndSettle();
       final sheet = find.byType(BottomSheet);
@@ -2064,14 +2058,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(l.calendarReadRetry), findsNothing);
       expect(
-        find.descendant(
-          of: line,
-          matching: find.text(
-            [
-              l.calendarEventCount(1),
-              context.clockTime(DateTime(now.year, now.month, now.day, 9)),
-            ].join(' · '),
-          ),
+        find.text(
+          'Dentista · '
+          '${context.clockTime(DateTime(now.year, now.month, now.day, 9))}',
         ),
         findsOneWidget,
       );
@@ -2242,7 +2231,7 @@ void main() {
       );
 
       testWidgets(
-        'UX-447: when $what retry succeeds the line shows the event count with its icon and no spinner',
+        'UX-447: when $what retry succeeds the event shows by name with its icon and no spinner',
         (tester) async {
           final now = DateTime.now();
           final bridge = failing(calendars: calendars);
@@ -2254,20 +2243,17 @@ void main() {
           final l = context.l10n;
           await retryHeld(tester, bridge, succeed: true);
           expect(find.text(l.calendarReadRetry), findsNothing);
+          final name = find.text(
+            'Dentista · '
+            '${context.clockTime(DateTime(now.year, now.month, now.day, 9))}',
+          );
+          expect(name, findsOneWidget);
+          final row = find.ancestor(of: name, matching: find.byType(InkWell));
           expect(
-            find.descendant(
-              of: line,
-              matching: find.text(
-                [
-                  l.calendarEventCount(1),
-                  context.clockTime(DateTime(now.year, now.month, now.day, 9)),
-                ].join(' · '),
-              ),
-            ),
+            find.descendant(of: row, matching: find.byIcon(Icons.event_outlined)),
             findsOneWidget,
           );
-          expect(eventIcon(), findsOneWidget);
-          expect(spinner(), findsNothing);
+          expect(find.byType(CircularProgressIndicator), findsNothing);
           expect(tester.takeException(), isNull);
         },
       );
@@ -2355,8 +2341,15 @@ void main() {
         bridge.statusGate = null;
         statusGate.complete();
         await tester.pumpAndSettle();
-        // Once read, the day's event shows as usual.
-        expect(eventIcon(), findsOneWidget);
+        // Once read, the day's event shows as usual, by name.
+        expect(
+          find.descendant(
+            of: find.byType(DeviceCalendarEvents),
+            matching: find.byIcon(Icons.event_outlined),
+          ),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Dentista · '), findsOneWidget);
         expect(spinner(), findsNothing);
         expect(tester.takeException(), isNull);
       },
@@ -3164,13 +3157,13 @@ void main() {
         find.descendant(of: emptyState(), matching: find.byType(Icon)),
         findsNothing,
       );
-      final events = find.byKey(const ValueKey('calendar-events-line'));
+      final events = find.textContaining('Dentista · ');
       await reveal(tester, events);
       expect(events, findsOneWidget);
       expect(
         tester.getRect(find.text(l.noScheduledTasks)).bottom,
         lessThanOrEqualTo(tester.getRect(events).top),
-        reason: 'the tasks line, then the events line',
+        reason: 'the tasks line, then the event',
       );
       expect(find.text(l.calendarEmpty), findsNothing);
       expect(tester.takeException(), isNull);
@@ -4660,6 +4653,277 @@ void main() {
         );
         expect(find.text(l.taskCompleted), findsOneWidget);
         expect(find.text(l.dayAllClear), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- Run 2026-10-28-app, round 1 · P277 (UX-2306, UX-2310): phone events
+  // by name on Calendar, sheets that end with «Cerrar», read errors you can
+  // retry in the events sheet ----
+
+  group('P277 · phone events by name', () {
+    final sheet = find.byType(BottomSheet);
+    Finder inSheet(Finder finder) =>
+        find.descendant(of: sheet, matching: finder);
+    final inbox = find.byKey(const ValueKey('calendar-inbox'));
+
+    _FlakyCalendars twoEvents() {
+      final now = DateTime.now();
+      return _FlakyCalendars()
+        ..data = [
+          DeviceCalendarEvent(
+            id: '50',
+            calendarId: workCalendar.id,
+            title: 'Reunión de equipo',
+            start: DateTime(now.year, now.month, now.day, 10),
+            end: DateTime(now.year, now.month, now.day, 11),
+            allDay: false,
+          ),
+          DeviceCalendarEvent(
+            id: '51',
+            calendarId: workCalendar.id,
+            title: 'Cita con el dentista',
+            start: DateTime(now.year, now.month, now.day, 17),
+            end: DateTime(now.year, now.month, now.day, 18),
+            allDay: false,
+          ),
+        ];
+    }
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'UX-2306: at ${scale}x on 360×800 in Spanish, two phone events read «Reunión de equipo · 10:00» and «Cita con el dentista · 17:00», at least 8 dp above «Sin fecha · 1», and a tap opens that event',
+        (tester) async {
+          final now = DateTime.now();
+          final bridge = twoEvents();
+          addTearDown(bridge.close);
+          await openCalendar(
+            tester,
+            [Task(id: 1, title: 'Algún día', priority: 1)],
+            overrides: phoneCalendar(bridge),
+            size: const Size(360, 800),
+            textScale: scale,
+          );
+          final context = tester.element(find.byType(CalendarScreen));
+          final l = context.l10n;
+          final ten = find.text(
+            'Reunión de equipo · '
+            '${context.clockTime(DateTime(now.year, now.month, now.day, 10))}',
+          );
+          final five = find.text(
+            'Cita con el dentista · '
+            '${context.clockTime(DateTime(now.year, now.month, now.day, 17))}',
+          );
+          await scrollAgendaToEnd(tester);
+          expect(ten, findsOneWidget);
+          expect(five, findsOneWidget);
+          // No grey count line any more.
+          expect(
+            find.byKey(const ValueKey('calendar-events-line')),
+            findsNothing,
+          );
+          expect(find.textContaining('2 eventos'), findsNothing);
+          // In order, each row a 48 dp target.
+          Finder row(Finder text) =>
+              find.ancestor(of: text, matching: find.byType(InkWell)).first;
+          expect(
+            tester.getRect(row(five)).top,
+            greaterThanOrEqualTo(tester.getRect(row(ten)).bottom - 0.5),
+          );
+          for (final text in [ten, five]) {
+            expect(tester.getSize(row(text)).height, greaterThanOrEqualTo(48));
+          }
+          // «Sin fecha · 1» right under the events, kept 8 dp apart.
+          expect(inbox, findsOneWidget);
+          expect(
+            find.descendant(of: inbox, matching: find.text(l.inboxCount(1))),
+            findsOneWidget,
+          );
+          expect(
+            tester.getRect(inbox).top - tester.getRect(row(five)).bottom,
+            greaterThanOrEqualTo(8),
+            reason: 'the last event and «Sin fecha · 1» don’t touch',
+          );
+          // The rows sit inside the screen, not cut at its side.
+          for (final text in [ten, five]) {
+            expect(tester.getRect(text).right, lessThanOrEqualTo(360));
+          }
+          // A tap on a row opens that event.
+          await tester.tap(five);
+          await tester.pumpAndSettle();
+          expect(sheet, findsOneWidget);
+          expect(inSheet(find.text('Cita con el dentista')), findsOneWidget);
+          expect(inSheet(find.text('Reunión de equipo')), findsNothing);
+          expect(inSheet(find.text(l.calendarOpenEvent)), findsOneWidget);
+          // «Cerrar» closes it.
+          final close = inSheet(find.widgetWithText(TextButton, l.close));
+          expect(l.close, 'Cerrar');
+          expect(close.hitTestable(), findsOneWidget);
+          await tester.tap(close);
+          await tester.pumpAndSettle();
+          expect(sheet, findsNothing);
+          await tester.tap(ten);
+          await tester.pumpAndSettle();
+          expect(inSheet(find.text('Reunión de equipo')), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    for (final list in [false, true]) {
+      final which = list ? 'the list of events' : 'an event';
+      testWidgets(
+        'UX-2310: when the events fail to read with $which open, its sheet says «No se pudieron leer los eventos. Toca para reintentar.», and a tap reads again, busy meanwhile',
+        (tester) async {
+          final now = DateTime.now();
+          final bridge = _FlakyCalendars()
+            ..data = [
+              for (var i = 0; i < (list ? 4 : 1); i++)
+                DeviceCalendarEvent(
+                  id: '${60 + i}',
+                  calendarId: workCalendar.id,
+                  title: 'Dentista $i',
+                  start: DateTime(now.year, now.month, now.day, 9 + i),
+                  end: DateTime(now.year, now.month, now.day, 10 + i),
+                  allDay: false,
+                ),
+            ];
+          addTearDown(bridge.close);
+          final container = await openCalendar(
+            tester,
+            [],
+            overrides: phoneCalendar(bridge),
+            size: const Size(360, 800),
+          );
+          final l = tester.element(find.byType(CalendarScreen)).l10n;
+          expect(
+            l.calendarReadRetry,
+            'No se pudieron leer los eventos. Toca para reintentar.',
+          );
+          final opener = list
+              ? find.byKey(const ValueKey('calendar-events-all'))
+              : find.textContaining('Dentista 0 · ');
+          await reveal(tester, opener);
+          await tester.tap(opener);
+          await tester.pumpAndSettle();
+          expect(inSheet(find.text('Dentista 0')), findsOneWidget);
+
+          // The phone's events can't be read now: the sheet reads them again.
+          bridge.failEvents = true;
+          await container.read(deviceCalendarProvider.notifier).refresh();
+          await tester.pumpAndSettle();
+          final line = inSheet(
+            find.byKey(const ValueKey('calendar-events-line')),
+          );
+          expect(line, findsOneWidget);
+          expect(
+            find.descendant(of: line, matching: find.text(l.calendarReadRetry)),
+            findsOneWidget,
+          );
+          expect(inSheet(find.text('Dentista 0')), findsNothing);
+          expect(line.hitTestable(), findsOneWidget);
+          expect(tester.widget<InkWell>(line).onTap, isNotNull);
+          expect(tester.getSize(line).height, greaterThanOrEqualTo(48));
+          expect(
+            find.descendant(
+              of: line,
+              matching: find.byType(CircularProgressIndicator),
+            ),
+            findsNothing,
+          );
+
+          // A tap reads again; meanwhile the line stays, busy, and takes no tap.
+          final reads = bridge.eventReads;
+          bridge.held = 0;
+          final gate = bridge.gate = Completer<void>();
+          bridge.failEvents = false;
+          await tester.tap(line);
+          for (var i = 0; i < 3; i++) {
+            await tester.pump();
+          }
+          expect(bridge.held, greaterThanOrEqualTo(1), reason: 'read again');
+          expect(sheet, findsOneWidget, reason: 'the sheet stays open');
+          expect(line, findsOneWidget);
+          expect(
+            find.descendant(of: line, matching: find.text(l.calendarReadRetry)),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(
+              of: line,
+              matching: find.byType(CircularProgressIndicator),
+            ),
+            findsOneWidget,
+          );
+          expect(tester.widget<InkWell>(line).onTap, isNull);
+          bridge.gate = null;
+          gate.complete();
+          await tester.pumpAndSettle();
+
+          // Read: the sheet shows the events again.
+          expect(bridge.eventReads, greaterThan(reads));
+          expect(line, findsNothing);
+          expect(inSheet(find.text('Dentista 0')), findsOneWidget);
+          if (list) {
+            expect(inSheet(find.text('Dentista 3')), findsOneWidget);
+          } else {
+            expect(inSheet(find.text(l.calendarOpenEvent)), findsOneWidget);
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2310: a retry in the events sheet that fails again brings the tappable line back',
+      (tester) async {
+        final now = DateTime.now();
+        final bridge = _FlakyCalendars()
+          ..data = [
+            DeviceCalendarEvent(
+              id: '70',
+              calendarId: workCalendar.id,
+              title: 'Dentista',
+              start: DateTime(now.year, now.month, now.day, 9),
+              end: DateTime(now.year, now.month, now.day, 10),
+              allDay: false,
+            ),
+          ];
+        addTearDown(bridge.close);
+        final container = await openCalendar(
+          tester,
+          [],
+          overrides: phoneCalendar(bridge),
+          size: const Size(360, 800),
+        );
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        final row = find.textContaining('Dentista · ');
+        await reveal(tester, row);
+        await tester.tap(row);
+        await tester.pumpAndSettle();
+        bridge.failEvents = true;
+        await container.read(deviceCalendarProvider.notifier).refresh();
+        await tester.pumpAndSettle();
+        final line = inSheet(
+          find.byKey(const ValueKey('calendar-events-line')),
+        );
+        final reads = bridge.eventReads;
+        await tester.tap(line);
+        await tester.pumpAndSettle();
+        expect(bridge.eventReads, greaterThan(reads), reason: 'read again');
+        expect(
+          find.descendant(of: line, matching: find.text(l.calendarReadRetry)),
+          findsOneWidget,
+        );
+        expect(tester.widget<InkWell>(line).onTap, isNotNull);
+        expect(
+          find.descendant(
+            of: line,
+            matching: find.byType(CircularProgressIndicator),
+          ),
+          findsNothing,
+        );
         expect(tester.takeException(), isNull);
       },
     );

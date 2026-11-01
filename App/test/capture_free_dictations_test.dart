@@ -3611,8 +3611,16 @@ void main() {
             expect(app.api.deletes, isEmpty);
             await tester.tap(find.widgetWithText(FilledButton, es.keep));
             await frames(tester);
+            expect(
+              find.byType(BottomSheet),
+              findsNothing,
+              reason: 'Conservar closes the sheet',
+            );
             app.api.hold!.complete();
             await tester.pumpAndSettle();
+            expect(find.text(es.pendingCaptureCount(1)), findsOneWidget);
+            expect(await pendingIds(app), hasLength(1));
+            expect(app.api.deletes, isEmpty);
             expect(tester.takeException(), isNull);
           },
         );

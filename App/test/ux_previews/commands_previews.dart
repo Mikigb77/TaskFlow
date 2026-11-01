@@ -452,7 +452,7 @@ void commandPreviews() {
     preview(
       cards,
       'change-which',
-      'A change that matches two tasks: «¿Cuál quieres cambiar?» with its ✕, then the two in a question box, each an outlined full-width choice with its day, 8 dp apart; tap the one to change; nothing waits on a guess.',
+      'A change that matches two tasks: «¿Cuál quieres cambiar?» with its ✕, then the two in a question box, each an outlined full-width choice with its day, 8 dp apart; tap the one to change; nothing waits on a guess. The card opens at its top, its ✕ in view, even at 2×.',
       [es1, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(
@@ -607,7 +607,7 @@ void commandPreviews() {
     preview(
       landed,
       'delete-applied',
-      'Eliminar tapped: Calendar with «Tarea eliminada» and Deshacer.',
+      'Eliminar tapped: Calendar with «Eliminada: Ir a la peluquería» and Deshacer.',
       everywhere,
       (p) async {
         final app = await PreviewApp.open(
@@ -629,7 +629,7 @@ void commandPreviews() {
       },
       then: {
         'delete-undone':
-            'Deshacer tapped: the task is back, and so is the result, ready to apply again.',
+            'Deshacer tapped: Calendar shows the task\'s own day, with «Ir a la peluquería» back and lit; no sheet.',
       },
     );
 

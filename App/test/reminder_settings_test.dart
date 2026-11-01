@@ -1423,7 +1423,7 @@ void main() {
       testWidgets(
         grant
             ? 'UX-1605: allowing during the flow, Recordatorios shows the switch on and no blocked line on every frame'
-            : 'UX-1605: refusing during the flow, the switch goes back off and the blocked line returns',
+            : 'UX-1605 / UX-2601: refusing during the flow, the switch goes back off, alone, and the message offers «Permitir avisos»',
         (tester) async {
           final store = MemoryReminderStore();
           final access = _GatedAccess(grant: grant);
@@ -1432,7 +1432,8 @@ void main() {
           );
           await tester.pumpAndSettle();
           expect(switchOn(tester), isFalse);
-          expect(find.text(es.notificationPermissionOff), findsOneWidget);
+          // UX-2601: with the switch off, the switch is the one way in.
+          expect(find.text(es.notificationPermissionOff), findsNothing);
 
           await tester.tap(find.byType(SwitchListTile));
           await tester.pump();
@@ -1468,15 +1469,21 @@ void main() {
           } else {
             await tester.pumpAndSettle();
             expect(switchOn(tester), isFalse);
+            // UX-2601: the switch alone; the message says why and offers
+            // the phone's page.
             expect(
               find.descendant(
                 of: find.byType(ListTile),
                 matching: find.text(es.notificationPermissionOff),
               ),
-              findsOneWidget,
+              findsNothing,
             );
             expect(
               find.widgetWithText(FilledButton, es.allowNotifications),
+              findsNothing,
+            );
+            expect(
+              find.widgetWithText(SnackBarAction, es.allowNotifications),
               findsOneWidget,
             );
             expect(store.value.enabled, isFalse);
@@ -2056,7 +2063,8 @@ void main() {
           );
           await tester.pumpAndSettle();
           expect(switchOn(tester), isFalse);
-          expect(find.text(es.notificationPermissionOff), findsOneWidget);
+          // UX-2601: off, the switch is alone.
+          expect(find.text(es.notificationPermissionOff), findsNothing);
           access.reconciles = 0;
 
           await tester.tap(find.byType(SwitchListTile));
@@ -2116,7 +2124,7 @@ void main() {
     }
 
     testWidgets(
-      'UX-1650: a refusal at Android’s dialog still turns the switch off and brings the problem line back at once',
+      'UX-1650 / UX-2601: a refusal at Android’s dialog still turns the switch off at once, alone, with the message',
       (tester) async {
         final store = MemoryReminderStore();
         final access = _SlowReconcile(
@@ -2135,13 +2143,14 @@ void main() {
         await tester.pump();
         await tester.pump();
         expect(switchOn(tester), isFalse);
-        // The screen's own line (the snackbar says it too).
+        // UX-2601: no line of the screen's own while the switch is off; the
+        // message says it.
         expect(
           find.descendant(
             of: find.byType(ListTile),
             matching: find.text(es.notificationPermissionOff),
           ),
-          findsOneWidget,
+          findsNothing,
         );
         expect(access.reconciles, 0);
         await tester.pumpAndSettle();
@@ -2969,6 +2978,161 @@ void main() {
           (tile.subtitle! as Text).data,
           tester.element(row).reminderLead(10),
         );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  group('P272 · Recordatorios has one way in while they’re off', () {
+    const timeoutChannel = MethodChannel('taskflow/accessibility');
+    final platform =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    setUp(
+      () =>
+          platform.setMockMethodCallHandler(timeoutChannel, (_) async => null),
+    );
+    tearDown(() => platform.setMockMethodCallHandler(timeoutChannel, null));
+    final es = lookupAppLocalizations(const Locale('es'));
+
+    /// Ajustes › Recordatorios in Spanish at 1× on a 360×800 phone.
+    Future<void> openReminders(
+      WidgetTester tester,
+      MemoryReminderStore store,
+      FakeReminderAccess access,
+    ) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            ...reminderOverrides(store, access),
+            taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+          ],
+          child: MaterialApp(
+            locale: const Locale('es'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: AppTheme.light,
+            home: const NotificationSettingsScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    bool switchOn(WidgetTester tester) =>
+        tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value;
+
+    /// The screen's own line about the phone blocking, not the message's.
+    Finder blockedLine() => find.descendant(
+      of: find.byType(ListView),
+      matching: find.text(es.notificationPermissionOff),
+    );
+
+    Finder allowButton() =>
+        find.widgetWithText(FilledButton, es.allowNotifications);
+
+    void leaveApp(WidgetTester tester) {
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+    }
+
+    void returnToApp(WidgetTester tester) {
+      for (final state in [
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+    }
+
+    testWidgets(
+      'UX-2601: ES 1× on 360×800, the switch off and notifications blocked: the switch alone, and turning it on asks Android',
+      (tester) async {
+        final store = MemoryReminderStore();
+        final access = FakeReminderAccess(allowed: false);
+        await openReminders(tester, store, access);
+        final toggle = find.widgetWithText(SwitchListTile, es.enableReminders);
+        expect(toggle, findsOneWidget);
+        expect(switchOn(tester), isFalse);
+        // Inside the viewport.
+        final box = tester.getRect(toggle);
+        expect(box.top, greaterThanOrEqualTo(0));
+        expect(box.bottom, lessThanOrEqualTo(800));
+        expect(blockedLine(), findsNothing);
+        expect(find.text(es.notificationPermissionOff), findsNothing);
+        expect(allowButton(), findsNothing);
+        expect(find.text(es.allowNotifications), findsNothing);
+        expect(find.byIcon(Icons.notifications_off_outlined), findsNothing);
+
+        await tester.tap(toggle);
+        await tester.pumpAndSettle();
+        expect(access.permissionRequests, 1);
+        expect(access.notificationSettingsOpened, 0);
+        expect(store.value.enabled, isTrue);
+        expect(switchOn(tester), isTrue);
+        expect(find.text(es.remindersOnConfirmation), findsOneWidget);
+        expect(blockedLine(), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2601: the switch refused by Android, then its «Permitir avisos» and allowing in Android: back on Recordatorios the switch is on, with Listo. Recordatorios activados.',
+      (tester) async {
+        final store = MemoryReminderStore();
+        final access = FakeReminderAccess(allowed: false, grant: false);
+        await openReminders(tester, store, access);
+        await tester.tap(find.byType(SwitchListTile));
+        await tester.pumpAndSettle();
+        expect(access.permissionRequests, 1);
+        expect(switchOn(tester), isFalse);
+        expect(blockedLine(), findsNothing);
+        expect(allowButton(), findsNothing);
+        await tester.tap(
+          find.widgetWithText(SnackBarAction, es.allowNotifications),
+        );
+        await tester.pump();
+        expect(access.notificationSettingsOpened, 1);
+        leaveApp(tester);
+        await tester.pump();
+
+        access.allowed = true;
+        returnToApp(tester);
+        await tester.pumpAndSettle();
+        expect(store.value.enabled, isTrue);
+        expect(store.value.dateOnlyTime, 540);
+        expect(store.value.asked, isTrue);
+        expect(switchOn(tester), isTrue);
+        expect(find.text(es.remindersOnConfirmation), findsOneWidget);
+        expect(blockedLine(), findsNothing);
+        expect(allowButton(), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2601 / UX-1606: the switch on and notifications blocked still show the line and «Permitir avisos», which opens the notifications page',
+      (tester) async {
+        final store = MemoryReminderStore(
+          const ReminderPreferences(enabled: true, asked: true),
+        );
+        final access = FakeReminderAccess(allowed: false);
+        await openReminders(tester, store, access);
+        expect(switchOn(tester), isTrue);
+        expect(blockedLine(), findsOneWidget);
+        expect(allowButton(), findsOneWidget);
+        await tester.tap(allowButton());
+        await tester.pumpAndSettle();
+        expect(access.notificationSettingsOpened, 1);
+        expect(access.permissionRequests, 0);
         expect(tester.takeException(), isNull);
       },
     );

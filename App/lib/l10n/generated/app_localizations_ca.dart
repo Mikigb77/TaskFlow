@@ -36,13 +36,18 @@ class AppLocalizationsCa extends AppLocalizations {
   String get reviewOriginalText => 'Text original';
 
   @override
-  String get reviewRemove => 'Treu';
-
-  @override
   String get reviewRemoved => 'Treta';
 
   @override
-  String get reviewUndoSaved => 'Tornen a ser aquí, sense desar.';
+  String reviewUndoSaved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Tornen a ser aquí, sense desar.',
+      one: 'Torna a ser aquí, sense desar.',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get reviewUndoChanged =>
@@ -365,10 +370,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get calendarRefresh => 'Actualitza els calendaris';
 
   @override
-  String get calendarReadError =>
-      'No s’han pogut llegir els esdeveniments. Actualitza per tornar-ho a provar; pot ser que faltin compromisos en aquesta vista.';
-
-  @override
   String get calendarReadRetry =>
       'No s’han pogut llegir els esdeveniments. Toca per tornar-ho a provar.';
 
@@ -397,14 +398,8 @@ class AppLocalizationsCa extends AppLocalizations {
   String get calendarAllDay => 'Tot el dia';
 
   @override
-  String calendarEventCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count esdeveniments',
-      one: '1 esdeveniment',
-    );
-    return '$_temp0';
+  String calendarSeeAllEvents(int count) {
+    return 'Mostra els $count esdeveniments';
   }
 
   @override
@@ -2960,6 +2955,17 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
+  String captureTasksAddedOn(int count, String date) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasques afegides al $date',
+      one: '1 tasca afegida al $date',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String captureKeptForReview(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -4308,6 +4314,11 @@ class AppLocalizationsCa extends AppLocalizations {
       one: 'Tasca suprimida',
     );
     return '$_temp0';
+  }
+
+  @override
+  String commandDeletedTitle(String title) {
+    return 'Suprimida: $title';
   }
 
   @override

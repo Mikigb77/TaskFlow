@@ -1016,7 +1016,7 @@ void main() {
   );
 
   testWidgets(
-    'UX-117: removing every draft leaves an enabled Terminar bottom button and no link',
+    'UX-117 / P275: after ✕ on one of two drafts, the last is a single result with no ✕; Cancelar → Descartar closes the sheet and discards the capture',
     (tester) async {
       final (_, store) = await openResultIn(tester, [
         CaptureDraft(
@@ -1035,34 +1035,18 @@ void main() {
       await tester.pumpAndSettle();
       hideMessage();
       await tester.pumpAndSettle();
-      // The last one is a single result: it is removed from Más opciones.
-      final options = find.byKey(const ValueKey('draft-options-b'));
-      await tester.ensureVisible(options);
-      await tester.tap(options);
-      await tester.pumpAndSettle();
-      final remove = find.text(es.reviewRemove);
-      await tester.ensureVisible(remove);
-      await tester.tap(remove);
-      await tester.pumpAndSettle();
-      hideMessage();
-      await tester.pumpAndSettle();
-      expect(es.captureFinish, 'Terminar');
+      // The last one is a single result: Cancelar is its way out (the
+      // card has no ✕, and Más opciones no Quitar since P275).
       expect(
-        find.descendant(of: button(), matching: find.text(es.captureFinish)),
-        findsOneWidget,
-      );
-      expect(saveButton(tester).onPressed, isNotNull);
-      // The only Terminar is the button: no small link.
-      expect(find.text(es.captureFinish), findsOneWidget);
-      expect(
-        find.ancestor(
-          of: find.text(es.captureFinish),
-          matching: find.byType(TextButton),
-        ),
+        find.byTooltip(es.removeCaptureItem('Llamar a mamá')),
         findsNothing,
       );
-      expect(button().hitTestable(), findsOneWidget);
-      await tester.tap(button());
+      expect(saveButton(tester).onPressed, isNotNull);
+      final cancel = find.widgetWithText(TextButton, es.cancel);
+      await tester.ensureVisible(cancel.last);
+      await tester.tap(cancel.last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, es.discard));
       await tester.pumpAndSettle();
       expect(find.byType(CaptureResult), findsNothing);
       expect(store.current!.status, 'discarded');
@@ -2169,9 +2153,18 @@ void main() {
             tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
           );
         }
+        // A longer title: since P275 the date line shows no time while
+        // the question is open, so the answers would fit without one.
+        final car = carAsking('es');
         await openResultIn(
           tester,
-          [carAsking('es')],
+          [
+            car.copyWith(
+              task: car.task.copyWith(
+                title: 'Recoger el coche del taller de la calle Mayor',
+              ),
+            ),
+          ],
           size: phone,
           settle: false,
         );
@@ -2512,6 +2505,537 @@ void main() {
       },
     );
   }
+
+  group('P275 · the result card', () {
+    /// The collapsed row's title button and its ✕ on card [id].
+    Finder titleButton(String id, String title) => find.descendant(
+      of: find.byKey(ValueKey(id)),
+      matching: find.widgetWithText(TextButton, title),
+    );
+    Finder removeButton(String title) =>
+        find.byTooltip(es.removeCaptureItem(title));
+    Finder titleField(String id) => find.descendant(
+      of: find.byKey(ValueKey(id)),
+      matching: find.byKey(const ValueKey('task-title')),
+    );
+
+    for (final (language, scale) in [('es', 1.0), ('es', 2.0), ('ca', 2.0)]) {
+      testWidgets(
+        'UX-2205: ${language.toUpperCase()} ${scale.toStringAsFixed(0)}× on 360×800, a three-task result: each collapsed row’s title ends at least 8 dp short of its ✕',
+        (tester) async {
+          if (scale != 1) largeText(tester);
+          await openResultIn(
+            tester,
+            threeTasks(),
+            language: language,
+            size: phone,
+          );
+          final l = lookupAppLocalizations(Locale(language));
+          for (final (id, title) in [
+            ('bread', 'Comprar pan y leche'),
+            ('doctor', 'Llamar al médico'),
+            ('kids', 'Recoger a los niños del colegio'),
+          ]) {
+            final x = find.byTooltip(l.removeCaptureItem(title));
+            await tester.ensureVisible(x);
+            await tester.pumpAndSettle();
+            final gap =
+                tester.getRect(x).left -
+                tester.getRect(titleButton(id, title)).right;
+            expect(gap, greaterThanOrEqualTo(8 - 0.5), reason: '$id: $gap');
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2205: ES 1× on 360×800, a three-task result: a tap 2 dp left of a row’s ✕ opens that row’s card and removes nothing',
+      (tester) async {
+        await openResultIn(tester, threeTasks(), size: phone);
+        for (final (id, title) in [
+          ('bread', 'Comprar pan y leche'),
+          ('kids', 'Recoger a los niños del colegio'),
+        ]) {
+          final x = removeButton(title);
+          await tester.ensureVisible(x);
+          await tester.pumpAndSettle();
+          final rect = tester.getRect(x);
+          await tester.tapAt(Offset(rect.left - 2, rect.center.dy));
+          await tester.pumpAndSettle();
+          expect(titleField(id), findsOneWidget, reason: '$id opens');
+          expect(find.text(es.reviewRemoved), findsNothing, reason: id);
+          for (final card in ['bread', 'doctor', 'kids']) {
+            expect(find.byKey(ValueKey(card)), findsOneWidget, reason: card);
+          }
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final (language, scale) in [('es', 1.0), ('es', 2.0), ('ca', 1.0)]) {
+      testWidgets(
+        'UX-2207: ${language.toUpperCase()} ${scale.toStringAsFixed(0)}×, a dictated note’s text is labelled «Tu nota», with the form’s hint, and TalkBack reads «Tu nota»',
+        (tester) async {
+          if (scale != 1) largeText(tester);
+          final l = lookupAppLocalizations(Locale(language));
+          final semantics = tester.ensureSemantics();
+          await openResultIn(
+            tester,
+            [
+              CaptureDraft(
+                id: 'idea',
+                task: Task(
+                  title: 'Ideas para el viaje',
+                  priority: 1,
+                  kind: 'note',
+                ),
+              ),
+            ],
+            language: language,
+            size: phone,
+          );
+          final field = notesField();
+          expect(field, findsOneWidget);
+          expect(
+            find.descendant(of: field, matching: find.text(l.noteBody)),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(of: field, matching: find.text(l.notes)),
+            findsNothing,
+          );
+          final editable = find.descendant(
+            of: field,
+            matching: find.byType(EditableText),
+          );
+          expect(tester.getSemantics(editable).label, contains(l.noteBody));
+          expect(tester.getSemantics(editable).label, isNot(contains(l.notes)));
+          // The hint shows once the empty field is focused.
+          await tester.ensureVisible(field);
+          await tester.pumpAndSettle();
+          await tester.tap(field);
+          await tester.pumpAndSettle();
+          final hint = find.descendant(
+            of: field,
+            matching: find.text(l.noteHint),
+          );
+          expect(hint, findsOneWidget);
+          expect(
+            find.descendant(of: field, matching: find.text(l.addNotes)),
+            findsNothing,
+          );
+          semantics.dispose();
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    /// «Quitar» is gone from «Más opciones»: ✕ and Cancelar remain.
+    void expectNoQuitar(WidgetTester tester) {
+      expect(find.text('Quitar'), findsNothing);
+      expect(find.byIcon(Icons.remove_circle_outline), findsNothing);
+    }
+
+    /// With no day, the repeat row says so and, since P298 (UX-2620), opens
+    /// the date sheet first, with a chevron, as an enabled button.
+    Future<void> expectRepeatNeedsDate(WidgetTester tester, String id) async {
+      final row = find.descendant(
+        of: find.byKey(ValueKey(id)),
+        matching: find.widgetWithText(ListTile, es.repeatNeedsDate),
+      );
+      expect(row, findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey(id)),
+          matching: find.text(es.neverRepeat),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: row,
+          matching: find.byIcon(Icons.chevron_right_rounded),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.getSemantics(row), isSemantics(hasTapAction: true));
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      final sheets = find.byType(BottomSheet).evaluate().length;
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet).evaluate().length, sheets + 1);
+      expect(find.widgetWithText(ChoiceChip, es.tomorrow), findsOneWidget);
+    }
+
+    testWidgets(
+      'UX-2208: a one-task result with no day: «Más opciones» shows no «Quitar», and the repeat row reads «Añade una fecha para repetir» and opens the date sheet',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await openResultIn(tester, [
+          CaptureDraft(
+            id: 'bread',
+            task: Task(title: 'Comprar pan', priority: 1),
+          ),
+        ], size: phone);
+        await openOptions(tester, 'bread');
+        expect(
+          find.byKey(const ValueKey('draft-add-notes-bread')),
+          findsOneWidget,
+          reason: 'Más opciones is open',
+        );
+        expectNoQuitar(tester);
+        await expectRepeatNeedsDate(tester, 'bread');
+        // Cancelar is still the way out.
+        expect(find.widgetWithText(TextButton, es.cancel), findsWidgets);
+        semantics.dispose();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2208: an opened batch card: «Más opciones» shows no «Quitar» (✕ stays); with no day its repeat row reads «Añade una fecha para repetir» and opens the date sheet',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await openResultIn(tester, [
+          CaptureDraft(
+            id: 'bread',
+            task: Task(title: 'Comprar pan', priority: 1),
+          ),
+          CaptureDraft(
+            id: 'doctor',
+            task: Task(
+              title: 'Llamar al médico',
+              priority: 1,
+              dueDate: nextWeekday(DateTime.friday),
+            ),
+          ),
+        ], size: phone);
+        final title = titleButton('bread', 'Comprar pan');
+        await tester.ensureVisible(title);
+        await tester.pumpAndSettle();
+        await tester.tap(title);
+        await tester.pumpAndSettle();
+        expect(titleField('bread'), findsOneWidget);
+        await openOptions(tester, 'bread');
+        expectNoQuitar(tester);
+        expect(removeButton('Comprar pan'), findsOneWidget);
+        await expectRepeatNeedsDate(tester, 'bread');
+        semantics.dispose();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2211: «Más opciones» tells TalkBack it is collapsed, then expanded once tapped, as ExpansionTile does',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await openResultIn(tester, [
+          CaptureDraft(
+            id: 'bread',
+            task: Task(title: 'Comprar pan', priority: 1),
+          ),
+        ], size: phone);
+        final strings = MaterialLocalizations.of(
+          tester.element(find.byType(CaptureResult)),
+        );
+        final options = find.byKey(const ValueKey('draft-options-bread'));
+        void expectState({required bool open}) {
+          final node = tester.getSemantics(options);
+          expect(
+            node,
+            isSemantics(
+              hasExpandedState: true,
+              isExpanded: open,
+              hint: open ? strings.collapsedHint : strings.expandedHint,
+            ),
+            reason: 'open: $open',
+          );
+          expect(
+            node.hintOverrides?.onTapHint,
+            open
+                ? strings.expansionTileExpandedTapHint
+                : strings.expansionTileCollapsedTapHint,
+          );
+          expect(node.label, contains(es.reviewOptions));
+        }
+
+        await tester.ensureVisible(options);
+        await tester.pumpAndSettle();
+        expectState(open: false);
+        await tester.tap(options);
+        await tester.pumpAndSettle();
+        expectState(open: true);
+        await tester.tap(options);
+        await tester.pumpAndSettle();
+        expectState(open: false);
+        semantics.dispose();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2211: a collapsed batch row’s title tells TalkBack it is collapsed and that its tap is «Editar tarea»; tapped, the card opens',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await openResultIn(tester, threeTasks(), size: phone);
+        for (final (id, title) in [
+          ('bread', 'Comprar pan y leche'),
+          ('doctor', 'Llamar al médico'),
+        ]) {
+          final button = titleButton(id, title);
+          await tester.ensureVisible(button);
+          await tester.pumpAndSettle();
+          final node = tester.getSemantics(button);
+          expect(
+            node,
+            isSemantics(
+              label: title,
+              isButton: true,
+              hasTapAction: true,
+              hasExpandedState: true,
+              isExpanded: false,
+            ),
+            reason: id,
+          );
+          expect(node.hintOverrides?.onTapHint, es.editTask, reason: id);
+          expect(es.editTask, 'Editar tarea');
+          await tester.tap(button);
+          await tester.pumpAndSettle();
+          expect(titleField(id), findsOneWidget, reason: '$id opens');
+        }
+        semantics.dispose();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    /// The text of card [id]'s date line.
+    Finder dateLine(String id, String text) => find.descendant(
+      of: find.byKey(ValueKey('draft-schedule-$id')),
+      matching: find.text(text),
+    );
+
+    testWidgets(
+      'UX-2212: a one-task result asking AM or PM: the date line shows the day only, and TalkBack hears no time; after 17:00 it shows the day · 17:00',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await openResultIn(tester, [carAsking('es')], size: phone);
+        final context = tester.element(find.byType(CaptureResult));
+        final thursday = nextWeekday(DateTime.thursday);
+        final day = context.weekdayDate(thursday);
+        final time = context.clockTime(DateTime(2026, 1, 1, 17));
+        expect(time, '17:00');
+        expect(find.text(amPm('es')), findsOneWidget);
+        expect(dateLine('car', day), findsOneWidget);
+        expect(dateLine('car', '$day · $time'), findsNothing);
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('draft-schedule-car')),
+            matching: find.textContaining(time),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.bySemanticsLabel('${es.reviewSchedule}: $day'),
+          findsOneWidget,
+        );
+        expect(
+          find.bySemanticsLabel(RegExp('17:00.*$day|$day.*17:00')),
+          findsNothing,
+        );
+        await tester.tap(answers(tester, es, 'car')[1]);
+        await tester.pumpAndSettle();
+        expect(find.text(amPm('es')), findsNothing);
+        expect(dateLine('car', '$day · $time'), findsOneWidget);
+        expect(
+          find.bySemanticsLabel('${es.reviewSchedule}: $day · $time'),
+          findsOneWidget,
+        );
+        semantics.dispose();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2212: a two-task result where both ask: each collapsed row’s date line shows the day only until its own question is answered',
+      (tester) async {
+        await openResultIn(tester, [
+          carAsking('es', id: 'car'),
+          CaptureDraft(
+            id: 'doctor',
+            task: Task(
+              title: 'Llamar al médico',
+              priority: 1,
+              dueDate: nextWeekday(
+                DateTime.friday,
+              ).add(const Duration(hours: 17)),
+              hasTime: true,
+            ),
+            confirmed: false,
+            clarifications: const [
+              CaptureClarification(
+                question: '¿A las 5 de la mañana o de la tarde?',
+                field: 'schedule',
+                times: ['05:00', '17:00'],
+              ),
+            ],
+          ),
+        ], size: phone);
+        final context = tester.element(find.byType(CaptureResult));
+        final thursday = context.weekdayDate(nextWeekday(DateTime.thursday));
+        final friday = context.weekdayDate(nextWeekday(DateTime.friday));
+        expect(dateLine('car', thursday), findsOneWidget);
+        expect(dateLine('doctor', friday), findsOneWidget);
+        final first = answers(tester, es, 'car')[1];
+        await tester.ensureVisible(first);
+        await tester.pumpAndSettle();
+        await tester.tap(first);
+        await tester.pumpAndSettle();
+        expect(dateLine('car', '$thursday · 17:00'), findsOneWidget);
+        expect(dateLine('doctor', friday), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- UX loop 2026-10-28-app, round 2 · P298 (UX-2620): the repeat row
+  // on a result with no day opens the date sheet ----
+  group('P298 · repeat row with no day', () {
+    /// The repeat row of card [id], reading [label].
+    Finder repeatRow(String id, String label) => find.descendant(
+      of: find.byKey(ValueKey(id)),
+      matching: find.widgetWithText(ListTile, label),
+    );
+
+    /// The capture sheet is itself a bottom sheet: the sheets open on it.
+    int sheets() => find.byType(BottomSheet).evaluate().length;
+
+    /// The date sheet is open on the result: its one-tap day chips show.
+    void expectDateSheet(int under) {
+      expect(sheets(), under + 1);
+      expect(find.widgetWithText(ChoiceChip, es.today), findsOneWidget);
+      expect(find.widgetWithText(ChoiceChip, es.tomorrow), findsOneWidget);
+      expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+    }
+
+    /// The repeat editor is open: «Repetir» with its choice of how often.
+    void expectRepeatEditor(int under) {
+      expect(sheets(), under + 1);
+      final sheet = find.byType(BottomSheet).last;
+      expect(
+        find.descendant(of: sheet, matching: find.text(es.repeat)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: sheet,
+          matching: find.byType(DropdownButtonFormField<String>),
+        ),
+        findsOneWidget,
+      );
+      expect(find.widgetWithText(ChoiceChip, es.tomorrow), findsNothing);
+    }
+
+    /// Taps [row] and returns how many sheets were open before.
+    Future<int> tapRow(WidgetTester tester, Finder row) async {
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      final under = sheets();
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+      return under;
+    }
+
+    CaptureDraft noDay() => CaptureDraft(
+      id: 'bread',
+      task: Task(title: 'Comprar pan', priority: 1),
+    );
+
+    testWidgets(
+      'UX-2620: ES 1× on 360×800, a one-task result with no day, «Más opciones» open: «Añade una fecha para repetir» has a chevron, is an enabled button for TalkBack, and opens the date sheet',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await openResultIn(tester, [noDay()], size: phone);
+        await openOptions(tester, 'bread');
+        final row = repeatRow('bread', es.repeatNeedsDate);
+        expect(row, findsOneWidget);
+        await tester.ensureVisible(row);
+        await tester.pumpAndSettle();
+        expectInView(tester, row);
+        final chevron = find.descendant(
+          of: row,
+          matching: find.byIcon(Icons.chevron_right_rounded),
+        );
+        expect(chevron, findsOneWidget);
+        expectInView(tester, chevron);
+        expect(
+          tester.getSemantics(row),
+          isSemantics(
+            label: es.repeatNeedsDate,
+            isButton: true,
+            hasEnabledState: true,
+            isEnabled: true,
+            hasTapAction: true,
+          ),
+        );
+        expectDateSheet(await tapRow(tester, row));
+        semantics.dispose();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2620: after «Mañana» is picked from the no-day repeat row, the row reads «No se repite» and opens the repeat editor',
+      (tester) async {
+        await openResultIn(tester, [noDay()], size: phone);
+        await openOptions(tester, 'bread');
+        final under = await tapRow(
+          tester,
+          repeatRow('bread', es.repeatNeedsDate),
+        );
+        expectDateSheet(under);
+        await tester.tap(find.widgetWithText(ChoiceChip, es.tomorrow));
+        await tester.pumpAndSettle();
+        // «Mañana» applies at once: the date sheet closes on the result.
+        expect(sheets(), under);
+        expect(repeatRow('bread', es.repeatNeedsDate), findsNothing);
+        final row = repeatRow('bread', es.neverRepeat);
+        expect(row, findsOneWidget);
+        expect(
+          find.descendant(
+            of: row,
+            matching: find.byIcon(Icons.chevron_right_rounded),
+          ),
+          findsOneWidget,
+        );
+        expectRepeatEditor(await tapRow(tester, row));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2620: a one-task result with a day from the start: the repeat row reads «No se repite» and opens the repeat editor, as before',
+      (tester) async {
+        await openResultIn(tester, [
+          CaptureDraft(
+            id: 'doctor',
+            task: Task(
+              title: 'Llamar al médico',
+              priority: 1,
+              dueDate: nextWeekday(DateTime.friday),
+            ),
+          ),
+        ], size: phone);
+        await openOptions(tester, 'doctor');
+        expect(repeatRow('doctor', es.repeatNeedsDate), findsNothing);
+        final row = repeatRow('doctor', es.neverRepeat);
+        expect(row, findsOneWidget);
+        expectRepeatEditor(await tapRow(tester, row));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }
 
 /// A capture store in memory: saving marks drafts saved and, given [tasks],

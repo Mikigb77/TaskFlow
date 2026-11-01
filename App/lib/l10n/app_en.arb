@@ -17,9 +17,16 @@
   "reviewOptions": "More options",
   "reviewOriginal": "See what I said",
   "reviewOriginalText": "Original text",
-  "reviewRemove": "Remove",
   "reviewRemoved": "Removed",
-  "reviewUndoSaved": "They’re back here, not saved yet.",
+  "reviewUndoSaved": "{count, plural, =1{It’s back here, not saved yet.} other{They’re back here, not saved yet.}}",
+  "@reviewUndoSaved": {
+    "description": "After Undo while the capture sheet stays open (some cards still wait): the tasks just saved are back in the sheet, unsaved. {count} is how many came back.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "reviewUndoChanged": "This task has changed. Your saved tasks were kept.",
   "reviewRepair": "Repair text",
   "reviewRepairHelp": "This text may have been saved with damaged accents. Review the correction before saving.",
@@ -183,7 +190,6 @@
   "calendarSettings": "Open app settings",
   "calendarEmptySources": "No visible calendars are synced to this phone. Connect an account in your calendar app, then refresh here.",
   "calendarRefresh": "Refresh calendars",
-  "calendarReadError": "Calendar events could not be read. Refresh to try again; this view may be missing commitments.",
   "calendarReadRetry": "Couldn’t read your events. Tap to try again.",
   "changeView": "Change view",
   "calendarPreferenceError": "Could not save that calendar choice. Try again. You can select up to 50 calendars.",
@@ -192,9 +198,9 @@
   "calendarReadOnly": "Calendar event · view only",
   "calendarNoSelection": "Choose calendars to show your existing commitments.",
   "calendarAllDay": "All day",
-  "calendarEventCount": "{count, plural, one{1 event} other{{count} events}}",
-  "@calendarEventCount": {
-    "description": "Calendar agenda line under the day’s tasks, followed by up to three start times.",
+  "calendarSeeAllEvents": "See all {count} events",
+  "@calendarSeeAllEvents": {
+    "description": "Calendar agenda: the row after the day’s first three phone-calendar events, shown only when there are more than three; a tap opens the list of all the day’s events. count is always 4 or more.",
     "placeholders": {
       "count": {
         "type": "int"
@@ -1889,6 +1895,18 @@
       }
     }
   },
+  "captureTasksAddedOn": "{count, plural, =1{1 task added to {date}} other{{count} tasks added to {date}}}",
+  "@captureTasksAddedOn": {
+    "description": "Brief message, with Undo, after several new tasks were saved and every one of them landed on the same day, the day Calendar then shows. {count} is how many were added; {date} is that day as taskAddedOn writes it, weekday first (“Thu, Oct 29”), never Today or Tomorrow. Tasks on several days, or one without a date, use captureTasksAdded instead.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "captureKeptForReview": "{count, plural, one{1 kept for review} other{{count} kept for review}}",
   "@captureKeptForReview": {
     "placeholders": {
@@ -3139,6 +3157,15 @@
     "placeholders": {
       "count": {
         "type": "int"
+      }
+    }
+  },
+  "commandDeletedTitle": "Deleted: {title}",
+  "@commandDeletedTitle": {
+    "description": "Brief message after a dictation deleted one task, with Undo. {title} is the task’s title, as a completion names it (notificationCompleted). Several deleted tasks use commandTasksDeleted.",
+    "placeholders": {
+      "title": {
+        "type": "String"
       }
     }
   },

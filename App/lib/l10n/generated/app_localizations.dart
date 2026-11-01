@@ -154,23 +154,17 @@ abstract class AppLocalizations {
   /// **'Original text'**
   String get reviewOriginalText;
 
-  /// No description provided for @reviewRemove.
-  ///
-  /// In en, this message translates to:
-  /// **'Remove'**
-  String get reviewRemove;
-
   /// No description provided for @reviewRemoved.
   ///
   /// In en, this message translates to:
   /// **'Removed'**
   String get reviewRemoved;
 
-  /// No description provided for @reviewUndoSaved.
+  /// After Undo while the capture sheet stays open (some cards still wait): the tasks just saved are back in the sheet, unsaved. {count} is how many came back.
   ///
   /// In en, this message translates to:
-  /// **'They’re back here, not saved yet.'**
-  String get reviewUndoSaved;
+  /// **'{count, plural, =1{It’s back here, not saved yet.} other{They’re back here, not saved yet.}}'**
+  String reviewUndoSaved(int count);
 
   /// No description provided for @reviewUndoChanged.
   ///
@@ -610,12 +604,6 @@ abstract class AppLocalizations {
   /// **'Refresh calendars'**
   String get calendarRefresh;
 
-  /// No description provided for @calendarReadError.
-  ///
-  /// In en, this message translates to:
-  /// **'Calendar events could not be read. Refresh to try again; this view may be missing commitments.'**
-  String get calendarReadError;
-
   /// No description provided for @calendarReadRetry.
   ///
   /// In en, this message translates to:
@@ -664,11 +652,11 @@ abstract class AppLocalizations {
   /// **'All day'**
   String get calendarAllDay;
 
-  /// Calendar agenda line under the day’s tasks, followed by up to three start times.
+  /// Calendar agenda: the row after the day’s first three phone-calendar events, shown only when there are more than three; a tap opens the list of all the day’s events. count is always 4 or more.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one{1 event} other{{count} events}}'**
-  String calendarEventCount(int count);
+  /// **'See all {count} events'**
+  String calendarSeeAllEvents(int count);
 
   /// No description provided for @calendarOffline.
   ///
@@ -4630,6 +4618,12 @@ abstract class AppLocalizations {
   /// **'{count, plural, one{1 task added} other{{count} tasks added}}'**
   String captureTasksAdded(int count);
 
+  /// Brief message, with Undo, after several new tasks were saved and every one of them landed on the same day, the day Calendar then shows. {count} is how many were added; {date} is that day as taskAddedOn writes it, weekday first (“Thu, Oct 29”), never Today or Tomorrow. Tasks on several days, or one without a date, use captureTasksAdded instead.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 task added to {date}} other{{count} tasks added to {date}}}'**
+  String captureTasksAddedOn(int count, String date);
+
   /// No description provided for @captureKeptForReview.
   ///
   /// In en, this message translates to:
@@ -6309,6 +6303,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{Task deleted} other{{count} tasks deleted}}'**
   String commandTasksDeleted(int count);
+
+  /// Brief message after a dictation deleted one task, with Undo. {title} is the task’s title, as a completion names it (notificationCompleted). Several deleted tasks use commandTasksDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted: {title}'**
+  String commandDeletedTitle(String title);
 
   /// Brief message after a dictation's new projects were created, with Undo.
   ///

@@ -8738,6 +8738,101 @@ void main() {
       );
     });
   });
+  group('P275 · room around «Activar recordatorios»', () {
+    const small = Size(360, 800);
+
+    /// The capture's result for one draft with a said plan, on a 360×800
+    /// phone whose reminders are off ([allowed]) or blocked by the phone.
+    Future<void> card(
+      WidgetTester tester, {
+      required bool allowed,
+      double textScale = 1,
+    }) async {
+      final captures = MemoryCaptures();
+      final app = await _App.open(
+        tester,
+        const [],
+        captures: captures,
+        reminders: allowed
+            ? const ReminderPreferences(dateOnlyTime: 540, asked: true)
+            : const ReminderPreferences(
+                enabled: true,
+                dateOnlyTime: 540,
+                asked: true,
+              ),
+        access: FakeReminderAccess(allowed: allowed),
+        textScale: textScale,
+        size: small,
+      );
+      captures.tasks = app.container;
+      captures.current = CaptureSession(
+        id: 'p275',
+        ownerKey: app.container.read(captureOwnerProvider),
+        timezone: 'Europe/Madrid',
+        capturedAt: now.toUtc(),
+        status: 'ready',
+        source: 'speech',
+        transcript: 'Presentar el proyecto…',
+        drafts: [
+          CaptureDraft(
+            id: 'd1',
+            task: Task(
+              title: 'Presentar el proyecto',
+              priority: 1,
+              dueDate: friday13,
+              reminderPlan: ownersPlan,
+            ),
+          ),
+        ],
+      );
+      await openCaptureResult(tester, 'p275');
+      expect(find.byType(VoiceTaskScreen), findsOneWidget);
+    }
+
+    for (final (name, allowed) in [
+      ('reminders off on this phone', true),
+      ('notifications blocked by the phone', false),
+    ]) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets(
+          'UX-2205: ES ${scale.toStringAsFixed(0)}× on 360×800, $name: «Activar recordatorios» sits at least 8 dp below the reminder row and 8 dp above «Más opciones»',
+          (tester) async {
+            await card(tester, allowed: allowed, textScale: scale);
+            final row = find.byKey(const ValueKey('draft-reminder-d1'));
+            final turnOn = find.ancestor(
+              of: find.descendant(
+                of: row,
+                matching: find.text(es.enableReminders),
+              ),
+              matching: find.byType(TextButton),
+            );
+            expect(turnOn, findsOneWidget);
+            await tester.ensureVisible(turnOn);
+            await tester.pumpAndSettle();
+            final line = find
+                .descendant(of: row, matching: find.byType(ListTile))
+                .first;
+            final options = find.byKey(const ValueKey('draft-options-d1'));
+            final button = tester.getRect(turnOn);
+            final above = button.top - tester.getRect(line).bottom;
+            final below = tester.getRect(options).top - button.bottom;
+            expect(
+              above,
+              greaterThanOrEqualTo(8 - 0.5),
+              reason: 'above $above',
+            );
+            expect(
+              below,
+              greaterThanOrEqualTo(8 - 0.5),
+              reason: 'below $below',
+            );
+            expect(button.height, greaterThanOrEqualTo(48));
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  });
 }
 
 /// UX-2020: in the [text] widget's laid-out paragraph, the time phrase

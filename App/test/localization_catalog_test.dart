@@ -209,11 +209,7 @@ void main() {
         ['Removed', 'Quitada', 'Treta'],
       );
       expect(
-        [en.reviewRemove, es.reviewRemove, ca.reviewRemove],
-        ['Remove', 'Quitar', 'Treu'],
-      );
-      expect(
-        [en.reviewUndoSaved, es.reviewUndoSaved, ca.reviewUndoSaved],
+        [en.reviewUndoSaved(2), es.reviewUndoSaved(2), ca.reviewUndoSaved(2)],
         [
           'They’re back here, not saved yet.',
           'Han vuelto aquí, sin guardar.',
@@ -381,13 +377,11 @@ void main() {
     final ca = lookupAppLocalizations(const Locale('ca'));
     expect(ca.reviewEditDetail, 'Canvia aquesta dada');
     expect(ca.reviewRepair, 'Corregeix el text');
-    expect(ca.reviewRemove, startsWith('Treu'));
     // No review button starts with an infinitive (Desar, Canviar, Treure…).
     final infinitive = RegExp(r'^\S+(ar|er|re|ir)$');
     for (final label in [
       ca.reviewEditDetail,
       ca.reviewRepair,
-      ca.reviewRemove,
       ca.reviewOriginal,
       ca.reviewResolve,
       ca.reviewOptions,
@@ -487,7 +481,6 @@ void main() {
             noList,
             notSaved,
             notSavedCount,
-            remove,
           )
           in [
             (
@@ -499,7 +492,6 @@ void main() {
               'No project',
               'Not saved yet',
               'Not saved yet · 1',
-              'Remove',
             ),
             (
               es,
@@ -510,7 +502,6 @@ void main() {
               'Sin proyecto',
               'Sin guardar',
               'Sin guardar · 1',
-              'Quitar',
             ),
             (
               ca,
@@ -521,7 +512,6 @@ void main() {
               'Sense projecte',
               'Sense desar',
               'Sense desar · 1',
-              'Treu',
             ),
           ]) {
         expect(l.inbox, inbox);
@@ -531,7 +521,6 @@ void main() {
         expect(l.noList, noList);
         expect(l.unfinishedCaptures, notSaved);
         expect(l.pendingCaptureCount(1), notSavedCount);
-        expect(l.reviewRemove, remove);
       }
       expect(
         es.inboxEmpty,

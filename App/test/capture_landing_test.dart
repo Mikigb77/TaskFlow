@@ -32,6 +32,7 @@ import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:agenda/widgets/task_actions.dart';
 import 'package:agenda/widgets/task_tile.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -188,7 +189,7 @@ void main() {
   );
 
   testWidgets(
-    'U5: a batch on two days lands on the earlier day with 2 tareas añadidas',
+    'U5 / P297: a batch on two days lands on the earlier day, named with its task',
     (tester) async {
       final early = inDays(3);
       final late = inDays(5);
@@ -202,12 +203,12 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('save-drafts')));
       await tester.pumpAndSettle();
       expect(find.byType(BottomSheet), findsNothing);
-      expect(es.captureTasksAdded(2), '2 tareas añadidas');
-      // The later day is out of sight: the message names it (P102).
+      // The message names the day Calendar lands on with its task (P297),
+      // and the later day, out of sight, after it (P102).
       final calendar = tester.element(find.byType(CalendarScreen));
       expect(
         find.text(
-          '${es.captureTasksAdded(2)} · '
+          '${es.taskAddedOn(calendar.weekdayDate(early))} · '
           '${es.captureAlsoOn(calendar.weekdayDate(late))}',
         ),
         findsOneWidget,
@@ -895,7 +896,7 @@ void main() {
   );
 
   testWidgets(
-    'U5: a Friday and a Saturday task in one save say 2 tareas añadidas · también el sáb, …; Friday, Saturday and the next Monday say 3 tareas añadidas · también en otros 2 días',
+    'U5 / P297: a Friday and a Saturday task in one save say Añadida al vie, … · también el sáb, …; Friday, Saturday and the next Monday say Añadida al vie, … · también en otros 2 días',
     (tester) async {
       final fri = friday();
       final sat = DateTime(fri.year, fri.month, fri.day + 1);
@@ -909,9 +910,11 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('save-drafts')));
       await tester.pumpAndSettle();
       final calendar = tester.element(find.byType(CalendarScreen));
+      // The landing day is named with its task (P297).
       final two =
-          '${es.captureTasksAdded(2)} · ${es.captureAlsoOn(calendar.weekdayDate(sat))}';
-      expect(two, startsWith('2 tareas añadidas · también el '));
+          '${es.taskAddedOn(calendar.weekdayDate(fri))} · ${es.captureAlsoOn(calendar.weekdayDate(sat))}';
+      expect(two, startsWith('Añadida al vie'));
+      expect(two, contains(' · también el '));
       expect(two, endsWith(calendar.weekdayDate(sat)));
       expect(calendar.weekdayDate(sat), startsWith('sáb'));
       expect(find.text(two), findsOneWidget);
@@ -928,8 +931,9 @@ void main() {
       await app.say(tester, 'Tres cosas en tres días');
       await tester.tap(find.byKey(const ValueKey('save-drafts')));
       await tester.pumpAndSettle();
-      final three = '${es.captureTasksAdded(3)} · ${es.captureAlsoOnDays(2)}';
-      expect(three, '3 tareas añadidas · también en otros 2 días');
+      final three =
+          '${es.taskAddedOn(calendar.weekdayDate(fri))} · ${es.captureAlsoOnDays(2)}';
+      expect(three, endsWith(' · también en otros 2 días'));
       expect(find.text(three), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
@@ -939,7 +943,7 @@ void main() {
   // both tasks on one day ----
 
   testWidgets(
-    'UX-701: a new account says the first-run example; two tasks for tomorrow land on tomorrow, both lit, with 2 tareas añadidas and no también',
+    'UX-701: a new account says the first-run example; two tasks for tomorrow land on tomorrow, both lit, with 2 tareas añadidas al … and no también',
     (tester) async {
       final tomorrow = inDays(1);
       final app = await _App.open(tester, []);
@@ -972,8 +976,12 @@ void main() {
           reason: title,
         );
       }
-      expect(es.captureTasksAdded(2), '2 tareas añadidas');
-      expect(find.text(es.captureTasksAdded(2)), findsOneWidget);
+      // UX-2203: one day for both, so the message names it.
+      final calendar = tester.element(find.byType(CalendarScreen));
+      expect(
+        find.text(es.captureTasksAddedOn(2, calendar.weekdayDate(tomorrow))),
+        findsOneWidget,
+      );
       expect(find.textContaining('también'), findsNothing);
       expect(
         find.descendant(
@@ -1333,10 +1341,13 @@ void main() {
     testWidgets(
       'UX-1405 / D9: a day the person picked, 5 minutes away and back, still goes to the next capture',
       (tester) async {
-        var clock = DateTime.now();
+        // A later day in the week shown: a capture takes Calendar's day only
+        // when it is after today. On a Sunday, the last day of the week, the
+        // app's clock starts on Saturday at noon, so Sunday is that later day.
+        final sunday = now.weekday == DateTime.sunday;
+        var clock = sunday ? inDays(-1, 12) : DateTime.now();
         final app = await _App.open(tester, [], clock: () => clock);
-        // A day in the week shown, other than today.
-        final picked = inDays(now.weekday == DateTime.sunday ? -1 : 1);
+        final picked = inDays(sunday ? 0 : 1);
         await tester.tap(
           find
               .descendant(
@@ -1707,6 +1718,394 @@ void main() {
       },
     );
   });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P274 (UX-2203): after a landing,
+  // a line on screen names the lit rows' day ----
+  group('P274 · the day heading after a landing', () {
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    });
+
+    DateTime at(int days, int hour, [int minute = 0]) =>
+        DateTime(now.year, now.month, now.day + days, hour, minute);
+
+    /// The preview suite's `normalDay()` without its own 17:00 «Recoger a
+    /// los niños del colegio», as `calendar/agenda.added` opens it.
+    List<Task> addedDay() => [
+      Task(
+        id: 1,
+        title: 'Paseo por el parque',
+        dueDate: at(0, 8, 30),
+        priority: 1,
+        isCompleted: true,
+      ),
+      Task(
+        id: 2,
+        title: 'Llamar al médico para pedir cita',
+        dueDate: at(0, 10),
+        priority: 2,
+        notes: 'Preguntar por los resultados de los análisis.',
+      ),
+      Task(id: 3, title: 'Comer con Ana', dueDate: at(0, 13, 30), priority: 1),
+      Task(
+        id: 5,
+        title: 'Clase de yoga',
+        dueDate: at(0, 19, 30),
+        priority: 1,
+        recurrence: 'weekly',
+      ),
+      Task(id: 6, title: 'Comprar pilas para el mando', priority: 1),
+      Task(
+        id: 7,
+        title: 'Pagar la factura de la luz',
+        dueDate: DateTime(now.year, now.month, now.day + 2),
+        hasTime: false,
+        priority: 2,
+      ),
+    ];
+
+    /// The preview's three-task answer: two today, one on Friday at 10.
+    List<Map<String, dynamic>> threeTasks() {
+      final fri = friday();
+      return [
+        found('Comprar pan y leche', on: inDays(0)),
+        found(
+          'Llamar al médico',
+          at: DateTime(fri.year, fri.month, fri.day, 10),
+        ),
+        found('Recoger a los niños del colegio', at: at(0, 17)),
+      ];
+    }
+
+    Finder litRow(String title) => find.byWidgetPredicate(
+      (widget) => widget is LandedTaskTile && widget.task.title == title,
+    );
+
+    Rect agendaArea(WidgetTester tester) => tester.getRect(
+      find
+          .descendant(
+            of: find.descendant(
+              of: find.byType(CalendarScreen),
+              matching: find.byType(CustomScrollView),
+            ),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+
+    /// [what] at [rect] is entirely in the agenda, above the save message.
+    void expectShown(WidgetTester tester, Rect rect, String what) {
+      final area = agendaArea(tester);
+      final message = tester.getRect(find.byType(SnackBar));
+      expect(
+        rect.top,
+        greaterThanOrEqualTo(area.top - 0.5),
+        reason: '$what $rect, agenda $area',
+      );
+      expect(
+        rect.bottom,
+        lessThanOrEqualTo(message.top + 0.5),
+        reason: '$what $rect, message $message',
+      );
+    }
+
+    /// The status bar and the gesture bar, 24 dp each, as on an Android
+    /// phone drawn edge to edge and as the preview suite draws them.
+    void phoneBars(WidgetTester tester) {
+      tester.view.padding = const FakeViewPadding(top: 24, bottom: 24);
+      tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 24);
+      addTearDown(tester.view.reset);
+    }
+
+    /// The tap, then the message's entrance and the landing's scroll,
+    /// inside the 1.5 s highlight.
+    Future<void> saveAndLand(WidgetTester tester) async {
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      for (var frame = 0; frame < 48; frame++) {
+        await tester.pump(const Duration(milliseconds: 25));
+      }
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.byType(SnackBar), findsOneWidget);
+    }
+
+    // At 360×800 the heading doesn't fit with both lit rows above the
+    // message, so the message names their day instead (P297, by the
+    // organizer's decision in plan.md, Round 2 (b1)).
+    for (final size in [const Size(360, 800), const Size(393, 852)]) {
+      final names = size.width < 380;
+      testWidgets(
+        'UX-2203: ES 1x on ${size.width.round()}×${size.height.round()}, '
+        'calendar/agenda.added (three tasks, two today; status and gesture bars): '
+        '${names ? 'the message names today and the other day' : 'the day heading «${es.todayAgenda}»'} '
+        'and both lit rows show above the message',
+        (tester) async {
+          phoneBars(tester);
+          final app = await _App.open(
+            tester,
+            addedDay(),
+            size: size,
+            clock: () => at(0, 9, 41),
+          );
+          expect(find.text(es.todayAgenda), findsOneWidget);
+          app.api.found = threeTasks();
+          await app.say(
+            tester,
+            'Comprar pan y leche, llamar al médico el viernes a las diez y '
+            'recoger a los niños del colegio a las cinco',
+          );
+          await saveAndLand(tester);
+          for (final title in [
+            'Comprar pan y leche',
+            'Recoger a los niños del colegio',
+          ]) {
+            expect(litRow(title), findsOneWidget, reason: title);
+            expectShown(tester, tester.getRect(litRow(title)), title);
+          }
+          if (names) {
+            final calendar = tester.element(find.byType(CalendarScreen));
+            final today = calendar.weekdayDate(at(0, 0));
+            final fri = calendar.weekdayDate(friday());
+            expect(
+              find.descendant(
+                of: find.byType(SnackBar),
+                matching: find.text(
+                  '${es.captureTasksAddedOn(2, today)} · '
+                  '${es.captureAlsoOn(fri)}',
+                ),
+              ),
+              findsOneWidget,
+            );
+          } else {
+            final heading = find.text(es.todayAgenda);
+            expect(heading, findsOneWidget);
+            expectShown(tester, tester.getRect(heading), 'the day heading');
+          }
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2203: ES 1x on 360×800, two tasks said for tomorrow evening after '
+      'two there in the morning: the day heading names tomorrow and shows '
+      'with both lit rows above «2 tareas añadidas al …»',
+      (tester) async {
+        phoneBars(tester);
+        final tomorrow = inDays(1);
+        final app = await _App.open(tester, [
+          for (final (index, hour) in [8, 9].indexed)
+            Task(
+              id: 10 + index,
+              title: 'Tarea de las $hour',
+              dueDate: at(1, hour),
+              priority: 1,
+            ),
+        ], size: const Size(360, 800));
+        app.api.found = [
+          found('Llamar al dentista', at: at(1, 18)),
+          found('Comprar pan', at: at(1, 19)),
+        ];
+        await app.say(tester, 'Mañana a las seis llamar al dentista y a las '
+            'siete comprar pan');
+        await saveAndLand(tester);
+        final heading = find.text(DateFormat.MMMMEEEEd('es').format(tomorrow));
+        expect(heading, findsOneWidget);
+        for (final title in ['Llamar al dentista', 'Comprar pan']) {
+          expect(litRow(title), findsOneWidget, reason: title);
+          expectShown(tester, tester.getRect(litRow(title)), title);
+        }
+        expectShown(tester, tester.getRect(heading), 'the day heading');
+        final calendar = tester.element(find.byType(CalendarScreen));
+        expect(
+          find.descendant(
+            of: find.byType(SnackBar),
+            matching: find.text(
+              es.captureTasksAddedOn(2, calendar.weekdayDate(tomorrow)),
+            ),
+          ),
+          findsOneWidget,
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- UX loop 2026-10-28-app, round 2 · P297 (UX-2203): a save on
+  // several days names the day Calendar lands on ----
+  group('P297 · landing after a save and after Deshacer', () {
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    });
+
+    DateTime at(int days, int hour, [int minute = 0]) =>
+        DateTime(now.year, now.month, now.day + days, hour, minute);
+
+    /// `calendar/agenda.added`'s answer: two today, one on Friday at 10.
+    List<Map<String, dynamic>> threeTasks() {
+      final fri = friday();
+      return [
+        found('Comprar pan y leche', on: inDays(0)),
+        found(
+          'Llamar al médico',
+          at: DateTime(fri.year, fri.month, fri.day, 10),
+        ),
+        found('Recoger a los niños del colegio', at: at(0, 17)),
+      ];
+    }
+
+    Finder inMessage(Finder finder) =>
+        find.descendant(of: find.byType(SnackBar), matching: finder);
+
+    /// Saves, waits past the message's entrance and the landing.
+    Future<void> save(WidgetTester tester) async {
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      for (var frame = 0; frame < 48; frame++) {
+        await tester.pump(const Duration(milliseconds: 25));
+      }
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.byType(SnackBar), findsOneWidget);
+    }
+
+    /// [text] is in the message, whole: not cut, inside the message and the
+    /// screen.
+    void expectWhole(WidgetTester tester, Finder text, Size size) {
+      expect(text, findsOneWidget);
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: text, matching: find.byType(RichText)).first,
+      );
+      expect(paragraph.didExceedMaxLines, isFalse, reason: 'not cut');
+      final box = tester.getRect(text);
+      final bar = tester.getRect(find.byType(SnackBar));
+      expect(box.left, greaterThanOrEqualTo(bar.left - 0.5), reason: '$box');
+      expect(box.right, lessThanOrEqualTo(bar.right + 0.5), reason: '$box');
+      expect(box.top, greaterThanOrEqualTo(bar.top - 0.5), reason: '$box');
+      expect(box.bottom, lessThanOrEqualTo(bar.bottom + 0.5), reason: '$box');
+      expect(bar.left, greaterThanOrEqualTo(0));
+      expect(bar.right, lessThanOrEqualTo(size.width));
+      expect(bar.bottom, lessThanOrEqualTo(size.height));
+    }
+
+    for (final (language, start) in [
+      ('en', '2 tasks added to '),
+      ('ca', '2 tasques afegides al '),
+    ]) {
+      testWidgets(
+        'UX-2203: $language 2x on 360×800, two tasks today and one on Friday '
+        '(calendar/agenda.added): the message names today, «$start…», then '
+        'the other day, whole',
+        (tester) async {
+          const size = Size(360, 800);
+          final l = lookupAppLocalizations(Locale(language));
+          final app = await _App.open(
+            tester,
+            [],
+            size: size,
+            textScale: 2,
+            language: language,
+            clock: () => at(0, 9, 41),
+          );
+          app.api.found = threeTasks();
+          await app.say(tester, 'Tres cosas', l: l);
+          await save(tester);
+          final calendar = tester.element(find.byType(CalendarScreen));
+          final today = calendar.weekdayDate(inDays(0));
+          final fri = calendar.weekdayDate(friday());
+          final named = l.captureTasksAddedOn(2, today);
+          expect(named, '$start$today');
+          final message = '$named · ${l.captureAlsoOn(fri)}';
+          expect(message, endsWith(fri));
+          expectWhole(tester, inMessage(find.text(message)), size);
+          expect(message, isNot(contains('…')));
+          expect(inMessage(find.text(l.undo)), findsOneWidget);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2203: two tasks today and one with no date: the message keeps '
+      '«3 tareas añadidas», no day named',
+      (tester) async {
+        final app = await _App.open(tester, []);
+        app.api.found = [
+          found('Comprar pan', at: at(0, 18)),
+          found('Llamar a Ana', at: at(0, 19)),
+          found('Ordenar el trastero'),
+        ];
+        await app.say(tester, 'Tres cosas');
+        await save(tester);
+        expect(es.captureTasksAdded(3), '3 tareas añadidas');
+        expect(inMessage(find.text(es.captureTasksAdded(3))), findsOneWidget);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2203: two tasks for tomorrow: «2 tareas añadidas al {tomorrow}», '
+      'nothing after it (P274, unchanged)',
+      (tester) async {
+        final app = await _App.open(tester, []);
+        app.api.found = [
+          found('Llamar al dentista', at: at(1, 18)),
+          found('Comprar pan', at: at(1, 19)),
+        ];
+        await app.say(tester, 'Mañana dos cosas');
+        await save(tester);
+        final calendar = tester.element(find.byType(CalendarScreen));
+        final message = es.captureTasksAddedOn(
+          2,
+          calendar.weekdayDate(inDays(1)),
+        );
+        expect(message, startsWith('2 tareas añadidas al '));
+        expect(inMessage(find.text(message)), findsOneWidget);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2203: one task today and one on Friday: «Añadida al {today} · '
+      'también el {Friday}»',
+      (tester) async {
+        final fri = friday();
+        final app = await _App.open(tester, [], clock: () => at(0, 9, 41));
+        app.api.found = [
+          found('Comprar pan', at: at(0, 18)),
+          found(
+            'Llamar al médico',
+            at: DateTime(fri.year, fri.month, fri.day, 10),
+          ),
+        ];
+        await app.say(tester, 'Dos cosas');
+        await save(tester);
+        final calendar = tester.element(find.byType(CalendarScreen));
+        final today = calendar.weekdayDate(inDays(0));
+        final message =
+            '${es.taskAddedOn(today)} · '
+            '${es.captureAlsoOn(calendar.weekdayDate(fri))}';
+        expect(message, startsWith('Añadida al $today · también el '));
+        expect(inMessage(find.text(message)), findsOneWidget);
+        // Calendar is on today, where the message says.
+        expect(find.text(es.todayAgenda), findsOneWidget);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }
 
 /// The app in Spanish with a 24-hour clock, on Calendar, with capture
@@ -1731,6 +2130,8 @@ class _App {
     double textScale = 1,
     // The account's projects, for project pages.
     List<TaskListInfo> projects = const [],
+    // The app's language.
+    String language = 'es',
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -1753,8 +2154,8 @@ class _App {
         attachmentEntriesProvider.overrideWith((ref, taskId) async => []),
         regionalStoreProvider.overrideWithValue(
           MemoryRegionalStore(
-            const RegionalPreferences(
-              language: 'es',
+            RegionalPreferences(
+              language: language,
               clock: ClockFormat.twentyFour,
               weekStart: 1,
             ),
@@ -1802,15 +2203,18 @@ class _App {
     WidgetTester tester,
     String words, {
     bool submit = true,
+    // The app's language, when not Spanish.
+    AppLocalizations? l,
   }) async {
-    await tester.tap(find.text(es.addTask).hitTestable());
+    l ??= es;
+    await tester.tap(find.text(l.addTask).hitTestable());
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('capture-type-instead')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('capture-words')), words);
     await tester.pumpAndSettle();
     if (!submit) return;
-    await tester.tap(find.widgetWithText(FilledButton, es.done));
+    await tester.tap(find.widgetWithText(FilledButton, l.done));
     await tester.pumpAndSettle();
   }
 }

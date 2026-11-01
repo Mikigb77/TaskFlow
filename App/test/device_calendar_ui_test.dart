@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
+import 'package:agenda/l10n/region.dart';
+import 'package:agenda/models/device_calendar_event.dart';
 import 'package:agenda/providers/device_calendar_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/screens/device_calendars_screen.dart';
@@ -14,6 +17,7 @@ import 'device_calendar_test.dart'
     show
         FakeDeviceCalendars,
         MemoryCalendarPreferences,
+        calendarEvent,
         homeCalendar,
         workCalendar;
 import 'support/design_fixtures.dart';
@@ -91,11 +95,11 @@ void main() {
             home: Scaffold(
                 body: DeviceCalendarEvents(day: DateTime(2026, 9, 22))))));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('calendar-events-line')));
+    // The event's row on Calendar opens it.
+    await tester.tap(find.textContaining('Calendar appointment · '));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Calendar appointment'));
-    await tester.pumpAndSettle();
-    expect(find.byType(BottomSheet), findsNWidgets(2));
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(find.text('Calendar appointment'), findsOneWidget);
     expect(find.text('Open in calendar app'), findsOneWidget);
     bridge.access = CalendarAccess.denied;
     await container.read(deviceCalendarProvider.notifier).refresh();
@@ -117,7 +121,9 @@ void main() {
         'UX-1421: the phone events sheet’s rows don’t say «Evento del calendario · solo lectura» ($language)',
         (tester) async {
       final l = lookupAppLocalizations(Locale(language));
-      final bridge = FakeDeviceCalendars();
+      // Four events: the fourth row opens the sheet with every event.
+      final bridge = FakeDeviceCalendars()
+        ..data = [for (var i = 0; i < 4; i++) calendarEvent(id: '${10 + i}')];
       final container = ProviderContainer(overrides: [
         deviceCalendarsProvider.overrideWithValue(bridge),
         calendarPreferenceStoreProvider.overrideWithValue(
@@ -138,13 +144,13 @@ void main() {
               home: Scaffold(
                   body: DeviceCalendarEvents(day: DateTime(2026, 9, 22))))));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('calendar-events-line')));
+      await tester.tap(find.byKey(const ValueKey('calendar-events-all')));
       await tester.pumpAndSettle();
       final sheet = find.byType(BottomSheet);
       expect(sheet, findsOneWidget);
       final row = find.descendant(
           of: sheet, matching: find.widgetWithText(ListTile, 'Calendar appointment'));
-      expect(row, findsOneWidget);
+      expect(row, findsNWidgets(4));
       expect(find.descendant(of: sheet, matching: find.textContaining(l.calendarReadOnly)),
           findsNothing);
       expect(find.textContaining('solo lectura'), findsNothing);
@@ -342,13 +348,8 @@ void main() {
                 home: Scaffold(
                     body: DeviceCalendarEvents(day: DateTime(2026, 9, 22))))));
         await tester.pumpAndSettle();
-        final line = find.byKey(const ValueKey('calendar-events-line'));
-        expect(line, findsOneWidget);
-        expect(
-            find.descendant(
-                of: line,
-                matching: find.textContaining(l.calendarEventCount(1))),
-            findsOneWidget);
+        // By name.
+        expect(find.textContaining('Calendar appointment · '), findsOneWidget);
         expect(find.text(l.calendarNoSelection), findsNothing);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
@@ -455,6 +456,322 @@ void main() {
       });
     }
 
+  });
+
+  // ---- Run 2026-10-28-app, round 1 · P277 (UX-2306, UX-2310): phone events
+  // by name, sheets that end with «Cerrar», read errors you can retry ----
+
+  group('P277 · phone events by name', () {
+    final day = DateTime(2026, 9, 22);
+
+    DeviceCalendarEvent event(int i, String title, int hour,
+            {bool allDay = false}) =>
+        DeviceCalendarEvent(
+            id: '${40 + i}',
+            calendarId: workCalendar.id,
+            title: title,
+            start: allDay
+                ? DateTime.utc(day.year, day.month, day.day)
+                : DateTime(day.year, day.month, day.day, hour),
+            end: allDay
+                ? DateTime.utc(day.year, day.month, day.day + 1)
+                : DateTime(day.year, day.month, day.day, hour, 30),
+            allDay: allDay);
+
+    /// [DeviceCalendarEvents] for [day] with [events], on a 360×800 view.
+    Future<AppLocalizations> pumpEvents(
+        WidgetTester tester, List<DeviceCalendarEvent> events,
+        {String language = 'es', double scale = 1}) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final bridge = FakeDeviceCalendars()..data = events;
+      final container = ProviderContainer(overrides: [
+        deviceCalendarsProvider.overrideWithValue(bridge),
+        calendarPreferenceStoreProvider.overrideWithValue(
+            MemoryCalendarPreferences(CalendarPreferences(
+                enabled: true, selected: {workCalendar.selectionKey}))),
+      ]);
+      addTearDown(() {
+        container.dispose();
+        bridge.close();
+      });
+      await container.read(deviceCalendarProvider.notifier).ready;
+      await tester.pumpWidget(UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+              locale: Locale(language),
+              supportedLocales: AppLocalizations.supportedLocales,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              theme: AppTheme.light,
+              builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(context)
+                      .copyWith(textScaler: TextScaler.linear(scale)),
+                  child: child!),
+              home: Scaffold(
+                  body: SingleChildScrollView(
+                      child: DeviceCalendarEvents(day: day))))));
+      await tester.pumpAndSettle();
+      return lookupAppLocalizations(Locale(language));
+    }
+
+    final sheet = find.byType(BottomSheet);
+    Finder inSheet(Finder finder) =>
+        find.descendant(of: sheet, matching: finder);
+    final all = find.byKey(const ValueKey('calendar-events-all'));
+
+    const seeAllFive = {
+      'es': 'Ver los 5 eventos',
+      'en': 'See all 5 events',
+      'ca': 'Mostra els 5 esdeveniments',
+    };
+    for (final language in ['es', 'en', 'ca']) {
+      testWidgets(
+          'UX-2306: with five events three rows show by name, then «${seeAllFive[language]}», which opens every event ($language)',
+          (tester) async {
+        final titles = [
+          'Reunión de equipo',
+          'Cita con el dentista',
+          'Clase de yoga',
+          'Cena con Ana',
+          'Llamada con Pau',
+        ];
+        final l = await pumpEvents(tester, [
+          for (final (i, title) in titles.indexed) event(i, title, 9 + 2 * i),
+        ], language: language);
+        expect(l.calendarSeeAllEvents(5), seeAllFive[language]);
+        final context = tester.element(find.byType(DeviceCalendarEvents));
+        for (final (i, title) in titles.indexed) {
+          final row = find.text(
+              '$title · ${context.clockTime(DateTime(2026, 9, 22, 9 + 2 * i))}');
+          expect(row, i < 3 ? findsOneWidget : findsNothing, reason: title);
+        }
+        // No other trace of the fourth and fifth events.
+        expect(find.textContaining('Cena con Ana'), findsNothing);
+        expect(find.textContaining('Llamada con Pau'), findsNothing);
+        expect(all, findsOneWidget);
+        expect(find.descendant(of: all, matching: find.text(seeAllFive[language]!)),
+            findsOneWidget);
+        // The fourth row comes after the three events.
+        final third = find.textContaining('Clase de yoga · ');
+        expect(tester.getRect(all).top,
+            greaterThanOrEqualTo(tester.getRect(third).bottom));
+        expect(tester.getSize(all).height, greaterThanOrEqualTo(48));
+        await tester.tap(all);
+        await tester.pumpAndSettle();
+        expect(sheet, findsOneWidget);
+        for (final title in titles) {
+          expect(inSheet(find.text(title)), findsOneWidget, reason: title);
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets(
+        'UX-2306: with three events there is no «Ver los N eventos» row and no count line',
+        (tester) async {
+      await pumpEvents(tester, [
+        event(0, 'Reunión de equipo', 10),
+        event(1, 'Cita con el dentista', 17),
+        event(2, 'Clase de yoga', 19),
+      ]);
+      expect(find.textContaining(' · '), findsNWidgets(3));
+      expect(all, findsNothing);
+      expect(find.byKey(const ValueKey('calendar-events-line')), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    for (final language in ['es', 'en', 'ca']) {
+      testWidgets(
+          'UX-2306: an all-day event’s row reads «{title} · ${lookupAppLocalizations(Locale(language)).calendarAllDay}» ($language)',
+          (tester) async {
+        final l = await pumpEvents(tester, [
+          event(0, 'Cumpleaños de Marta', 0, allDay: true),
+        ], language: language);
+        if (language == 'es') expect(l.calendarAllDay, 'Todo el día');
+        final row = find.text('Cumpleaños de Marta · ${l.calendarAllDay}');
+        expect(row, findsOneWidget);
+        // The row opens the event.
+        await tester.tap(row);
+        await tester.pumpAndSettle();
+        expect(inSheet(find.text('Cumpleaños de Marta')), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets(
+        'UX-2306: event rows are events, not tasks: no circle, no checkbox and no swipe',
+        (tester) async {
+      await pumpEvents(tester, [
+        event(0, 'Reunión de equipo', 10),
+        event(1, 'Cita con el dentista', 17),
+      ]);
+      final rows = find.byType(DeviceCalendarEvents);
+      for (final type in [Dismissible, Checkbox, Radio<Object?>]) {
+        expect(find.descendant(of: rows, matching: find.byType(type)),
+            findsNothing,
+            reason: '$type');
+      }
+      expect(
+          find.descendant(
+              of: rows, matching: find.byIcon(Icons.circle_outlined)),
+          findsNothing);
+      expect(
+          find.descendant(
+              of: rows,
+              matching: find.byIcon(Icons.radio_button_unchecked_rounded)),
+          findsNothing);
+      // Swiping a row does nothing: it stays.
+      final row = find.textContaining('Reunión de equipo · ');
+      await tester.drag(row, const Offset(-300, 0));
+      await tester.pumpAndSettle();
+      expect(row, findsOneWidget);
+      expect(sheet, findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    /// «Cerrar» is the sheet's last thing,
+    /// right at its bottom, under everything else in it.
+    void expectEndsWithClose(WidgetTester tester, AppLocalizations l) {
+      final close = inSheet(find.widgetWithText(TextButton, l.close));
+      expect(close, findsOneWidget);
+      expect(close.hitTestable(), findsOneWidget, reason: 'on screen');
+      final closeRect = tester.getRect(close);
+      final sheetRect = tester.getRect(sheet);
+      expect(sheetRect.bottom - closeRect.bottom, lessThanOrEqualTo(16.5),
+          reason: '«${l.close}» ends the sheet');
+      // What scrolls ends above it, so nothing shows under «Cerrar».
+      final scroll = inSheet(find.byType(Scrollable)).first;
+      expect(tester.getRect(scroll).bottom,
+          lessThanOrEqualTo(closeRect.top + 0.5),
+          reason: 'the sheet’s content sits above «${l.close}»');
+    }
+
+    /// The sheet's own content under its drag handle: never past three
+    /// quarters of the 800 dp screen, as before.
+    double contentHeight(WidgetTester tester) =>
+        tester.getSize(inSheet(find.byType(SafeArea)).first).height;
+
+    /// The sheet's scroll view: whether it has more than it shows.
+    ScrollPosition sheetScroll(WidgetTester tester) => tester
+        .state<ScrollableState>(inSheet(find.byType(Scrollable)).first)
+        .position;
+
+    for (final language in ['es', 'en', 'ca']) {
+      testWidgets(
+          'UX-2306: an event’s sheet fits its content and ends with «${lookupAppLocalizations(Locale(language)).close}», which closes it ($language)',
+          (tester) async {
+        final l = await pumpEvents(tester, [
+          event(0, 'Reunión de equipo', 10),
+          event(1, 'Cita con el dentista', 17),
+        ], language: language);
+        await tester.tap(find.textContaining('Cita con el dentista · '));
+        await tester.pumpAndSettle();
+        expect(sheet, findsOneWidget);
+        expect(inSheet(find.text('Cita con el dentista')), findsOneWidget);
+        expect(inSheet(find.text('Reunión de equipo')), findsNothing);
+        expect(inSheet(find.text(l.calendarOpenEvent)), findsOneWidget);
+        expectEndsWithClose(tester, l);
+        expect(sheetScroll(tester).maxScrollExtent, 0);
+        expect(contentHeight(tester), lessThan(800 * .75),
+            reason: 'as tall as its content, not three quarters');
+        await tester.tap(inSheet(find.widgetWithText(TextButton, l.close)));
+        await tester.pumpAndSettle();
+        expect(sheet, findsNothing);
+        // Calendar's rows are still there.
+        expect(find.textContaining('Cita con el dentista · '), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+          'UX-2306: at ${scale}x the list sheet with four events is no taller than its rows and «Cerrar», which closes it',
+          (tester) async {
+        final l = await pumpEvents(
+            tester,
+            [
+              for (final (i, title) in [
+                'Reunión de equipo',
+                'Cita con el dentista',
+                'Clase de yoga',
+                'Cena con Ana',
+              ].indexed)
+                event(i, title, 9 + 2 * i),
+            ],
+            scale: scale);
+        await tester.tap(all);
+        await tester.pumpAndSettle();
+        expect(sheet, findsOneWidget);
+        expectEndsWithClose(tester, l);
+        expect(contentHeight(tester), lessThanOrEqualTo(800 * .75 + 0.5),
+            reason: 'never past three quarters');
+        final scroll = sheetScroll(tester);
+        if (scroll.maxScrollExtent == 0) {
+          // Everything fits: no empty space under the last row.
+          final lastRow = inSheet(find.widgetWithText(ListTile, 'Cena con Ana'));
+          final close = inSheet(find.widgetWithText(TextButton, l.close));
+          expect(
+              tester.getRect(close).top - tester.getRect(lastRow).bottom,
+              lessThanOrEqualTo(16.5),
+              reason: 'the sheet ends right after its rows');
+        } else {
+          // Capped at three quarters, scrolling, with «Cerrar» still in view.
+          expect(contentHeight(tester), closeTo(800 * .75, 0.5));
+        }
+        await tester.tap(inSheet(find.widgetWithText(TextButton, l.close)));
+        await tester.pumpAndSettle();
+        expect(sheet, findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets(
+        'UX-2306: with twelve events the list sheet stops at three quarters of the screen, scrolls, and keeps «Cerrar» in view',
+        (tester) async {
+      final l = await pumpEvents(tester, [
+        for (var i = 0; i < 12; i++) event(i, 'Evento $i', 8 + i),
+      ]);
+      await tester.tap(all);
+      await tester.pumpAndSettle();
+      expect(contentHeight(tester), lessThanOrEqualTo(800 * .75 + 0.5));
+      expect(sheetScroll(tester).maxScrollExtent, greaterThan(0));
+      final close = inSheet(find.widgetWithText(TextButton, l.close));
+      expect(close.hitTestable(), findsOneWidget);
+      await tester.tap(close);
+      await tester.pumpAndSettle();
+      expect(sheet, findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    test(
+        'UX-2310: no calendarReadError key in the three catalogs, and calendarSeeAllEvents in all three',
+        () {
+      const seeAll = {
+        'es': 'Ver los {count} eventos',
+        'en': 'See all {count} events',
+        'ca': 'Mostra els {count} esdeveniments',
+      };
+      const retry = {
+        'es': 'No se pudieron leer los eventos. Toca para reintentar.',
+        'en': 'Couldn’t read your events. Tap to try again.',
+        'ca':
+            'No s’han pogut llegir els esdeveniments. Toca per tornar-ho a provar.',
+      };
+      for (final language in ['en', 'es', 'ca']) {
+        final catalog = jsonDecode(
+                File('lib/l10n/app_$language.arb').readAsStringSync())
+            as Map<String, dynamic>;
+        expect(catalog.containsKey('calendarReadError'), isFalse,
+            reason: language);
+        expect(catalog.containsKey('@calendarReadError'), isFalse,
+            reason: language);
+        expect(catalog['calendarSeeAllEvents'], seeAll[language],
+            reason: language);
+        expect(catalog['calendarReadRetry'], retry[language],
+            reason: 'calendarReadRetry unchanged ($language)');
+      }
+    });
   });
 }
 
