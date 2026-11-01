@@ -212,4 +212,94 @@ void main() {
         DateTime.utc(2026, 9, 22, 22));
     expect(archive.tasks.single.task!.hasTime, isTrue);
   });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P300 (UX-2311, D2): completion
+  // times through Exportar e importar ----
+  group('P300 · completion times', () {
+    test(
+        'UX-2311: a task completed with a time keeps that time through Exportar and Importar, a repetition’s too',
+        () async {
+      final bread = DateTime(2026, 11, 3, 8, 15);
+      final plants = DateTime(2026, 11, 2, 20, 30);
+      await database.insertTasks([
+        Task(
+            title: 'Comprar pan',
+            priority: 1,
+            isCompleted: true,
+            completedAt: bread),
+        Task(
+            title: 'Regar las plantas',
+            priority: 1,
+            dueDate: DateTime(2026, 11, 1, 9),
+            recurrence: 'daily',
+            completedDates: ['2026-11-01', '2026-11-02'],
+            completedTimes: {'2026-11-02': plants}),
+      ]);
+      final contents = await ArchiveStore(database, 'local').export();
+      final archive = TaskArchive.parse(contents);
+      expect(archive.tasks.every((row) => row.error == null), isTrue);
+      final target = ArchiveStore(database, 'account-B');
+      await target.import(
+          archive, archive.tasks.map((row) => row.sourceId).toSet());
+      final restored = await database.getTasks(ownerKey: 'account-B');
+      final copy = restored.singleWhere((t) => t.title == 'Comprar pan');
+      expect(copy.completedAt, bread);
+      final daily = restored.singleWhere((t) => t.title == 'Regar las plantas');
+      expect(daily.completedDates, ['2026-11-01', '2026-11-02']);
+      expect(daily.completedTimes, {'2026-11-02': plants});
+      expect(daily.completedAt, isNull);
+    });
+
+    test('UX-2311: an archive with no times imports as before', () async {
+      await database.insertTasks([
+        Task(title: 'Comprar pan', priority: 1, isCompleted: true),
+        Task(
+            title: 'Regar las plantas',
+            priority: 1,
+            dueDate: DateTime(2026, 11, 1, 9),
+            recurrence: 'daily',
+            completedDates: ['2026-11-01']),
+      ]);
+      final data = jsonDecode(await ArchiveStore(database, 'local').export())
+          as Map<String, dynamic>;
+      // As an export from before the app kept times.
+      for (final task in data['tasks'] as List) {
+        (task as Map).remove('completed_at');
+        task.remove('completed_times');
+      }
+      final archive = TaskArchive.parse(jsonEncode(data));
+      expect(archive.tasks.every((row) => row.error == null), isTrue);
+      final target = ArchiveStore(database, 'account-B');
+      final result = await target.import(
+          archive, archive.tasks.map((row) => row.sourceId).toSet());
+      expect(result.added, 2);
+      final restored = await database.getTasks(ownerKey: 'account-B');
+      final copy = restored.singleWhere((t) => t.title == 'Comprar pan');
+      expect(copy.isCompleted, isTrue);
+      expect(copy.completedAt, isNull);
+      final daily = restored.singleWhere((t) => t.title == 'Regar las plantas');
+      expect(daily.completedDates, ['2026-11-01']);
+      expect(daily.completedTimes, isEmpty);
+    });
+
+    test('UX-2311: a time that isn’t a date-time, or a key that isn’t a completed date, is left out, never an error', () {
+      final task = TaskArchive.validatedTask({
+        ...Task(
+          title: 'Regar las plantas',
+          priority: 1,
+          dueDate: DateTime(2026, 11, 1, 9),
+          recurrence: 'daily',
+          completedDates: ['2026-11-01'],
+        ).toApi(),
+        'id': const Uuid().v4(),
+        'completed_at': 'yesterday',
+        'completed_times': {
+          '2026-11-01': 'not a time',
+          '2026-11-05': '2026-11-05T08:00:00.000Z',
+        },
+      });
+      expect(task.completedAt, isNull);
+      expect(task.completedTimes, isEmpty);
+    });
+  });
 }

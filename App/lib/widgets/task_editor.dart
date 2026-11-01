@@ -36,6 +36,7 @@ import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/models/reminder_plan.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/reminder_plans.dart';
+import 'package:agenda/screens/edit_task_screen.dart';
 
 /// Edits a saved task or note, or fills in a new task: a [task] with no id
 /// is new. That is how an account without Pro creates tasks (DECISIONS.md,
@@ -313,8 +314,26 @@ class _TaskEditorState extends ConsumerState<TaskEditor>
       _kept = _words;
       _title.addListener(_keepWords);
       _notes.addListener(_keepWords);
+      _title.addListener(_markEmpty);
     }
   }
+
+  // The new task's route, told whether this form is still empty, so a
+  // second tap on the widget or a shortcut opens no second form (UX-2110).
+  NewTaskRoute? _route;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (_creating && route is NewTaskRoute && route != _route) {
+      _route = route;
+      _markEmpty();
+    }
+  }
+
+  /// The empty form D12's Back just closes: no title.
+  void _markEmpty() => _route?.empty = _title.text.trim().isEmpty;
 
   @override
   void dispose() {

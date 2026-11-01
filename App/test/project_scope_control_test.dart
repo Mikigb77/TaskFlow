@@ -12,8 +12,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/widgets/task_assignment_picker.dart';
+import 'package:agenda/widgets/project_preferences.dart';
+import 'package:agenda/providers/groups_provider.dart';
+import 'package:agenda/providers/task_provider.dart';
 import 'support/design_fixtures.dart';
 import 'support/search_clear.dart';
+import 'support/button_label.dart' show loadManrope;
+import 'package:agenda/widgets/task_list_picker.dart';
 
 void main() {
   testWidgets(
@@ -424,5 +429,423 @@ void main() {
       expect(tester.takeException(), isNull);
       semantics.dispose();
     });
+  });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P294 (UX-2514): pickers mark the
+  // current choice with ✓, not colour alone ----
+  group('P294 · pickers mark the current choice with ✓', () {
+    final es = lookupAppLocalizations(const Locale('es'));
+    final casa = TaskListInfo(id: 'casa', name: 'Casa');
+    final trabajo = TaskListInfo(id: 'trabajo', name: 'Trabajo');
+    final mates = TaskListInfo(
+      id: 'mates',
+      name: 'Matemáticas',
+      shared: true,
+      role: 'owner',
+      ownerId: 1,
+      notifications: 'assigned',
+      people: const [
+        ProjectMember(id: 1, name: 'Miki', role: 'owner'),
+        ProjectMember(id: 2, name: 'Ana', role: 'editor'),
+      ],
+    );
+
+    Finder sheet() => find.byType(BottomSheet);
+    Finder checks() => find.descendant(
+      of: sheet(),
+      matching: find.byIcon(Icons.check_rounded),
+    );
+
+    /// The only ✓ in the open sheet is on the row reading [label].
+    void expectOnlyCheckOn(WidgetTester tester, String label) {
+      expect(checks(), findsOneWidget, reason: 'one ✓, on «$label»');
+      final row = find.ancestor(of: checks(), matching: find.byType(ListTile));
+      expect(
+        find.descendant(of: row.first, matching: find.text(label)),
+        findsOneWidget,
+        reason: 'the ✓ is on «$label»',
+      );
+      expect(tester.widget<ListTile>(row.first).selected, isTrue);
+    }
+
+    Future<Task Function()> pick(WidgetTester tester, Task initial) async {
+      var task = initial;
+      final api = OfflineApiClient();
+      addTearDown(api.close);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWithValue(api),
+            authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
+            taskListsProvider.overrideWith(
+              (ref) async => [casa, trabajo, mates],
+            ),
+            groupsProvider.overrideWith((ref) async => []),
+            taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+          ],
+          child: MaterialApp(
+            locale: const Locale('es'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: StatefulBuilder(
+                builder: (context, change) => TaskAssignmentPicker(
+                  task: task,
+                  lockShared: true,
+                  onChanged: (value) => change(() => task = value),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return () => task;
+    }
+
+    for (final (listId, chip, selected) in [
+      ('casa', 'Casa', 'Casa'),
+      (null, es.noList, es.noList),
+    ]) {
+      testWidgets(
+        'UX-2514: the project sheet (task in ${listId ?? 'no project'}) has a drag handle, its «Proyecto» title is a heading, and only «$selected» shows a ✓',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          await pick(
+            tester,
+            Task(id: 1, title: 'Comprar pan', priority: 1, listId: listId),
+          );
+          await tester.tap(find.widgetWithText(ActionChip, chip));
+          await tester.pumpAndSettle();
+          expect(sheet(), findsOneWidget);
+          expect(tester.widget<BottomSheet>(sheet()).showDragHandle, isTrue);
+          final title = find.descendant(
+            of: sheet(),
+            matching: find.text(es.list),
+          );
+          expect(title, findsOneWidget);
+          expect(es.list, 'Proyecto');
+          expect(
+            find.ancestor(of: title, matching: find.byType(ListTile)),
+            findsNothing,
+            reason: 'not drawn as a plain row',
+          );
+          expect(
+            tester.getSemantics(title).flagsCollection.isHeader,
+            isTrue,
+          );
+          expectOnlyCheckOn(tester, selected);
+          semantics.dispose();
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2514: «Todos los proyectos»: only the scope chosen shows a ✓, first «Todos los proyectos», then «Casa» once chosen',
+      (tester) async {
+        final container = ProviderContainer(
+          overrides: [
+            taskListsProvider.overrideWith((ref) async => [casa, trabajo]),
+          ],
+        );
+        addTearDown(container.dispose);
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(
+              locale: Locale('es'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: Scaffold(
+                body: SafeArea(child: ProjectScopeControl()),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(ActionChip, es.projectsAll));
+        await tester.pumpAndSettle();
+        expectOnlyCheckOn(tester, es.projectsAll);
+        await tester.tap(
+          find.descendant(
+            of: sheet(),
+            matching: find.widgetWithText(ListTile, 'Casa'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(container.read(projectScopeProvider).projectId, 'casa');
+        await tester.tap(find.widgetWithText(ActionChip, 'Casa'));
+        await tester.pumpAndSettle();
+        expectOnlyCheckOn(tester, 'Casa');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final (notifications, label) in [
+      ('all', es.updatesAll),
+      ('assigned', es.updatesAssigned),
+      ('muted', es.updatesMuted),
+    ]) {
+      testWidgets(
+        'UX-2514: «Novedades del proyecto» set to $notifications: only «$label» shows a ✓',
+        (tester) async {
+          final project = TaskListInfo(
+            id: 'mates',
+            name: 'Matemáticas',
+            shared: true,
+            notifications: notifications,
+          );
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+              ],
+              child: MaterialApp(
+                locale: const Locale('es'),
+                localizationsDelegates:
+                    AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: Scaffold(
+                  body: Consumer(
+                    builder: (context, ref, _) => TextButton(
+                      onPressed: () =>
+                          showProjectPreferences(context, ref, project),
+                      child: const Text('open'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.tap(find.text('open'));
+          await tester.pumpAndSettle();
+          expect(find.text(es.projectNotifications), findsOneWidget);
+          expectOnlyCheckOn(tester, label);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    for (final (assignment, assignee, label) in [
+      ('member', 2, 'Ana'),
+      ('group', null, es.assignedToGroup),
+    ]) {
+      testWidgets(
+        'UX-2514: «¿Quién es responsable?» for a task ${assignment == 'group' ? 'for everyone' : 'given to Ana'}: only its row shows a ✓',
+        (tester) async {
+          await pick(
+            tester,
+            Task(
+              id: 1,
+              title: 'Terminar la presentación',
+              priority: 1,
+              listId: 'mates',
+              assignment: assignment,
+              assigneeId: assignee,
+              assigneeName: assignee == null ? null : 'Ana',
+            ),
+          );
+          final chip = find.descendant(
+            of: find.byType(TaskAssignmentPicker),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is ActionChip &&
+                  (widget.avatar as Icon?)?.icon !=
+                      Icons.folder_outlined &&
+                  ((widget.avatar as Icon?)?.icon == Icons.groups_outlined ||
+                      (widget.avatar as Icon?)?.icon == Icons.person_outline),
+            ),
+          );
+          expect(chip, findsOneWidget);
+          await tester.tap(chip);
+          await tester.pumpAndSettle();
+          expect(
+            find.descendant(
+              of: sheet(),
+              matching: find.text(es.assignmentChoose),
+            ),
+            findsOneWidget,
+          );
+          expect(checks(), findsOneWidget);
+          final row = find.ancestor(
+            of: checks(),
+            matching: find.byType(ListTile),
+          );
+          expect(tester.widget<ListTile>(row.first).selected, isTrue);
+          expect(
+            find.descendant(
+              of: row.first,
+              matching: find.textContaining(label),
+            ),
+            findsOneWidget,
+            reason: 'the ✓ is on «$label»',
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  });
+
+  // ---- UX loop 2026-10-28-app, round 2 · P311 (UX-2639): the project
+  // sheet shows its last row whole ----
+  group('P311 · project sheet height', () {
+    final es = lookupAppLocalizations(const Locale('es'));
+    List<TaskListInfo> projects(int count) => [
+      for (var i = 0; i < count; i++)
+        i < 2
+            ? TaskListInfo(
+                id: 'p$i',
+                name: 'Proyecto compartido $i',
+                shared: true,
+                role: 'owner',
+                ownerId: 1,
+                groupName: 'Familia',
+              )
+            : TaskListInfo(id: 'p$i', name: 'Proyecto $i'),
+    ];
+
+    /// The project sheet, opened on 360×800 at [textScale], with [lists].
+    Future<void> openSheet(
+      WidgetTester tester,
+      List<TaskListInfo> lists, {
+      double textScale = 1,
+    }) async {
+      await loadManrope();
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final api = OfflineApiClient();
+      addTearDown(api.close);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWithValue(api),
+            authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
+            taskListsProvider.overrideWith((ref) async => lists),
+            groupsProvider.overrideWith((ref) async => []),
+            taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light,
+            locale: const Locale('es'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(textScale)),
+              child: child!,
+            ),
+            home: Scaffold(
+              body: Consumer(
+                builder: (context, ref, _) {
+                  ref.watch(taskListsProvider);
+                  return Center(
+                    child: TextButton(
+                      onPressed: () => chooseTaskList(context, ref),
+                      child: const Text('open'),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsOneWidget);
+    }
+
+    Finder newProject() => find.ancestor(
+      of: find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.text(es.newList),
+      ),
+      matching: find.byType(ListTile),
+    );
+    Finder list() => find.descendant(
+      of: find.byType(BottomSheet),
+      matching: find.byType(Scrollable),
+    );
+
+    bool contains(Rect outer, Rect inner) =>
+        inner.top >= outer.top - 0.5 &&
+        inner.bottom <= outer.bottom + 0.5 &&
+        inner.left >= outer.left - 0.5 &&
+        inner.right <= outer.right + 0.5;
+
+    testWidgets(
+      'UX-2639: five projects, ES 1× on 360×800: «Nuevo proyecto» is a whole 360 × 56 dp row inside the sheet, with no scrolling',
+      (tester) async {
+        await openSheet(tester, projects(5));
+        final row = newProject();
+        expect(row, findsOneWidget);
+        final rect = tester.getRect(row);
+        expect(rect.width, closeTo(360, 0.5));
+        expect(rect.height, greaterThanOrEqualTo(56));
+        expect(
+          contains(tester.getRect(list()), rect),
+          isTrue,
+          reason: 'whole in the list: $rect in ${tester.getRect(list())}',
+        );
+        expect(
+          contains(tester.getRect(find.byType(BottomSheet)), rect),
+          isTrue,
+        );
+        expect(rect.bottom, lessThanOrEqualTo(800));
+        expect(
+          tester.state<ScrollableState>(list()).position.pixels,
+          0,
+          reason: 'seen without scrolling',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2639: one project, ES 1×: the sheet hugs its content, shorter than half the screen',
+      (tester) async {
+        await openSheet(tester, projects(5).sublist(4));
+        final sheet = tester.getRect(find.byType(BottomSheet));
+        expect(sheet.height, lessThan(400), reason: 'sheet $sheet');
+        expect(sheet.bottom, closeTo(800, 0.5));
+        expect(contains(sheet, tester.getRect(newProject())), isTrue);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2639: twelve projects, ES 2× on 360×800: the list is no taller than 70% of the screen and scrolls to «Nuevo proyecto»',
+      (tester) async {
+        await openSheet(tester, projects(12), textScale: 2);
+        final viewport = tester.getRect(list());
+        expect(
+          viewport.height,
+          lessThanOrEqualTo(800 * .7 + 0.5),
+          reason: 'list $viewport',
+        );
+        final sheet = tester.getRect(find.byType(BottomSheet));
+        // Room above it: the screen isn't covered to the top.
+        expect(sheet.top, greaterThan(0), reason: 'sheet $sheet');
+        await tester.scrollUntilVisible(
+          find.descendant(
+            of: find.byType(BottomSheet),
+            matching: find.text(es.newList),
+          ),
+          200,
+          scrollable: list(),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          contains(tester.getRect(list()), tester.getRect(newProject())),
+          isTrue,
+          reason: '«Nuevo proyecto» whole in view once scrolled',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }

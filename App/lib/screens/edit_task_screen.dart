@@ -106,6 +106,59 @@ class NewTaskArguments {
   /// Opened by a way in that asks to speak (the widget, the voice
   /// shortcut): without the mic, the form says why.
   final bool askedToSpeak;
+
+  /// Nothing to start from: no day, project, person, words or capture. The
+  /// widget and the shortcuts open the form so (UX-2642).
+  bool get blank =>
+      day == null &&
+      projectId == null &&
+      person == null &&
+      captureId == null &&
+      words.isEmpty;
+}
+
+/// The route of the task form for a new task (`/newTask`). It knows whether
+/// the form on it is still empty, so a second tap on the widget or a
+/// shortcut opens no second form over it (UX-2110).
+class NewTaskRoute extends MaterialPageRoute<void> {
+  NewTaskRoute({required super.builder, super.settings});
+
+  // The forms on screen.
+  static final _open = <NewTaskRoute>{};
+
+  /// No title typed in its form yet. The form keeps this from its first
+  /// build on; until then it is empty.
+  bool empty = true;
+
+  @override
+  void install() {
+    super.install();
+    _open.add(this);
+  }
+
+  @override
+  void dispose() {
+    _open.remove(this);
+    super.dispose();
+  }
+}
+
+/// Which form a widget or shortcut entry opens waits on top of [navigator],
+/// still empty: its [NewTaskArguments.askedToSpeak] when the route on top is
+/// a new task's form with nothing in its title, opened [NewTaskArguments.blank]
+/// as an entry opens it; null otherwise. A form with a day, a project, a
+/// person, words or a capture is never an entry's (UX-2110, UX-2642).
+bool? emptyEntryFormOnTop(NavigatorState navigator) {
+  for (final route in NewTaskRoute._open) {
+    if (route.navigator != navigator || !route.isCurrent || !route.empty) {
+      continue;
+    }
+    final arguments =
+        route.settings.arguments as NewTaskArguments? ??
+        const NewTaskArguments();
+    return arguments.blank ? arguments.askedToSpeak : null;
+  }
+  return null;
 }
 
 /// The task form in create mode, for accounts without Pro: free text makes

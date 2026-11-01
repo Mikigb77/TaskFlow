@@ -23,6 +23,7 @@ import 'device_calendar_test.dart'
 import 'support/button_label.dart';
 import 'support/icon_button_label.dart';
 import 'support/design_fixtures.dart';
+import 'support/address_wrap.dart';
 
 void main() {
   testWidgets(
@@ -859,6 +860,116 @@ void main() {
         expect(tester.takeException(), isNull);
       });
     }
+  });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P295 (UX-2610): phone calendars
+  // without a caveats paragraph, with whole addresses ----
+  group('P295 · phone calendars', () {
+    const maria = DeviceCalendar(
+      id: '3',
+      name: 'Personal',
+      account: 'maria.lopez@example.com',
+      sourceId: 'maria',
+    );
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'UX-2610: first-run/phone-calendars.allowed, ES at ${scale.toInt()}× on 360×800: no paragraph between «ELEGIR CALENDARIOS» and the checkboxes; each account line breaks only after «@» or «.», and TalkBack reads it whole',
+        (tester) async {
+          await loadManrope();
+          final semantics = tester.ensureSemantics();
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          final es = lookupAppLocalizations(const Locale('es'));
+          final bridge = FakeDeviceCalendars()
+            ..access = CalendarAccess.denied
+            ..sources = [maria, workCalendar];
+          addTearDown(bridge.close);
+          final container = ProviderContainer(overrides: [
+            deviceCalendarsProvider.overrideWithValue(bridge),
+            calendarPreferenceStoreProvider
+                .overrideWithValue(MemoryCalendarPreferences()),
+          ]);
+          addTearDown(container.dispose);
+          await tester.pumpWidget(UncontrolledProviderScope(
+              container: container,
+              child: MaterialApp(
+                  locale: const Locale('es'),
+                  supportedLocales: AppLocalizations.supportedLocales,
+                  localizationsDelegates:
+                      AppLocalizations.localizationsDelegates,
+                  theme: AppTheme.light,
+                  builder: (context, child) => MediaQuery(
+                      data: MediaQuery.of(context)
+                          .copyWith(textScaler: TextScaler.linear(scale)),
+                      child: child!),
+                  home: const DeviceCalendarsScreen())));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('calendar-connect')));
+          await tester.pumpAndSettle();
+
+          final heading = find.text(es.calendarChoose.toUpperCase());
+          await tester.ensureVisible(heading);
+          await tester.pumpAndSettle();
+          expect(heading, findsOneWidget);
+          final tiles = find.byType(CheckboxListTile);
+          expect(tiles, findsNWidgets(2));
+          final firstTile = tester.getRect(tiles.first);
+          final label = tester.getRect(heading);
+          expect(firstTile.top, greaterThanOrEqualTo(label.bottom));
+          // Nothing drawn between the heading and the first checkbox.
+          final between = tester
+              .widgetList<Text>(find.descendant(
+                  of: find.byType(ListView), matching: find.byType(Text)))
+              .where((text) {
+            final rect = tester.getRect(find.byWidget(text));
+            return rect.top >= label.bottom - 0.5 &&
+                rect.bottom <= firstTile.top + 0.5;
+          }).toList();
+          expect(between, isEmpty,
+              reason: between.map((text) => text.data).join(' | '));
+          for (final old in [
+            'Selecciona hasta 50 calendarios. Las horas siguen la zona de tu dispositivo; los eventos de día completo conservan sus fechas originales.',
+          ]) {
+            expect(find.text(old, skipOffstage: false), findsNothing);
+          }
+
+          for (final calendar in [maria, workCalendar]) {
+            final tile = find.widgetWithText(CheckboxListTile, calendar.name);
+            await tester.ensureVisible(tile);
+            await tester.pumpAndSettle();
+            final account = find.descendant(
+              of: tile,
+              matching: find.text(breakableAddress(calendar.account)),
+            );
+            expect(account, findsOneWidget, reason: calendar.account);
+            final lines =
+                expectAddressWrapsWhole(tester, account, calendar.account);
+            if (scale == 2.0 && calendar == maria) {
+              expect(lines, greaterThanOrEqualTo(2),
+                  reason: 'at 2× the address wraps, as in the render');
+            }
+            final spoken = spokenLabel(tester, account);
+            expect(spoken, contains(calendar.account));
+          }
+          semantics.dispose();
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    test('UX-2610: no calendarChooseHelp key remains in any catalog', () {
+      for (final language in ['en', 'es', 'ca']) {
+        final catalog = jsonDecode(
+          File('lib/l10n/app_$language.arb').readAsStringSync(),
+        ) as Map<String, dynamic>;
+        expect(catalog.containsKey('calendarChooseHelp'), isFalse,
+            reason: language);
+        expect(catalog.containsKey('@calendarChooseHelp'), isFalse,
+            reason: language);
+      }
+    });
   });
 }
 

@@ -566,6 +566,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   ? strings.recoveryHeading
                                   : _register
                                   ? strings.registerHeading
+                                  : folded
+                                  // New and returning people alike start here.
+                                  ? strings.signInOrUpHeading
                                   : strings.signInHeading,
                             ),
                             const SizedBox(height: 10),
@@ -1018,6 +1021,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     textAlign: TextAlign.center,
                                   ),
                                 ),
+                              // Apart, so a tap on one doesn't land on the
+                              // other.
+                              if (!_hasRecoveryCode) const SizedBox(height: 8),
                               TextButton(
                                 onPressed: busy ? null : () => _mode(),
                                 child: Text(strings.backToSignIn),

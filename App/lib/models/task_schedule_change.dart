@@ -33,7 +33,11 @@ class TaskScheduleChange {
       repeatUntil: before.repeatUntil,
       completedDates: before.recurrence == after.recurrence
           ? current.completedDates
-          : before.completedDates);
+          : before.completedDates,
+      // With those dates, their times: old completions don't look new.
+      completedTimes: before.recurrence == after.recurrence
+          ? current.completedTimes
+          : before.completedTimes);
 
   static Task apply(Task current, DateTime? date, bool hasTime) =>
       current.dueDate == date && current.hasTime == (date != null && hasTime)

@@ -14,13 +14,17 @@ import 'package:agenda/services/reminder_copy.dart';
 enum ReminderBlock { archived, muted, notForAccount }
 
 class TaskDatabase {
-  static const schemaVersion = 20;
+  static const schemaVersion = 21;
   static final TaskDatabase _instance = TaskDatabase._internal();
   Database? _database;
   Future<Database>? _opening;
   factory TaskDatabase() => _instance;
   TaskDatabase._internal();
   TaskDatabase.forTesting(Database database) : _database = database;
+
+  /// The time [updateTask] gives a completion new in its write
+  /// ([Task.withCompletionTimes]); tests set it.
+  DateTime Function() clock = DateTime.now;
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -61,6 +65,7 @@ class TaskDatabase {
           imagePaths TEXT, hasTime INTEGER NOT NULL DEFAULT 1,
           recurrence TEXT NOT NULL DEFAULT 'none', repeatUntil TEXT,
           completedDates TEXT NOT NULL DEFAULT '[]',
+          completedAt TEXT, completedTimes TEXT NOT NULL DEFAULT '{}',
           reminderMinutes INTEGER, reminderTime INTEGER, reminderPlan TEXT,
           deadline TEXT, deadlineHasTime INTEGER NOT NULL DEFAULT 0,
           durationMinutes INTEGER, reminderAnchor TEXT NOT NULL DEFAULT 'planned',
@@ -251,6 +256,15 @@ class TaskDatabase {
       // owner changed meanwhile (D9). Rows pending today keep their change.
       await db.execute(
         'ALTER TABLE tasks ADD COLUMN own_reminders_pending INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+    if (oldVersion < 21 && newVersion >= 21) {
+      // When each completion happened (Backend/docs/COMPLETION_TIMES.md):
+      // completions from before have no time, and Completadas lists them
+      // after the timed ones. Rows waiting to be sent keep their change.
+      await db.execute('ALTER TABLE tasks ADD COLUMN completedAt TEXT');
+      await db.execute(
+        "ALTER TABLE tasks ADD COLUMN completedTimes TEXT NOT NULL DEFAULT '{}'",
       );
     }
   }
@@ -556,6 +570,8 @@ class TaskDatabase {
           );
         }
       }
+      // A completion new in this write takes its time now; one kept, its own.
+      task = task.withCompletionTimes(Task.fromMap(previous.single), clock());
       final values = task.toMap()..remove('id');
       final count = await tx.update(
         'tasks',
@@ -796,9 +812,12 @@ class TaskDatabase {
       ..remove('filePaths')
       ..remove('imagePaths')
       // A server that doesn't send plans yet leaves this phone's as it is.
+      // Likewise a server that doesn't send completion times.
       ..removeWhere(
         (key, _) =>
-            key == 'reminderPlan' && !remote.containsKey('reminder_plan'),
+            (key == 'reminderPlan' && !remote.containsKey('reminder_plan')) ||
+            (key == 'completedAt' && !remote.containsKey('completed_at')) ||
+            (key == 'completedTimes' && !remote.containsKey('completed_times')),
       )),
     'is_deleted': remote['is_deleted'] == true ? 1 : 0,
     'remote_version': remote['version'],

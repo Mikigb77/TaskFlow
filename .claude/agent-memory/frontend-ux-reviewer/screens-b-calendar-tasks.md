@@ -96,4 +96,11 @@ Current as of 2026-10-13 (whole-app run, slice B). Paths are under `App/lib/`.
   - a typed task: 3, plus typing.
 - **Task detail of a plain task:** about 45 words.
 
+## Run 2026-10-28-app (closed in code 2026-11-01)
+- **Task page:** Completar closes the page (`_toggle`); «Reabrir» stays. Occurrence pinned at first build (`_pinned`), held while leaving (`_leaving`). Date card is one row: «Planificado para» over `dayHeading` [· time]; no «Hora» row; no date row for deadline-only tasks. Labels are one grey line; notes are one TalkBack node.
+- **Steps (checklist):** checkbox + title merged for TalkBack (`MergeSemantics`, off while renaming); ⋮ stays separate.
+- **Edit form** saves on `paused`; Deshacer returns to `_opened`.
+- **Completadas:** newest completion first (see [[ui-patterns]] › Completion times).
+- **Remove file:** ES «Quitar archivo» / «¿Quitar este archivo de la tarea?» (help line still «Se eliminará…»).
+
 Related: [[ui-patterns]], [[screens-a-voice-capture]].

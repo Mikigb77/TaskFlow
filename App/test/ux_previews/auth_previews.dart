@@ -98,7 +98,7 @@ void authPreviews() {
     preview(
       login,
       'sign-in',
-      'The first screen signed out: Continuar con Google, and under it Continuar con mi correo, with the email form folded; the Privacy Policy and Terms links under the card.',
+      'The first screen signed out, headed Entra o crea tu cuenta: Continuar con Google, and under it Continuar con mi correo, with the email form folded; the Privacy Policy and Terms links under the card.',
       [...mainScreen, ...longText],
       (p) async {
         await _signedOut(p);
@@ -132,7 +132,7 @@ void authPreviews() {
     preview(
       login,
       'recovery',
-      '¿Has olvidado tu contraseña?: the email to send a recovery code to.',
+      '¿Has olvidado tu contraseña?: the email to send a recovery code to; under Enviar código, Ya tengo un código and Volver a iniciar sesión, 8 dp apart.',
       everywhere,
       (p) async {
         await _emailForm(p);

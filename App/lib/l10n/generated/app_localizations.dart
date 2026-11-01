@@ -544,12 +544,6 @@ abstract class AppLocalizations {
   /// **'Choose calendars'**
   String get calendarChoose;
 
-  /// No description provided for @calendarChooseHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Select up to 50 calendars. Calendar times follow your device; all-day dates stay on their original days.'**
-  String get calendarChooseHelp;
-
   /// No description provided for @calendarDenied.
   ///
   /// In en, this message translates to:
@@ -1570,6 +1564,12 @@ abstract class AppLocalizations {
   /// **'Delete task'**
   String get deleteTask;
 
+  /// Tooltip and TalkBack label of the delete button on a note's page. The pair of «Delete task».
+  ///
+  /// In en, this message translates to:
+  /// **'Delete note'**
+  String get deleteNote;
+
   /// No description provided for @keepTask.
   ///
   /// In en, this message translates to:
@@ -1641,6 +1641,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not move this task. Please retry.'**
   String get moveError;
+
+  /// Shown when a note could not be moved to another project from its page. The pair of «Could not move this task. Please retry.».
+  ///
+  /// In en, this message translates to:
+  /// **'Could not move this note. Please retry.'**
+  String get moveNoteError;
 
   /// No description provided for @occurrence.
   ///
@@ -2152,16 +2158,16 @@ abstract class AppLocalizations {
   /// **'Please enter a task title'**
   String get titleRequiredField;
 
-  /// Under a date read from typed words, before the Keep as typed button.
+  /// Under a date read from the person's words, typed or spoken, before the Keep my words button.
   ///
   /// In en, this message translates to:
   /// **'From your words'**
   String get fromYourWords;
 
-  /// Text button: the typed words become the title again, without the date read from them.
+  /// Text button: the words become the title again, without the date read from them.
   ///
   /// In en, this message translates to:
-  /// **'Keep as typed'**
+  /// **'Keep my words'**
   String get keepAsTyped;
 
   /// No description provided for @optionalTime.
@@ -2499,6 +2505,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sign in'**
   String get signInHeading;
+
+  /// Heading of sign-in's first screen, where only Continue with Google and Continue with my email show, for new and returning people alike.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in or sign up'**
+  String get signInOrUpHeading;
 
   /// No description provided for @authPitch.
   ///
@@ -4876,17 +4888,23 @@ abstract class AppLocalizations {
   /// **'TaskFlow Pro'**
   String get taskflowPro;
 
-  /// No description provided for @billingSettingsHelp.
+  /// The Pro screen's list of what Pro gives, first line: what Pro adds to the free tier (unlimited dictations and file space). The app bar already says TaskFlow Pro. Only this line promises anything without limit.
   ///
   /// In en, this message translates to:
-  /// **'Subscription, purchases and billing'**
-  String get billingSettingsHelp;
+  /// **'Unlimited dictation and file space'**
+  String get proBenefitDictation;
 
-  /// The Pro screen's first line: what Pro adds to the free tier (unlimited dictations and file space). The app bar already says TaskFlow Pro.
+  /// The Pro screen's list of what Pro gives, second line: with Pro, a sentence typed in the capture sheet becomes tasks, as a dictation does (without Pro, typing opens the form).
   ///
   /// In en, this message translates to:
-  /// **'Unlimited dictations, and room for all your files.'**
-  String get billingIntro;
+  /// **'Sentences you type become tasks'**
+  String get proBenefitTyping;
+
+  /// The Pro screen's list of what Pro gives, third line: reminders asked for in your own words («A tu manera»). Left out when the screen opens from that choice, whose heading already names it.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask for reminders in your own words'**
+  String get proBenefitReminders;
 
   /// No description provided for @billingComplimentary.
   ///
@@ -5175,6 +5193,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Shared tasks stay in their project.'**
   String get sharedTaskStays;
+
+  /// Asked before a personal note moves into a shared project. {name} is the group, or the project when it has no group. The pair of shareTaskConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Share with {name}? Everyone there will see this note. It can’t be made private again.'**
+  String shareNoteConfirm(String name);
+
+  /// Shown when the project chip of a note in a shared project is tapped: it can't be moved out. The pair of «Shared tasks stay in their project.».
+  ///
+  /// In en, this message translates to:
+  /// **'Shared notes stay in their project.'**
+  String get sharedNoteStays;
 
   /// No description provided for @assignmentIsRight.
   ///
@@ -5602,7 +5632,7 @@ abstract class AppLocalizations {
   /// **'This private test build is for invited testers. Ask the TaskFlow owner for an invitation to this email address.'**
   String get stagingInviteOnly;
 
-  /// Under a spoken capture's result, for an account without Pro, only when 3 or fewer free dictations are left this month.
+  /// Under a spoken capture's result, for an account without Pro, only when 3 or fewer free dictations are left this month; and as the subtitle of the TaskFlow Pro row in Settings, for an account without Pro, at any count.
   ///
   /// In en, this message translates to:
   /// **'{count, plural, =0{No free dictations left this month} =1{1 free dictation left this month} other{{count} free dictations left this month}}'**
@@ -5680,10 +5710,10 @@ abstract class AppLocalizations {
   /// **'Create a task'**
   String get freeVoiceNoticeCreate;
 
-  /// Atop a task's attachments, for an account without Pro, only once its file space is 80% used or more; and on the Pro screen, for an account without Pro. Whole megabytes.
+  /// Atop a task's attachments, for an account without Pro, only once its file space is 80% used or more; and on the Pro screen, for an account without Pro. Whole megabytes. A no-break space keeps {used} with the word after it, and {limit} with MB.
   ///
   /// In en, this message translates to:
-  /// **'Files: {used} of {limit} MB used'**
+  /// **'Files: {used} of {limit} MB used'**
   String storageUsage(int used, int limit);
 
   /// Under an attachment the server refused because the user's own free file space is full. The card's buttons below it offer Pro and the list of tasks with files. {limit} is the free cap in whole megabytes.

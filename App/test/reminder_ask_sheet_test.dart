@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/main.dart';
@@ -19,6 +20,7 @@ import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/task_editor.dart';
 import 'package:agenda/widgets/task_tile.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1456,6 +1458,127 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P293 (UX-2417): the plan offer
+  // keeps its date whole ----
+  group('P293 · the plan offer keeps its date whole', () {
+    DateTime dayAhead(int days) {
+      final now = DateTime.now();
+      return DateTime(now.year, now.month, now.day + days);
+    }
+
+    /// The edit form of task 90, its day moved from 20 to 21 days away and
+    /// saved, with reminders on: the offer comes once the message has gone.
+    Future<void> moveAndSave(WidgetTester tester) async {
+      unawaited(
+        tester
+            .state<NavigatorState>(find.byType(Navigator).first)
+            .pushNamed('/editTask', arguments: 90),
+      );
+      await tester.pumpAndSettle();
+      final date = find.byKey(const ValueKey('task-date'));
+      await tester.ensureVisible(date);
+      await tester.pumpAndSettle();
+      await tester.tap(date);
+      await tester.pumpAndSettle();
+      final calendar = find.byType(CalendarDatePicker);
+      if (dayAhead(21).month != dayAhead(20).month) {
+        await tester.tap(
+          find.descendant(
+            of: calendar,
+            matching: find.byTooltip(
+              MaterialLocalizations.of(
+                tester.element(calendar),
+              ).nextMonthTooltip,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+      final target = find.descendant(
+        of: calendar,
+        matching: find.text('${dayAhead(21).day}'),
+      );
+      await tester.ensureVisible(target);
+      await tester.pumpAndSettle();
+      await tester.tap(target);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('schedule-done')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('task-save')));
+      await tester.pumpAndSettle();
+      await tester.pump(FeedbackTimeout.defaultDuration);
+      await tester.pumpAndSettle();
+    }
+
+    for (final (language, scale) in [('es', 1.0), ('ca', 2.0)]) {
+      for (final title in [
+        'Presentar el proyecto de empresa',
+        'Presentar el proyecto',
+        'Revisar el informe del trimestre',
+        'Presentar el proyecto de la empresa nueva',
+        'Llamar a Ana',
+      ]) {
+        testWidgets(
+          'UX-2417: reminders/offer.asked, $language at ${scale.toInt()}× on 360×800, «$title»: the day phrase never splits across lines, and TalkBack reads the whole line',
+          (tester) async {
+            await openApp(
+              tester,
+              MemoryReminderStore(const ReminderPreferences(enabled: true)),
+              FakeReminderAccess(allowed: true),
+              tasks: [
+                Task(
+                  id: 90,
+                  title: title,
+                  dueDate: dayAhead(20),
+                  hasTime: false,
+                  priority: 2,
+                ),
+              ],
+              language: language,
+              size: const Size(360, 800),
+              textScale: scale,
+            );
+            await moveAndSave(tester);
+            final line = find.descendant(
+              of: sheet(),
+              matching: find.byWidgetPredicate(
+                (widget) =>
+                    widget is Text &&
+                    (widget.semanticsLabel ?? '').startsWith('$title · '),
+              ),
+            );
+            expect(line, findsOneWidget, reason: 'the offer shows the task');
+            final context = tester.element(line);
+            final day = context.weekdayDate(dayAhead(21));
+            final full = tester.widget<Text>(line).semanticsLabel!;
+            expect(full, contains(day), reason: 'TalkBack reads the date');
+            expect(full, startsWith('$title · '));
+            final paragraph = tester.renderObject<RenderParagraph>(
+              find.descendant(of: line, matching: find.byType(RichText)),
+            );
+            final drawn = paragraph.text.toPlainText();
+            final bound = day.replaceAll(' ', ' ');
+            final start = drawn.indexOf(bound);
+            expect(
+              start,
+              greaterThanOrEqualTo(0),
+              reason: 'the date is drawn whole and bound: «$drawn»',
+            );
+            final tops = {
+              for (var i = start; i < start + bound.length; i++)
+                for (final box in paragraph.getBoxesForSelection(
+                  TextSelection(baseOffset: i, extentOffset: i + 1),
+                ))
+                  box.top.round(),
+            };
+            expect(tops, hasLength(1), reason: '«$day» on one line: «$drawn»');
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
   });
 }
 

@@ -31,6 +31,9 @@ Future<void> showProjectPreferences(
             ListTile(
               title: Text(option.$2),
               selected: project.notifications == option.$1,
+              trailing: project.notifications == option.$1
+                  ? const Icon(Icons.check_rounded)
+                  : null,
               leading: Icon(
                 option.$1 == 'muted'
                     ? Icons.notifications_off_outlined

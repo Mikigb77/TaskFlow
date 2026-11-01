@@ -19,6 +19,10 @@ import androidx.core.graphics.drawable.IconCompat
  *
  * The short label is one word: at large text the launcher shows it whole, where the long
  * one was cut to «Dictar un…». The launcher shows the long label wherever it fits.
+ *
+ * On Android 8+ each icon resource is an adaptive icon (drawable-anydpi-v26), which a
+ * resource icon keeps: the launcher fills its own circle with the mint, where the plain
+ * vector of Android 7 (drawable/) came out as a small disc inside a white one (UX-2112).
  */
 object CaptureShortcuts {
     fun publish(context: Context) {

@@ -1,4 +1,5 @@
 import 'package:agenda/widgets/app_components.dart';
+import 'package:agenda/widgets/task_form_entry.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -90,6 +91,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   StreamSubscription<void>? _actions;
   StreamSubscription<void>? _entries;
   bool _openingEntry = false;
+  // Capture sheets opened by the widget or a shortcut, still open.
+  int _entrySheets = 0;
   bool _openingInvitation = false;
   @override
   void initState() {
@@ -183,6 +186,39 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         // open an empty sheet, which keeps nothing until something is said or
         // typed.
         final shared = entry.kind == 'share';
+        final voice = entry.kind == 'voice';
+        // A tap on the widget or a shortcut while what it would open already
+        // waits on top, empty, opens nothing more: a second tap stacks no
+        // second sheet or form (UX-2110). A form or used-up notice counts
+        // only if an entry opened it, and a tap that asks to speak only one
+        // that says why the mic is missing (UX-2642). Otherwise what holds
+        // nothing closes first, so one sheet or form shows, in the mode asked
+        // for: an empty sheet of the other mode, so the mic never lands on
+        // the keyboard (UX-2637), unless it keeps a recording (UX-2641); an
+        // entry's empty form, which Back would just close. Anything else
+        // stays, and the entry opens over it: a sheet with words or a
+        // recording, a form with a day, project, person or words. Shared
+        // words always open their own.
+        if (!shared) {
+          final navigator = _navigator.currentState!;
+          final sheet = _entrySheets > 0
+              ? emptyCaptureSheetOnTop(navigator)
+              : null;
+          final recorded =
+              sheet != null && emptyCaptureSheetOnTopRecorded(navigator);
+          final form = emptyEntryFormOnTop(navigator);
+          final asked = voice ? CaptureMode.voice : CaptureMode.typing;
+          if (sheet == asked ||
+              (captureOpensForm(
+                    ProviderScope.containerOf(context, listen: false),
+                    typing: !voice,
+                  ) &&
+                  emptyTaskFormOnTop(navigator, askedToSpeak: voice))) {
+            await entries.acknowledge(entry.id);
+            continue;
+          }
+          if ((sheet != null && !recorded) || form != null) navigator.pop();
+        }
         CaptureSession? session;
         if (shared) {
           await ref.read(regionalProvider.notifier).ready;
@@ -213,7 +249,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         }
         await CaptureInterruption.stop();
         if (!mounted || owner != ref.read(captureOwnerProvider)) continue;
-        final voice = entry.kind == 'voice';
+        final navigator = _navigator;
+        _entrySheets++;
         unawaited(
           showCaptureSheet(
             _navigator.currentContext!,
@@ -223,7 +260,10 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
             typing: !voice,
             // Saved tasks land on Calendar, in view, whichever tab shows.
             showCalendar: true,
-          ),
+          ).whenComplete(() {
+            // A sign-out's fresh navigator started the count again.
+            if (navigator == _navigator) _entrySheets--;
+          }),
         );
       }
     } catch (_) {
@@ -424,6 +464,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       // A fresh navigator prevents Back from restoring protected routes after logout.
       _navigator = GlobalKey<NavigatorState>();
       _signInAgain = null;
+      _entrySheets = 0;
     }
     final regional = ref.watch(regionalProvider);
     final system24Hour =
@@ -529,7 +570,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         // The task form for a new task: how an account without Pro creates
         // tasks. Open it with openTaskForm.
         if (settings.name == '/newTask') {
-          return MaterialPageRoute(
+          return NewTaskRoute(
             settings: settings,
             builder: (_) => NewTaskScreen(
               arguments:

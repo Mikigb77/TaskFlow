@@ -105,4 +105,11 @@ The base map above predates the free tier (b7) and this run; trust this section 
 - **Plurals:** «No se cambiarán / eliminarán / completarán» on ✕; a set still asking (no count yet) passes 2 so it stays plural.
 - **Device checks still open:** largest font, «Borra todas las completadas de mates» → tap «Matemáticas»; heading and ✕ must stay in view.
 
+## Run 2026-10-28-app (closed in code 2026-11-01; widget level, device checks owed)
+- **Native entries now:** widget mic / shortcuts → `_openEntries` (`main.dart`), which absorbs, closes-first or opens over — rule in [[ui-patterns]] › Run 2026-10-28-app. A free account's TEXT entry, and VOICE at 0 dictations, open the task form (`/newTask`, `NewTaskRoute`), not the sheet; VOICE at 0 left shows the used-up notice/line.
+- **Launcher shortcut icons:** adaptive icons (`drawable-anydpi-v26/capture_shortcut_{voice,text}.xml`, bg `#E3F1EE`, 108 dp foregrounds); launcher not yet seen on the emulator.
+- **«Guardar como tarea»** → one-task result card with «Añadir al calendario» (nothing saved until then).
+- **Capture sheet:** ring only while starting/listening/understanding; «Escribir» also on the online path; while understanding is slow «Guardar como tarea» is a TextButton, filled only after a failure; error banners show whole, only the words scroll.
+- **Open:** UX-2643, UX-2644 (entry rules).
+
 Related: [[ui-patterns]], [[screens-b-calendar-tasks]].

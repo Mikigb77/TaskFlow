@@ -255,7 +255,7 @@ void main() {
         ),
       ]);
       await _App.detail(tester, 1);
-      await tester.tap(find.byTooltip(es.delete));
+      await tester.tap(find.byTooltip(es.deleteNote));
       await tester.pumpAndSettle();
       expect(find.byType(AlertDialog), findsNothing);
       expect(find.byType(TaskDetailScreen), findsNothing);
@@ -2584,6 +2584,228 @@ void main() {
       },
     );
   });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P294 (UX-2510, UX-2614): a note
+  // is called a note; the task page's chips sit 8 dp apart ----
+  group('P294 · a note is called a note; chips 8 dp apart', () {
+    final mates = TaskListInfo(
+      id: 'mates',
+      name: 'Matemáticas',
+      version: 1,
+      shared: true,
+      role: 'owner',
+      ownerId: 1,
+      people: const [
+        ProjectMember(id: 1, name: 'Miki', role: 'owner'),
+        ProjectMember(id: 2, name: 'Ana', role: 'editor'),
+      ],
+    );
+    final casa = TaskListInfo(id: 'casa', name: 'Casa', version: 1);
+
+    Task item({required bool note, String? listId}) => Task(
+      id: 1,
+      title: note ? 'Ideas para la reunión' : 'Pedir cita',
+      priority: 1,
+      kind: note ? 'note' : 'task',
+      dueDate: note ? null : friday,
+      listId: listId,
+      assignment: listId == 'mates' ? 'group' : 'personal',
+    );
+
+    test('UX-2510: the note strings read as planned in ES, EN and CA', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(
+        es.shareNoteConfirm('Matemáticas'),
+        '¿Compartir con Matemáticas? Todos verán esta nota y no podrás volver a hacerla privada.',
+      );
+      expect(
+        en.shareNoteConfirm('Matemáticas'),
+        'Share with Matemáticas? Everyone there will see this note. It can’t be made private again.',
+      );
+      expect(
+        ca.shareNoteConfirm('Matemáticas'),
+        ca.shareTaskConfirm('Matemáticas'),
+      );
+      expect(es.sharedNoteStays, 'Las notas compartidas se quedan en su proyecto.');
+      expect(en.sharedNoteStays, 'Shared notes stay in their project.');
+      expect(ca.sharedNoteStays, 'Les notes compartides es queden al seu projecte.');
+      expect(es.moveNoteError, 'No se pudo mover esta nota. Inténtalo de nuevo.');
+      expect(en.moveNoteError, 'Could not move this note. Please retry.');
+      expect(ca.moveNoteError, 'No s’ha pogut moure aquesta nota. Torna-ho a provar.');
+      expect(es.deleteNote, 'Eliminar nota');
+      expect(en.deleteNote, 'Delete note');
+      expect(ca.deleteNote, 'Suprimeix la nota');
+    });
+
+    for (final note in [true, false]) {
+      final what = note ? 'note' : 'task';
+      testWidgets(
+        'UX-2510: a personal $what moved into «Matemáticas» asks «${note ? es.shareNoteConfirm('Matemáticas') : es.shareTaskConfirm('Matemáticas')}»',
+        (tester) async {
+          await _App.open(tester, [item(note: note)], projects: [mates, casa]);
+          await _App.detail(tester, 1);
+          final chip = find.widgetWithText(ActionChip, es.noList);
+          await tester.ensureVisible(chip);
+          await tester.pumpAndSettle();
+          await tester.tap(chip);
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.descendant(
+              of: find.byType(BottomSheet),
+              matching: find.widgetWithText(ListTile, 'Matemáticas'),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final dialog = find.byType(AlertDialog);
+          expect(dialog, findsOneWidget);
+          final expected = note
+              ? es.shareNoteConfirm('Matemáticas')
+              : es.shareTaskConfirm('Matemáticas');
+          expect(
+            find.descendant(of: dialog, matching: find.text(expected)),
+            findsOneWidget,
+          );
+          await tester.tap(find.widgetWithText(TextButton, es.cancel));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    for (final language in ['es', 'en', 'ca']) {
+      for (final note in [true, false]) {
+        final l = lookupAppLocalizations(Locale(language));
+        final what = note ? 'note' : 'task';
+        testWidgets(
+          'UX-2510: a shared $what’s locked project chip says «${note ? l.sharedNoteStays : l.sharedTaskStays}», and its delete button’s tooltip reads «${note ? l.deleteNote : l.deleteTask}» ($language)',
+          (tester) async {
+            await _App.open(
+              tester,
+              [item(note: note, listId: 'mates')],
+              projects: [mates],
+              language: language,
+            );
+            await _App.detail(tester, 1);
+            expect(
+              find.byTooltip(note ? l.deleteNote : l.deleteTask),
+              findsOneWidget,
+            );
+            expect(find.byTooltip(l.delete), findsNothing);
+            if (note) expect(find.byTooltip(l.deleteTask), findsNothing);
+            final chip = find.widgetWithText(ActionChip, 'Matemáticas');
+            await tester.ensureVisible(chip);
+            await tester.pumpAndSettle();
+            await tester.tap(chip);
+            await tester.pump();
+            expect(
+              find.text(note ? l.sharedNoteStays : l.sharedTaskStays),
+              findsOneWidget,
+            );
+            expect(
+              find.text(note ? l.sharedTaskStays : l.sharedNoteStays),
+              findsNothing,
+            );
+            await tester.pumpAndSettle();
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+
+    for (final note in [true, false]) {
+      final what = note ? 'note' : 'task';
+      testWidgets(
+        'UX-2510: a $what whose move fails says «${note ? es.moveNoteError : es.moveError}»',
+        (tester) async {
+          tester.view.physicalSize = const Size(390, 844);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          final container = designContainer(
+            regionalStore: MemoryRegionalStore(
+              const RegionalPreferences(language: 'es'),
+            ),
+            projects: [casa],
+            tasks: () => TaskNotifier(_FailingMoves([item(note: note)])),
+          );
+          addTearDown(container.dispose);
+          await tester.pumpWidget(
+            UncontrolledProviderScope(
+              container: container,
+              child: const MyApp(),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await _App.detail(tester, 1);
+          final chip = find.widgetWithText(ActionChip, es.noList);
+          await tester.ensureVisible(chip);
+          await tester.pumpAndSettle();
+          await tester.tap(chip);
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.descendant(
+              of: find.byType(BottomSheet),
+              matching: find.widgetWithText(ListTile, 'Casa'),
+            ),
+          );
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 300));
+          expect(
+            find.text(note ? es.moveNoteError : es.moveError),
+            findsOneWidget,
+          );
+          expect(
+            find.text(note ? es.moveError : es.moveNoteError),
+            findsNothing,
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    for (final language in ['es', 'ca']) {
+      testWidgets(
+        'UX-2614: tasks/detail.created-by, $language at 2× on 360×800: the project and person chips, wrapped, are 8 dp apart or more',
+        (tester) async {
+          await loadManrope();
+          tester.platformDispatcher.textScaleFactorTestValue = 2;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          await _App.open(
+            tester,
+            [fromServer()],
+            projects: [familia],
+            language: language,
+            size: const Size(360, 800),
+          );
+          await _App.detail(tester, 1);
+          final picker = find.byType(TaskAssignmentPicker);
+          final wrap = find
+              .descendant(of: picker, matching: find.byType(Wrap))
+              .first;
+          expect(tester.widget<Wrap>(wrap).runSpacing, 8);
+          final chips = tester
+              .widgetList(find.descendant(of: wrap, matching: find.byType(ActionChip)))
+              .map((chip) => tester.getRect(find.byWidget(chip)))
+              .toList()
+            ..sort((a, b) => a.top.compareTo(b.top));
+          expect(chips, hasLength(2), reason: 'the project and who it’s for');
+          final (first, second) = (chips[0], chips[1]);
+          expect(
+            second.top,
+            greaterThanOrEqualTo(first.bottom - 0.5),
+            reason: 'at 2× the chips wrap, as in the render',
+          );
+          expect(
+            second.top - first.bottom,
+            greaterThanOrEqualTo(8 - 0.5),
+            reason: 'wrapped chips 8 dp apart',
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  });
 }
 
 /// The app in Spanish, signed in, on Calendar, with the real task list over
@@ -2823,4 +3045,12 @@ class _ReaderPhone {
     await phone._start('es');
     return phone;
   }
+}
+
+/// P294: tasks whose every save fails, as a move can.
+class _FailingMoves extends _Repository {
+  _FailingMoves(super.tasks);
+  @override
+  Future<int> updateTask(Task task) async =>
+      throw StateError('The move could not be saved.');
 }

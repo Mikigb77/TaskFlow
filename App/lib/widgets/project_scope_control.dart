@@ -171,6 +171,9 @@ class ProjectScopeControl extends ConsumerWidget {
                                             Icons.calendar_month_outlined,
                                           ),
                                           title: Text(context.l10n.projectsAll),
+                                          trailing: selectedId == null
+                                              ? const Icon(Icons.check_rounded)
+                                              : null,
                                           selected: selectedId == null,
                                           onTap: () =>
                                               Navigator.pop(context, ''),
@@ -438,6 +441,9 @@ Iterable<Widget> _projectChoices(
         subtitle:
             (project.pinned || query.isNotEmpty) && project.groupName != null
             ? Text(project.groupName!)
+            : null,
+        trailing: project.id == selectedId
+            ? const Icon(Icons.check_rounded)
             : null,
         selected: project.id == selectedId,
         onTap: () => Navigator.pop(context, project.id),

@@ -259,7 +259,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                     if (canEdit)
                       IconButton(
                         tooltip: task.isNote
-                            ? context.l10n.delete
+                            ? context.l10n.deleteNote
                             : context.l10n.deleteTask,
                         onPressed: () => _delete(task),
                         icon: Icon(
@@ -318,7 +318,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                                       if (context.mounted) {
                                         showFeedback(
                                           ScaffoldMessenger.of(context),
-                                          context.l10n.moveError,
+                                          task.isNote
+                                              ? context.l10n.moveNoteError
+                                              : context.l10n.moveError,
                                         );
                                       }
                                     }

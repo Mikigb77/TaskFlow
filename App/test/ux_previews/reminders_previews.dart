@@ -295,7 +295,7 @@ void remindersPreviews() {
       },
       then: {
         'pro-screen':
-            'The badge tapped: the Pro screen says first, as a heading, «Con Pro, pide los avisos con tus palabras:», then the example «una semana antes y el día antes a las 8».',
+            'The badge tapped: the Pro screen says first, as a heading, «Con Pro, pide los avisos con tus palabras:», then the example «una semana antes y el día antes a las 8», then the plan («No hay una suscripción Pro activa» and the free dictations left), then what else Pro gives: dictation and file space without limit, and typed sentences turned into tasks.',
       },
     );
 

@@ -94,4 +94,11 @@ Current as of 2026-10-13 (whole-app run, slice D). Paths are under `App/`.
 - **Tab labels at the 1.3× cap, 320 dp (80 dp tab):** ES "Calendario" selected 77.9 dp after P45 (fits, 2.1 dp spare); CA "Configuració" 92.9 dp (wraps until U13).
 - **Notificaciones:** 8 controls, about 135 words.
 
+## Run 2026-10-28-app (closed in code 2026-11-01)
+- **Ajustes › TaskFlow Pro subtitle:** «Pro está activo» (Pro/complimentary), else the free count («Te quedan 4 dictados gratis este mes»), else nothing; `billingSettingsHelp` gone.
+- **Pro screen (`/subscription`):** reason (if any) → status, renewal, «Dictados gratis: …» → three benefit rows (`proBenefitDictation/Typing/Reminders`; third hidden when a reason shows) with fixed 20 dp ✓ → storage line (free) → pinned «Ver suscripción». Complimentary: status + `billingComplimentary`. `billingIntro` gone.
+- **Sign-in:** folded heading «Entra o crea tu cuenta»; sign-in-again keeps «Inicia sesión».
+- **Phone calendars:** no help paragraph; account address breakable after «@».
+- **Language sheet** closes at once; reminders rewritten in the background (device check owed).
+
 Related: [[ui-patterns]], [[screens-a-voice-capture]].

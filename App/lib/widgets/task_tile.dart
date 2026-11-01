@@ -24,6 +24,7 @@ class TaskTile extends ConsumerWidget {
     this.showUndated = true,
     this.markOverdue = false,
     this.lastOpen = false,
+    this.doneAt,
   });
   final Task task;
 
@@ -46,6 +47,10 @@ class TaskTile extends ConsumerWidget {
   /// The open task left on Calendar's shown day: ticking it says the day is
   /// clear rather than «Tarea completada».
   final bool lastOpen;
+
+  /// The time an open row on Completadas was done at, given back when it is
+  /// ticked again.
+  final DateTime? doneAt;
 
   /// The row's date line, or null when it has nothing to say.
   String? _dateLine(BuildContext context, WidgetRef ref) {
@@ -209,6 +214,7 @@ class TaskTile extends ConsumerWidget {
       ref,
       task,
       doneMessage: lastOpen ? context.l10n.dayAllClear : null,
+      doneAt: doneAt,
     );
     return Semantics(
       container: true,

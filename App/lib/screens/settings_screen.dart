@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/reminder_provider.dart';
+import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/language_selector.dart';
@@ -66,6 +67,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     final colors = Theme.of(context).colorScheme;
     final email = ref.watch(authProvider).account?.email;
     final reminders = ref.watch(reminderPreferencesProvider).valueOrNull;
+    // The plan, as the other rows show their value: Pro, or the free
+    // dictations left; nothing until billing and the account answer.
+    final freeLeft = ref.watch(freeVoiceLeftProvider);
+    final plan = ref.watch(hasProProvider)
+        ? context.l10n.billingStatus('active')
+        : ref.watch(billingLoadingProvider) || freeLeft == null
+        ? null
+        : context.l10n.freeVoiceLeft(freeLeft);
     return Scaffold(
       appBar: CustomAppBar(title: context.l10n.settings, isRoot: true),
       body: ListView(
@@ -127,7 +136,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
           ListTile(
             leading: Icon(Icons.auto_awesome_outlined, color: colors.primary),
             title: Text(context.l10n.taskflowPro),
-            subtitle: Text(context.l10n.billingSettingsHelp),
+            subtitle: plan == null ? null : Text(plan),
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () => Navigator.pushNamed(context, '/subscription'),
           ),

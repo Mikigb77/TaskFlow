@@ -336,10 +336,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get calendarChoose => 'Tria els calendaris';
 
   @override
-  String get calendarChooseHelp =>
-      'Selecciona fins a 50 calendaris. Les hores segueixen el fus del dispositiu; els esdeveniments de tot el dia mantenen la data original.';
-
-  @override
   String get calendarDenied =>
       'Permet l’accés al calendari per mostrar els esdeveniments. Les tasques continuen funcionant sense aquest permís.';
 
@@ -901,6 +897,9 @@ class AppLocalizationsCa extends AppLocalizations {
   String get deleteTask => 'Suprimeix la tasca';
 
   @override
+  String get deleteNote => 'Suprimeix la nota';
+
+  @override
   String get keepTask => 'Conserva la tasca';
 
   @override
@@ -939,6 +938,10 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get moveError =>
       'No s’ha pogut moure aquesta tasca. Torna-ho a provar.';
+
+  @override
+  String get moveNoteError =>
+      'No s’ha pogut moure aquesta nota. Torna-ho a provar.';
 
   @override
   String get occurrence => 'Repetició';
@@ -1300,7 +1303,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get titleRequiredField => 'Introdueix un títol per a la tasca';
 
   @override
-  String get fromYourWords => 'Segons el que has escrit';
+  String get fromYourWords => 'Segons les teves paraules';
 
   @override
   String get keepAsTyped => 'Deixa-ho com està';
@@ -1529,6 +1532,9 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get signInHeading => 'Inicia la sessió';
+
+  @override
+  String get signInOrUpHeading => 'Entra o crea el teu compte';
 
   @override
   String get authPitch =>
@@ -3232,11 +3238,15 @@ class AppLocalizationsCa extends AppLocalizations {
   String get taskflowPro => 'TaskFlow Pro';
 
   @override
-  String get billingSettingsHelp => 'Subscripció, compres i facturació';
+  String get proBenefitDictation => 'Dictats i espai per a fitxers sense límit';
 
   @override
-  String get billingIntro =>
-      'Dictats sense límit i espai per a tots els fitxers.';
+  String get proBenefitTyping =>
+      'Les frases que escrius es converteixen en tasques';
+
+  @override
+  String get proBenefitReminders =>
+      'Demana els recordatoris amb les teves paraules';
 
   @override
   String get billingComplimentary =>
@@ -3465,6 +3475,15 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get sharedTaskStays =>
       'Les tasques compartides es queden al seu projecte.';
+
+  @override
+  String shareNoteConfirm(String name) {
+    return 'Vols compartir-la amb $name? Tothom la veurà i no la podràs tornar a fer privada.';
+  }
+
+  @override
+  String get sharedNoteStays =>
+      'Les notes compartides es queden al seu projecte.';
 
   @override
   String get assignmentIsRight => 'És correcte?';
@@ -3801,7 +3820,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String storageUsage(int used, int limit) {
-    return 'Fitxers: $used de $limit MB utilitzats';
+    return 'Fitxers: $used de $limit MB utilitzats';
   }
 
   @override

@@ -403,7 +403,7 @@ void main() {
       final usage = find.text(l.storageUsage(85, 100));
       expect(usage, findsOneWidget);
       if (language == 'es') {
-        expect(find.text('Archivos: 85 de 100 MB usados'), findsOneWidget);
+        expect(find.text('Archivos: 85 de 100 MB usados'), findsOneWidget);
       }
       expect(
           tester.getTopLeft(find.text(heading.toUpperCase())).dy,
@@ -635,7 +635,7 @@ void main() {
 
   for (final scale in [1.0, 2.0]) {
     testWidgets(
-        'UX-1414: a file refused for the account’s own full space (tasks/detail.file-space-full, es, ${scale}x on 360 dp) says one sentence and shows exactly 4 buttons, with no «Reintentar transferencia»; «Eliminar archivo adjunto» is last, in the error colour, at least 12 dp below the others, and no two buttons are under 8 dp apart',
+        'UX-1414: a file refused for the account’s own full space (tasks/detail.file-space-full, es, ${scale}x on 360 dp) says one sentence and shows exactly 4 buttons, with no «Reintentar transferencia»; «Quitar archivo» is last, in the error colour, at least 12 dp below the others, and no two buttons are under 8 dp apart',
         (tester) async {
       await tester.binding.setSurfaceSize(const Size(360, 800));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -873,6 +873,66 @@ void main() {
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });
+  });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P293 (UX-2418): «Quitar archivo»
+  // in Spanish ----
+  group('P293 · Quitar archivo', () {
+    for (final (language, button, question) in [
+      ('es', 'Quitar archivo', '¿Quitar este archivo de la tarea?'),
+      ('en', 'Remove attachment', 'Remove this attachment?'),
+      ('ca', 'Treu el fitxer adjunt', 'Vols treure aquest fitxer adjunt?'),
+    ]) {
+      testWidgets(
+        'UX-2418: the remove-file dialog in $language reads «$question» with «$button»${language == 'es' ? '' : ' (unchanged)'}, and no «Eliminar»',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          expect(l.fileRemove, button);
+          expect(l.fileRemoveQuestion, question);
+          await pumpPanel(tester, language: language);
+          final remove = find.widgetWithText(TextButton, button);
+          await tester.ensureVisible(remove);
+          await tester.pumpAndSettle();
+          await tester.tap(remove);
+          await tester.pumpAndSettle();
+          final dialog = find.byType(AlertDialog);
+          expect(dialog, findsOneWidget);
+          expect(
+            find.descendant(of: dialog, matching: find.text(question)),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(
+              of: dialog,
+              matching: find.widgetWithText(FilledButton, button),
+            ),
+            findsOneWidget,
+          );
+          // The help under it still says the original stays.
+          expect(
+            find.descendant(
+              of: dialog,
+              matching: find.textContaining(l.fileRemoveHelp),
+            ),
+            findsOneWidget,
+          );
+          if (language == 'es') {
+            expect(
+              find.descendant(
+                of: dialog,
+                matching: find.textContaining('Eliminar'),
+              ),
+              findsNothing,
+            );
+          }
+          await tester.tap(find.widgetWithText(TextButton, l.cancel));
+          await tester.pumpAndSettle();
+          expect(dialog, findsNothing);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        },
+      );
+    }
   });
 }
 

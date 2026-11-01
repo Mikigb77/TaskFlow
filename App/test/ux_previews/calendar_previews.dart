@@ -536,14 +536,28 @@ void calendarPreviews() {
     preview(
       completedTasks,
       'list',
-      'Tasks already done.',
+      'Tasks already done, the last one ticked first: «Comprar pan», with no day, ticked a moment ago, above today’s walk and yesterday’s marks.',
       everywhere,
       (p) async {
+        // When each was ticked (D2): the order follows these, not the days.
+        final ticked = {1: day(0, 8, 45), 34: day(-1, 18, 10)};
         final app = await PreviewApp.open(
           p,
           tasks: [
-            ...normalDay(),
-            ...sharedProjectTasks().where((t) => t.isCompleted),
+            for (final task in [
+              ...normalDay(),
+              ...sharedProjectTasks().where((t) => t.isCompleted),
+            ])
+              task.isCompleted
+                  ? task.copyWith(completedAt: ticked[task.id])
+                  : task,
+            Task(
+              id: 40,
+              title: 'Comprar pan',
+              priority: 1,
+              isCompleted: true,
+              completedAt: day(0, 9, 30),
+            ),
           ],
           projects: allProjects,
         );

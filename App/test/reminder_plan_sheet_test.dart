@@ -2012,7 +2012,7 @@ void main() {
         expect(words, startsWith('«'));
         expect(words, endsWith('»'));
         // Then the line Pro already had.
-        final intro = find.text(es.billingIntro);
+        final intro = find.text(es.proBenefitDictation);
         expect(intro, findsOneWidget);
         expect(
           tester.getTopLeft(reason).dy,
@@ -2129,8 +2129,8 @@ void main() {
         expect(words, isNot(endsWith('.')));
         expect(words, isNot(contains(es.reminderPlanEveryDays(3))));
         expect(words, isNot(contains(es.reminderPlanEveryDays(1))));
-        // Then billingIntro.
-        final intro = find.text(es.billingIntro);
+        // Then what Pro gives.
+        final intro = find.text(es.proBenefitDictation);
         expect(intro, findsOneWidget);
         expect(
           tester.getTopLeft(reason).dy,
@@ -2667,13 +2667,16 @@ void main() {
     const normal = ReminderPlan.rhythm(ReminderPlan.normal);
     const phone = Size(360, 800);
     // The task's title and its day as the app writes a day elsewhere
-    // (taskDayLine, `weekdayDate`), read off the open sheet.
-    String taskLine(WidgetTester tester) {
+    // (taskDayLine, `weekdayDate`), read off the open sheet. On screen
+    // the day is bound with no-break spaces (UX-2417); TalkBack reads it
+    // with plain ones.
+    String taskLine(WidgetTester tester, {bool shown = false}) {
       final day = tester
           .element(find.byType(BottomSheet).last)
           .weekdayDate(friday13);
       expect(day, startsWith('vie, 13'));
-      return 'Presentar el proyecto · $day';
+      return 'Presentar el proyecto · '
+          '${shown ? day.replaceAll(' ', '\u00A0') : day}';
     }
 
     const question =
@@ -2817,7 +2820,7 @@ void main() {
         final app = await _App.open(tester, const [], size: phone);
         await createInForm(tester, app);
         await afterTheMessage(tester);
-        final line = inSheet(find.text(taskLine(tester)));
+        final line = inSheet(find.text(taskLine(tester, shown: true)));
         final asked = inSheet(find.text(question));
         final yes = inSheet(find.text(es.reminderAskYes));
         final notNow = inSheet(find.text(es.reminderAskNotNow));
@@ -3028,7 +3031,10 @@ void main() {
         expect(app.task(1).dueDate, friday13);
         expect(offerSheet(), findsNothing);
         await afterTheMessage(tester);
-        expect(inSheet(find.text(taskLine(tester))), findsOneWidget);
+        expect(
+          inSheet(find.text(taskLine(tester, shown: true))),
+          findsOneWidget,
+        );
         expect(inSheet(find.text(question)), findsOneWidget);
         expect(app.reminders.offered, {1});
       },
@@ -3044,7 +3050,10 @@ void main() {
           {'title': 'Comprar pan', 'scheduled_date': '2026-10-23'},
           {'title': 'Presentar el proyecto', 'scheduled_date': '2026-11-13'},
         ]);
-        expect(inSheet(find.text(taskLine(tester))), findsOneWidget);
+        expect(
+          inSheet(find.text(taskLine(tester, shown: true))),
+          findsOneWidget,
+        );
         expect(inSheet(find.text(question)), findsOneWidget);
         expect(inSheet(find.textContaining('Comprar pan')), findsNothing);
       },

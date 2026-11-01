@@ -6,7 +6,7 @@ class TaskList extends StatelessWidget {
   const TaskList({
     super.key,
     required this.tasks,
-    this.newestFirst = false,
+    this.completedTime,
     this.landedIds = const {},
     this.lit = false,
     this.landedRow,
@@ -16,8 +16,11 @@ class TaskList extends StatelessWidget {
   });
   final List<Task> tasks;
 
-  /// Latest date first, undated last: what was just done is on top.
-  final bool newestFirst;
+  /// Completadas' order, by when each row was completed, from this: rows
+  /// with a time first, the last one done on top; then those without one,
+  /// latest planned day first, undated last. Null orders by schedule. An
+  /// open row ticked again is done at its time from this, not now.
+  final DateTime? Function(Task)? completedTime;
 
   /// Just-saved tasks, highlighted while [lit]. The first one's row carries
   /// [landedRow], so it can be scrolled into view.
@@ -36,13 +39,27 @@ class TaskList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final timeOf = completedTime;
+    int latestPlannedFirst(Task a, Task b) =>
+        a.displayDate == null || b.displayDate == null
+        ? Task.compareBySchedule(a, b)
+        : b.displayDate!.compareTo(a.displayDate!);
     final sorted = [...tasks]
       ..sort(
-        newestFirst
-            ? (a, b) => a.displayDate == null || b.displayDate == null
-                  ? Task.compareBySchedule(a, b)
-                  : b.displayDate!.compareTo(a.displayDate!)
-            : Task.compareBySchedule,
+        timeOf == null
+            ? Task.compareBySchedule
+            : (a, b) {
+                final at = timeOf(a), bt = timeOf(b);
+                if (at == null || bt == null) {
+                  return at != null
+                      ? -1
+                      : bt != null
+                      ? 1
+                      : latestPlannedFirst(a, b);
+                }
+                final order = bt.compareTo(at);
+                return order != 0 ? order : latestPlannedFirst(a, b);
+              },
       );
     final first = sorted.indexWhere((task) => landedIds.contains(task.id));
     return ListView.separated(
@@ -68,6 +85,7 @@ class TaskList extends StatelessWidget {
                 project: project,
                 showUndated: showUndated,
                 markOverdue: true,
+                doneAt: task.isCompleted ? null : timeOf?.call(task),
               );
       },
     );

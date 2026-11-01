@@ -10,15 +10,17 @@ import 'package:agenda/widgets/schedule_editor.dart';
 /// Shared by Calendar, Tasks and details, including keyboard/accessible buttons.
 class TaskInteractions {
   /// Ticks or reopens [task]. A tick says [doneMessage], if given, rather
-  /// than «Tarea completada».
+  /// than «Tarea completada», and keeps [doneAt], if given, as the time it
+  /// was done rather than now.
   static Future<void> toggle(BuildContext context, WidgetRef ref, Task task,
-      {String? doneMessage}) async {
+      {String? doneMessage, DateTime? doneAt}) async {
     final container = ProviderScope.containerOf(context, listen: false);
     final notifier = ref.read(taskProvider.notifier);
     final messenger = ScaffoldMessenger.of(context);
     final strings = context.l10n;
     try {
-      await notifier.setCompleted(task, !task.isCompleted);
+      await notifier.setCompleted(task, !task.isCompleted,
+          at: task.isCompleted ? null : doneAt);
       if (!messenger.mounted ||
           !identical(container.read(taskProvider.notifier), notifier)) {
         return;

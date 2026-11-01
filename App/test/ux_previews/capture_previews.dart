@@ -667,6 +667,29 @@ void capturePreviews() {
       },
     );
 
+    // P299 (UX-2612, D1): «Guardar como tarea» shows its task before saving.
+    preview(
+      result,
+      'as-written',
+      'Guardar como tarea tapped while the assistant was slow (8 s): the phone\'s reading on one card, Llamar al dentista y comprar pan for tomorrow, with Añadir al calendario; nothing is saved yet.',
+      [es1, es2, ca2],
+      (p) async {
+        final app = await PreviewApp.open(p, tasks: normalDay());
+        app.api.hold = Completer<void>();
+        await openSheet(app);
+        await hear(app, 'Mañana, llamar al dentista y comprar pan');
+        await sendWords(app);
+        for (var i = 0; i < 9; i++) {
+          await p.tester.pump(const Duration(seconds: 1));
+        }
+        await p.tester.tap(
+          find.widgetWithText(TextButton, p.l.captureSaveAsWritten),
+        );
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
     preview(
       result,
       'several',

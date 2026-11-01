@@ -681,7 +681,7 @@ void main() {
     expect(
         find.descendant(of: bar, matching: find.byTooltip(l10n.editNote)),
         findsNothing);
-    expect(find.descendant(of: bar, matching: find.byTooltip(l10n.delete)),
+    expect(find.descendant(of: bar, matching: find.byTooltip(l10n.deleteNote)),
         findsOneWidget);
     // At the bottom: under the note's body, in the screen's lower part.
     final screen = tester.getRect(find.byType(TaskDetailScreen));

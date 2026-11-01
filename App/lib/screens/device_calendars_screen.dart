@@ -116,7 +116,6 @@ class _DeviceCalendarsScreenState extends ConsumerState<DeviceCalendarsScreen>
             if (state.access == CalendarAccess.granted && enabled) ...[
               const SizedBox(height: 20),
               SectionLabel(l.calendarChoose),
-              Text(l.calendarChooseHelp),
               if (state.truncated) MessageBanner(l.calendarTruncated),
               if (state.calendars.isEmpty)
                 Padding(
@@ -129,9 +128,11 @@ class _DeviceCalendarsScreenState extends ConsumerState<DeviceCalendarsScreen>
                     title: Text(calendar.name.isEmpty
                         ? l.calendarUntitled
                         : calendar.name),
+                    // An address wraps after «@» or «.», never mid-word.
                     subtitle: calendar.account.isEmpty
                         ? null
-                        : Text(calendar.account),
+                        : Text(breakableAddress(calendar.account),
+                            semanticsLabel: calendar.account),
                     value: state.preferences.selected
                         .contains(calendar.selectionKey),
                     onChanged: _busy

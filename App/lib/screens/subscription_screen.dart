@@ -60,23 +60,29 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     final freeVoice = free ? account.freeVoice : null;
     final freeVoiceLeft = ref.watch(freeVoiceLeftProvider);
     final storage = free ? account.storage : null;
-    final freeLines = [
-      if (freeVoice != null && freeVoiceLeft != null)
-        l10n.freeVoiceStatus(
-          freeVoiceLeft,
-          freeVoice.limit,
-          context.shortDate(ref.watch(freeVoiceResetsProvider).toLocal()),
-        ),
-      if (storage != null && storage.limitBytes > 0)
-        l10n.storageUsage(
-          (storage.usedBytes / _megabyte).round(),
-          (storage.limitBytes / _megabyte).round(),
-        ),
-    ];
+    final voiceLine = freeVoice != null && freeVoiceLeft != null
+        ? l10n.freeVoiceStatus(
+            freeVoiceLeft,
+            freeVoice.limit,
+            context.shortDate(ref.watch(freeVoiceResetsProvider).toLocal()),
+          )
+        : null;
+    final storageLine = storage != null && storage.limitBytes > 0
+        ? l10n.storageUsage(
+            (storage.usedBytes / _megabyte).round(),
+            (storage.limitBytes / _megabyte).round(),
+          )
+        : null;
     // Without Pro, «Ver suscripción» stays in view, as the task form's button.
     final offer = !state.hasPro && state.monthly != null;
     final restore = !state.complimentary && !state.hasPro;
     final reason = widget.reason == ProReason.reminderPlans;
+    // The height of a benefit's first line, for its check icon: the body text
+    // the Scaffold's Material gives its Text.
+    final bodyStyle = Theme.of(context).textTheme.bodyMedium!;
+    final benefitLineHeight =
+        MediaQuery.textScalerOf(context).scale(bodyStyle.fontSize ?? 14) *
+        (bodyStyle.height ?? 1.5);
     return Scaffold(
       appBar: CustomAppBar(title: l10n.taskflowPro),
       body: ListView(
@@ -93,7 +99,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Opened from a Pro choice: what Pro gives there, first, with
-                  // an example.
+                  // an example; then your plan, then what Pro gives.
                   if (reason) ...[
                     Semantics(
                       header: true,
@@ -112,14 +118,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  // What Pro gives; the app bar already says «TaskFlow Pro».
-                  Text(
-                    state.complimentary
-                        ? l10n.billingComplimentary
-                        : l10n.billingIntro,
-                    style: TextStyle(color: colors.onPrimaryContainer),
-                  ),
-                  const SizedBox(height: 20),
+                  // Your plan first: the status, then its renewal or dictations left.
                   Text(
                     l10n.billingStatus(
                       state.hasPro
@@ -146,24 +145,75 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                       style: TextStyle(color: colors.onPrimaryContainer),
                     ),
                   ],
-                  for (final line in freeLines) ...[
+                  if (voiceLine != null) ...[
                     const SizedBox(height: 8),
                     Text(
-                      line,
+                      voiceLine,
                       style: TextStyle(color: colors.onPrimaryContainer),
                     ),
                   ],
-                  // A full space: which tasks use it, to make room.
-                  if (storage != null &&
-                      storage.limitBytes > 0 &&
-                      storage.usedBytes >= storage.limitBytes)
-                    TextButton(
-                      style: TextButton.styleFrom(
-                        foregroundColor: colors.onPrimaryContainer,
+                  const SizedBox(height: 20),
+                  // Then what Pro gives, one line each; the app bar already
+                  // says «TaskFlow Pro», and a reason's heading names its own.
+                  if (state.complimentary)
+                    Text(
+                      l10n.billingComplimentary,
+                      style: TextStyle(color: colors.onPrimaryContainer),
+                    )
+                  else
+                    for (final (index, benefit) in [
+                      l10n.proBenefitDictation,
+                      l10n.proBenefitTyping,
+                      if (!reason) l10n.proBenefitReminders,
+                    ].indexed)
+                      Padding(
+                        padding: EdgeInsets.only(top: index == 0 ? 0 : 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 20 dp at every text size, level with its first
+                            // line.
+                            SizedBox(
+                              height: benefitLineHeight,
+                              child: Center(
+                                child: Icon(
+                                  Icons.check_rounded,
+                                  size: 20,
+                                  color: colors.onPrimaryContainer,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                benefit,
+                                style: TextStyle(
+                                  color: colors.onPrimaryContainer,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      onPressed: () => TasksWithFilesScreen.open(context),
-                      child: Text(l10n.storageSeeTasks),
+                  // Without Pro, the file space after what Pro gives: at 2×
+                  // in Catalan, the first benefit stays above the pinned
+                  // «Ver suscripción».
+                  if (storageLine != null) ...[
+                    const SizedBox(height: 20),
+                    Text(
+                      storageLine,
+                      style: TextStyle(color: colors.onPrimaryContainer),
                     ),
+                    // A full space: which tasks use it, to make room.
+                    if (storage!.usedBytes >= storage.limitBytes)
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: colors.onPrimaryContainer,
+                        ),
+                        onPressed: () => TasksWithFilesScreen.open(context),
+                        child: Text(l10n.storageSeeTasks),
+                      ),
+                  ],
                 ],
               ),
             ),
@@ -261,9 +311,11 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                       ? () => _run(() => controller.presentPaywall(locale))
                       : null,
                   icon: const Icon(Icons.auto_awesome_outlined),
-                  label: Text(l10n.billingViewPlans,
-                      textAlign: TextAlign.center,
-                      textWidthBasis: TextWidthBasis.longestLine),
+                  label: Text(
+                    l10n.billingViewPlans,
+                    textAlign: TextAlign.center,
+                    textWidthBasis: TextWidthBasis.longestLine,
+                  ),
                 ),
               ),
             )

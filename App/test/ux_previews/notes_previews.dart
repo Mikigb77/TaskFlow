@@ -30,6 +30,7 @@ const noteOpen = Screen(
     'lib/screens/task_detail_screen.dart',
     'lib/widgets/note_text.dart',
     'lib/widgets/checklist_editor.dart',
+    'lib/widgets/task_list_picker.dart',
   ],
 );
 
@@ -241,6 +242,26 @@ void notesPreviews() {
         );
         await app.tab(p.l.notes);
         await p.tester.tap(find.text(p.l.addNote).hitTestable());
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    // P294 (UX-2514): the chosen project carries a ✓, under a heading.
+    preview(
+      noteOpen,
+      'project-sheet',
+      'The window note in «Casa» opened, its project chip tapped: the Proyecto sheet with its drag handle and heading, and «Casa» marked with a ✓.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), ..._notes()],
+          projects: allProjects,
+        );
+        await app.tab(p.l.notes);
+        await app.tap('Medidas de la ventana del salón');
+        await p.tester.tap(find.widgetWithText(ActionChip, 'Casa'));
         await p.tester.pumpAndSettle();
         await p.shoot();
       },

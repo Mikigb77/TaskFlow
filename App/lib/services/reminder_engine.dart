@@ -870,9 +870,21 @@ class ReminderEngine {
         if (occurrence != null) {
           done ? dates.add(occurrence) : dates.remove(occurrence);
         }
-        final values = task.isRecurring
-            ? {'completedDates': jsonEncode(dates.toList()..sort())}
-            : {'isCompleted': done ? 1 : 0};
+        final written =
+            (task.isRecurring
+                    ? task.copyWith(completedDates: dates.toList()..sort())
+                    : task.copyWith(isCompleted: done))
+                .withCompletionTimes(Task.fromMap(rows.single), clock())
+                .toMap();
+        // `complete` stamps the tick's time; `undo` clears it.
+        final values = {
+          if (task.isRecurring)
+            'completedDates': written['completedDates']
+          else
+            'isCompleted': written['isCompleted'],
+          'completedAt': written['completedAt'],
+          'completedTimes': written['completedTimes'],
+        };
         await tx.update(
           'tasks',
           {

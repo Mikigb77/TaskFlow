@@ -21,6 +21,7 @@ import 'package:agenda/l10n/region.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/free_voice_notice_provider.dart';
@@ -31,6 +32,7 @@ import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/screens/calendar_screen.dart';
 import 'package:agenda/screens/captures_screen.dart';
+import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/screens/notes_screen.dart';
 import 'package:agenda/screens/subscription_screen.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
@@ -487,7 +489,7 @@ void main() {
   // ---- P89 · UX-499: capture_id, and the cancel ----
 
   testWidgets(
-    'UX-499: Guardar como tarea while a free dictation is understood sends one DELETE for its capture_id, saves the words, ignores the 409 that follows; the next dictation uses a new capture_id',
+    'UX-499: Guardar como tarea while a free dictation is understood sends one DELETE for its capture_id, shows the words on their card, which saves them, ignores the 409 that follows; the next dictation uses a new capture_id',
     (tester) async {
       final app = await _FreeApp.open(tester, freeVoice: freeVoice(5));
       app.api.hold = Completer<void>();
@@ -505,6 +507,16 @@ void main() {
       await tester.tap(save);
       await tester.pumpAndSettle();
       expect(app.api.deletes, ['ai/drafts/$first/']);
+      // The words show on their card first (UX-2612); its button saves them.
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(app.tasks.titles(), isEmpty);
+      final add = find.byKey(const ValueKey('save-drafts'));
+      expect(
+        find.descendant(of: add, matching: find.text(es.captureAddTask)),
+        findsOneWidget,
+      );
+      await tester.tap(add);
+      await tester.pumpAndSettle();
       expect(find.byType(BottomSheet), findsNothing);
       expect(app.tasks.titles(), ['Llamar al médico']);
 
@@ -681,6 +693,11 @@ void main() {
       expect(kept.status, isNot('discarded'));
 
       await tester.tap(button(es.captureSaveAsWritten));
+      await tester.pumpAndSettle();
+      // Its card shows first (UX-2612); its button saves the words.
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(app.tasks.titles(), isEmpty);
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
       await tester.pumpAndSettle();
       expect(app.api.drafts, hasLength(1), reason: 'no second request');
       expect(app.tasks.titles(), ['Comprar pan']);
@@ -1253,7 +1270,7 @@ void main() {
       );
       expect(
         es.freeVoiceStatus(4, 10, day('es')),
-        'Dictados gratis: te quedan 4 de 10 este mes. Más el ${day('es')}.',
+        'Dictados gratis: te quedan 4 de 10 este mes. El ${day('es')} tendrás más.',
       );
       expect(
         freeVoiceUsedUpText(en, november),
@@ -3822,6 +3839,418 @@ void main() {
       );
     });
   });
+
+  // ---- UX loop 2026-10-28-app, round 2 · P308 (UX-2110): a free account's
+  // second tap from outside the app stacks no second form ----
+  group('P308 · one entry, one sheet or form', () {
+    /// Every task form on the navigator, on top or under another.
+    Finder forms() => find.byType(TaskEditor, skipOffstage: false);
+    Finder titles() =>
+        find.byKey(const ValueKey('task-title'), skipOffstage: false);
+
+    /// Android hands over [entry] and says so, without waiting for it to
+    /// open.
+    Future<void> announce(
+      WidgetTester tester,
+      _FreeApp app,
+      Map<String, Object> entry,
+    ) async {
+      app.queue.add(entry);
+      const channel = MethodChannel('test/free-dictation-entries');
+      await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+        channel.name,
+        channel.codec.encodeMethodCall(const MethodCall('changed')),
+        (_) {},
+      );
+    }
+
+    /// Two entries of [kind], 300 ms apart.
+    Future<void> doubleTap(
+      WidgetTester tester,
+      _FreeApp app,
+      String kind,
+    ) async {
+      await announce(tester, app, entry(kind));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await announce(tester, app, entry(kind));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> backToCalendar(WidgetTester tester) async {
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(forms(), findsNothing, reason: 'no second form under it');
+      expect(notice(), findsNothing);
+      expect(find.byType(CalendarScreen).hitTestable(), findsOneWidget);
+    }
+
+    testWidgets(
+      'UX-2110: a free account with dictations left, ES 1× on 360×800: two TEXT entries 300 ms apart open one form; Back lands on Calendar',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(5),
+          size: const Size(360, 800),
+        );
+        await doubleTap(tester, app, 'text');
+        expect(forms(), findsOneWidget, reason: 'one /newTask route');
+        expect(find.byType(VoiceTaskScreen), findsNothing);
+        expect(app.queue, isEmpty, reason: 'both entries taken');
+        await backToCalendar(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2110: a free account: two TEXT entries already pending when the app looks open one form',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(5),
+          size: const Size(360, 800),
+        );
+        app.queue.add(entry('text'));
+        await announce(tester, app, entry('text'));
+        await tester.pumpAndSettle();
+        expect(forms(), findsOneWidget);
+        expect(app.queue, isEmpty);
+        await backToCalendar(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2110: a free account: a TEXT entry, «Pan» typed as the title, then a TEXT entry opens a second, empty form over it; Back on it shows the first form with «Pan»',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(5),
+          size: const Size(360, 800),
+        );
+        await app.deliver(tester, entry('text'));
+        expect(forms(), findsOneWidget);
+        await tester.enterText(title(), 'Pan');
+        await tester.pumpAndSettle();
+        await app.deliver(tester, entry('text'));
+        expect(forms(), findsNWidgets(2), reason: 'a second form over it');
+        expect(formTitle(tester), isEmpty, reason: 'the new form is empty');
+
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(forms(), findsOneWidget);
+        expect(titles(), findsOneWidget);
+        expect(formTitle(tester), 'Pan');
+        expect(app.tasks.titles(), isEmpty, reason: 'nothing saved yet');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2110: a free account with 0 dictations left, the used-up notice already seen this month: two VOICE entries 300 ms apart open one form; Back lands on Calendar',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(0),
+          noticeSeen: true,
+          size: const Size(360, 800),
+        );
+        await doubleTap(tester, app, 'voice');
+        expect(notice(), findsNothing);
+        expect(forms(), findsOneWidget);
+        expect(app.speech.starts, 0);
+        expect(app.queue, isEmpty);
+        await backToCalendar(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2110: a free account with 0 dictations left, the notice not yet seen: two VOICE entries 300 ms apart show one notice; «Crear una tarea» opens one form',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(0),
+          size: const Size(360, 800),
+        );
+        await doubleTap(tester, app, 'voice');
+        expect(notice(), findsOneWidget, reason: 'one notice');
+        expect(forms(), findsNothing);
+        expect(app.queue, isEmpty);
+        await tester.tap(
+          inNotice(find.widgetWithText(FilledButton, es.freeVoiceNoticeCreate)),
+        );
+        await tester.pumpAndSettle();
+        expect(notice(), findsNothing);
+        expect(forms(), findsOneWidget);
+        await backToCalendar(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- UX loop 2026-10-28-app, round 3 · P313 (UX-2642): an entry from
+  // outside the app lands only in a form it would open itself ----
+  group('P313 · an entry never closes what holds something', () {
+    /// Every task form on the navigator, on top or under another.
+    Finder forms() => find.byType(TaskEditor, skipOffstage: false);
+    final monday = DateTime(2026, 10, 19, 10);
+    final resets = DateTime.utc(2026, 11);
+
+    /// The top form's day chip [key] is chosen. Only the top form is on
+    /// stage.
+    bool chosen(WidgetTester tester, String key) =>
+        tester.widget<ChoiceChip>(find.byKey(ValueKey(key))).selected;
+
+    /// The top form presets no day: neither today, tomorrow nor another.
+    void expectNoDay(WidgetTester tester) {
+      for (final key in [
+        'new-task-today',
+        'new-task-tomorrow',
+        'new-task-pick-day',
+      ]) {
+        expect(chosen(tester, key), isFalse, reason: '$key: no day preset');
+      }
+      expect(
+        find.byKey(const ValueKey('new-task-time')),
+        findsNothing,
+        reason: 'no day, so no time chip',
+      );
+    }
+
+    Future<void> back(WidgetTester tester) async {
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> backToCalendar(WidgetTester tester) async {
+      await back(tester);
+      expect(forms(), findsNothing, reason: 'no second form under it');
+      expect(find.byType(VoiceTaskScreen), findsNothing);
+      expect(find.byType(CalendarScreen).hitTestable(), findsOneWidget);
+    }
+
+    testWidgets(
+      'UX-2642: a free account with 0 dictations left, the used-up notice seen, ES 1× on 360×800: a TEXT entry opens the form; with nothing typed, a VOICE entry leaves exactly one form, showing the used-up line; Back lands on Calendar',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(0),
+          noticeSeen: true,
+          size: const Size(360, 800),
+        );
+        await app.deliver(tester, entry('text'));
+        expect(forms(), findsOneWidget);
+        expect(formTitle(tester), isEmpty);
+
+        await app.deliver(tester, entry('voice'));
+        expect(forms(), findsOneWidget, reason: 'exactly one form');
+        expect(notice(), findsNothing);
+        expect(
+          usedUp(),
+          findsOneWidget,
+          reason: 'the form says why the mic is missing',
+        );
+        expect(usedUp().hitTestable(), findsOneWidget);
+        expect(app.speech.starts, 0);
+        expect(app.queue, isEmpty, reason: 'both entries taken');
+
+        await backToCalendar(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2642: a free account with 0 dictations left: a VOICE entry opens the form with the used-up line; with nothing typed, a TEXT entry is taken by it, still one form; Back lands on Calendar',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(0),
+          noticeSeen: true,
+          size: const Size(360, 800),
+        );
+        await app.deliver(tester, entry('voice'));
+        expect(forms(), findsOneWidget);
+        expect(usedUp(), findsOneWidget);
+
+        await app.deliver(tester, entry('text'));
+        expect(forms(), findsOneWidget, reason: 'absorbed: still one form');
+        expect(usedUp(), findsOneWidget, reason: 'the same form, still true');
+        expect(app.queue, isEmpty);
+
+        await backToCalendar(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final left in [0, 5]) {
+      testWidgets(
+        'UX-2642: a free account with $left dictations left: Calendar on a later day, a new task’s form opened there and left empty (it shows that day); a TEXT entry opens a second form on top with no day preset; Back on it shows the first form with the picked day',
+        (tester) async {
+          final app = await _FreeApp.open(
+            tester,
+            freeVoice: freeVoice(left, resets: resets),
+            noticeSeen: true,
+            clock: monday,
+            size: const Size(360, 800),
+          );
+          // Friday 23.
+          await tester.tap(
+            find
+                .descendant(
+                  of: find.byType(CalendarScreen),
+                  matching: find.text('23'),
+                )
+                .hitTestable()
+                .first,
+          );
+          await tester.pumpAndSettle();
+          if (left == 0) {
+            await tester.tap(find.text(es.newTask).hitTestable());
+            await tester.pumpAndSettle();
+          } else {
+            // With dictations left, Añadir tarea listens; Escribir opens the
+            // form for that day.
+            await tester.tap(find.text(es.addTask).hitTestable());
+            await tester.pumpAndSettle();
+            await tester.tap(
+              find.byKey(const ValueKey('capture-fill-by-hand')),
+            );
+            await tester.pumpAndSettle();
+          }
+          expect(forms(), findsOneWidget);
+          expect(formTitle(tester), isEmpty);
+          expect(
+            chosen(tester, 'new-task-pick-day'),
+            isTrue,
+            reason: 'the in-app form shows the picked Friday',
+          );
+
+          await app.deliver(tester, entry('text'));
+          expect(
+            forms(),
+            findsNWidgets(2),
+            reason: 'the entry opens its own form over the in-app one',
+          );
+          expect(find.byType(VoiceTaskScreen), findsNothing);
+          expect(formTitle(tester), isEmpty);
+          expectNoDay(tester);
+          expect(app.queue, isEmpty);
+
+          await back(tester);
+          expect(forms(), findsOneWidget, reason: 'the in-app form shows');
+          expect(chosen(tester, 'new-task-pick-day'), isTrue);
+          expect(chosen(tester, 'new-task-today'), isFalse);
+          expect(app.tasks.titles(), isEmpty, reason: 'nothing saved');
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2642: a free account with 0 dictations left, on a shared project’s page with Ana’s chip on: Nueva tarea left empty (Familia and Ana set), then a TEXT entry opens a second form on top with no project and no person; Back shows the first form',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(0),
+          noticeSeen: true,
+          size: const Size(360, 800),
+          projects: [
+            TaskListInfo(
+              id: 'familia',
+              name: 'Familia',
+              version: 1,
+              shared: true,
+              role: 'owner',
+              ownerId: 1,
+              people: const [
+                ProjectMember(id: 1, name: 'Yo', role: 'owner'),
+                ProjectMember(id: 2, name: 'Ana', role: 'editor'),
+              ],
+            ),
+          ],
+        );
+        await openTasksTab(tester);
+        unawaited(
+          Navigator.of(tester.element(find.byType(HomeScreen).first)).push(
+            MaterialPageRoute<void>(
+              builder: (_) =>
+                  const HomeScreen(isRoot: false, listId: 'familia'),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('people-2')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(es.newTask).hitTestable());
+        await tester.pumpAndSettle();
+        expect(forms(), findsOneWidget);
+        Finder inForm(Finder finder) =>
+            find.descendant(of: find.byType(TaskEditor), matching: finder);
+        expect(inForm(find.widgetWithText(ActionChip, 'Ana')), findsOneWidget);
+        expect(inForm(find.text('Familia')), findsOneWidget);
+
+        await app.deliver(tester, entry('text'));
+        expect(
+          forms(),
+          findsNWidgets(2),
+          reason: 'the entry opens its own form over the in-app one',
+        );
+        expect(formTitle(tester), isEmpty);
+        expect(
+          inForm(find.widgetWithText(ActionChip, 'Ana')),
+          findsNothing,
+          reason: 'no person set',
+        );
+        expect(
+          inForm(find.text('Familia')),
+          findsNothing,
+          reason: 'no project',
+        );
+        expect(app.queue, isEmpty);
+
+        await back(tester);
+        expect(forms(), findsOneWidget, reason: 'the in-app form shows');
+        expect(inForm(find.widgetWithText(ActionChip, 'Ana')), findsOneWidget);
+        expect(inForm(find.text('Familia')), findsOneWidget);
+        expect(app.tasks.titles(), isEmpty, reason: 'nothing saved');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2642: a free account with dictations left: a TEXT entry opens the form; with nothing typed, a VOICE entry opens the listening sheet with no form under it; Cancelar lands on Calendar',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(5),
+          size: const Size(360, 800),
+        );
+        await app.deliver(tester, entry('text'));
+        expect(forms(), findsOneWidget);
+
+        await app.deliver(tester, entry('voice'));
+        expect(find.byType(VoiceTaskScreen), findsOneWidget);
+        expect(app.speech.starts, 1, reason: 'the sheet listens');
+        expect(forms(), findsNothing, reason: 'the empty form closed first');
+        expect(app.queue, isEmpty);
+
+        await tester.tap(
+          find
+              .descendant(
+                of: find.byType(VoiceTaskScreen),
+                matching: find.widgetWithText(TextButton, es.cancel),
+              )
+              .hitTestable(),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(VoiceTaskScreen), findsNothing);
+        expect(forms(), findsNothing, reason: 'no form under it');
+        expect(find.byType(CalendarScreen).hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }
 
 /// A phone whose database can't be read or written.
@@ -3948,6 +4377,7 @@ class _FreeApp {
     _Notices? notices,
     bool noticeSeen = false,
     DateTime? clock,
+    List<TaskListInfo> projects = const [],
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -3991,7 +4421,7 @@ class _FreeApp {
             ),
           ),
         ),
-        taskListsProvider.overrideWith((ref) async => []),
+        taskListsProvider.overrideWith((ref) async => projects),
         taskRepositoryProvider.overrideWithValue(MemoryTasks()),
         taskProvider.overrideWith((ref) => tasks),
         themeStoreProvider.overrideWithValue(MemoryThemeStore()),

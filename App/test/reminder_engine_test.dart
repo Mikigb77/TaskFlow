@@ -1202,6 +1202,85 @@ void main() {
           DateTime(2026, 10, 19, 9));
     });
   });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P300 (UX-2311, D2): the
+  // notification's Completar keeps the tick's time ----
+  group('P300 · completion times', () {
+    Future<({int id, String token})> delivered(Task task) async {
+      await RegionalPreferenceStore(database).write(const RegionalPreferences(
+          language: 'es', clock: ClockFormat.twentyFour));
+      await enable();
+      await database.insertTask(task);
+      await engine.reconcile('local');
+      final alert =
+          (await alerts()).firstWhere((row) => row['title'] == task.title);
+      final id = alert['id'] as int;
+      now = DateTime.parse(alert['fire_at'] as String)
+          .toLocal()
+          .add(const Duration(minutes: 1));
+      driver.pending.remove(id);
+      await engine.reconcile('local');
+      final current = (await alerts()).singleWhere((row) => row['id'] == id);
+      return (id: id, token: current['token'] as String);
+    }
+
+    test(
+        'UX-2311: «Completar» on a one-off task stores the engine clock’s time, and «Deshacer» on its notice clears it',
+        () async {
+      final alert = await delivered(Task(
+          title: 'Llamar al médico',
+          priority: 1,
+          dueDate: DateTime(2026, 9, 22, 9)));
+      now = DateTime(2026, 9, 22, 9, 3, 30);
+      expect(await engine.action(alert.id, 'complete', token: alert.token),
+          isTrue);
+      var task = (await database.getTasks()).single;
+      expect(task.isCompleted, isTrue);
+      expect(task.completedAt, DateTime(2026, 9, 22, 9, 3, 30));
+      expect(task.completedTimes, isEmpty);
+      now = DateTime(2026, 9, 22, 9, 4);
+      expect(
+          await engine.action(alert.id, 'undo',
+              token: driver.undoToken[alert.id]),
+          isTrue);
+      task = (await database.getTasks()).single;
+      expect(task.isCompleted, isFalse);
+      expect(task.completedAt, isNull);
+      final row = (await (await database.database).query('tasks')).single;
+      expect(row['completedAt'], isNull);
+    });
+
+    test(
+        'UX-2311: «Completar» on a repeating task stores the time under that repetition’s date, and «Deshacer» clears it',
+        () async {
+      final alert = await delivered(Task(
+          title: 'Tomar la pastilla',
+          priority: 1,
+          dueDate: DateTime(2026, 9, 21, 9),
+          recurrence: 'daily',
+          completedDates: ['2026-09-21'],
+          completedTimes: {'2026-09-21': DateTime(2026, 9, 21, 9, 5)}));
+      now = DateTime(2026, 9, 22, 9, 2);
+      expect(await engine.action(alert.id, 'complete', token: alert.token),
+          isTrue);
+      var task = (await database.getTasks()).single;
+      expect(task.completedDates, ['2026-09-21', '2026-09-22']);
+      expect(task.completedTimes, {
+        '2026-09-21': DateTime(2026, 9, 21, 9, 5),
+        '2026-09-22': DateTime(2026, 9, 22, 9, 2),
+      });
+      expect(task.completedAt, isNull);
+      expect(
+          await engine.action(alert.id, 'undo',
+              token: driver.undoToken[alert.id]),
+          isTrue);
+      task = (await database.getTasks()).single;
+      expect(task.completedDates, ['2026-09-21']);
+      expect(task.completedTimes, {
+        '2026-09-21': DateTime(2026, 9, 21, 9, 5),
+      });
+    });
+  });
 }
 
 class _Driver implements ReminderDriver {

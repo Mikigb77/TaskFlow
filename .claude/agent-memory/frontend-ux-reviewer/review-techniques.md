@@ -22,6 +22,9 @@ Ways to turn "needs a device check" into measured evidence, proven in the 2026-1
 
 ## Verify rounds
 - First check each fix's files actually have a diff in the main checkout (`git diff HEAD -- <file>`, grep for the new symbol). In run 2026-10-21-changes, five fixer worktrees were made from main instead of dev, so their fixes never landed; testers' failing tests were the first sign.
+- The tester's whole-suite log is `App/build/round-check/suite.log`: read failures there instead of re-running Flutter.
+- Entry-flow fixes (widget, shortcuts, share) have no preview render; they rest on code + widget tests. Walk the stack rules as sequences (VOICE→TEXT→VOICE, recorded vs empty, free 0 left vs Pro) — regressions there came from state combinations, not single taps.
+- Resume-to-today scroll (UX-1628) breaks on Calendar bottom-bar height changes: rerun `capture_landing_test.dart` UX-1628 when that height changes.
 
 ## Search changes
 - Re-implement the matcher as a script and run every prefix of real words (Catalan l·l words in all three spellings, accented Spanish) against stored forms; diff old vs new matcher over all pairs to prove "no lost matches".

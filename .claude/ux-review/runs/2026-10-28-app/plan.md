@@ -368,3 +368,72 @@ None.
 - P304's implementer: the inner `Padding(vertical: 12)` on two FilledButtons (delete_account_screen.dart:440, device_calendar_events.dart:354) is still there, as noted in round 2.
 - P301's implementer: AUDIT still flags 0 dp gaps between the repeat sheet's five rows, and weekday chips under 48 dp at 2×. Both predate P301.
 - The verify note (B, round 2): screens without TaskActions under a leaving task page (Activity, the Notas list, Tasks with files) have no leaving guard. Only a tap more than 300 ms after Completar could reach them. Not a regression.
+
+## Round 2 (b3)
+
+Round 1 of batch 3 ran P290–P295, P299 and P300. The reviewers found every finding fixed except UX-2110, which is only partly fixed and has failed once. They also found five regressions, now UX-2636 to UX-2640. The round check passed. The debug APK build couldn't run here because this environment has no Android SDK, so this round's Android resource changes haven't been compiled.
+Round 2 has five packages, P308–P312: two S2 and three S1. P308 and P309 share one test file. Otherwise no two packages share a file. There are no new decisions, and nothing is escalated.
+
+The briefs are in `plan-b3-r2.json`.
+
+### Settled here
+- **An entry from outside the app is absorbed only by an empty sheet or form of its own kind** (UX-2110, UX-2637). A voice entry is absorbed by an empty voice sheet, and a text entry by an empty typing sheet. An entry that would open the form is absorbed by an empty new-task form, or by the month's used-up notice. An empty sheet of the other kind is closed first, so one sheet shows, in the mode the entry asked for. The reviewer let a text entry be absorbed by any empty sheet. That would leave the mic listening when the person asked to type, so it's out.
+- **The words' card uses one wording for typed and spoken words** (UX-2636). It now says «Según tus palabras» / “From your words” / «Segons les teves paraules», and the button says “Keep my words” in EN. The reviewer's spoken-only variant would add strings, so it isn't used.
+- **The Pro screen shows your plan first, for every account** (UX-2640). The reviewer offered this as the fallback. Fixing the icon size alone doesn't bring «Dictados gratis» into view at ES 2×: the three benefits still take about 9 lines. If the first benefit line no longer fits at CA 2× (UX-1613's test), only the file-space line goes back below the benefits.
+- **A completion from before the update that is reopened and then undone gets today's time.** This is the second case of UX-2638. The contract can't send "no time", so the case is accepted.
+
+### Packages, in run order
+
+#### P308 · From outside the app: a second tap never stacks a second form, and the mic never lands on the keyboard · A · M · after P292
+- **UX-2110** (S1; partly fixed, failed once). Round 1 covered the capture sheet. A free account's entry opens the task form instead, and a double tap there still stacked two forms. Now an empty new-task form absorbs it, and so does the used-up notice.
+- **UX-2637** (S2; R1A-2). The widget's mic was absorbed by an empty typing sheet, which left the keyboard showing. Now the empty typing sheet closes, and a listening sheet opens in its place.
+
+#### P309 · The words' card says «Según tus palabras», whether they were typed or spoken · A · S · after P299
+- **UX-2636** (S2; R1A-1). Every spoken «Guardar como tarea» card said «Según lo que has escrito». Now it says «Según tus palabras» / «Segons les teves paraules». In EN, “Keep as typed” becomes “Keep my words”. No new key.
+
+#### P310 · Completadas: ticking a row you just reopened puts it back where it was · B · S · after P300
+- **UX-2638** (S1; R1B-1). When a row was re-ticked with its checkbox, it got today's time, so on the next visit it was listed first. Now Completadas passes back the time it remembered for the row.
+
+#### P311 · The project sheet shows its last row whole · C · S · after P294
+- **UX-2639** (S1; R1C-1). The handle and the heading pushed «Nuevo proyecto» half below the sheet's edge. Now the sheet is scroll-controlled, capped at 70% of the screen, like «¿Quién es responsable?».
+
+#### P312 · The Pro screen shows your plan first, and its benefit checks stay small at large text · D · S · after P290
+- **UX-2640** (S1; R1D-1). At 2× the benefit list hid «No hay una suscripción Pro activa» and the dictation count. Now the check icons stay 20 dp, and the status block comes before the benefits.
+
+### Escalated
+None. UX-2110 has failed once.
+
+### For the main session (noted by the tester and the implementers, not by a reviewer, so not planned)
+- **The debug APK build didn't run.** The tester's `flutter build apk --debug --no-pub --target-platform android-x64` stopped with «No Android SDK found», and the proxy refused dl.google.com, so the SDK couldn't be installed. Run the build on the Windows PC before the round's commit and the device checks. It's the only compile of P292's adaptive shortcut icons (`res/drawable-anydpi-v26/`, the new foreground vectors, `CaptureShortcuts.kt`) and of this round's Android resource changes.
+- From P294's implementer: the ca 2× render of `tasks/detail.created-by` cuts «Ho veuen tots els membres.» behind the Completa / Canvia la data buttons, and the es 1× AUDIT has «Planificado para…» and «Prioridad Media» 1 dp apart. Not filed by a reviewer. Worth a look at close.
+- From P293's implementer: ES `fileRemoveHelp` still says «Se eliminará de la tarea…» next to «Quitar archivo». «Se quitará de la tarea…» would match it. The reviewer noted the same.
+- From P299's implementer: the result card shows the title above the date line, while D3's flow says the date comes first. The card's widgets were outside P299, and every result card shows the same order.
+- From P300's implementer: Deshacer after a repeating task lost its repeat stamps restored dates that never had a time. The server applies the same rule.
+- From P290's implementer: at ES 2× on Ajustes, «Otros ajustes» sits below the fold in `settings-tab.free`. Nothing is clipped.
+
+## Round 3 (b3)
+
+Round 2 of batch 3 ran P308–P312. The reviewers found every finding fixed (UX-2110, UX-2636, UX-2637, UX-2638, UX-2639, UX-2640; P308's device checks are still to do). They found two regressions, both from P308, now UX-2641 and UX-2642. The round check passed and no test failed.
+Round 3 has one package, P313 (S2), for both regressions. They sit in the same check in `_openEntries`. There are no new decisions, and nothing is escalated: each regression is new, so neither has failed before.
+
+The brief is in `plan-b3-r3.json`.
+
+### Settled here
+- **Absorbing and closing use different tests** (UX-2641). An entry absorbed by an empty sheet of its own mode loses nothing, so that test stays "no words, no result". Closing an empty sheet of the other mode needs the sheet's own test, "nothing said or typed", which counts a kept recording. The reviewer's one-word fix (`_hasInput` for both) would make an online-listening sheet non-empty within 120 ms, and a double tap would stack two listening sheets again (UX-2110), so it isn't used.
+- **An entry lands only in a form an entry would open** (UX-2642): no day, project, person, words or capture. A voice entry also needs the form to have been opened to speak, so the used-up line shows. A text entry may land in either kind. An empty entry form that doesn't take the entry closes first, as an empty sheet of the other mode does (Back on a form with no title just closes, D12). This also covers the reviewer's note that a voice entry with dictations left opened its sheet over an empty text-entry form. In-app forms (with a day, project or person) are never closed or used: the entry's own form opens over them, as before P308.
+- **The used-up notice** takes either kind of entry when an entry opened it: the notice itself says the dictations are used up. It's never closed.
+
+### Packages, in run order
+
+#### P313 · From outside the app: an entry never closes a sheet holding a recording, and lands only in a form it would open itself · A · M · after P308
+- **UX-2641** (S2; R2A-1). In online listening, a paused voice sheet with a recording counted as empty, and a text tap closed it without asking. Now a sheet that keeps a recording is never closed: the typing sheet opens over it, and Cancelar shows it again.
+- **UX-2642** (S2; R2A-2). Any empty form took an outside tap: the mic landed in a text form without the used-up line, and the widget landed in a form set to a picked day, list or person. Now only an empty form an entry would open takes it; an empty entry form of the wrong kind closes first; in-app forms get the entry's own form over them.
+
+### Escalated
+None.
+
+### For the main session (noted by the implementers, not by a reviewer, so not planned)
+- From P309's implementer: a code comment, `App/lib/models/capture_session.dart:21`, still names the old button `Keep as typed`. It isn't user-facing; it could say `Keep my words`.
+- From P309's implementer: the Catalan «Segons les teves paraules» was written by the reviewer; a native read is welcome.
+- From P312's implementer: the `settings/pro` file-space-full CA 2× render scrolls the button into view and drags back 200 dp, so the last benefit line sits cut at the list's top edge. Only the scroll position; AUDIT reports no cut text.
+- The debug APK build is still owed from round 2 (no Android SDK here): run it on the Windows PC before the round's commit and the device checks.

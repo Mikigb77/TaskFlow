@@ -1144,8 +1144,8 @@ void main() {
       expect(
         arb('es')['homeCaptureInstructions'],
         'En Android, mantén pulsado el icono de TaskFlow para ver los accesos '
-        'directos, o añade el widget de micrófono desde el lanzador. Comparte '
-        'texto con TaskFlow desde otra aplicación.',
+        'directos, o añade el widget Dictar una tarea desde la pantalla de '
+        'inicio. Comparte texto con TaskFlow desde otra aplicación.',
       );
       expect(
         arb('ca')['homeCaptureInstructions'],
@@ -1156,4 +1156,127 @@ void main() {
       );
     },
   );
+
+  // ---- UX loop 2026-10-28-app, round 1 · P292 (UX-2112): the shortcut
+  // icons read at launcher size ----
+  group('P292 · adaptive shortcut icons', () {
+    for (final name in ['capture_shortcut_voice', 'capture_shortcut_text']) {
+      test(
+        'UX-2112: drawable-anydpi-v26/$name.xml is an <adaptive-icon> with a #E3F1EE background and a foreground vector',
+        () {
+          final file = File('$_res/drawable-anydpi-v26/$name.xml');
+          expect(file.existsSync(), isTrue, reason: name);
+          final xml = file.readAsStringSync();
+          final body = xml
+              .replaceAll(RegExp(r'<\?xml[^>]*\?>'), '')
+              .replaceAll(RegExp(r'<!--[\s\S]*?-->'), '')
+              .trim();
+          expect(
+            body,
+            startsWith(
+              '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android"',
+            ),
+          );
+          expect(body, endsWith('</adaptive-icon>'));
+          final background = RegExp(
+            r'<background>\s*<color android:color="([^"]+)"\s*/>\s*</background>',
+          ).firstMatch(body);
+          expect(background, isNotNull, reason: 'a colour background');
+          expect(background![1]!.toUpperCase(), '#E3F1EE');
+          final foreground = RegExp(
+            r'<foreground android:drawable="@drawable/([a-z_]+)"\s*/>',
+          ).firstMatch(body);
+          expect(foreground, isNotNull);
+          expect(foreground![1], '${name}_foreground');
+          // No monochrome or second layer the launcher could pick instead.
+          expect(RegExp('<foreground').allMatches(body).length, 1);
+          expect(RegExp('<background').allMatches(body).length, 1);
+        },
+      );
+
+      test(
+        'UX-2112: drawable/${name}_foreground.xml is a 108 dp vector with the teal #167568 glyph, at about half the 72 dp safe zone, centred',
+        () {
+          final file = File('$_res/drawable/${name}_foreground.xml');
+          expect(file.existsSync(), isTrue);
+          final xml = file
+              .readAsStringSync()
+              .replaceAll(RegExp(r'<!--[\s\S]*?-->'), '');
+          expect(xml, contains('<vector'));
+          for (final attribute in [
+            'android:width="108dp"',
+            'android:height="108dp"',
+            'android:viewportWidth="108"',
+            'android:viewportHeight="108"',
+          ]) {
+            expect(xml, contains(attribute));
+          }
+          final paths = RegExp(
+            r'<path\s[^>]*?android:fillColor="([^"]+)"[^>]*?android:pathData="([^"]+)"[^>]*/>',
+          ).allMatches(xml).toList();
+          expect(paths, isNotEmpty);
+          for (final path in paths) {
+            expect(path[1]!.toUpperCase(), '#167568');
+          }
+          // The group's scale and translation, if any.
+          double attr(String name, double fallback) {
+            final match = RegExp(
+              'android:$name="(-?[0-9.]+)"',
+            ).firstMatch(xml);
+            return match == null ? fallback : double.parse(match[1]!);
+          }
+
+          final scaleX = attr('scaleX', 1), scaleY = attr('scaleY', 1);
+          final dx = attr('translateX', 0), dy = attr('translateY', 0);
+          var left = double.infinity, top = double.infinity;
+          var right = -double.infinity, bottom = -double.infinity;
+          for (final path in paths) {
+            final b = _pathBounds(path[2]!);
+            left = math.min(left, b.left * scaleX + dx);
+            right = math.max(right, b.right * scaleX + dx);
+            top = math.min(top, b.top * scaleY + dy);
+            bottom = math.max(bottom, b.bottom * scaleY + dy);
+          }
+          // Inside the 72 dp safe zone (18–90 dp of the 108 dp canvas).
+          expect(left, greaterThanOrEqualTo(18));
+          expect(top, greaterThanOrEqualTo(18));
+          expect(right, lessThanOrEqualTo(90));
+          expect(bottom, lessThanOrEqualTo(90));
+          // About half of it: the glyph's larger side 30–44 dp.
+          final size = math.max(right - left, bottom - top);
+          expect(size, inInclusiveRange(30, 44));
+          // Centred, within 4 dp.
+          expect(((left + right) / 2 - 54).abs(), lessThanOrEqualTo(4));
+          expect(((top + bottom) / 2 - 54).abs(), lessThanOrEqualTo(4));
+        },
+      );
+
+      test(
+        'UX-2112: the API 24–25 vector $name.xml stays in drawable/, with its own light circle',
+        () {
+          final file = File('$_res/drawable/$name.xml');
+          expect(file.existsSync(), isTrue);
+          expect(
+            file.readAsStringSync().trim(),
+            startsWith('<vector'),
+          );
+        },
+      );
+    }
+
+    test(
+      'UX-2112: the shortcuts still name the same icon resources, which Android resolves to the adaptive icon on 8+',
+      () {
+        final shortcuts = File(
+          'android/app/src/main/kotlin/com/example/agenda/CaptureShortcuts.kt',
+        ).readAsStringSync();
+        expect(shortcuts, contains('R.drawable.capture_shortcut_voice'));
+        expect(shortcuts, contains('R.drawable.capture_shortcut_text'));
+        // The launcher icon is unchanged (D8 of 2026-10-20).
+        expect(shortcuts, isNot(contains('R.drawable.app_icon')));
+        expect(shortcuts, isNot(contains('R.mipmap.')));
+      },
+    );
+  });
+
 }

@@ -89,38 +89,35 @@ Future<void> showCaptureSheet(
   bool useScope = true,
 }) async {
   final container = ProviderScope.containerOf(context, listen: false);
-  if (container.read(typesInFormProvider)) {
-    if (captureId == null) {
-      if (kind == 'task' &&
-          (typing || !container.read(voiceAvailableProvider))) {
-        return openTaskForm(
-          context,
-          projectId: projectId,
-          person: person,
-          day: day,
-          page: page,
-          showCalendar: showCalendar,
-          askedToSpeak: askedToSpeak,
-        );
-      }
-    } else {
-      final typed = await _typedWords(container, captureId);
-      if (!context.mounted) return;
-      if (typed != null) {
-        return openTaskForm(
-          context,
-          projectId: typed.projectId,
-          day: typed.day,
-          page: page,
-          showCalendar: showCalendar,
-          words: typed.text,
-          // Shared words name their day and time, counted from the share
-          // (D3, 2026-10-20); words typed in the sheet stay as written.
-          readsDates: typed.source == 'shared',
-          heardAt: typed.capturedAt.toLocal(),
-          captureId: typed.id,
-        );
-      }
+  if (captureId == null) {
+    if (kind == 'task' && captureOpensForm(container, typing: typing)) {
+      return openTaskForm(
+        context,
+        projectId: projectId,
+        person: person,
+        day: day,
+        page: page,
+        showCalendar: showCalendar,
+        askedToSpeak: askedToSpeak,
+      );
+    }
+  } else if (container.read(typesInFormProvider)) {
+    final typed = await _typedWords(container, captureId);
+    if (!context.mounted) return;
+    if (typed != null) {
+      return openTaskForm(
+        context,
+        projectId: typed.projectId,
+        day: typed.day,
+        page: page,
+        showCalendar: showCalendar,
+        words: typed.text,
+        // Shared words name their day and time, counted from the share
+        // (D3, 2026-10-20); words typed in the sheet stay as written.
+        readsDates: typed.source == 'shared',
+        heardAt: typed.capturedAt.toLocal(),
+        captureId: typed.id,
+      );
     }
   }
   if (!context.mounted) return;
@@ -153,9 +150,17 @@ Future<void> showCaptureSheet(
           ),
         ),
       ),
-    ),
+    ).._typing = typing,
   );
 }
+
+/// Whether a new task capture with no words yet opens the task form rather
+/// than the sheet: an account without Pro that would type, or has no mic.
+/// [showCaptureSheet] and the widget's and shortcuts' entries ask the same
+/// question (UX-2110).
+bool captureOpensForm(ProviderContainer container, {required bool typing}) =>
+    container.read(typesInFormProvider) &&
+    (typing || !container.read(voiceAvailableProvider));
 
 /// A task capture of typed or shared words with no result yet: for an
 /// account without Pro, the form takes it. A dictation stays in the sheet.
@@ -197,6 +202,34 @@ class _CaptureOrigin extends InheritedWidget {
       page != old.page || showCalendar != old.showCalendar;
 }
 
+/// What an empty capture sheet waits for: words said, or words typed.
+enum CaptureMode { voice, typing }
+
+/// The mode of the capture sheet on top of [navigator] when it holds
+/// nothing yet (no words heard or typed, no result), or null when the top
+/// isn't such a sheet. A tap on the widget or a shortcut that asks for the
+/// same mode then opens no second sheet over it (UX-2110); one that asks for
+/// the other mode closes it first, so the mic never lands on the keyboard
+/// (UX-2637), unless it keeps a recording ([emptyCaptureSheetOnTopRecorded]).
+CaptureMode? emptyCaptureSheetOnTop(NavigatorState navigator) =>
+    _emptySheetOnTop(navigator)?._mode;
+
+/// Whether the empty capture sheet on top of [navigator] keeps a recording:
+/// in online listening no words show, but what was said is kept. It still
+/// takes a tap of its own mode, but one of the other mode opens over it
+/// rather than closing it, as its own `Cancelar` would ask first (UX-2641).
+bool emptyCaptureSheetOnTopRecorded(NavigatorState navigator) =>
+    _emptySheetOnTop(navigator)?._recorded ?? false;
+
+_CaptureSheetRoute? _emptySheetOnTop(NavigatorState navigator) {
+  for (final route in _CaptureSheetRoute._open) {
+    if (route.navigator == navigator && route.isCurrent && route._empty) {
+      return route;
+    }
+  }
+  return null;
+}
+
 /// A modal bottom sheet whose scrim can't close it while capture is listening
 /// or working. Swiping down is handled by [_SheetFrame], so it asks the same
 /// question as Cancel and Back instead of closing at once.
@@ -215,6 +248,33 @@ class _CaptureSheetRoute extends ModalBottomSheetRoute<void> {
        );
 
   bool _holdScrim = false;
+
+  // The sheets on screen, so a widget or shortcut tap can tell whether an
+  // empty one already waits on top (UX-2110).
+  static final _open = <_CaptureSheetRoute>{};
+
+  // Nothing said, typed or understood in it yet, and whether it shows the
+  // keyboard rather than the mic: set as it's pushed, then kept by the
+  // capture each build.
+  bool _empty = true;
+  bool _typing = false;
+
+  // A recording kept in it, even with no words shown (UX-2641).
+  bool _recorded = false;
+
+  CaptureMode get _mode => _typing ? CaptureMode.typing : CaptureMode.voice;
+
+  @override
+  void install() {
+    super.install();
+    _open.add(this);
+  }
+
+  @override
+  void dispose() {
+    _open.remove(this);
+    super.dispose();
+  }
 
   @override
   bool get barrierDismissible => !_holdScrim;
@@ -558,8 +618,6 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   // Counts understanding steps; saving as written ends the running one, so
   // its late answer changes nothing.
   int _attempts = 0;
-  // The result saved as soon as it shows: words saved as written.
-  String? _saveAtOnce;
   late final NativeSpeech _speech;
   SpeechCapability _capability = const SpeechCapability();
   // The recognizer's language, e.g. `ca-ES`, passed to every listening run.
@@ -865,6 +923,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         status: _recording ? 'recording' : 'editing',
         audioFormat: _audioFormat,
       );
+      _markRecorded();
       await _store.update(_session!);
     });
     unawaited(
@@ -1644,9 +1703,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   /// Words that can be saved as written: saved audio with no words can't.
   bool get _hasWords => _words.text.trim().isNotEmpty;
 
-  /// `Guardar como tarea`: the words as written, with the date they name, saved
-  /// at once as any result is, while the assistant is slow or after it
-  /// failed.
+  /// `Guardar como tarea`: the words as written, with the date they name, shown
+  /// as a result card, while the assistant is slow or after it failed. Only
+  /// the card's button saves it, as on any result (D1 of run 2026-10-28-app).
   Future<void> _saveAsWritten() async {
     final session = _session;
     if (session == null || !_hasWords) return;
@@ -1669,7 +1728,6 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       );
       if (!mounted) return;
       _session = written;
-      _saveAtOnce = written.id;
       ref.invalidate(pendingCapturesProvider);
       _phase = _CapturePhase.idle;
       _review(written);
@@ -1684,8 +1742,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   }
 
   /// `Guardar como tarea` on a result whose commands found nothing: its words
-  /// become a task, understood on the phone and saved at once. No command is
-  /// applied, and nothing goes to the assistant, so no dictation is used.
+  /// become a task, understood on the phone and shown on its own card, which
+  /// saves it. No command is applied, and nothing goes to the assistant, so
+  /// no dictation is used.
   Future<void> _saveResultAsWritten(CaptureSession result) async {
     final words = result.transcript.trim().isNotEmpty
         ? result.transcript
@@ -1698,7 +1757,6 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     );
     if (!mounted) return;
     _session = written;
-    _saveAtOnce = written.id;
     ref.invalidate(pendingCapturesProvider);
     _review(written);
   }
@@ -1783,7 +1841,6 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     if (_result == null || !mounted) return;
     _previousResult = previous;
     _projectId = previous.projectId;
-    _saveAtOnce = null;
     // The last free dictation may have just been used: then it types.
     _voice = _voice && ref.read(voiceAvailableProvider);
     _words.clear();
@@ -2218,6 +2275,27 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     }
   }
 
+  /// Tells the sheet's route whether it holds anything yet, whether it
+  /// types, and whether it keeps a recording (UX-2110, UX-2637, UX-2641).
+  void _markEmpty(bool empty) {
+    final route = ModalRoute.of(context);
+    if (route is _CaptureSheetRoute) {
+      route._empty = empty;
+      route._typing = _typing;
+      route._recorded = _session?.audioPath != null;
+    }
+  }
+
+  /// Tells the sheet's route at once that it keeps a recording: the audio is
+  /// kept with no rebuild (UX-2641).
+  void _markRecorded() {
+    if (!mounted) return;
+    final route = ModalRoute.of(context);
+    if (route is _CaptureSheetRoute) {
+      route._recorded = _session?.audioPath != null;
+    }
+  }
+
   /// While the sheet listens or works, a tap on the scrim doesn't close it.
   void _holdScrim(bool hold) {
     final route = ModalRoute.of(context);
@@ -2230,16 +2308,16 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   @override
   Widget build(BuildContext context) {
     final result = _result;
+    _markEmpty(result == null && !_hasWords);
     if (result != null) {
       _holdScrim(false);
-      final saveAtOnce = _saveAtOnce == result.id;
       return CaptureResult(
-        // Saved as written from its own result: a new result, built afresh.
-        key: ValueKey((result.id, saveAtOnce)),
+        // Rebuilt as written from its own result (`Guardar como tarea`), the
+        // words keep its id but lose its commands: a new card, built afresh.
+        key: ValueKey((result.id, result.commands.isEmpty)),
         session: result,
         onSayAgain: _sayAgain,
         onSaveAsWritten: _saveResultAsWritten,
-        saveAtOnce: saveAtOnce,
       );
     }
     final l10n = context.l10n;
@@ -2773,13 +2851,8 @@ class CaptureResult extends ConsumerStatefulWidget {
     required this.session,
     this.onSayAgain,
     this.onSaveAsWritten,
-    this.saveAtOnce = false,
   });
   final CaptureSession session;
-
-  /// Saved as written: saved as soon as it shows, unless a detail still
-  /// needs an answer (morning or afternoon).
-  final bool saveAtOnce;
 
   /// Spoken captures: listen again. It gets the result as it is now, with
   /// its edits written, so Cancel can bring it back.
@@ -2826,13 +2899,6 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final pending = _items.where((d) => d.pending);
-      if (widget.saveAtOnce &&
-          pending.isNotEmpty &&
-          pending.every((d) => d.ready)) {
-        unawaited(_save());
-        return;
-      }
       _reveal();
       _announce();
     });
@@ -4305,7 +4371,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     if (mounted) widget.onSayAgain?.call(_session);
   }
 
-  /// `Guardar como tarea`: the words, not the commands, are what to keep.
+  /// `Guardar como tarea`: the words, not the commands, are what to keep,
+  /// shown on a card of their own.
   Future<void> _saveAsWritten() async {
     final save = widget.onSaveAsWritten;
     if (_saving || save == null) return;

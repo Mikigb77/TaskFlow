@@ -206,7 +206,7 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
         return true;
       });
 
-  Future<void> setCompleted(Task occurrence, bool completed) {
+  Future<void> setCompleted(Task occurrence, bool completed, {DateTime? at}) {
     return _mutate(() async {
       final tasks = await _repository.getAllTasks();
       final task = tasks.where((t) => t.id == occurrence.id).firstOrNull;
@@ -224,10 +224,18 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
         } else {
           dates.remove(key);
         }
-        await _repository
-            .updateTask(task.copyWith(completedDates: dates.toList()..sort()));
+        // Completing keeps [at], the time Completadas remembers for a row
+        // reopened there, or else the time [occurrence] had for this
+        // completion, as Deshacer after a reopen passes it; without either,
+        // an open row's tick gets now.
+        final time = completed ? (at ?? occurrence.completedTimes[key]) : null;
+        await _repository.updateTask(task.copyWith(
+            completedDates: dates.toList()..sort(),
+            completedTimes: {...task.completedTimes, key: ?time}));
       } else {
-        await _repository.updateTask(task.copyWith(isCompleted: completed));
+        await _repository.updateTask(task.copyWith(
+            isCompleted: completed,
+            completedAt: completed ? (at ?? occurrence.completedAt) : null));
       }
       if (mounted) await showLocal();
     });

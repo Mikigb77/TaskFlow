@@ -1,5 +1,6 @@
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/main.dart';
+import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/screens/other_settings_screen.dart';
 import 'package:agenda/services/capture_entries.dart';
@@ -1117,6 +1118,150 @@ void main() {
       },
     );
   }
+
+  // ---- UX loop 2026-10-28-app, round 1 · P290 (UX-2605): the Pro row
+  // shows your plan ----
+  group('P290 · Ajustes shows your plan', () {
+    /// Ajustes in [language] at [scale] on 360×800, for an account with Pro
+    /// when [pro], else with [freeLeft] free dictations left (null: the
+    /// count isn't known yet).
+    Future<void> openPlan(
+      WidgetTester tester, {
+      required bool pro,
+      int? freeLeft,
+      String language = 'es',
+      double scale = 1,
+    }) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final container = designContainer(
+        pro: pro,
+        regionalStore: MemoryRegionalStore(
+          RegionalPreferences(language: language),
+        ),
+        overrides: [
+          ...reminderOverrides(
+            MemoryReminderStore(const ReminderPreferences()),
+            FakeReminderAccess(allowed: false),
+          ),
+          if (!pro) freeVoiceLeftProvider.overrideWithValue(freeLeft),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const MyApp()),
+      );
+      await tester.pumpAndSettle();
+      final l = lookupAppLocalizations(Locale(language));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text(l.settings),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    Finder proRow(AppLocalizations l) => find.descendant(
+      of: find.byType(SettingsScreen),
+      matching: find.widgetWithText(ListTile, l.taskflowPro),
+    );
+
+    test('UX-2605: the plan lines read as planned in ES, EN and CA', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(es.freeVoiceLeft(4), 'Te quedan 4 dictados gratis este mes');
+      expect(es.freeVoiceLeft(0), 'Ya no te quedan dictados gratis este mes');
+      expect(es.billingStatus('active'), 'Pro está activo');
+      expect(en.billingStatus('active'), 'Pro is active');
+      expect(ca.billingStatus('active'), 'Pro està actiu');
+    });
+
+    for (final (language, scale) in [('es', 1.0), ('es', 2.0), ('ca', 2.0)]) {
+      final l = lookupAppLocalizations(Locale(language));
+      for (final (what, pro, left, line) in [
+        ('a free account with 4 left', false, 4, l.freeVoiceLeft(4)),
+        ('a free account with 0 left', false, 0, l.freeVoiceLeft(0)),
+        ('Pro', true, null, l.billingStatus('active')),
+        ('a free account whose count isn’t known yet', false, null, null),
+      ]) {
+        testWidgets(
+          'UX-2605: Ajustes, $language at ${scale.toInt()}× on 360×800, for $what: the TaskFlow Pro row reads ${line == null ? 'no subtitle' : '«$line»'}, whole; «Suscripción, compras y facturación» shows nowhere',
+          (tester) async {
+            await openPlan(
+              tester,
+              pro: pro,
+              freeLeft: left,
+              language: language,
+              scale: scale,
+            );
+            final row = proRow(l);
+            await tester.ensureVisible(row);
+            await tester.pumpAndSettle();
+            expect(row, findsOneWidget);
+            final tile = tester.widget<ListTile>(row);
+            if (line == null) {
+              expect(tile.subtitle, isNull, reason: 'nothing until it’s known');
+            } else {
+              final subtitle = find.descendant(
+                of: row,
+                matching: find.text(line),
+              );
+              expect(subtitle, findsOneWidget);
+              final rect = tester.getRect(subtitle);
+              expect(rect.left, greaterThanOrEqualTo(0));
+              expect(rect.right, lessThanOrEqualTo(360.5));
+            }
+            for (final gone in [
+              'Suscripción, compras y facturación',
+              'Subscription, purchases and billing',
+              'Subscripció, compres i facturació',
+            ]) {
+              expect(find.text(gone, skipOffstage: false), findsNothing);
+            }
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P295 (UX-2613): the Spanish
+  // widget help names the widget ----
+  group('P295 · the Spanish widget help names the widget', () {
+    testWidgets(
+      'UX-2613: Ajustes › Otros ajustes’ help in Spanish reads the new sentence, naming the widget exactly as capture_widget_label does in values-es/strings.xml',
+      (tester) async {
+        await openWidgetHelp(tester, 'es', fails: false);
+        final label = RegExp(
+          r'<string name="capture_widget_label"[^>]*>([^<]*)</string>',
+        ).firstMatch(
+          File(
+            'android/app/src/main/res/values-es/strings.xml',
+          ).readAsStringSync(),
+        )![1]!;
+        expect(label, 'Dictar una tarea');
+        const sentence =
+            'En Android, mantén pulsado el icono de TaskFlow para ver los '
+            'accesos directos, o añade el widget Dictar una tarea desde la '
+            'pantalla de inicio. Comparte texto con TaskFlow desde otra '
+            'aplicación.';
+        expect(es.homeCaptureInstructions, sentence);
+        expect(sentence, contains('el widget $label desde'));
+        final sheet = find.byType(BottomSheet);
+        expect(
+          find.descendant(of: sheet, matching: find.text(sentence)),
+          findsOneWidget,
+        );
+        expect(find.textContaining('widget de micrófono'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
 }
 
 class _CountingRegionalStore extends MemoryRegionalStore {

@@ -337,10 +337,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get calendarChoose => 'Elegir calendarios';
 
   @override
-  String get calendarChooseHelp =>
-      'Selecciona hasta 50 calendarios. Las horas siguen la zona de tu dispositivo; los eventos de día completo conservan sus fechas originales.';
-
-  @override
   String get calendarDenied =>
       'Permite el acceso al calendario para mostrar tus eventos. Tus tareas siguen funcionando sin él.';
 
@@ -751,7 +747,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get homeCaptureInstructions =>
-      'En Android, mantén pulsado el icono de TaskFlow para ver los accesos directos, o añade el widget de micrófono desde el lanzador. Comparte texto con TaskFlow desde otra aplicación.';
+      'En Android, mantén pulsado el icono de TaskFlow para ver los accesos directos, o añade el widget Dictar una tarea desde la pantalla de inicio. Comparte texto con TaskFlow desde otra aplicación.';
 
   @override
   String get widgetPickerHelp =>
@@ -902,6 +898,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get deleteTask => 'Eliminar tarea';
 
   @override
+  String get deleteNote => 'Eliminar nota';
+
+  @override
   String get keepTask => 'Conservar tarea';
 
   @override
@@ -939,6 +938,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get moveError => 'No se pudo mover esta tarea. Inténtalo de nuevo.';
+
+  @override
+  String get moveNoteError => 'No se pudo mover esta nota. Inténtalo de nuevo.';
 
   @override
   String get occurrence => 'Repetición';
@@ -1308,7 +1310,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get titleRequiredField => 'Introduce un título para la tarea';
 
   @override
-  String get fromYourWords => 'Según lo que has escrito';
+  String get fromYourWords => 'Según tus palabras';
 
   @override
   String get keepAsTyped => 'Dejar como está';
@@ -1455,7 +1457,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get fileRetry => 'Volver a subir';
 
   @override
-  String get fileRemove => 'Eliminar archivo adjunto';
+  String get fileRemove => 'Quitar archivo';
 
   @override
   String removeFileNamed(String file) {
@@ -1463,7 +1465,7 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get fileRemoveQuestion => '¿Eliminar este archivo adjunto?';
+  String get fileRemoveQuestion => '¿Quitar este archivo de la tarea?';
 
   @override
   String get fileRemoveHelp =>
@@ -1536,6 +1538,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get signInHeading => 'Inicia sesión';
+
+  @override
+  String get signInOrUpHeading => 'Entra o crea tu cuenta';
 
   @override
   String get authPitch =>
@@ -3245,11 +3250,14 @@ class AppLocalizationsEs extends AppLocalizations {
   String get taskflowPro => 'TaskFlow Pro';
 
   @override
-  String get billingSettingsHelp => 'Suscripción, compras y facturación';
+  String get proBenefitDictation =>
+      'Dictados y espacio para archivos sin límite';
 
   @override
-  String get billingIntro =>
-      'Dictados sin límite y espacio para todos tus archivos.';
+  String get proBenefitTyping => 'Tus frases escritas se convierten en tareas';
+
+  @override
+  String get proBenefitReminders => 'Pide los recordatorios con tus palabras';
 
   @override
   String get billingComplimentary =>
@@ -3295,7 +3303,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get billingRenewalHelp =>
-      'Se renueva automáticamente cada mes hasta que la canceles. Revisa el precio final y las condiciones de prueba antes de confirmar.';
+      'Se renueva automáticamente cada mes hasta que la canceles. Revisa el precio final y las condiciones de cualquier prueba antes de confirmar.';
 
   @override
   String get billingViewPlans => 'Ver suscripción';
@@ -3477,6 +3485,15 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get sharedTaskStays =>
       'Las tareas compartidas se quedan en su proyecto.';
+
+  @override
+  String shareNoteConfirm(String name) {
+    return '¿Compartir con $name? Todos verán esta nota y no podrás volver a hacerla privada.';
+  }
+
+  @override
+  String get sharedNoteStays =>
+      'Las notas compartidas se quedan en su proyecto.';
 
   @override
   String get assignmentIsRight => '¿Es correcto?';
@@ -3765,7 +3782,7 @@ class AppLocalizationsEs extends AppLocalizations {
       other: 'te quedan $left',
       one: 'te queda 1',
     );
-    return 'Dictados gratis: $_temp0 de $limit este mes. Más el $date.';
+    return 'Dictados gratis: $_temp0 de $limit este mes. El $date tendrás más.';
   }
 
   @override
@@ -3812,7 +3829,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String storageUsage(int used, int limit) {
-    return 'Archivos: $used de $limit MB usados';
+    return 'Archivos: $used de $limit MB usados';
   }
 
   @override

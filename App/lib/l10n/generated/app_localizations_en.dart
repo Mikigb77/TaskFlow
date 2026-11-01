@@ -331,10 +331,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get calendarChoose => 'Choose calendars';
 
   @override
-  String get calendarChooseHelp =>
-      'Select up to 50 calendars. Calendar times follow your device; all-day dates stay on their original days.';
-
-  @override
   String get calendarDenied =>
       'Allow calendar access to display your events. Your tasks still work without it.';
 
@@ -888,6 +884,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deleteTask => 'Delete task';
 
   @override
+  String get deleteNote => 'Delete note';
+
+  @override
   String get keepTask => 'Keep task';
 
   @override
@@ -924,6 +923,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get moveError => 'Could not move this task. Please retry.';
+
+  @override
+  String get moveNoteError => 'Could not move this note. Please retry.';
 
   @override
   String get occurrence => 'Occurrence';
@@ -1274,7 +1276,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fromYourWords => 'From your words';
 
   @override
-  String get keepAsTyped => 'Keep as typed';
+  String get keepAsTyped => 'Keep my words';
 
   @override
   String get optionalTime => 'Time (optional)';
@@ -1496,6 +1498,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get signInHeading => 'Sign in';
+
+  @override
+  String get signInOrUpHeading => 'Sign in or sign up';
 
   @override
   String get authPitch =>
@@ -3159,11 +3164,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taskflowPro => 'TaskFlow Pro';
 
   @override
-  String get billingSettingsHelp => 'Subscription, purchases and billing';
+  String get proBenefitDictation => 'Unlimited dictation and file space';
 
   @override
-  String get billingIntro =>
-      'Unlimited dictations, and room for all your files.';
+  String get proBenefitTyping => 'Sentences you type become tasks';
+
+  @override
+  String get proBenefitReminders => 'Ask for reminders in your own words';
 
   @override
   String get billingComplimentary =>
@@ -3389,6 +3396,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sharedTaskStays => 'Shared tasks stay in their project.';
+
+  @override
+  String shareNoteConfirm(String name) {
+    return 'Share with $name? Everyone there will see this note. It can’t be made private again.';
+  }
+
+  @override
+  String get sharedNoteStays => 'Shared notes stay in their project.';
 
   @override
   String get assignmentIsRight => 'Is this right?';
@@ -3719,7 +3734,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String storageUsage(int used, int limit) {
-    return 'Files: $used of $limit MB used';
+    return 'Files: $used of $limit MB used';
   }
 
   @override

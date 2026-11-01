@@ -650,6 +650,44 @@ void tasksPreviews() {
 
     preview(
       detail,
+      'remove-file',
+      'After «Quitar archivo» on a task’s uploaded file: «¿Quitar este archivo de la tarea?», the file’s name, that it leaves the task and the other devices while the original file stays, «Cancelar» and «Quitar archivo» in the error colour.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), ..._fileTasks()],
+          projects: [...allProjects, _choir],
+          overrides: [
+            taskRepositoryProvider.overrideWithValue(_FileTasks(_fileUsage)),
+            attachmentEntriesProvider.overrideWith(
+              (ref, taskId) async => [
+                if (taskId == 80)
+                  const AttachmentEntry(
+                    'Billetes de avión.pdf',
+                    '/preview/billetes.pdf',
+                    true,
+                    item: TaskAttachment(
+                      id: 'billetes',
+                      taskId: 'viaje',
+                      name: 'Billetes de avión.pdf',
+                      size: 2 * _megabyte,
+                      sha256: '',
+                      remote: true,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        );
+        await app.push('/taskDetails', arguments: 80);
+        await app.tap(p.l.fileRemove);
+        await p.shoot();
+      },
+    );
+
+    preview(
+      detail,
       'from-files-list',
       'Opened from «Tareas con archivos»: a task with notes and steps opens with its Archivos section in view.',
       [es1, es2],

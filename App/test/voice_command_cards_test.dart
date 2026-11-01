@@ -2441,10 +2441,11 @@ void _commandsRound1() {
     );
 
     testWidgets(
-      'UX-901: «Guardar como tarea» sends nothing more to the assistant, saves '
-      '«Cambia el aceite del coche» on Saturday with no command applied, '
-      'closes the sheet, and Calendar shows Saturday with the row lit and '
-      '«Añadida al …» with Deshacer',
+      'UX-901: «Guardar como tarea» sends nothing more to the assistant, shows '
+      '«Cambia el aceite del coche» on its card, whose «Añadir al calendario» '
+      'saves it on Saturday with no command applied, closes the sheet, and '
+      'Calendar shows Saturday with the row lit and «Añadida al …» with '
+      'Deshacer',
       (tester) async {
         final app = await _App.open(
           tester,
@@ -2454,6 +2455,20 @@ void _commandsRound1() {
         await app.speak(tester, 'Cambia el aceite del coche el sábado');
         expect(app.api.drafts, hasLength(1));
         await tester.tap(_asWritten());
+        await tester.pumpAndSettle();
+        // The words show on a card of their own first (UX-2612).
+        expect(find.byType(CaptureResult), findsOneWidget);
+        expect(_asWritten(), findsNothing);
+        expect(app.tasks.named('Cambia el aceite del coche'), isNull);
+        final add = find.byKey(const ValueKey('save-drafts'));
+        expect(
+          find.descendant(
+            of: add,
+            matching: find.text(es.captureAddToCalendar),
+          ),
+          findsOneWidget,
+        );
+        await tester.tap(add);
         await tester.pumpAndSettle();
         expect(app.api.drafts, hasLength(1), reason: 'no second request');
         final saved = app.tasks.named('Cambia el aceite del coche');
@@ -2731,12 +2746,13 @@ void _commandsRound1() {
         expect(find.text(es.freeVoiceLeft(3)), findsOneWidget);
         expect(_asWritten(), findsOneWidget);
         await tester.tap(_asWritten());
-        // Before the sheet closes, it still says 3.
-        await tester.pump();
-        if (find.byType(CaptureResult).evaluate().isNotEmpty) {
-          expect(find.text(es.freeVoiceLeft(3)), findsOneWidget);
-          expect(find.text(es.freeVoiceLeft(2)), findsNothing);
-        }
+        await tester.pumpAndSettle();
+        // On the words' own card (UX-2612), it still says 3.
+        expect(find.byType(CaptureResult), findsOneWidget);
+        expect(find.text(es.freeVoiceLeft(3)), findsOneWidget);
+        expect(find.text(es.freeVoiceLeft(2)), findsNothing);
+        expect(app.api.drafts, hasLength(1), reason: 'no second dictation');
+        await tester.tap(find.byKey(const ValueKey('save-drafts')));
         await tester.pumpAndSettle();
         expect(app.api.drafts, hasLength(1), reason: 'no second dictation');
         expect(app.tasks.named('Cambia el aceite del coche'), isNotNull);
@@ -5871,9 +5887,14 @@ void _commandsRound3b() {
             matching: find.byIcon(Icons.edit_outlined),
           );
           expect(pencil, findsOneWidget);
+          // After the row's ✓ (P294, UX-2514), last.
           expect(
             tester.widget<ListTile>(row).trailing,
-            isA<Icon>().having((i) => i.icon, 'icon', Icons.edit_outlined),
+            isA<Row>().having(
+              (r) => (r.children.last as Icon).icon,
+              'last icon',
+              Icons.edit_outlined,
+            ),
             reason: 'at the end of the row',
           );
           expect(

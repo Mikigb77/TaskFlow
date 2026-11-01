@@ -2,6 +2,7 @@
 // screen's buttons and the free tier's numbers.
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
@@ -154,6 +155,7 @@ void main() {
     Map<String, dynamic> user = const {},
     Future<void> Function()? refreshAccount,
     double textScale = 1,
+    ProReason? reason,
   }) async {
     final controller = SubscriptionController(
       sdk,
@@ -188,7 +190,7 @@ void main() {
             ).copyWith(textScaler: TextScaler.linear(textScale)),
             child: child!,
           ),
-          home: const SubscriptionScreen(),
+          home: SubscriptionScreen(reason: reason),
         ),
       ),
     );
@@ -316,7 +318,7 @@ void main() {
 
       await openPro(tester, sdk: _CountingRevenueCat(), user: used(100));
       final usage = find.text(es.storageUsage(100, 100));
-      expect(es.storageUsage(100, 100), 'Archivos: 100 de 100 MB usados');
+      expect(es.storageUsage(100, 100), 'Archivos: 100 de 100 MB usados');
       expect(usage, findsOneWidget);
       expect(see, findsOneWidget);
       expect(
@@ -348,22 +350,25 @@ void main() {
     },
   );
 
-  test('UX-501: freeVoiceStatus has a singular and a plural in EN, ES and CA', () {
-    for (final language in ['en', 'es', 'ca']) {
-      final l = lookupAppLocalizations(Locale(language));
-      final one = l.freeVoiceStatus(1, 10, 'D');
-      final four = l.freeVoiceStatus(4, 10, 'D');
-      for (final text in [one, four]) {
-        expect(text, contains('10'));
-        expect(text, contains('D'));
+  test(
+    'UX-501: freeVoiceStatus has a singular and a plural in EN, ES and CA',
+    () {
+      for (final language in ['en', 'es', 'ca']) {
+        final l = lookupAppLocalizations(Locale(language));
+        final one = l.freeVoiceStatus(1, 10, 'D');
+        final four = l.freeVoiceStatus(4, 10, 'D');
+        for (final text in [one, four]) {
+          expect(text, contains('10'));
+          expect(text, contains('D'));
+        }
+        expect(one, contains('1'));
+        expect(four, contains('4'));
       }
-      expect(one, contains('1'));
-      expect(four, contains('4'));
-    }
-    final es = lookupAppLocalizations(const Locale('es'));
-    expect(es.freeVoiceStatus(1, 10, 'D'), contains('te queda 1'));
-    expect(es.freeVoiceStatus(4, 10, 'D'), contains('te quedan 4'));
-  });
+      final es = lookupAppLocalizations(const Locale('es'));
+      expect(es.freeVoiceStatus(1, 10, 'D'), contains('te queda 1'));
+      expect(es.freeVoiceStatus(4, 10, 'D'), contains('te quedan 4'));
+    },
+  );
 
   test(
     'UX-501: billingTestMode no longer says Pro unlocks voice capture, and the removed keys are gone from the three ARB files',
@@ -533,11 +538,12 @@ void main() {
     final en = lookupAppLocalizations(const Locale('en'));
     final es = lookupAppLocalizations(const Locale('es'));
     final ca = lookupAppLocalizations(const Locale('ca'));
-    expect(en.billingIntro, 'Unlimited dictations, and room for all your files.');
-    expect(es.billingIntro,
-        'Dictados sin límite y espacio para todos tus archivos.');
-    expect(ca.billingIntro,
-        'Dictats sense límit i espai per a tots els fitxers.');
+    expect(en.proBenefitDictation, 'Unlimited dictation and file space');
+    expect(
+      es.proBenefitDictation,
+      'Dictados y espacio para archivos sin límite',
+    );
+    expect(ca.proBenefitDictation, 'Dictats i espai per a fitxers sense límit');
     for (final reason in ['store', 'other']) {
       expect(en.billingError(reason),
           'The store didn’t answer. Open this screen again.');
@@ -552,6 +558,8 @@ void main() {
     testWidgets(
       'UX-1613: $language at 2× on 360×800, a free account sees what Pro gives and Ver suscripción without scrolling, and no second TaskFlow Pro heading or sparkle in the card',
       (tester) async {
+        // A fit: measured in the app's own font (P312 put the plan first).
+        await loadManrope();
         tester.view.physicalSize = const Size(360, 800);
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
@@ -565,7 +573,7 @@ void main() {
         );
         final body = find.byType(ListView);
         final viewport = tester.getRect(body);
-        final intro = find.text(l.billingIntro);
+        final intro = find.text(l.proBenefitDictation);
         expect(intro, findsOneWidget);
         final introRect = tester.getRect(intro);
         expect(introRect.top, greaterThanOrEqualTo(viewport.top));
@@ -780,6 +788,462 @@ void main() {
         },
       );
     }
+  });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P290 (UX-2603, UX-2607) ----
+  group('P290 · what Pro gives, and the Pro screen’s copy', () {
+    test('UX-2603: the three lines read as planned in EN, ES and CA', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final es = lookupAppLocalizations(const Locale('es'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(
+        [en.proBenefitDictation, en.proBenefitTyping, en.proBenefitReminders],
+        [
+          'Unlimited dictation and file space',
+          'Sentences you type become tasks',
+          'Ask for reminders in your own words',
+        ],
+      );
+      expect(
+        [es.proBenefitDictation, es.proBenefitTyping, es.proBenefitReminders],
+        [
+          'Dictados y espacio para archivos sin límite',
+          'Tus frases escritas se convierten en tareas',
+          'Pide los recordatorios con tus palabras',
+        ],
+      );
+      expect(
+        [ca.proBenefitDictation, ca.proBenefitTyping, ca.proBenefitReminders],
+        [
+          'Dictats i espai per a fitxers sense límit',
+          'Les frases que escrius es converteixen en tasques',
+          'Demana els recordatoris amb les teves paraules',
+        ],
+      );
+    });
+
+    for (final (language, scale) in [('es', 1.0), ('es', 2.0), ('ca', 2.0)]) {
+      testWidgets(
+        'UX-2603: settings/pro.free, $language at ${scale.toInt()}× on 360×800: three lines, each whole and on its own row, in that order; the old one-sentence intro is gone',
+        (tester) async {
+          await loadManrope();
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          final l = lookupAppLocalizations(Locale(language));
+          await openPro(
+            tester,
+            sdk: _CountingRevenueCat(),
+            language: language,
+            user: freeUser,
+            textScale: scale,
+          );
+          final lines = [
+            l.proBenefitDictation,
+            l.proBenefitTyping,
+            l.proBenefitReminders,
+          ];
+          // In that order, one under the other, before any scrolling.
+          for (var i = 1; i < lines.length; i++) {
+            expect(
+              tester.getRect(find.text(lines[i])).top,
+              greaterThanOrEqualTo(
+                tester.getRect(find.text(lines[i - 1])).bottom,
+              ),
+              reason: '«${lines[i]}» under «${lines[i - 1]}»',
+            );
+          }
+          for (final line in lines) {
+            final text = find.text(line);
+            expect(text, findsOneWidget, reason: line);
+            await tester.ensureVisible(text);
+            await tester.pumpAndSettle();
+            final rect = tester.getRect(text);
+            expect(rect.left, greaterThanOrEqualTo(0), reason: line);
+            expect(rect.right, lessThanOrEqualTo(360.5), reason: line);
+            final paragraph = tester.renderObject<RenderParagraph>(
+              find.descendant(of: text, matching: find.byType(RichText)),
+            );
+            expect(paragraph.didExceedMaxLines, isFalse, reason: line);
+            expect(
+              paragraph.text.toPlainText(),
+              line,
+              reason: 'drawn whole, with no ellipsis',
+            );
+          }
+          for (final old in [
+            'Dictados sin límite y espacio para todos tus archivos.',
+            'Dictats sense límit i espai per a tots els fitxers.',
+          ]) {
+            expect(find.text(old), findsNothing);
+          }
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2603: reminders/sheet.pro-screen, opened from «A tu manera» (ES 1×): the list has the first two lines only',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final es = lookupAppLocalizations(const Locale('es'));
+        await openPro(
+          tester,
+          sdk: _CountingRevenueCat(),
+          user: freeUser,
+          reason: ProReason.reminderPlans,
+        );
+        expect(
+          find.byKey(const ValueKey('subscription-reason')),
+          findsOneWidget,
+        );
+        expect(find.text(es.proBenefitDictation), findsOneWidget);
+        expect(find.text(es.proBenefitTyping), findsOneWidget);
+        expect(find.text(es.proBenefitReminders), findsNothing);
+        expect(
+          tester.getRect(find.text(es.proBenefitTyping)).top,
+          greaterThan(tester.getRect(find.text(es.proBenefitDictation)).top),
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+
+    test(
+      'UX-2607: the Spanish Pro copy: «El {date} tendrás más.», «las condiciones de cualquier prueba»; the file line binds its numbers to their words in EN, ES and CA',
+      () {
+        final en = lookupAppLocalizations(const Locale('en'));
+        final es = lookupAppLocalizations(const Locale('es'));
+        final ca = lookupAppLocalizations(const Locale('ca'));
+        expect(
+          es.freeVoiceStatus(4, 10, '1 nov'),
+          'Dictados gratis: te quedan 4 de 10 este mes. El 1 nov tendrás más.',
+        );
+        expect(
+          es.freeVoiceStatus(1, 10, '1 nov'),
+          'Dictados gratis: te queda 1 de 10 este mes. El 1 nov tendrás más.',
+        );
+        expect(
+          es.billingRenewalHelp,
+          'Se renueva automáticamente cada mes hasta que la canceles. Revisa el precio final y las condiciones de cualquier prueba antes de confirmar.',
+        );
+        expect(es.storageUsage(42, 100), 'Archivos: 42 de 100 MB usados');
+        expect(en.storageUsage(42, 100), 'Files: 42 of 100 MB used');
+        expect(ca.storageUsage(42, 100), 'Fitxers: 42 de 100 MB utilitzats');
+      },
+    );
+
+    testWidgets(
+      'UX-2607: the Pro screen in Spanish reads «Dictados gratis: te quedan 4 de 10 este mes. El {date} tendrás más.» with the reset date as it shows it, and «…las condiciones de cualquier prueba antes de confirmar.»',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 1600);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final es = lookupAppLocalizations(const Locale('es'));
+        await openPro(tester, sdk: _CountingRevenueCat(), user: freeUser);
+        final date = tester
+            .element(find.byType(SubscriptionScreen))
+            .shortDate(resets.toLocal());
+        expect(
+          find.text(
+            'Dictados gratis: te quedan 4 de 10 este mes. El $date tendrás más.',
+          ),
+          findsOneWidget,
+        );
+        expect(find.textContaining('. Más el '), findsNothing);
+        final renewal = find.text(es.billingRenewalHelp);
+        await tester.scrollUntilVisible(renewal, 200);
+        expect(renewal, findsOneWidget);
+        expect(
+          es.billingRenewalHelp,
+          endsWith('las condiciones de cualquier prueba antes de confirmar.'),
+        );
+        expect(find.textContaining('condiciones de prueba'), findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+
+    testWidgets(
+      'UX-2607: settings/pro.free.es.light.2x, «100 MB» stays on one line, and «42 de» too',
+      (tester) async {
+        await loadManrope();
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final es = lookupAppLocalizations(const Locale('es'));
+        await openPro(
+          tester,
+          sdk: _CountingRevenueCat(),
+          user: freeUser,
+          textScale: 2,
+        );
+        final usage = find.text(es.storageUsage(42, 100));
+        expect(usage, findsOneWidget);
+        await tester.ensureVisible(usage);
+        await tester.pumpAndSettle();
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: usage, matching: find.byType(RichText)),
+        );
+        final drawn = paragraph.text.toPlainText();
+        for (final bound in ['100 MB', '42 de']) {
+          final start = drawn.indexOf(bound);
+          expect(start, greaterThanOrEqualTo(0), reason: bound);
+          final tops = {
+            for (var i = start; i < start + bound.length; i++)
+              for (final box in paragraph.getBoxesForSelection(
+                TextSelection(baseOffset: i, extentOffset: i + 1),
+              ))
+                box.top.round(),
+          };
+          expect(tops, hasLength(1), reason: '«$bound» on one line');
+        }
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+  });
+
+  // ---- UX loop 2026-10-28-app, round 2 · P312 (UX-2640): the Pro screen
+  // shows your plan first; its checks stay 20 dp ----
+  group('P312 · plan first', () {
+    final status = find.byKey(const ValueKey('subscription-status'));
+    final offer = find.byKey(const ValueKey('subscription-paywall'));
+    List<String> benefits(AppLocalizations l) => [
+      l.proBenefitDictation,
+      l.proBenefitTyping,
+      l.proBenefitReminders,
+    ];
+
+    /// The free dictations line, with the reset date as the screen shows it.
+    String voiceLine(WidgetTester tester, AppLocalizations l) => l
+        .freeVoiceStatus(
+          4,
+          10,
+          tester
+              .element(find.byType(SubscriptionScreen))
+              .shortDate(resets.toLocal()),
+        );
+
+    Future<void> openFree(
+      WidgetTester tester,
+      String language,
+      double scale, {
+      ProReason? reason,
+    }) async {
+      await loadManrope();
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await openPro(
+        tester,
+        sdk: _CountingRevenueCat(),
+        language: language,
+        user: freeUser,
+        textScale: scale,
+        reason: reason,
+      );
+    }
+
+    double top(WidgetTester tester, Finder finder) =>
+        tester.getRect(finder).top;
+
+    for (final language in ['es', 'ca']) {
+      testWidgets(
+        'UX-2640: a free account with 4 dictations left, $language 2× on 360×800: the status and the whole free dictations line are in view above the pinned «Ver suscripción» with no scrolling, and so is the first benefit line',
+        (tester) async {
+          await openFree(tester, language, 2);
+          final l = lookupAppLocalizations(Locale(language));
+          expect(
+            l.billingStatus('inactive'),
+            language == 'es'
+                ? 'No hay una suscripción Pro activa'
+                : 'No hi ha cap subscripció Pro activa',
+          );
+          final body = find.byType(ListView);
+          expect(
+            tester.state<ScrollableState>(
+              find.descendant(of: body, matching: find.byType(Scrollable)),
+            ).position.pixels,
+            0,
+            reason: 'nothing scrolled',
+          );
+          final viewport = tester.getRect(body);
+          final pinned = tester.getRect(offer);
+          final line = voiceLine(tester, l);
+          expect(
+            line,
+            startsWith(language == 'es' ? 'Dictados gratis' : 'Dictats grat'),
+          );
+          for (final (name, finder) in [
+            ('status', status),
+            ('free dictations line', find.text(line)),
+            ('first benefit', find.text(l.proBenefitDictation)),
+          ]) {
+            expect(finder, findsOneWidget, reason: name);
+            final rect = tester.getRect(finder);
+            expect(rect.top, greaterThanOrEqualTo(viewport.top), reason: name);
+            expect(
+              rect.bottom,
+              lessThanOrEqualTo(viewport.bottom),
+              reason: '$name whole in view: $rect, list $viewport',
+            );
+            expect(
+              rect.bottom,
+              lessThanOrEqualTo(pinned.top),
+              reason: '$name above «Ver suscripción»',
+            );
+          }
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+        },
+      );
+    }
+
+    for (final (language, scale) in [('es', 1.0), ('es', 2.0), ('ca', 2.0)]) {
+      testWidgets(
+        'UX-2640: $language ${scale.toInt()}×: every benefit’s check is 20 × 20 dp, its centre within 4 dp of its text’s first line',
+        (tester) async {
+          await openFree(tester, language, scale);
+          final l = lookupAppLocalizations(Locale(language));
+          for (final benefit in benefits(l)) {
+            final text = find.text(benefit);
+            expect(text, findsOneWidget, reason: benefit);
+            final row = find
+                .ancestor(of: text, matching: find.byType(Row))
+                .first;
+            final check = find.descendant(
+              of: row,
+              matching: find.byIcon(Icons.check_rounded),
+            );
+            expect(check, findsOneWidget, reason: benefit);
+            final icon = tester.getRect(check);
+            expect(icon.width, closeTo(20, 0.5), reason: benefit);
+            expect(icon.height, closeTo(20, 0.5), reason: benefit);
+            final paragraph = tester.renderObject<RenderParagraph>(
+              find.descendant(of: text, matching: find.byType(RichText)),
+            );
+            final first = paragraph
+                .getBoxesForSelection(
+                  const TextSelection(baseOffset: 0, extentOffset: 1),
+                  boxHeightStyle: ui.BoxHeightStyle.max,
+                )
+                .first;
+            final lineCentre = paragraph
+                .localToGlobal(Offset(0, (first.top + first.bottom) / 2))
+                .dy;
+            expect(
+              (icon.center.dy - lineCentre).abs(),
+              lessThanOrEqualTo(4),
+              reason: '$benefit: check at ${icon.center.dy}, line at $lineCentre',
+            );
+          }
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2640: a free account, ES 1×: top to bottom, the status, «Dictados gratis: …», then the three benefit lines; the file space line follows them (the brief’s fallback for CA 2×)',
+      (tester) async {
+        await openFree(tester, 'es', 1);
+        final l = lookupAppLocalizations(const Locale('es'));
+        final order = [
+          status,
+          find.text(voiceLine(tester, l)),
+          for (final benefit in benefits(l)) find.text(benefit),
+          find.text(l.storageUsage(42, 100)),
+        ];
+        for (var i = 1; i < order.length; i++) {
+          expect(order[i], findsOneWidget);
+          expect(
+            top(tester, order[i]),
+            greaterThan(top(tester, order[i - 1])),
+            reason: '${order[i]} under ${order[i - 1]}',
+          );
+        }
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+
+    testWidgets(
+      'UX-2640: why the file space line follows the benefits: at CA 2× on 360×800, put above them it would push the first benefit line under the pinned «Ver suscripción»',
+      (tester) async {
+        await openFree(tester, 'ca', 2);
+        final l = lookupAppLocalizations(const Locale('ca'));
+        final benefit = tester.getRect(find.text(l.proBenefitDictation));
+        final storage = tester.getRect(find.text(l.storageUsage(42, 100)));
+        final pinned = tester.getRect(offer);
+        // The line and the 20 dp before it, moved above the benefits.
+        expect(
+          benefit.bottom + storage.height + 20,
+          greaterThan(pinned.top),
+          reason:
+              'benefit ends at ${benefit.bottom}, the line takes ${storage.height + 20}, «Ver suscripción» starts at ${pinned.top}',
+        );
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+
+    testWidgets(
+      'UX-2640: opened from «A tu manera» (ES 1×): the reason heading and its example first, then the status, then only the first two benefit lines',
+      (tester) async {
+        await openFree(tester, 'es', 1, reason: ProReason.reminderPlans);
+        final l = lookupAppLocalizations(const Locale('es'));
+        final order = [
+          find.byKey(const ValueKey('subscription-reason')),
+          find.byKey(const ValueKey('subscription-reason-example')),
+          status,
+          find.text(l.proBenefitDictation),
+          find.text(l.proBenefitTyping),
+        ];
+        for (var i = 1; i < order.length; i++) {
+          expect(order[i], findsOneWidget);
+          expect(
+            top(tester, order[i]),
+            greaterThan(top(tester, order[i - 1])),
+            reason: '${order[i]} under ${order[i - 1]}',
+          );
+        }
+        expect(find.text(l.proBenefitReminders), findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+
+    testWidgets(
+      'UX-2640: a Pro account (ES 1×): «Pro está activo» and its renewal date come before the benefit lines',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final sdk = _CountingRevenueCat()..info = billingInfo(active: true);
+        await openPro(tester, sdk: sdk);
+        final l = lookupAppLocalizations(const Locale('es'));
+        expect(tester.widget<Text>(status).data, l.billingStatus('active'));
+        expect(l.billingStatus('active'), 'Pro está activo');
+        final date = MaterialLocalizations.of(
+          tester.element(find.byType(SubscriptionScreen)),
+        ).formatMediumDate(DateTime.parse('2026-10-29T00:00:00Z').toLocal());
+        final renewal = find.text(l.billingUntil('renews', date));
+        expect(renewal, findsOneWidget);
+        expect(top(tester, renewal), greaterThan(top(tester, status)));
+        for (final benefit in benefits(l)) {
+          expect(
+            top(tester, find.text(benefit)),
+            greaterThan(top(tester, renewal)),
+            reason: '«$benefit» after the renewal date',
+          );
+        }
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
   });
 }
 
