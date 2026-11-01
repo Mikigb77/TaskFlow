@@ -483,6 +483,7 @@ def merge(args):
                 report["removed"].append(str(wt))
     if args.log:
         try:
+            Path(args.log).parent.mkdir(parents=True, exist_ok=True)
             with open(args.log, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps({"at": time.strftime("%Y-%m-%dT%H:%M:%S"), **report}, ensure_ascii=False) + "\n")
         except OSError as e:

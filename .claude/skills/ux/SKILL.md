@@ -197,4 +197,4 @@ Keep it short; the details live in `report.md`.
 - **Scoped run, one area:** 1 reviewer and 1 organizer, then about 4–6 agents per package. A two-package run is about 12–15 agents.
 - **Whole app:** 6 reviewers and 1 organizer, then the same per package. A large plan takes hours; see "How long it takes" above.
 
-Models and effort are set in each agent's frontmatter in `.claude/agents/`; the workflow lowers effort for the mechanical steps.
+Models and effort are set in each agent's frontmatter in `.claude/agents/`. The fix workflow lowers the effort of verification, the re-plan and the record, and runs the mechanical steps (loading the plan, merging) on a small model.
