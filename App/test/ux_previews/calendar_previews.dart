@@ -35,6 +35,7 @@ const agenda = Screen(
     'lib/widgets/invitation_cards.dart',
     'lib/widgets/custom_app_bar.dart',
     'lib/widgets/app_components.dart',
+    'lib/widgets/device_calendar_events.dart',
   ],
 );
 
@@ -284,7 +285,7 @@ void calendarPreviews() {
     preview(
       agenda,
       'added',
-      'Three dictated tasks just added: Calendar shows them lit, with the message and Deshacer.',
+      'Three dictated tasks just added, two today and one on Friday: today\'s two lit, and «2 tareas añadidas al … · también el vie, …» with Deshacer. The day\'s heading shows above them when it fits with both above the message; at 1× on 360×800 it scrolls away, and the message names the day.',
       [es1, es2, ca2, es1Wide, esDark],
       (p) async {
         // A day doesn't hold the same task twice at the same time: leave out
@@ -322,9 +323,35 @@ void calendarPreviews() {
 
     preview(
       agenda,
+      'all-clear',
+      'Today\'s last open task just ticked: «Todo listo. Respira.» with Deshacer.',
+      [es1, es2, ca2],
+      (p) async {
+        // Today: the walk, already done, and the call to the doctor.
+        await PreviewApp.open(
+          p,
+          tasks: [
+            for (final task in normalDay())
+              if (task.id! < 3 || task.id! > 5) task,
+          ],
+        );
+        final checkbox = find.descendant(
+          of: find.widgetWithText(TaskTile, 'Llamar al médico para pedir cita'),
+          matching: find.byType(Checkbox),
+        );
+        await p.tester.ensureVisible(checkbox);
+        await p.tester.pumpAndSettle();
+        await p.tester.tap(checkbox);
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      agenda,
       'phone-events',
-      'The phone\'s own calendar shown too: its events line after the day\'s tasks, scrolled into view.',
-      [es1],
+      'The phone\'s own calendar shown too: its two events by name, «Reunión de equipo · 10:00» and «Cita con el dentista · 17:00», after the day\'s tasks and above «Sin fecha · 1», scrolled into view.',
+      [es1, es2],
       (p) async {
         final app = await PreviewApp.open(
           p,
@@ -339,22 +366,79 @@ void calendarPreviews() {
               id: 'e1',
               calendarId: '1',
               title: 'Reunión de equipo',
-              start: day(0, 11, 30).toUtc(),
-              end: day(0, 12, 30).toUtc(),
+              start: day(0, 10).toUtc(),
+              end: day(0, 11).toUtc(),
               allDay: false,
             ),
             DeviceCalendarEvent(
               id: 'e2',
               calendarId: '1',
-              title: 'Cena con los Puig',
-              start: day(0, 21).toUtc(),
-              end: day(0, 23).toUtc(),
+              title: 'Cita con el dentista',
+              start: day(0, 17).toUtc(),
+              end: day(0, 18).toUtc(),
               allDay: false,
             ),
           ],
         );
         await p.tester.scrollUntilVisible(
-          find.textContaining(p.l.calendarEventCount(2)),
+          find.byKey(const ValueKey('calendar-inbox')),
+          200,
+          scrollable: app.mainScroll(),
+        );
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      agenda,
+      'phone-events-many',
+      'Five phone events on the day: the first three by name, the all-day one first, then «Ver los 5 eventos», which opens them all.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          calendarAccess: CalendarAccess.granted,
+          phoneCalendars: CalendarPreferences(
+            enabled: true,
+            selected: {PreviewDeviceCalendars.work.selectionKey},
+          ),
+          phoneEvents: [
+            DeviceCalendarEvent(
+              id: 'm0',
+              calendarId: '1',
+              title: 'Vacaciones de Laura',
+              start: DateTime.utc(
+                previewToday.year,
+                previewToday.month,
+                previewToday.day,
+              ),
+              end: DateTime.utc(
+                previewToday.year,
+                previewToday.month,
+                previewToday.day + 1,
+              ),
+              allDay: true,
+            ),
+            for (final (i, (title, hour)) in [
+              ('Reunión de equipo', 10),
+              ('Cita con el dentista', 17),
+              ('Cumpleaños de Marta', 19),
+              ('Llamada con Londres', 21),
+            ].indexed)
+              DeviceCalendarEvent(
+                id: 'm${i + 1}',
+                calendarId: '1',
+                title: title,
+                start: day(0, hour).toUtc(),
+                end: day(0, hour + 1).toUtc(),
+                allDay: false,
+              ),
+          ],
+        );
+        await p.tester.scrollUntilVisible(
+          find.byKey(const ValueKey('calendar-inbox')),
           200,
           scrollable: app.mainScroll(),
         );
@@ -414,10 +498,35 @@ void calendarPreviews() {
     preview(
       timeline,
       'busy',
-      'A busy day hour by hour, with overlaps side by side.',
-      [es1],
+      'A busy day hour by hour, with overlaps side by side: at 1× both lanes share the space beside the hours; at 2× each keeps 240 dp and they scroll sideways, with the bar showing along the bottom of the hours.',
+      [es1, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(p, tasks: busyDay(), projects: allProjects);
+        await app.push('/timeline', arguments: previewToday);
+        await p.shoot();
+      },
+    );
+
+    preview(
+      timeline,
+      'events-error',
+      'Today hour by hour when the phone\'s events can\'t be read: «No se pudieron leer los eventos. Toca para reintentar.» above the hours; a tap reads them again.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          calendarAccess: CalendarAccess.granted,
+          phoneCalendars: CalendarPreferences(
+            enabled: true,
+            selected: {PreviewDeviceCalendars.work.selectionKey},
+          ),
+        );
+        (app.container.read(deviceCalendarsProvider) as PreviewDeviceCalendars)
+            .failEvents = true;
+        app.container.invalidate(
+          deviceEventsProvider(Task.dateKey(previewToday)),
+        );
         await app.push('/timeline', arguments: previewToday);
         await p.shoot();
       },
@@ -427,14 +536,28 @@ void calendarPreviews() {
     preview(
       completedTasks,
       'list',
-      'Tasks already done.',
+      'Tasks already done, the last one ticked first: «Comprar pan», with no day, ticked a moment ago, above today’s walk and yesterday’s marks.',
       everywhere,
       (p) async {
+        // When each was ticked (D2): the order follows these, not the days.
+        final ticked = {1: day(0, 8, 45), 34: day(-1, 18, 10)};
         final app = await PreviewApp.open(
           p,
           tasks: [
-            ...normalDay(),
-            ...sharedProjectTasks().where((t) => t.isCompleted),
+            for (final task in [
+              ...normalDay(),
+              ...sharedProjectTasks().where((t) => t.isCompleted),
+            ])
+              task.isCompleted
+                  ? task.copyWith(completedAt: ticked[task.id])
+                  : task,
+            Task(
+              id: 40,
+              title: 'Comprar pan',
+              priority: 1,
+              isCompleted: true,
+              completedAt: day(0, 9, 30),
+            ),
           ],
           projects: allProjects,
         );

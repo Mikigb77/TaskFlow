@@ -25,10 +25,13 @@ class DayTimelineScreen extends ConsumerStatefulWidget {
 }
 
 class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, CalendarReadRetry {
   late DateTime _day = Task.day(widget.day);
   final _scroll = ScrollController();
   final _untimed = ScrollController();
+
+  /// The lanes, when they don't all fit beside the hours.
+  final _sideways = ScrollController();
   final _timeline = GlobalKey();
   final _landedRow = GlobalKey();
   Timer? _clock;
@@ -61,6 +64,7 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
     _highlightTimer?.cancel();
     _scroll.dispose();
     _untimed.dispose();
+    _sideways.dispose();
     super.dispose();
   }
 
@@ -159,6 +163,12 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
         ref.read(taskProvider.notifier).loadTasks(),
         ref.read(deviceCalendarProvider.notifier).refresh(),
       ]);
+
+  /// The retry line's tap: the phone's calendars again when reading them
+  /// failed, otherwise this day's events.
+  Future<void> _readEventsAgain() => ref.read(deviceCalendarProvider).error
+      ? ref.read(deviceCalendarProvider.notifier).refresh()
+      : readDayEventsAgain(ref, Task.dateKey(_day));
   @override
   Widget build(BuildContext context) {
     // Capture opened here shows what it saved here (or on Calendar).
@@ -224,7 +234,7 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
                   onPressed: () => _changeDay(-1),
                   icon: const Icon(Icons.chevron_left_rounded)),
               Expanded(
-                  child: Text(context.fullDate(_day),
+                  child: Text(context.dayHeading(_day, now),
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.titleMedium)),
               IconButton(
@@ -255,11 +265,21 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
                                     if (tasks.hasError)
                                       MessageBanner(l.loadTasksError,
                                           isError: true),
-                                    if (access.preferences.enabled &&
-                                        (access.error ||
-                                            eventRead?.hasError == true))
-                                      MessageBanner(l.calendarReadError,
-                                          isError: true),
+                                    // Calendar's own retry line, 8 dp under
+                                    // the day's arrows: a tap reads again,
+                                    // busy until the read settles.
+                                    if (retrying ||
+                                        access.preferences.enabled &&
+                                            (access.error ||
+                                                eventRead?.hasError == true))
+                                      Padding(
+                                          padding:
+                                              const EdgeInsets.only(top: 8),
+                                          child: CalendarReadRetryLine(
+                                              inset: 0,
+                                              busy: retrying,
+                                              onRetry: () =>
+                                                  retry(_readEventsAgain))),
                                     if (access.preferences.enabled &&
                                         access.access !=
                                             CalendarAccess.granted &&
@@ -367,9 +387,21 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
     final colors = Theme.of(context).colorScheme;
     return RefreshIndicator(
         onRefresh: _refresh,
-        // All of it is built, so the day can open on its first timed
-        // item however short the view is above the add button.
-        child: SingleChildScrollView(
+        // When the lanes scroll sideways, their bar runs along the bottom of
+        // the hours, always in view, as «Sin hora»'s does. The body already
+        // ends above the add button, so the bar needs no inset of its own.
+        child: MediaQuery.removePadding(
+          context: context,
+          removeBottom: true,
+          child: Scrollbar(
+            controller: _sideways,
+            thumbVisibility: true,
+            notificationPredicate: (notification) =>
+                notification.depth == 1 &&
+                notification.metrics.axis == Axis.horizontal,
+            // All of it is built, so the day can open on its first timed
+            // item however short the view is above the add button.
+            child: SingleChildScrollView(
             key: const ValueKey('timeline-scroll'),
             controller: _scroll,
             physics: const AlwaysScrollableScrollPhysics(),
@@ -385,45 +417,69 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
                 Text(l.timelineHours(data.window.minutes ~/ 60)),
               const SizedBox(height: 16),
               LayoutBuilder(builder: (context, constraints) {
-                final ruler = math.max(64.0, 54 * scale);
-                final laneWidth = math.max(150.0 * math.min(scale, 2),
-                    (constraints.maxWidth - ruler) / layout.lanes);
-                final width = ruler + laneWidth * layout.lanes;
-                final height =
-                    data.window.minutes * 1.2 + minimumHeight + 12;
                 final times =
                     data.window.hours.map(context.clockTime).toList();
+                final labels = [
+                  for (var index = 0; index < times.length; index++)
+                    '${times[index]}${times.take(times.length - 1).where((time) => time == times[index]).length > 1 ? '\n${data.window.hours[index].timeZoneName}' : ''}'
+                ];
+                final style = Theme.of(context).textTheme.bodySmall;
+                // As wide as the widest hour, and a gap before the lanes.
+                var widest = 0.0;
+                for (final label in labels) {
+                  final painter = TextPainter(
+                      text: TextSpan(text: label, style: style),
+                      textDirection: Directionality.of(context),
+                      textScaler: MediaQuery.textScalerOf(context))
+                    ..layout();
+                  widest = math.max(widest, painter.width);
+                  painter.dispose();
+                }
+                final ruler = widest.ceilToDouble() + 8;
+                // One lane always fills the space beside the hours, and
+                // side-by-side lanes share it down to 120 dp each at 1×
+                // (240 dp at 2×): about ten letters of a title, and its
+                // times. Narrower, they keep that width and scroll sideways.
+                final space = constraints.maxWidth - ruler;
+                final readable = 120.0 * math.min(scale, 2);
+                final sideways =
+                    layout.lanes > 1 && space / layout.lanes < readable;
+                final laneWidth =
+                    sideways ? math.min(space, readable) : space / layout.lanes;
+                final width = sideways
+                    ? ruler + laneWidth * layout.lanes
+                    : constraints.maxWidth;
+                final height =
+                    data.window.minutes * 1.2 + minimumHeight + 12;
                 return SingleChildScrollView(
                     key: _timeline,
+                    controller: _sideways,
                     scrollDirection: Axis.horizontal,
                     child: SizedBox(
                         width: width,
                         height: height,
                         child: Stack(children: [
-                          for (var index = 0;
-                              index < data.window.hours.length;
-                              index++)
+                          // Each block says its own time: TalkBack skips
+                          // the hours.
+                          for (var index = 0; index < labels.length; index++)
                             Positioned(
                                 top: index * 72.0,
                                 left: 0,
                                 right: 0,
-                                child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
+                                child: ExcludeSemantics(
+                                    child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
                                       SizedBox(
                                           width: ruler,
-                                          child: Text(
-                                              '${times[index]}${times.take(times.length - 1).where((time) => time == times[index]).length > 1 ? '\n${data.window.hours[index].timeZoneName}' : ''}',
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall)),
+                                          child: Text(labels[index],
+                                              style: style)),
                                       Expanded(
                                           child: Divider(
-                                              color:
-                                                  colors.outlineVariant,
+                                              color: colors.outlineVariant,
                                               height: 1)),
-                                    ])),
+                                    ]))),
                           if (data.window.contains(now))
                             Positioned(
                                 top: data.window.offset(now) * 1.2,
@@ -452,7 +508,8 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
                                             saved(item.entry.task)))),
                         ])));
               }),
-            ])));
+            ])),
+        )));
   }
 }
 
@@ -469,8 +526,9 @@ class _TimelineBlock extends StatelessWidget {
     final entry = item.entry;
     final l = context.l10n;
     final colors = Theme.of(context).colorScheme;
+    // A deadline's prefix says what it is; passed or not, it isn't an alarm.
     final color = entry.kind == TimelineKind.deadline
-        ? colors.error
+        ? colors.tertiary
         : entry.kind == TimelineKind.calendar
             ? colors.secondary
             : colors.primary;
@@ -519,20 +577,21 @@ class _TimelineBlock extends StatelessWidget {
               builder: (context, background, child) => Material(
                   color: background,
                   borderRadius: BorderRadius.circular(8),
+                  // The duration bar keeps to the block's rounded shape.
+                  clipBehavior: Clip.antiAlias,
                   child: child),
               child: InkWell(
                   onTap: open,
                   borderRadius: BorderRadius.circular(8),
                   child: Stack(children: [
-                    Positioned(
-                        left: 0,
-                        top: 0,
-                        width: 5,
-                        height: item.durationHeight,
-                        child: DecoratedBox(
-                            decoration: BoxDecoration(
-                                color: color,
-                                borderRadius: BorderRadius.circular(3)))),
+                    // A moment, with no duration, has no bar.
+                    if (!entry.point)
+                      Positioned(
+                          left: 0,
+                          top: 0,
+                          width: 5,
+                          height: item.durationHeight,
+                          child: ColoredBox(color: color)),
                     Positioned.fill(
                         child: Padding(
                             padding: const EdgeInsets.fromLTRB(11, 5, 5, 5),

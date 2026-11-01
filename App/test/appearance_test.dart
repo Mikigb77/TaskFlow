@@ -12,6 +12,7 @@ import 'package:agenda/screens/calendar_screen.dart';
 import 'package:agenda/widgets/task_tile.dart';
 import 'package:agenda/widgets/task_actions.dart';
 import 'package:agenda/theme/app_theme.dart';
+import 'support/button_label.dart';
 import 'support/design_fixtures.dart';
 
 void main() {
@@ -339,7 +340,12 @@ void main() {
             .isCompleted,
         isTrue,
       );
-      expect(find.widgetWithText(FilledButton, 'Reopen'), findsOneWidget);
+      // UX-2404 (P280): Complete closes the task's page, back on Calendar
+      // with «Task completed» and Undo, instead of offering Reopen there.
+      expect(find.widgetWithText(FilledButton, 'Reopen'), findsNothing);
+      expect(find.byType(CalendarScreen), findsOneWidget);
+      expect(find.text('Task completed'), findsOneWidget);
+      expect(find.text('Undo'), findsOneWidget);
       expect(find.text('Low priority'), findsNothing);
     },
   );
@@ -653,6 +659,113 @@ void main() {
       },
     );
   }
+
+  // ---- UX loop 2026-10-28-app, round 1 · P289 (UX-2108, UX-2608) ----
+  group('P289 · filled buttons are 60 dp tall and padded', () {
+    final es = lookupAppLocalizations(const Locale('es'));
+
+    Future<void> pumpButtons(
+      WidgetTester tester,
+      ThemeData theme, {
+      double scale = 1,
+      double width = 312,
+    }) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(scale)),
+            child: child!,
+          ),
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: width,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    FilledButton(onPressed: () {}, child: Text(es.done)),
+                    const SizedBox(height: 12),
+                    FilledButton.tonal(
+                      onPressed: () {},
+                      child: Text(es.captureContinue),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: () {},
+                      icon: const Icon(Icons.mic_none_rounded),
+                      label: Text(es.addTask),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: () {},
+                      child: Text(es.allowPreciseAlarms),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    for (final (name, theme) in [
+      ('light', AppTheme.light),
+      ('dark', AppTheme.dark),
+    ]) {
+      testWidgets(
+        'UX-2108: in the $name theme at 1×, a filled, a tonal and an icon filled button are each at least 58 dp tall',
+        (tester) async {
+          await loadManrope();
+          await pumpButtons(tester, theme);
+          for (final label in [es.done, es.captureContinue, es.addTask]) {
+            expect(
+              tester.getRect(filledButtonWithText(label)).height,
+              greaterThanOrEqualTo(58),
+              reason: '«$label»',
+            );
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+
+      testWidgets(
+        'UX-2608: in the $name theme at ES 2× in 312 dp, a filled button’s wrapped label has at least 8 dp above and below it, and the button grows to hold it',
+        (tester) async {
+          await loadManrope();
+          await pumpButtons(tester, theme, scale: 2);
+          final allow = filledButtonWithText(es.allowPreciseAlarms);
+          expect(tester.getRect(allow).height, greaterThanOrEqualTo(58));
+          expectCentredPaddedLabel(
+            tester,
+            allow,
+            es.allowPreciseAlarms,
+            centred: false,
+          );
+          for (final label in [es.done, es.captureContinue, es.addTask]) {
+            final button = filledButtonWithText(label);
+            expect(tester.getRect(button).height, greaterThanOrEqualTo(58));
+            expectCentredPaddedLabel(
+              tester,
+              button,
+              label,
+              wraps: false,
+              centred: false,
+            );
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  });
 }
 
 Future<ProviderContainer> _pump(

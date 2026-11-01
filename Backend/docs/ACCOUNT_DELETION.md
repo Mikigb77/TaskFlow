@@ -64,7 +64,7 @@ If the request fails, nothing changes on the phone. Deleting needs a connection;
 2. ~~**Deleting the RevenueCat customer**~~: done (see the table), decided by the main session on 2026-10-18 while the owner was away.
 3. **A cleanup job for tasks.** The owner described completed tasks being removed after 1 month (free) or 3 months (Pro). That job doesn't exist, and the privacy page currently says the opposite: "Las tareas completadas no se eliminan automáticamente a los 30 o 90 días". The owner has to choose, and the website text must match.
 4. **Free-dictation reuse.** Deleting an account and signing up again gives 10 new free dictations. Preventing that means keeping a hash of the email, which must then be disclosed.
-5. **The website.** Once the in-app option ships, the delete-account page's line "La versión de pruebas actual todavía no tiene una opción de eliminación dentro de la app" must change (separate repo).
+5. ~~**The website.**~~ Done: the delete-account page gives the in-app option (TaskFlowWeb, WEB-202 and WEB-204).
 
 ## Implementation
 - Module: `core/account_deletion.py` (`deletion_preview`, `delete_account` and the view).

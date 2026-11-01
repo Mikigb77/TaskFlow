@@ -24,7 +24,9 @@ import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
+import 'support/button_label.dart';
 import 'support/design_fixtures.dart';
+import 'support/phone_alerts.dart';
 import 'support/reminder_fixtures.dart';
 
 void main() {
@@ -932,8 +934,11 @@ void main() {
         await tester.tap(more);
         await tester.pumpAndSettle();
       }
-      final es = lookupAppLocalizations(const Locale('es'));
-      final row = find.widgetWithText(ListTile, es.reminder);
+      // P270 (UX-2206): a line that names itself is the row's only text.
+      final row = find.descendant(
+        of: find.byType(ReminderControl),
+        matching: find.byType(ListTile),
+      );
       await tester.ensureVisible(row);
       await tester.pumpAndSettle();
       return row;
@@ -965,9 +970,9 @@ void main() {
         (tester) async {
           final es = lookupAppLocalizations(const Locale('es'));
           final row = await pumpForm(tester, task, projects: projects);
-          final subtitle =
-              (tester.widget<ListTile>(row).subtitle! as Text).data;
-          expect(subtitle, reading(es));
+          final tile = tester.widget<ListTile>(row);
+          expect((tile.title! as Text).data, reading(es));
+          expect(tile.subtitle, isNull);
           expect(tester.takeException(), isNull);
         },
       );
@@ -1087,9 +1092,10 @@ void main() {
         (tester) async {
           final es = lookupAppLocalizations(const Locale('es'));
           final row = await pumpForm(tester, task, projects: [project()]);
-          final subtitle =
-              (tester.widget<ListTile>(row).subtitle! as Text).data!;
+          final tile = tester.widget<ListTile>(row);
+          final subtitle = (tile.title! as Text).data!;
           expect(subtitle, reading);
+          expect(tile.subtitle, isNull);
           expect(subtitle, isNot(contains(es.defaultChoice)));
           expect(subtitle.toLowerCase(), isNot(contains('predeterminado')));
           expect(tester.takeException(), isNull);
@@ -1418,7 +1424,7 @@ void main() {
       testWidgets(
         grant
             ? 'UX-1605: allowing during the flow, Recordatorios shows the switch on and no blocked line on every frame'
-            : 'UX-1605: refusing during the flow, the switch goes back off and the blocked line returns',
+            : 'UX-1605 / UX-2601: refusing during the flow, the switch goes back off, alone, and the message offers «Permitir avisos»',
         (tester) async {
           final store = MemoryReminderStore();
           final access = _GatedAccess(grant: grant);
@@ -1427,7 +1433,8 @@ void main() {
           );
           await tester.pumpAndSettle();
           expect(switchOn(tester), isFalse);
-          expect(find.text(es.notificationPermissionOff), findsOneWidget);
+          // UX-2601: with the switch off, the switch is the one way in.
+          expect(find.text(es.notificationPermissionOff), findsNothing);
 
           await tester.tap(find.byType(SwitchListTile));
           await tester.pump();
@@ -1463,15 +1470,21 @@ void main() {
           } else {
             await tester.pumpAndSettle();
             expect(switchOn(tester), isFalse);
+            // UX-2601: the switch alone; the message says why and offers
+            // the phone's page.
             expect(
               find.descendant(
                 of: find.byType(ListTile),
                 matching: find.text(es.notificationPermissionOff),
               ),
-              findsOneWidget,
+              findsNothing,
             );
             expect(
               find.widgetWithText(FilledButton, es.allowNotifications),
+              findsNothing,
+            );
+            expect(
+              find.widgetWithText(SnackBarAction, es.allowNotifications),
               findsOneWidget,
             );
             expect(store.value.enabled, isFalse);
@@ -2051,7 +2064,8 @@ void main() {
           );
           await tester.pumpAndSettle();
           expect(switchOn(tester), isFalse);
-          expect(find.text(es.notificationPermissionOff), findsOneWidget);
+          // UX-2601: off, the switch is alone.
+          expect(find.text(es.notificationPermissionOff), findsNothing);
           access.reconciles = 0;
 
           await tester.tap(find.byType(SwitchListTile));
@@ -2111,7 +2125,7 @@ void main() {
     }
 
     testWidgets(
-      'UX-1650: a refusal at Android’s dialog still turns the switch off and brings the problem line back at once',
+      'UX-1650 / UX-2601: a refusal at Android’s dialog still turns the switch off at once, alone, with the message',
       (tester) async {
         final store = MemoryReminderStore();
         final access = _SlowReconcile(
@@ -2130,13 +2144,14 @@ void main() {
         await tester.pump();
         await tester.pump();
         expect(switchOn(tester), isFalse);
-        // The screen's own line (the snackbar says it too).
+        // UX-2601: no line of the screen's own while the switch is off; the
+        // message says it.
         expect(
           find.descendant(
             of: find.byType(ListTile),
             matching: find.text(es.notificationPermissionOff),
           ),
-          findsOneWidget,
+          findsNothing,
         );
         expect(access.reconciles, 0);
         await tester.pumpAndSettle();
@@ -2361,13 +2376,18 @@ void main() {
           await tester.tap(more);
           await tester.pumpAndSettle();
         }
-        final row = find.widgetWithText(ListTile, es.reminder);
+        final row = find.descendant(
+          of: find.byType(ReminderControl),
+          matching: find.byType(ListTile),
+        );
         await tester.ensureVisible(row);
         await tester.pumpAndSettle();
+        // P270 (UX-2206): the passed line names itself, alone in the row.
         expect(
-          (tester.widget<ListTile>(row).subtitle! as Text).data,
+          (tester.widget<ListTile>(row).title! as Text).data,
           es.noReminderTimePassed,
         );
+        expect(tester.widget<ListTile>(row).subtitle, isNull);
         expect(tester.takeException(), isNull);
       },
     );
@@ -2552,6 +2572,696 @@ void main() {
           expect(rect.right, lessThanOrEqualTo(360));
           final textRect = tester.getRect(text);
           expect(textRect.right, lessThanOrEqualTo(rect.right));
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  });
+
+  group('P270 · a reminder that has rung', () {
+    const timeoutChannel = MethodChannel('taskflow/accessibility');
+    final platform =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    setUp(
+      () =>
+          platform.setMockMethodCallHandler(timeoutChannel, (_) async => null),
+    );
+    tearDown(() => platform.setMockMethodCallHandler(timeoutChannel, null));
+    const on = ReminderPreferences(
+      enabled: true,
+      asked: true,
+      dateOnlyTime: 540,
+    );
+    // Monday 19 October 2026.
+    DateTime at(int hour, int minute) => DateTime(2026, 10, 19, hour, minute);
+
+    /// «Pagar la luz», today at 09:50 with «10 minutos antes».
+    Task bill(int id) => Task(
+      id: id,
+      title: 'Pagar la luz',
+      priority: 1,
+      dueDate: at(9, 50),
+      hasTime: true,
+      reminderMinutes: 10,
+    );
+
+    /// A date-only task for today, with the 9:00 default (D1).
+    Task call(int id) => Task(
+      id: id,
+      title: 'Llamar a Marta',
+      priority: 1,
+      dueDate: DateTime(2026, 10, 19),
+      hasTime: false,
+    );
+
+    // What the real engine keeps on the phone for each case.
+    late int billId;
+    late List<Map<String, Object?>> ringing; // rang at 09:40, not planned again
+    late List<Map<String, Object?>> rang; // planned again at 09:41
+    late List<Map<String, Object?>> snoozed; // «Posponer 10 min» at 09:42
+    late int callId;
+    late List<Map<String, Object?>> savedLate; // saved at 10:00 (D1)
+    setUpAll(() async {
+      final phone = await PhoneAlerts.open(at(9, 30));
+      billId = await phone.add(bill(0));
+      ringing = await phone.of(billId);
+      phone.now = at(9, 41);
+      await phone.refresh();
+      rang = await phone.of(billId);
+      phone.now = at(9, 42);
+      await phone.snooze(billId);
+      snoozed = await phone.of(billId);
+      await phone.close();
+      final later = await PhoneAlerts.open(at(10, 0));
+      callId = await later.add(call(0));
+      savedLate = await later.of(callId);
+      await later.close();
+    });
+
+    /// The app at [now], with [kept] as the phone's alerts.
+    Future<void> open(
+      WidgetTester tester, {
+      required DateTime now,
+      required List<Task> tasks,
+      List<Map<String, Object?>> kept = const [],
+      String language = 'es',
+    }) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final container = designContainer(
+        tasks: () => _P190Tasks(tasks),
+        regionalStore: MemoryRegionalStore(
+          RegionalPreferences(
+            language: language,
+            clock: ClockFormat.twentyFour,
+            weekStart: 1,
+          ),
+        ),
+        overrides: [
+          ...reminderOverrides(
+            MemoryReminderStore(on),
+            FakeReminderAccess(allowed: true)..kept = [...kept],
+          ),
+          calendarClockProvider.overrideWithValue(() => now),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const MyApp()),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    NavigatorState navigator(WidgetTester tester) =>
+        tester.state<NavigatorState>(find.byType(Navigator).first);
+
+    /// Task [id]'s page, its reminder chip in view.
+    Future<void> openDetail(WidgetTester tester, int id) async {
+      navigator(tester).pushNamed('/taskDetails', arguments: id);
+      await tester.pumpAndSettle();
+      final chip = find.byType(ReminderChip);
+      expect(chip, findsOneWidget);
+      await tester.ensureVisible(chip);
+      await tester.pumpAndSettle();
+    }
+
+    /// [task]'s edit form, «Más detalles» open, its reminder row in view.
+    Future<Finder> openForm(WidgetTester tester, Task task) async {
+      unawaited(
+        navigator(
+          tester,
+        ).push(MaterialPageRoute<void>(builder: (_) => TaskEditor(task: task))),
+      );
+      await tester.pumpAndSettle();
+      final more = find.byKey(const ValueKey('task-more-details'));
+      if (more.evaluate().isNotEmpty) {
+        await tester.ensureVisible(more);
+        await tester.pumpAndSettle();
+        await tester.tap(more);
+        await tester.pumpAndSettle();
+      }
+      final row = find.descendant(
+        of: find.byType(ReminderControl),
+        matching: find.byType(ListTile),
+      );
+      expect(row, findsOneWidget);
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      return row;
+    }
+
+    String chipLabel(WidgetTester tester) => tester
+        .widgetList<Text>(
+          find.descendant(
+            of: find.byType(ReminderChip),
+            matching: find.byType(Text),
+          ),
+        )
+        .map((text) => text.data ?? '')
+        .join();
+
+    Finder chipIcon(IconData icon) => find.descendant(
+      of: find.byType(ReminderChip),
+      matching: find.byIcon(icon),
+    );
+
+    String clock(WidgetTester tester, int hour, int minute) =>
+        tester.element(find.byType(ReminderChip)).clockTime(at(hour, minute));
+
+    test('the engine kept the alert that rang, and its snooze', () {
+      expect(ringing.map((row) => row['status']), contains('scheduled'));
+      expect(rang.map((row) => row['status']), contains('elapsed'));
+      expect(snoozed.any((row) => row['snooze_at'] != null), isTrue);
+    });
+
+    test('UX-2401: the sent and snoozed lines in EN, ES and CA', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final es = lookupAppLocalizations(const Locale('es'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(
+        en.reminderSent('today', '', '09:40'),
+        'Reminder sent: today, 09:40',
+      );
+      expect(
+        es.reminderSent('today', '', '09:40'),
+        'Recordatorio enviado: hoy, 09:40',
+      );
+      expect(
+        ca.reminderSent('today', '', '09:40'),
+        'Recordatori enviat: avui, 09:40',
+      );
+      expect(
+        en.reminderSnoozed('today', '', '09:52'),
+        'Reminder snoozed: today, 09:52',
+      );
+      expect(
+        es.reminderSnoozed('today', '', '09:52'),
+        'Recordatorio pospuesto: hoy, 09:52',
+      );
+      expect(
+        ca.reminderSnoozed('today', '', '09:52'),
+        'Recordatori ajornat: avui, 09:52',
+      );
+    });
+
+    test('UX-2411: the deadline reading in EN, ES and CA', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final es = lookupAppLocalizations(const Locale('es'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(
+        en.reminderValue(en.reminderBeforeDeadline('1 hour before')),
+        'Reminder: 1 hour before · deadline',
+      );
+      expect(
+        es.reminderValue(es.reminderBeforeDeadline('1 hora antes')),
+        'Recordatorio: 1 hora antes · fecha límite',
+      );
+      expect(
+        ca.reminderValue(ca.reminderBeforeDeadline('1 hora abans')),
+        'Recordatori: 1 hora abans · termini',
+      );
+    });
+
+    for (final language in ['es', 'en', 'ca']) {
+      testWidgets(
+        'UX-2401: opened at 09:41, a reminder that rang at 09:40 reads «Recordatorio enviado: hoy, 09:40» with the usual bell ($language)',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          await open(
+            tester,
+            now: at(9, 41),
+            tasks: [bill(billId)],
+            kept: rang,
+            language: language,
+          );
+          await openDetail(tester, billId);
+          final time = clock(tester, 9, 40);
+          expect(time, '09:40');
+          expect(chipLabel(tester), l.reminderSent('today', '', time));
+          expect(chipLabel(tester), isNot(l.noReminderTimePassed));
+          expect(chipIcon(Icons.notifications_outlined), findsOneWidget);
+          expect(chipIcon(Icons.notifications_off_outlined), findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2401: opened from its notice before the phone plans again, the reminder that rang still reads «Recordatorio enviado: hoy, 09:40»',
+      (tester) async {
+        final es = lookupAppLocalizations(const Locale('es'));
+        await open(
+          tester,
+          now: at(9, 41),
+          tasks: [bill(billId)],
+          kept: ringing,
+        );
+        await openDetail(tester, billId);
+        expect(
+          chipLabel(tester),
+          es.reminderSent('today', '', clock(tester, 9, 40)),
+        );
+        expect(chipIcon(Icons.notifications_outlined), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2401: a tap on «Recordatorio enviado» opens the reminder choices',
+      (tester) async {
+        final es = lookupAppLocalizations(const Locale('es'));
+        await open(tester, now: at(9, 41), tasks: [bill(billId)], kept: rang);
+        await openDetail(tester, billId);
+        final lead = tester.element(find.byType(ReminderChip)).reminderLead(10);
+        await tester.tap(find.byType(ReminderChip));
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        expect(sheet, findsOneWidget);
+        expect(
+          find.descendant(of: sheet, matching: find.text(es.reminder)),
+          findsWidgets,
+        );
+        expect(
+          find.descendant(of: sheet, matching: find.textContaining(lead)),
+          findsWidgets,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final language in ['es', 'en', 'ca']) {
+      testWidgets(
+        'UX-2401: after «Posponer 10 min» at 09:42 it reads «Recordatorio pospuesto: hoy, 09:52» ($language)',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          await open(
+            tester,
+            now: at(9, 43),
+            tasks: [bill(billId)],
+            kept: snoozed,
+            language: language,
+          );
+          await openDetail(tester, billId);
+          final time = clock(tester, 9, 52);
+          expect(time, '09:52');
+          expect(chipLabel(tester), l.reminderSnoozed('today', '', time));
+          expect(chipIcon(Icons.notifications_outlined), findsOneWidget);
+          expect(chipIcon(Icons.notifications_off_outlined), findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2401 (D1): a date-only task for today saved at 10:00 with the 9:00 default still reads «Sin recordatorio: ya ha pasado la hora del aviso»',
+      (tester) async {
+        final es = lookupAppLocalizations(const Locale('es'));
+        await open(
+          tester,
+          now: at(10, 0),
+          tasks: [call(callId)],
+          kept: savedLate,
+        );
+        await openDetail(tester, callId);
+        expect(chipLabel(tester), es.noReminderTimePassed);
+        expect(chipIcon(Icons.notifications_off_outlined), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2401: the form’s row of a reminder that rang reads «Recordatorio enviado: hoy, 09:40» alone, with the usual bell',
+      (tester) async {
+        final es = lookupAppLocalizations(const Locale('es'));
+        await open(tester, now: at(9, 41), tasks: [bill(billId)], kept: rang);
+        final row = await openForm(tester, bill(billId));
+        final tile = tester.widget<ListTile>(row);
+        final time = tester.element(row).clockTime(at(9, 40));
+        expect((tile.title! as Text).data, es.reminderSent('today', '', time));
+        expect(tile.subtitle, isNull);
+        expect(
+          find.descendant(
+            of: row,
+            matching: find.byIcon(Icons.notifications_outlined),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    /// «Entregar el informe» tomorrow at 10:00, due the day after at 12:00,
+    /// with «1 hora antes» from [anchor].
+    Task report(String anchor) => Task(
+      id: 5,
+      title: 'Entregar el informe',
+      priority: 1,
+      dueDate: DateTime(2026, 10, 20, 10),
+      hasTime: true,
+      deadline: DateTime(2026, 10, 21, 12),
+      deadlineHasTime: true,
+      reminderAnchor: anchor,
+      reminderMinutes: 60,
+    );
+
+    testWidgets(
+      'UX-2411: a task with a deadline whose reminder counts from its day reads «Recordatorio: 1 hora antes», with no «Planificado para ·»',
+      (tester) async {
+        final es = lookupAppLocalizations(const Locale('es'));
+        await open(tester, now: at(9, 0), tasks: [report('planned')]);
+        await openDetail(tester, 5);
+        final lead = tester.element(find.byType(ReminderChip)).reminderLead(60);
+        expect(chipLabel(tester), es.reminderValue(lead));
+        expect(chipLabel(tester), isNot(contains(es.plannedFor)));
+        expect(chipLabel(tester), isNot(contains(es.deadline)));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final language in ['es', 'en', 'ca']) {
+      testWidgets(
+        'UX-2411: counting from the deadline it reads «Recordatorio: 1 hora antes · fecha límite» ($language)',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          await open(
+            tester,
+            now: at(9, 0),
+            tasks: [report('deadline')],
+            language: language,
+          );
+          await openDetail(tester, 5);
+          final lead = tester
+              .element(find.byType(ReminderChip))
+              .reminderLead(60);
+          expect(
+            chipLabel(tester),
+            l.reminderValue(l.reminderBeforeDeadline(lead)),
+          );
+          expect(chipLabel(tester), isNot(contains(l.plannedFor)));
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2206: a single reminder’s form row still shows «Recordatorio» over «10 minutos antes»',
+      (tester) async {
+        final es = lookupAppLocalizations(const Locale('es'));
+        final tomorrow = bill(
+          1,
+        ).copyWith(dueDate: DateTime(2026, 10, 20, 9, 50));
+        await open(tester, now: at(9, 0), tasks: [tomorrow]);
+        final row = await openForm(tester, tomorrow);
+        final tile = tester.widget<ListTile>(row);
+        expect((tile.title! as Text).data, es.reminder);
+        expect(
+          (tile.subtitle! as Text).data,
+          tester.element(row).reminderLead(10),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  group('P272 · Recordatorios has one way in while they’re off', () {
+    const timeoutChannel = MethodChannel('taskflow/accessibility');
+    final platform =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    setUp(
+      () =>
+          platform.setMockMethodCallHandler(timeoutChannel, (_) async => null),
+    );
+    tearDown(() => platform.setMockMethodCallHandler(timeoutChannel, null));
+    final es = lookupAppLocalizations(const Locale('es'));
+
+    /// Ajustes › Recordatorios in Spanish at 1× on a 360×800 phone.
+    Future<void> openReminders(
+      WidgetTester tester,
+      MemoryReminderStore store,
+      FakeReminderAccess access,
+    ) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            ...reminderOverrides(store, access),
+            taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+          ],
+          child: MaterialApp(
+            locale: const Locale('es'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: AppTheme.light,
+            home: const NotificationSettingsScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    bool switchOn(WidgetTester tester) =>
+        tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value;
+
+    /// The screen's own line about the phone blocking, not the message's.
+    Finder blockedLine() => find.descendant(
+      of: find.byType(ListView),
+      matching: find.text(es.notificationPermissionOff),
+    );
+
+    Finder allowButton() =>
+        find.widgetWithText(FilledButton, es.allowNotifications);
+
+    void leaveApp(WidgetTester tester) {
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+    }
+
+    void returnToApp(WidgetTester tester) {
+      for (final state in [
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+    }
+
+    testWidgets(
+      'UX-2601: ES 1× on 360×800, the switch off and notifications blocked: the switch alone, and turning it on asks Android',
+      (tester) async {
+        final store = MemoryReminderStore();
+        final access = FakeReminderAccess(allowed: false);
+        await openReminders(tester, store, access);
+        final toggle = find.widgetWithText(SwitchListTile, es.enableReminders);
+        expect(toggle, findsOneWidget);
+        expect(switchOn(tester), isFalse);
+        // Inside the viewport.
+        final box = tester.getRect(toggle);
+        expect(box.top, greaterThanOrEqualTo(0));
+        expect(box.bottom, lessThanOrEqualTo(800));
+        expect(blockedLine(), findsNothing);
+        expect(find.text(es.notificationPermissionOff), findsNothing);
+        expect(allowButton(), findsNothing);
+        expect(find.text(es.allowNotifications), findsNothing);
+        expect(find.byIcon(Icons.notifications_off_outlined), findsNothing);
+
+        await tester.tap(toggle);
+        await tester.pumpAndSettle();
+        expect(access.permissionRequests, 1);
+        expect(access.notificationSettingsOpened, 0);
+        expect(store.value.enabled, isTrue);
+        expect(switchOn(tester), isTrue);
+        expect(find.text(es.remindersOnConfirmation), findsOneWidget);
+        expect(blockedLine(), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2601: the switch refused by Android, then its «Permitir avisos» and allowing in Android: back on Recordatorios the switch is on, with Listo. Recordatorios activados.',
+      (tester) async {
+        final store = MemoryReminderStore();
+        final access = FakeReminderAccess(allowed: false, grant: false);
+        await openReminders(tester, store, access);
+        await tester.tap(find.byType(SwitchListTile));
+        await tester.pumpAndSettle();
+        expect(access.permissionRequests, 1);
+        expect(switchOn(tester), isFalse);
+        expect(blockedLine(), findsNothing);
+        expect(allowButton(), findsNothing);
+        await tester.tap(
+          find.widgetWithText(SnackBarAction, es.allowNotifications),
+        );
+        await tester.pump();
+        expect(access.notificationSettingsOpened, 1);
+        leaveApp(tester);
+        await tester.pump();
+
+        access.allowed = true;
+        returnToApp(tester);
+        await tester.pumpAndSettle();
+        expect(store.value.enabled, isTrue);
+        expect(store.value.dateOnlyTime, 540);
+        expect(store.value.asked, isTrue);
+        expect(switchOn(tester), isTrue);
+        expect(find.text(es.remindersOnConfirmation), findsOneWidget);
+        expect(blockedLine(), findsNothing);
+        expect(allowButton(), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2601 / UX-1606: the switch on and notifications blocked still show the line and «Permitir avisos», which opens the notifications page',
+      (tester) async {
+        final store = MemoryReminderStore(
+          const ReminderPreferences(enabled: true, asked: true),
+        );
+        final access = FakeReminderAccess(allowed: false);
+        await openReminders(tester, store, access);
+        expect(switchOn(tester), isTrue);
+        expect(blockedLine(), findsOneWidget);
+        expect(allowButton(), findsOneWidget);
+        await tester.tap(allowButton());
+        await tester.pumpAndSettle();
+        expect(access.notificationSettingsOpened, 1);
+        expect(access.permissionRequests, 0);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P289 (UX-2608, UX-2108) ----
+  group('P289 · padded, centred filled buttons', () {
+    const timeoutChannel = MethodChannel('taskflow/accessibility');
+    final platform =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    setUp(
+      () =>
+          platform.setMockMethodCallHandler(timeoutChannel, (_) async => null),
+    );
+    tearDown(() => platform.setMockMethodCallHandler(timeoutChannel, null));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    final timed = Task(
+      id: 1,
+      title: 'Médico',
+      priority: 1,
+      dueDate: DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 10),
+    );
+
+    Future<void> open(
+      WidgetTester tester,
+      FakeReminderAccess access,
+      Widget home, {
+      MemoryReminderStore? store,
+    }) async {
+      await loadManrope();
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            ...reminderOverrides(store ?? MemoryReminderStore(), access),
+            taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+          ],
+          child: MaterialApp(
+            locale: const Locale('es'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: AppTheme.light,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: const TextScaler.linear(2)),
+              child: child!,
+            ),
+            home: home,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+      'UX-2608 / UX-2108: ES 2× on 360×800, the exact-alarms sheet’s «Permitir «Alarmas y recordatorios»» is at least 58 dp tall, its wrapped lines centred with at least 8 dp above and below',
+      (tester) async {
+        final task = ValueNotifier(timed);
+        addTearDown(task.dispose);
+        await open(
+          tester,
+          FakeReminderAccess(exact: false),
+          Scaffold(
+            body: Padding(
+              padding: const EdgeInsets.all(24),
+              child: ValueListenableBuilder<Task>(
+                valueListenable: task,
+                builder: (context, value, _) => ReminderChip(
+                  task: value,
+                  onChanged: (changed) => task.value = changed,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.byType(ReminderChip));
+        await tester.pumpAndSettle();
+        final allow = find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.widgetWithText(FilledButton, es.allowPreciseAlarms),
+        );
+        expect(allow, findsOneWidget);
+        await tester.ensureVisible(allow);
+        await tester.pumpAndSettle();
+        expect(tester.getRect(allow).height, greaterThanOrEqualTo(58));
+        expectCentredPaddedLabel(tester, allow, es.allowPreciseAlarms);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final (problem, access, label) in [
+      (
+        'exact alarms are off',
+        FakeReminderAccess(allowed: true, exact: false),
+        es.allowPreciseAlarms,
+      ),
+      (
+        'notifications are off',
+        FakeReminderAccess(allowed: false),
+        es.allowNotifications,
+      ),
+    ]) {
+      testWidgets(
+        'UX-2608 / UX-2108: ES 2× on 360×800, when $problem Recordatorios’ «$label» is at least 58 dp tall, centred, with at least 8 dp above and below its text',
+        (tester) async {
+          await open(
+            tester,
+            access,
+            const NotificationSettingsScreen(),
+            store: MemoryReminderStore(
+              const ReminderPreferences(enabled: true, asked: true),
+            ),
+          );
+          final fix = find.widgetWithText(FilledButton, label);
+          expect(fix, findsOneWidget);
+          await tester.ensureVisible(fix);
+          await tester.pumpAndSettle();
+          expect(tester.getRect(fix).height, greaterThanOrEqualTo(58));
+          expectCentredPaddedLabel(
+            tester,
+            fix,
+            label,
+            wraps: label == es.allowPreciseAlarms,
+          );
           expect(tester.takeException(), isNull);
         },
       );

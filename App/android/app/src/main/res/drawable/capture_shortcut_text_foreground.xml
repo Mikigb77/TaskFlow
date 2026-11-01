@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The text shortcut's pencil, teal on the adaptive icon's mint background:
+     the 24 dp glyph of drawable/capture_shortcut_text.xml at 2x, centred in the
+     108 dp canvas as the launcher icon's tick is. The pencil spans 36-72 dp,
+     about half the 72 dp safe zone, so it reads at about 16 dp in the
+     launcher's circle (UX-2112). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="2"
+        android:scaleY="2"
+        android:translateX="30"
+        android:translateY="30">
+        <path
+            android:fillColor="#167568"
+            android:pathData="M3,17.25V21h3.75L17.81,9.94l-3.75,-3.75L3,17.25zM20.71,7.04c0.39,-0.39 0.39,-1.02 0,-1.41l-2.34,-2.34c-0.39,-0.39 -1.02,-0.39 -1.41,0l-1.83,1.83 3.75,3.75 1.83,-1.83z" />
+    </group>
+</vector>

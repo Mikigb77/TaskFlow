@@ -80,7 +80,7 @@ class TaskAssignmentPicker extends ConsumerWidget {
       children: [
         Wrap(
           spacing: 8,
-          runSpacing: 4,
+          runSpacing: 8,
           children: [
             TaskListPicker(
               asRow: asRow ?? compact,
@@ -88,6 +88,7 @@ class TaskAssignmentPicker extends ConsumerWidget {
               lockShared: lockShared,
               newName: newProjectName,
               onRename: onRenameProject,
+              note: task.isNote,
               onChanged: onChanged == null
                   ? null
                   : (project) => onChanged!(taskWithProject(task, project)),
@@ -124,8 +125,7 @@ class TaskAssignmentPicker extends ConsumerWidget {
                           ),
                         ),
                       ),
-                      if (changeable)
-                        const DropDownMark(),
+                      if (changeable) const DropDownMark(),
                     ],
                   ),
                 ),
@@ -145,8 +145,22 @@ class TaskAssignmentPicker extends ConsumerWidget {
                               child: ListView(
                                 shrinkWrap: true,
                                 children: [
-                                  ListTile(
-                                    title: Text(context.l10n.assignmentChoose),
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      24,
+                                      0,
+                                      24,
+                                      8,
+                                    ),
+                                    child: Semantics(
+                                      header: true,
+                                      child: Text(
+                                        context.l10n.assignmentChoose,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleMedium,
+                                      ),
+                                    ),
                                   ),
                                   ListTile(
                                     leading: const Icon(Icons.groups_outlined),
@@ -154,6 +168,9 @@ class TaskAssignmentPicker extends ConsumerWidget {
                                     subtitle: Text(
                                       context.l10n.assignmentGroupHelp,
                                     ),
+                                    trailing: task.assignment == 'group'
+                                        ? const Icon(Icons.check_rounded)
+                                        : null,
                                     selected: task.assignment == 'group',
                                     onTap: () => Navigator.pop(context, 0),
                                   ),
@@ -167,6 +184,11 @@ class TaskAssignmentPicker extends ConsumerWidget {
                                             ? '${person.name} · ${context.l10n.assignedToMe}'
                                             : person.name,
                                       ),
+                                      trailing:
+                                          task.assignment == 'member' &&
+                                              task.assigneeId == person.id
+                                          ? const Icon(Icons.check_rounded)
+                                          : null,
                                       selected:
                                           task.assignment == 'member' &&
                                           task.assigneeId == person.id,

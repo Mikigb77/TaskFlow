@@ -24,6 +24,7 @@ import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/services/attachment_files.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/app_components.dart';
+import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/reminder_control.dart';
 import 'package:agenda/widgets/reminder_ask_sheet.dart';
@@ -35,6 +36,7 @@ import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/models/reminder_plan.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/reminder_plans.dart';
+import 'package:agenda/screens/edit_task_screen.dart';
 
 /// Edits a saved task or note, or fills in a new task: a [task] with no id
 /// is new. That is how an account without Pro creates tasks (DECISIONS.md,
@@ -68,7 +70,8 @@ class TaskEditor extends ConsumerStatefulWidget {
   ConsumerState<TaskEditor> createState() => _TaskEditorState();
 }
 
-class _TaskEditorState extends ConsumerState<TaskEditor> {
+class _TaskEditorState extends ConsumerState<TaskEditor>
+    with WidgetsBindingObserver {
   final _form = GlobalKey<FormState>();
   // The steps show in both the short and the full form; one key keeps a
   // half-typed step across `Más detalles`.
@@ -161,6 +164,11 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   /// is clear where the task goes; otherwise the project waits in `Más
   /// detalles`. Decided once, so the row never jumps.
   late final bool _projectUpFront = _creating && widget.task.listId != null;
+
+  /// The task as the form opened it. The editor is rebuilt with the saved
+  /// task after a save in the background; Deshacer and the series' own
+  /// days still go by this one.
+  late final Task _opened = widget.task;
 
   /// Words carried into a new task beyond its title show at once.
   late final bool _notesUpFront =
@@ -263,7 +271,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   void initState() {
     super.initState();
     _titleFocus.addListener(_titleFocusChanged);
-    final task = widget.task;
+    final task = _opened;
     _isNote = task.isNote;
     _detailsExpanded = false;
     _dueDate = task.dueDate;
@@ -296,6 +304,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     _attachments = [...task.filePaths, ...task.imagePaths];
     _checklist = [...task.checklist];
     _unchanged = _edited().toMap();
+    _held = _unchanged;
+    WidgetsBinding.instance.addObserver(this);
     if (_creating) {
       _captures = ref.read(captureStoreProvider);
       _owner = ref.read(captureOwnerProvider);
@@ -304,11 +314,45 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       _kept = _words;
       _title.addListener(_keepWords);
       _notes.addListener(_keepWords);
+      // Typing changes no state of the form's own, so nothing rebuilds it.
+      _title.addListener(_markRoute);
+      _notes.addListener(_markRoute);
     }
+  }
+
+  // The new task's route, told whether this form is still empty, so a
+  // second tap on the widget or a shortcut opens no second form (UX-2110),
+  // and whether it is as it opened, so only then may one close it (UX-2643).
+  NewTaskRoute? _route;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (_creating && route is NewTaskRoute && route != _route) {
+      _route = route;
+      _markRoute();
+    }
+  }
+
+  /// Tells the route whether this is the empty form D12's Back just closes
+  /// (no title), and whether it is untouched: nothing changed since it
+  /// opened, with Más detalles closed and no file being picked. A step typed
+  /// without Enter and a file being picked aren't in [_edited] yet; in a new
+  /// task's form both are reached only with Más detalles open.
+  void _markRoute() {
+    final route = _route;
+    if (route == null) return;
+    route.empty = _title.text.trim().isEmpty;
+    route.untouched =
+        !_detailsExpanded &&
+        !_pickingFile &&
+        const DeepCollectionEquality().equals(_edited().toMap(), _unchanged);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _titleFocus.dispose();
     _title.dispose();
     _notes.dispose();
@@ -408,7 +452,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   ].contains(path.extension(file).toLowerCase());
 
   bool get _ruleChanged {
-    final before = widget.task;
+    final before = _opened;
     return before.dueDate != _dueDate ||
         before.hasTime != _hasTime ||
         before.recurrence != _recurrence ||
@@ -480,6 +524,52 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     );
   }
 
+  /// At most 10 labels of up to 32 letters each.
+  bool _labelsFit(String? text) {
+    final labels = (text ?? '')
+        .split(',')
+        .map((label) => label.trim())
+        .where((label) => label.isNotEmpty)
+        .toSet();
+    return labels.length <= 10 && labels.every((label) => label.length <= 32);
+  }
+
+  /// The saved task as the repository holds it while the form is open: as
+  /// it opened, or as the last save in the background left it.
+  late Map<String, dynamic> _held;
+  Future<void> _holding = Future.value();
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) _saveInBackground();
+  }
+
+  /// A saved task's edits are saved when the app goes to the background,
+  /// as Back would save them (D12), so they survive Android closing it. The
+  /// form stays open and says nothing; its later Guardar cambios or Back
+  /// shows «Cambios guardados», whose Deshacer brings back the task as the
+  /// form opened it. A new task's words are kept in the capture store
+  /// instead. Nothing is saved with no title, with labels that don't fit,
+  /// or when a changed rule would reset a series' own days, which the
+  /// person is asked about first.
+  void _saveInBackground() {
+    if (_creating || _saving || !mounted) return;
+    if (_title.text.trim().isEmpty || !_labelsFit(_labels.text)) return;
+    if (_ruleChanged && _exceptions.isNotEmpty) return;
+    final task = _edited();
+    final map = task.toMap();
+    final notifier = ref.read(taskProvider.notifier);
+    _holding = _holding.then((_) async {
+      if (const DeepCollectionEquality().equals(map, _held)) return;
+      try {
+        await notifier.updateTask(task);
+        _held = map;
+      } catch (_) {
+        // Still in the form; Guardar cambios or Back saves it again.
+      }
+    });
+  }
+
   /// Back and Save behave the same: an unchanged form just closes, and
   /// changes are saved, with Undo (D12). A new task with no title just
   /// closes; with one, Back saves it too.
@@ -506,11 +596,31 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       await _add();
       return;
     }
+    await _holding;
+    if (!mounted) return;
     if (const DeepCollectionEquality().equals(_edited().toMap(), _unchanged)) {
+      // Edits saved in the background and then undone in the form: the
+      // task goes back as it was, with nothing to say.
+      if (!const DeepCollectionEquality().equals(_held, _unchanged)) {
+        try {
+          await ref.read(taskProvider.notifier).updateTask(_edited());
+        } catch (_) {
+          if (mounted) {
+            unawaited(
+              showFeedback(
+                ScaffoldMessenger.of(context),
+                context.l10n.taskSaveError,
+              ),
+            );
+          }
+          return;
+        }
+        if (!mounted) return;
+      }
       Navigator.pop(context);
       return;
     }
-    final before = widget.task;
+    final before = _opened;
     if (_ruleChanged && _exceptions.isNotEmpty) {
       final confirmed = await showDialog<bool>(
         context: context,
@@ -664,6 +774,27 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     }
   }
 
+  /// Whether this saved task still has a file kept only on the phone: one
+  /// its files show with «Subir», as the task's details do.
+  Future<bool> _hasPhoneOnlyFile() async {
+    final id = widget.task.id;
+    if (id == null || ref.read(taskRepositoryProvider).ownerKey == 'local') {
+      return false;
+    }
+    final entries = attachmentEntriesProvider(id);
+    // Kept alive until read: nothing else may be listening.
+    final listening = ref.listenManual(entries, (_, __) {});
+    try {
+      return (await ref.read(
+        entries.future,
+      )).any((entry) => entry.item == null && entry.exists);
+    } catch (_) {
+      return false;
+    } finally {
+      listening.close();
+    }
+  }
+
   Future<void> _attach() async {
     if (_pickingFile || _saving) return;
     if (_attachments.length >= 20) {
@@ -672,7 +803,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       );
       return;
     }
-    final local = ref.read(taskRepositoryProvider).ownerKey == 'local';
+    final explain = await _hasPhoneOnlyFile();
+    if (!mounted) return;
     final gallery = await showModalBottomSheet<bool>(
       context: context,
       builder: (context) => SafeArea(
@@ -681,16 +813,13 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // A new task has no older files to explain: its two rows
-              // speak for themselves.
-              if (!_creating)
+              // Only a task with a file still kept only on the phone, one
+              // that shows «Subir», has something to explain; otherwise its
+              // two rows speak for themselves.
+              if (explain)
                 Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Text(
-                    local
-                        ? context.l10n.fileLocalHelp
-                        : context.l10n.fileUploadHelp,
-                  ),
+                  child: Text(context.l10n.fileUploadHelp),
                 )
               else
                 const SizedBox(height: 12),
@@ -744,6 +873,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
 
   @override
   Widget build(BuildContext context) {
+    // Every change in the form rebuilds it: its route learns of each.
+    _markRoute();
     final colors = Theme.of(context).colorScheme;
     return PopScope(
       canPop: false,
@@ -766,7 +897,10 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 640),
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+                // 16 dp under the last field: the 60 dp button below
+                // carries its own room (UX-2108), and at 2× a title still
+                // shows from its first word once the keyboard goes down.
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
                 child: Form(
                   key: _form,
                   child: Column(
@@ -798,10 +932,11 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                       TextFormField(
                         key: const ValueKey('task-title'),
                         controller: _title,
-                        // A new task opens with the keyboard up. Its Done key
-                        // only closes the keyboard: the day comes next. While
-                        // typing, a long title wraps up to three lines so the
-                        // days still show; without the focus it shows whole.
+                        // A new task opens with the keyboard up. The Done key
+                        // only closes the keyboard, in the edit form too:
+                        // saving stays on its button and Back. While typing,
+                        // a long title wraps up to three lines so the days
+                        // still show; without the focus it shows whole.
                         focusNode: _titleFocus,
                         autofocus: _creating,
                         minLines: 1,
@@ -810,9 +945,6 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                         textInputAction: _isNote
                             ? TextInputAction.next
                             : TextInputAction.done,
-                        onFieldSubmitted: _isNote || _creating
-                            ? null
-                            : (_) => _save(),
                         onChanged: (_) => setState(() {}),
                         maxLength: 160,
                         textCapitalization: TextCapitalization.sentences,
@@ -945,9 +1077,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                               if (_deadline != null)
                                 taskDeadlineLabel(context, _planningTask),
                               if (_priority > 1)
-                                context.l10n.priorityValue(
-                                  context.priorityName(_priority),
-                                ),
+                                context.priorityPhrase(_priority),
                             ].join(' · '),
                             style: TextStyle(color: colors.onSurfaceVariant),
                           ),
@@ -1092,17 +1222,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                             labelText: context.l10n.labels,
                             hintText: context.l10n.labelsExample,
                           ),
-                          validator: (text) {
-                            final labels = (text ?? '')
-                                .split(',')
-                                .map((label) => label.trim())
-                                .where((label) => label.isNotEmpty)
-                                .toSet();
-                            return labels.length > 10 ||
-                                    labels.any((label) => label.length > 32)
-                                ? context.l10n.labelLimit
-                                : null;
-                          },
+                          validator: (text) =>
+                              _labelsFit(text) ? null : context.l10n.labelLimit,
                         ),
                         const SizedBox(height: 24),
                         ..._files(colors),
@@ -1142,6 +1263,10 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                       : _dueDate != null
                       ? context.l10n.captureAddToCalendar
                       : context.l10n.captureAddTask,
+                  // A label that wraps at large text stays centred beside
+                  // its ✓, as the other buttons' labels do.
+                  textAlign: TextAlign.center,
+                  textWidthBasis: TextWidthBasis.longestLine,
                 ),
               ),
             ),
@@ -1228,7 +1353,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       children: [
         Wrap(
           spacing: 8,
-          runSpacing: 4,
+          runSpacing: 8,
           children: [
             ChoiceChip(
               key: const ValueKey('new-task-today'),
@@ -1297,6 +1422,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     plan: _reminderPlan,
     task: _responsibility,
     schedule: _repeatTask.copyWith(
+      // A saved task's alerts are known by its id: the row says one has rung.
+      id: widget.task.id,
       exceptions: _exceptions,
       completedDates: widget.task.completedDates,
       isCompleted: widget.task.isCompleted,

@@ -129,12 +129,15 @@ class SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Text(text.toUpperCase(),
-          style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 11,
-              letterSpacing: 1.5,
-              fontWeight: FontWeight.w800)));
+      // A heading, so a screen reader can jump between sections.
+      child: Semantics(
+          header: true,
+          child: Text(text.toUpperCase(),
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 11,
+                  letterSpacing: 1.5,
+                  fontWeight: FontWeight.w800))));
 }
 
 class EmptyState extends StatelessWidget {

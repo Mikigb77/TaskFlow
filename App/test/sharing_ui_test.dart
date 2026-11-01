@@ -1,3 +1,5 @@
+import 'package:agenda/l10n/region.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -23,6 +25,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/design_fixtures.dart';
 import 'support/hanging_sync.dart';
+import 'support/address_wrap.dart';
 import 'package:flutter/rendering.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/providers/regional_provider.dart';
@@ -360,11 +363,12 @@ void main() {
         {'id': 'inv-1', 'email': 'ana@example.invalid', 'role': 'editor'}
       ]
     });
-    final row = find.widgetWithText(ListTile, 'ana@example.invalid');
+    final row =
+        find.widgetWithText(ListTile, breakableAddress('ana@example.invalid'));
     await tester.ensureVisible(row);
     await tester.pumpAndSettle();
     final before = app.api.calls.length;
-    await tester.tap(find.text('ana@example.invalid'));
+    await tester.tap(find.text(breakableAddress('ana@example.invalid')));
     await tester.pumpAndSettle();
     expect(app.api.calls.length, before, reason: 'no request on tap');
     expect(find.byType(AlertDialog), findsNothing);
@@ -570,7 +574,7 @@ void main() {
       ModalRoute.of(tester.element(find.byType(TaskListsScreen)))!.isCurrent;
 
   testWidgets(
-      'UX-476: deleting Compras from its page (Compartir → Eliminar proyecto) lands on Projects with Proyecto eliminado, and no Compras page is left',
+      'UX-476: deleting Compras from its page (⋮ → Eliminar proyecto) lands on Projects with Proyecto eliminado, and no Compras page is left',
       (tester) async {
     final api = await openProjectsApp(
         tester, [TaskListInfo(id: 'compras', name: 'Compras', version: 2)],
@@ -578,14 +582,10 @@ void main() {
     await tester.tap(find.widgetWithText(ListTile, 'Compras'));
     await tester.pumpAndSettle();
     expect(projectPage('compras'), findsOneWidget);
-    final share = find.widgetWithText(TextButton, es.shareProject);
-    await tester.ensureVisible(share);
-    await tester.tap(share);
+    // P286: an unshared project is deleted from its page's ⋮.
+    await tester.tap(find.byTooltip(es.manageItem('Compras')));
     await tester.pumpAndSettle();
-    final delete = find.widgetWithText(OutlinedButton, es.deleteList);
-    await tester.ensureVisible(delete);
-    await tester.pumpAndSettle();
-    await tester.tap(delete);
+    await tester.tap(find.text(es.deleteList));
     await tester.pumpAndSettle();
     await tester.tap(find.descendant(
         of: find.byType(AlertDialog),
@@ -649,17 +649,19 @@ void main() {
   });
 
   testWidgets(
-      'UX-476: Projects ⋮ → Compartir → delete stays on Projects (not one screen too far) and says Proyecto eliminado',
+      'UX-476: Projects ⋮ → Miembros → delete stays on Projects (not one screen too far) and says Proyecto eliminado',
       (tester) async {
-    final api = await openProjectsApp(
-        tester, [TaskListInfo(id: 'compras', name: 'Compras', version: 2)],
-        'owner');
+    // Shared: an unshared project's sharing page has no delete (P286).
+    final api = await openProjectsApp(tester, [
+      TaskListInfo(id: 'compras', name: 'Compras', version: 2, shared: true)
+    ], 'owner');
     await tester.tap(find.byTooltip(es.manageItem('Compras')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text(es.shareProject));
+    await tester.tap(find.text(es.people));
     await tester.pumpAndSettle();
     expect(find.byType(ListSharingScreen), findsOneWidget);
-    final delete = find.widgetWithText(OutlinedButton, es.deleteList);
+    final delete =
+        find.widgetWithText(OutlinedButton, es.deleteListForEveryone);
     await tester.ensureVisible(delete);
     await tester.pumpAndSettle();
     await tester.tap(delete);
@@ -678,7 +680,7 @@ void main() {
   });
 
   testWidgets(
-      'UX-477: on the sharing screen of an unshared project you own, the button reads Eliminar proyecto and asks with «Casa» and no para todas',
+      'UX-477 / P286: the sharing screen of an unshared project you own has no delete button',
       (tester) async {
     expect(es.deleteList, 'Eliminar proyecto');
     expect(es.deleteListPrivateHelp('Casa'),
@@ -690,19 +692,9 @@ void main() {
     }, projects: [
       TaskListInfo(id: 'casa', name: 'Casa', version: 1)
     ]);
-    final delete = find.widgetWithText(OutlinedButton, es.deleteList);
-    await tester.ensureVisible(delete);
-    await tester.pumpAndSettle();
-    expect(delete, findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, es.deleteList), findsNothing);
+    expect(find.text(es.deleteList), findsNothing);
     expect(find.text(es.deleteListForEveryone), findsNothing);
-    await tester.tap(delete);
-    await tester.pumpAndSettle();
-    expect(
-        find.descendant(
-            of: find.byType(AlertDialog),
-            matching: find.text(es.deleteListPrivateHelp('Casa'))),
-        findsOneWidget);
-    expect(find.textContaining('para todas'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -863,13 +855,15 @@ void main() {
         scrollable: find.byType(Scrollable).last);
     final tile = tester.widget<ListTile>(anaRow);
     expect((tile.title as Text).data, 'Ana');
-    expect((tile.subtitle as Text).data, 'ana@example.invalid · ${es.roleEditor}');
+    expect((tile.subtitle as Text).data,
+        '${breakableAddress('ana@example.invalid')} · ${es.roleEditor}');
     // Someone the project doesn't name yet: their email.
-    final luis = find.widgetWithText(ListTile, 'luis@example.invalid');
+    final luis =
+        find.widgetWithText(ListTile, breakableAddress('luis@example.invalid'));
     await tester.scrollUntilVisible(luis, 120,
         scrollable: find.byType(Scrollable).last);
     expect((tester.widget<ListTile>(luis).title as Text).data,
-        'luis@example.invalid');
+        breakableAddress('luis@example.invalid'));
     expect(tester.takeException(), isNull);
   });
 
@@ -1395,6 +1389,438 @@ void main() {
           'reaches anyone else), so the last sentence says they aren’t shared.');
     });
   });
+
+  group('P284 · sharing page answers where you tapped', () {
+    // Measure wrapping in the app's own font, not the square test font.
+    setUpAll(() async {
+      await (FontLoader('Manrope')
+            ..addFont(rootBundle.load('assets/fonts/Manrope.ttf')))
+          .load();
+    });
+
+    const anaEmail = 'ana.garcia@example.com';
+    const carmenEmail = 'carmen.lopez@example.com';
+    const luisEmail = 'luis.martinez@example.com';
+    Finder inPage(Finder finder) =>
+        find.descendant(of: find.byType(ListSharingScreen), matching: finder);
+    Finder bar() => inPage(find.byType(LinearProgressIndicator));
+    Finder rowOf(String shown) => find.widgetWithText(ListTile, shown);
+
+    testWidgets(
+        'UX-2502: with the sync held open, Ana’s row reads Lector as soon as «Dar permiso de lectura» answers, and the page never blanks to a spinner',
+        (tester) async {
+      final tasks = HangingSyncTasks();
+      final api = await _openLiveSharing(tester, tasks: tasks);
+      final anaRow = rowOf(breakableAddress(anaEmail));
+      expect(find.descendant(of: anaRow, matching: find.text(es.roleEditor)),
+          findsOneWidget);
+      final menu = find.byTooltip(es.manageItem(anaEmail));
+      await tester.ensureVisible(menu);
+      await tester.pumpAndSettle();
+      await tester.tap(menu);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(es.makeViewer));
+      for (var frame = 0; frame < 20; frame++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(inPage(find.byType(CircularProgressIndicator)), findsNothing,
+            reason: 'the page stays on screen (frame $frame)');
+        expect(anaRow, findsOneWidget);
+      }
+      expect(api.calls, contains(('POST', 'lists/casa/member/')));
+      expect(api.calls.last, ('GET', 'lists/casa/sharing/'),
+          reason: 'the page fetched its own data again');
+      expect(tasks.syncs, greaterThan(0), reason: 'a sync is under way');
+      expect(tasks.sync.isCompleted, isFalse, reason: 'and still running');
+      expect(find.descendant(of: anaRow, matching: find.text(es.roleViewer)),
+          findsOneWidget);
+      expect(find.descendant(of: anaRow, matching: find.text(es.roleEditor)),
+          findsNothing);
+      expect(bar(), findsNothing, reason: 'the change is done');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'UX-2502: while a change runs, a 2 dp bar sits under the app bar, in view when scrolled to the bottom, and nothing below it moves (es, 2x, 360x800)',
+        (tester) async {
+      final api = await _openLiveSharing(tester, scale: 2);
+      api.hold = Completer<void>();
+      final menu = find.byTooltip(es.manageItem(anaEmail));
+      await tester.ensureVisible(menu);
+      await tester.pumpAndSettle();
+      final anaRow = rowOf(breakableAddress(anaEmail));
+      final before = tester.getRect(anaRow);
+      await tester.tap(menu);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(es.makeViewer));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(api.calls.last, ('POST', 'lists/casa/member/'),
+          reason: 'the request is on its way');
+      final appBar = tester.getRect(inPage(find.byType(AppBar)));
+      expect(bar(), findsOneWidget);
+      var rect = tester.getRect(bar());
+      expect(rect.height, moreOrLessEquals(2, epsilon: 0.01));
+      expect(rect.top, moreOrLessEquals(appBar.bottom, epsilon: 0.5));
+      expect(tester.getRect(anaRow), before, reason: 'nothing moves');
+      // Scrolled to the bottom, the bar is still in view.
+      await tester.drag(inPage(find.byType(Scrollable)).first,
+          const Offset(0, -4000));
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      final delete = find.text(es.deleteListForEveryone);
+      expect(delete, findsOneWidget);
+      expect(tester.getRect(delete).bottom, lessThanOrEqualTo(800));
+      expect(bar(), findsOneWidget);
+      rect = tester.getRect(bar());
+      expect(rect.height, moreOrLessEquals(2, epsilon: 0.01));
+      expect(rect.top, moreOrLessEquals(appBar.bottom, epsilon: 0.5));
+      expect(rect.bottom, lessThanOrEqualTo(800));
+      api.hold!.complete();
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(bar(), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'UX-2502 / UX-2511: offline, «Dar permiso de lectura» keeps the members on screen and says the network message as a floating message, with nothing after «inténtalo de nuevo.»',
+        (tester) async {
+      final api = await _openLiveSharing(tester);
+      api.offline = true;
+      final menu = find.byTooltip(es.manageItem(anaEmail));
+      await tester.ensureVisible(menu);
+      await tester.pumpAndSettle();
+      await tester.tap(menu);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(es.makeViewer));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      const network =
+          'No hay conexión. Revisa el wifi o los datos móviles e inténtalo de nuevo.';
+      expect(es.requestError('network'), network);
+      final snack = find.byType(SnackBar);
+      expect(snack, findsOneWidget);
+      expect(tester.widget<SnackBar>(snack).behavior, SnackBarBehavior.floating);
+      expect(find.descendant(of: snack, matching: find.text(network)),
+          findsOneWidget);
+      expect(find.textContaining('Tus tareas siguen guardadas'), findsNothing);
+      expect(inPage(find.byType(MessageBanner)), findsNothing,
+          reason: 'the top banner is only for a page that couldn’t load');
+      final anaRow = rowOf(breakableAddress(anaEmail));
+      expect(anaRow, findsOneWidget, reason: 'the members stay');
+      expect(find.descendant(of: anaRow, matching: find.text(es.roleEditor)),
+          findsOneWidget);
+      expect(inPage(find.byType(CircularProgressIndicator)), findsNothing);
+      expect(bar(), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'UX-2511: a sharing page that can’t load offline says the network message and nothing after it',
+        (tester) async {
+      await _openLiveSharing(tester, offlineFromStart: true);
+      final banner = inPage(find.byType(MessageBanner));
+      expect(banner, findsOneWidget);
+      expect(
+          find.descendant(
+              of: banner, matching: find.text(es.requestError('network'))),
+          findsOneWidget);
+      expect(find.textContaining('Tus tareas siguen guardadas'), findsNothing);
+      expect(inPage(find.text(es.retry)), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+          'UX-2513: (es, ${scale}x, 360x800) members’ and pending invitations’ addresses wrap only after «@» or «.», and TalkBack reads them whole',
+          (tester) async {
+        final semantics = tester.ensureSemantics();
+        await _openLiveSharing(tester, scale: scale, named: true);
+        final checks = <(String, String)>[
+          // Ana is named: her address leads the second line.
+          ('${breakableAddress(anaEmail)} · ${es.roleEditor}', anaEmail),
+          (breakableAddress(carmenEmail), carmenEmail),
+          (breakableAddress(luisEmail), luisEmail),
+        ];
+        for (final (shown, address) in checks) {
+          final text = find.text(shown);
+          await tester.scrollUntilVisible(text, 100,
+              scrollable: inPage(find.byType(Scrollable)).first);
+          await tester.pumpAndSettle();
+          expect(text, findsOneWidget, reason: address);
+          expectAddressWrapsWhole(tester, text, address);
+          final spoken = spokenLabel(tester, text);
+          expect(spoken, contains(address));
+          expect(tester.getRect(text).right, lessThanOrEqualTo(360.5));
+        }
+        semantics.dispose();
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets(
+        'UX-2518: (es, 2x, 360x800) the invite dialog’s stacked «Cancelar» and «Enviar invitación» stand 8 dp or more apart',
+        (tester) async {
+      await _openLiveSharing(tester, scale: 2);
+      final invite = find.byKey(const ValueKey('invite-person'));
+      await tester.ensureVisible(invite);
+      await tester.pumpAndSettle();
+      await tester.tap(invite);
+      await tester.pumpAndSettle();
+      final dialog = find.byType(AlertDialog);
+      expect(dialog, findsOneWidget);
+      expectButtonsApart(
+        tester,
+        find.descendant(
+            of: dialog, matching: find.widgetWithText(TextButton, es.cancel)),
+        find.descendant(
+            of: dialog,
+            matching: find.widgetWithText(FilledButton, es.sendInvitation)),
+        stacked: true,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('P285 · project sharing headings', () {
+    testWidgets(
+        'UX-2519: on a project’s sharing page, Miembros and INVITACIONES PENDIENTES are headings',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      await _SharingApp.open(tester, {
+        'list': {'name': 'Casa', 'role': 'owner', 'version': 1},
+        'members': [],
+        'invitations': [
+          {'id': 'inv-1', 'email': 'ana@example.invalid', 'role': 'editor'}
+        ]
+      }, projects: [
+        // Not shared yet: the page shows its own «Miembros» section.
+        TaskListInfo(id: 'casa', name: 'Casa', version: 1, role: 'owner'),
+      ]);
+      for (final title in [es.people, es.pendingInvitations]) {
+        final label = find.byWidgetPredicate(
+            (w) => w is SectionLabel && w.text == title);
+        expect(label, findsOneWidget, reason: title);
+        await tester.ensureVisible(label);
+        await tester.pumpAndSettle();
+        final text = find.descendant(
+            of: label, matching: find.text(title.toUpperCase()));
+        final node = tester.getSemantics(text);
+        expect(node.label, title.toUpperCase());
+        expect(node.getSemanticsData().flagsCollection.isHeader, isTrue,
+            reason: '«$title» is a heading');
+      }
+      semantics.dispose();
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('P286 · no delete inside an unshared project’s sharing page', () {
+    /// Scrolls the sharing page to its last line, «Cómo funciona…».
+    Future<void> toTheEnd(WidgetTester tester) async {
+      await tester.scrollUntilVisible(find.text(es.howSharingWorks), 200,
+          scrollable: find
+              .descendant(
+                  of: find.byType(ListSharingScreen),
+                  matching: find.byType(Scrollable))
+              .first);
+      await tester.drag(
+          find
+              .descendant(
+                  of: find.byType(ListSharingScreen),
+                  matching: find.byType(Scrollable))
+              .first,
+          const Offset(0, -2000));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+        'UX-2503: «Compartir proyecto» for an unshared «Casa» you own has no Eliminar proyecto, even scrolled to its end',
+        (tester) async {
+      await _SharingApp.open(tester, {
+        'list': {'name': 'Casa', 'role': 'owner', 'version': 1},
+        'members': [],
+        'invitations': []
+      }, projects: [
+        TaskListInfo(id: 'casa', name: 'Casa', version: 1)
+      ]);
+      expect(
+          find.descendant(
+              of: find.byType(AppBar), matching: find.text(es.listSharing)),
+          findsOneWidget);
+      await toTheEnd(tester);
+      expect(find.text(es.howSharingWorks), findsOneWidget);
+      expect(find.text(es.deleteList, skipOffstage: false), findsNothing);
+      expect(find.text(es.deleteListForEveryone, skipOffstage: false),
+          findsNothing);
+      expect(
+          find.descendant(
+              of: find.byType(ListSharingScreen),
+              matching: find.byType(OutlinedButton)),
+          findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'UX-2503: a shared project’s Miembros page still ends with Eliminar el proyecto para todos for its owner',
+        (tester) async {
+      await _SharingApp.open(tester, {
+        'list': {'name': 'Casa', 'role': 'owner', 'version': 1},
+        'members': [
+          {'user_id': 2, 'user__email': 'ana@example.invalid', 'role': 'editor'}
+        ],
+        'invitations': []
+      }, projects: [
+        TaskListInfo(
+            id: 'casa',
+            name: 'Casa',
+            version: 1,
+            shared: true,
+            ownerId: 1,
+            people: const [owner, ana])
+      ]);
+      await toTheEnd(tester);
+      expect(find.widgetWithText(OutlinedButton, es.deleteListForEveryone),
+          findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+}
+
+/// UX-2518: [a] and [b] leave at least 8 dp between them, one above the
+/// other when [stacked].
+void expectButtonsApart(WidgetTester tester, Finder a, Finder b,
+    {bool stacked = true}) {
+  expect(a, findsOneWidget);
+  expect(b, findsOneWidget);
+  final first = tester.getRect(a);
+  final second = tester.getRect(b);
+  final (upper, lower) =
+      first.top <= second.top ? (first, second) : (second, first);
+  if (stacked) {
+    expect(lower.top, greaterThanOrEqualTo(upper.bottom - 0.5),
+        reason: 'one above the other: $first, $second');
+  }
+  final gap = stacked
+      ? lower.top - upper.bottom
+      : (first.left <= second.left
+          ? second.left - first.right
+          : first.left - second.right);
+  expect(gap, greaterThanOrEqualTo(7.99),
+      reason: 'the buttons stand ${gap.toStringAsFixed(1)} dp apart');
+}
+
+/// P284: the sharing screen of project `casa`, in Spanish at [scale] on a
+/// 360×800 view, fed by a [_LiveSharing] server through the app's own
+/// provider: Ana (editor) and Carmen (viewer) have access, and Luis is
+/// invited. With [named], the project knows Ana's name. Signed in as
+/// account 1, the owner.
+Future<_LiveSharing> _openLiveSharing(
+  WidgetTester tester, {
+  double scale = 1,
+  bool named = false,
+  bool offlineFromStart = false,
+  TaskNotifier? tasks,
+}) async {
+  tester.view.physicalSize = const Size(360, 800);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  final api = _LiveSharing()..offline = offlineFromStart;
+  final container = ProviderContainer(overrides: [
+    apiClientProvider.overrideWithValue(api),
+    authProvider.overrideWith((ref) => _Auth(api)),
+    taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+    taskProvider.overrideWith((ref) => tasks ?? DesignTaskNotifier()),
+    themeStoreProvider.overrideWithValue(MemoryThemeStore()),
+    taskListsProvider.overrideWith((ref) async => [
+          if (named)
+            TaskListInfo(
+                id: 'casa',
+                name: 'Casa',
+                version: 1,
+                shared: true,
+                ownerId: 1,
+                people: const [
+                  ProjectMember(id: 1, name: 'Yo', role: 'owner'),
+                  ProjectMember(id: 2, name: 'Ana', role: 'editor'),
+                ]),
+        ]),
+  ]);
+  addTearDown(container.dispose);
+  addTearDown(api.close);
+  await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+          locale: const Locale('es'),
+          theme: AppTheme.light,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: TextScaler.linear(scale)),
+              child: child!),
+          home: Builder(
+              builder: (context) => Scaffold(
+                  body: Center(
+                      child: TextButton(
+                          onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute<void>(
+                                  builder: (_) => const ListSharingScreen(
+                                      listId: 'casa'))),
+                          child: const Text('Abrir'))))))));
+  await tester.tap(find.text('Abrir'));
+  await tester.pumpAndSettle();
+  return api;
+}
+
+/// P284: the sharing server of project `casa`. A role change takes effect
+/// at once and the next GET shows it; [hold] keeps a change waiting;
+/// [offline] fails every request as a lost connection.
+class _LiveSharing extends OfflineApiClient {
+  final calls = <(String, String)>[];
+  bool offline = false;
+  Completer<void>? hold;
+  final members = <Map<String, dynamic>>[
+    {'user_id': 2, 'user__email': 'ana.garcia@example.com', 'role': 'editor'},
+    {'user_id': 3, 'user__email': 'carmen.lopez@example.com', 'role': 'viewer'},
+  ];
+  final invitations = <Map<String, dynamic>>[
+    {'id': 'inv-1', 'email': 'luis.martinez@example.com', 'role': 'editor'},
+  ];
+  @override
+  Account get account => Account.fromJson(
+      {'id': 1, 'email': 'owner@example.invalid', 'timezone': 'UTC'});
+  @override
+  Future<dynamic> request(String method, String path,
+      {Map<String, dynamic>? data,
+      String? audioPath,
+      bool authenticated = true,
+      int? accountId}) async {
+    calls.add((method, path));
+    if (offline) throw ApiException(0, 'offline');
+    if (method == 'GET' && path == 'lists/casa/sharing/') {
+      return {
+        'list': {'name': 'Casa', 'role': 'owner', 'version': 1},
+        'members': [for (final member in members) {...member}],
+        'invitations': [for (final invitation in invitations) {...invitation}],
+      };
+    }
+    if (hold != null) await hold!.future;
+    if (method == 'POST' && path == 'lists/casa/member/') {
+      final member =
+          members.firstWhere((member) => member['user_id'] == data!['user_id']);
+      if (data!['role'] == 'remove') {
+        members.remove(member);
+      } else {
+        member['role'] = data['role'];
+      }
+      return {};
+    }
+    return path.endsWith('invite/') ? {'code': _Recorder.code} : {};
+  }
 }
 
 /// The sharing screen of project `casa` with [data], in [language] at

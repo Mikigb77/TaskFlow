@@ -70,6 +70,12 @@ class _TaskActionsState extends ConsumerState<TaskActions> {
   }
 
   Future<void> _add() async {
+    // A page above this screen is still leaving: the tap was meant for it
+    // (UX-2623).
+    if (ModalRoute.of(context)?.secondaryAnimation?.status ==
+        AnimationStatus.reverse) {
+      return;
+    }
     if (_deciding) return;
     if (ref.read(opensFormProvider)) {
       _deciding = true;
@@ -118,7 +124,9 @@ class _TaskActionsState extends ConsumerState<TaskActions> {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+    // 8 dp above the 60 dp button, so a landing still shows the day's
+    // heading with its rows (UX-2203).
+    padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [

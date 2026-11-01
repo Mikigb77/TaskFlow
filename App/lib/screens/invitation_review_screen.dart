@@ -168,7 +168,8 @@ class _InvitationReviewScreenState
                     ],
                     if (account != null)
                       Text(
-                        strings.signedInAs(account.email),
+                        strings.signedInAs(breakableAddress(account.email)),
+                        semanticsLabel: strings.signedInAs(account.email),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     if (_error != null)
@@ -178,7 +179,11 @@ class _InvitationReviewScreenState
                           _error is ApiException &&
                                   (_error as ApiException).status == 404
                               ? strings.invitationUnavailable
-                              : requestProblemText(strings, _error!),
+                              : requestProblemText(
+                                  strings,
+                                  _error!,
+                                  keptNote: false,
+                                ),
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.error,
                           ),
@@ -212,14 +217,16 @@ class _InvitationReviewScreenState
                         child: Text(strings.tryAgain),
                       ),
                     // Keeps the link: Calendar's card offers the
-                    // invitation again.
-                    if (!_unavailable)
+                    // invitation again. Apart from the button above it.
+                    if (!_unavailable) ...[
+                      const SizedBox(height: 8),
                       TextButton(
                         onPressed: _accepting
                             ? null
                             : () => Navigator.pop(context, false),
                         child: Text(strings.invitationNotNow),
                       ),
+                    ],
                   ],
                 ],
               ),

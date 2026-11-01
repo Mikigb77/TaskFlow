@@ -46,6 +46,7 @@ import 'support/billing_fixtures.dart';
 import 'support/capture_fixtures.dart';
 import 'support/design_fixtures.dart';
 import 'support/never_syncing_tasks.dart';
+import 'support/phone_alerts.dart';
 import 'support/reading_order.dart';
 import 'support/reminder_fixtures.dart';
 
@@ -789,7 +790,8 @@ void main() {
       (tester) async {
         await card(tester, [said(plan: ownersPlan)]);
         expect(row(), findsOneWidget);
-        expect(inRow(find.text(es.reminder)), findsOneWidget);
+        // P270 (UX-2206): the plan's line names itself, alone in the row.
+        expect(inRow(find.text(es.reminder)), findsNothing);
         expect(inRow(find.text(ownersLine)), findsOneWidget);
         expect(
           top(row()),
@@ -800,7 +802,7 @@ void main() {
         expect(find.text(es.enableReminders), findsNothing);
         noSubtitle();
         await tapVisible(tester, options());
-        expect(find.text(es.reminder), findsOneWidget);
+        expect(find.text(es.reminder), findsNothing);
         expect(find.byType(ReminderControl), findsOneWidget);
         expect(find.text(ownersLine), findsOneWidget);
         expect(tester.takeException(), isNull);
@@ -811,7 +813,7 @@ void main() {
       'UX-1805: changing the plan to a time, then to «Desactivado», keeps the row above «Más opciones»',
       (tester) async {
         final (_, captures) = await card(tester, [said(plan: ownersPlan)]);
-        await tapVisible(tester, inRow(find.text(es.reminder)));
+        await tapVisible(tester, inRow(find.text(ownersLine)));
         await tapVisible(tester, inSheet(find.text(es.chooseAlertTime)));
         final picker = find.byType(TimePickerDialog);
         expect(picker, findsOneWidget);
@@ -974,7 +976,7 @@ void main() {
           said(plan: passed, day: DateTime(2026, 10, 27, 10), timed: true),
         ]);
         expect(inRow(find.text(es.noReminderTimePassed)), findsOneWidget);
-        await tapVisible(tester, inRow(find.text(es.reminder)));
+        await tapVisible(tester, inRow(find.text(es.noReminderTimePassed)));
         expect(sheet(), findsNWidgets(2));
         // The default lead here is 10 minutes, so its row says so.
         await tapVisible(
@@ -1109,9 +1111,8 @@ void main() {
         await tapVisible(tester, find.byIcon(Icons.repeat_rounded));
         await tapVisible(
           tester,
-          inSheet(find.byType(DropdownButtonFormField<String>)),
+          inSheet(find.byKey(const ValueKey('repeat-weekly'))),
         );
-        await tapVisible(tester, find.text(es.weekly).last);
         await tapVisible(
           tester,
           inSheet(find.widgetWithText(FilledButton, es.done)),
@@ -1139,8 +1140,8 @@ void main() {
             textScale: 2,
           );
           expect(tester.takeException(), isNull);
-          final title = inRow(find.text(l.reminder));
-          expect(title, findsOneWidget);
+          // P270 (UX-2206): no «Recordatorio» over the plan's line.
+          expect(inRow(find.text(l.reminder)), findsNothing);
           final texts = find.descendant(
             of: row(),
             matching: find.byType(RichText),
@@ -1377,11 +1378,11 @@ void main() {
         await tapVisible(tester, options());
         await tapVisible(tester, find.byType(DropdownButtonFormField<int>));
         await tapVisible(tester, find.text(es.high).last);
-        expect(optionsSubtitle(), es.priorityValue(es.high));
+        expect(optionsSubtitle(), es.priorityValue('high'));
         await eighteenInsideOptions(tester);
         expect(
           optionsSubtitle(),
-          [es.priorityValue(es.high), es.reminderValue('18:00')].join(' · '),
+          [es.priorityValue('high'), es.reminderValue('18:00')].join(' · '),
         );
         expect(tester.takeException(), isNull);
       },
@@ -1418,7 +1419,7 @@ void main() {
       (tester) async {
         await card(tester, [said(plan: ownersPlan)]);
         expect(optionsSubtitle(), isNull);
-        await tapVisible(tester, inRow(find.text(es.reminder)));
+        await tapVisible(tester, inRow(find.text(ownersLine)));
         await tapVisible(tester, inSheet(find.text(es.chooseAlertTime)));
         await pick18(tester);
         expect(inRow(find.text('18:00')), findsOneWidget);
@@ -1859,7 +1860,12 @@ void main() {
           expect(inSheet(yourWay), findsNothing);
           expect(inSheet(find.text(es.reminderPlanUntilDay)), findsNothing);
           expect(inSheet(find.text(es.reminderPlanYourWay)), findsNothing);
-          expect(inSheet(find.byType(Divider)), findsNothing);
+          // No line above plans: only the one under the title (UX-2412).
+          expect(inSheet(find.byType(Divider)), findsOneWidget);
+          expect(
+            inSheet(find.byKey(const ValueKey('reminder-sheet-header-edge'))),
+            findsOneWidget,
+          );
           // A date-only task's single rows: default, off, pick a time.
           expect(inSheet(find.byType(ListTile)), findsNWidgets(3));
         },
@@ -2006,7 +2012,7 @@ void main() {
         expect(words, startsWith('«'));
         expect(words, endsWith('»'));
         // Then the line Pro already had.
-        final intro = find.text(es.billingIntro);
+        final intro = find.text(es.proBenefitDictation);
         expect(intro, findsOneWidget);
         expect(
           tester.getTopLeft(reason).dy,
@@ -2123,8 +2129,8 @@ void main() {
         expect(words, isNot(endsWith('.')));
         expect(words, isNot(contains(es.reminderPlanEveryDays(3))));
         expect(words, isNot(contains(es.reminderPlanEveryDays(1))));
-        // Then billingIntro.
-        final intro = find.text(es.billingIntro);
+        // Then what Pro gives.
+        final intro = find.text(es.proBenefitDictation);
         expect(intro, findsOneWidget);
         expect(
           tester.getTopLeft(reason).dy,
@@ -2661,13 +2667,16 @@ void main() {
     const normal = ReminderPlan.rhythm(ReminderPlan.normal);
     const phone = Size(360, 800);
     // The task's title and its day as the app writes a day elsewhere
-    // (taskDayLine, `weekdayDate`), read off the open sheet.
-    String taskLine(WidgetTester tester) {
+    // (taskDayLine, `weekdayDate`), read off the open sheet. On screen
+    // the day is bound with no-break spaces (UX-2417); TalkBack reads it
+    // with plain ones.
+    String taskLine(WidgetTester tester, {bool shown = false}) {
       final day = tester
           .element(find.byType(BottomSheet).last)
           .weekdayDate(friday13);
       expect(day, startsWith('vie, 13'));
-      return 'Presentar el proyecto · $day';
+      return 'Presentar el proyecto · '
+          '${shown ? day.replaceAll(' ', '\u00A0') : day}';
     }
 
     const question =
@@ -2811,7 +2820,7 @@ void main() {
         final app = await _App.open(tester, const [], size: phone);
         await createInForm(tester, app);
         await afterTheMessage(tester);
-        final line = inSheet(find.text(taskLine(tester)));
+        final line = inSheet(find.text(taskLine(tester, shown: true)));
         final asked = inSheet(find.text(question));
         final yes = inSheet(find.text(es.reminderAskYes));
         final notNow = inSheet(find.text(es.reminderAskNotNow));
@@ -3022,7 +3031,10 @@ void main() {
         expect(app.task(1).dueDate, friday13);
         expect(offerSheet(), findsNothing);
         await afterTheMessage(tester);
-        expect(inSheet(find.text(taskLine(tester))), findsOneWidget);
+        expect(
+          inSheet(find.text(taskLine(tester, shown: true))),
+          findsOneWidget,
+        );
         expect(inSheet(find.text(question)), findsOneWidget);
         expect(app.reminders.offered, {1});
       },
@@ -3038,7 +3050,10 @@ void main() {
           {'title': 'Comprar pan', 'scheduled_date': '2026-10-23'},
           {'title': 'Presentar el proyecto', 'scheduled_date': '2026-11-13'},
         ]);
-        expect(inSheet(find.text(taskLine(tester))), findsOneWidget);
+        expect(
+          inSheet(find.text(taskLine(tester, shown: true))),
+          findsOneWidget,
+        );
         expect(inSheet(find.text(question)), findsOneWidget);
         expect(inSheet(find.textContaining('Comprar pan')), findsNothing);
       },
@@ -3407,7 +3422,7 @@ void main() {
     }
 
     testWidgets(
-      'UX-1804: after Completar the detail stays open and the chip reads the plan alone, with no «próximo»',
+      'UX-1804: after Completar the task’s page, opened again, reads the plan alone, with no «próximo»',
       (tester) async {
         final app = await _App.open(tester, [
           presentation(plan: normal),
@@ -3415,7 +3430,9 @@ void main() {
         await app.detail(1);
         await tapVisible(tester, find.text(es.complete));
         expect(app.task(1).isCompleted, isTrue);
-        expect(find.byType(TaskDetailScreen), findsOneWidget);
+        // Completar closes the page (P280, UX-2404).
+        expect(find.byType(TaskDetailScreen), findsNothing);
+        await app.detail(1);
         expect(chipLine(tester), 'Recordatorios normales hasta el vie 13');
         expect(find.textContaining('próximo'), findsNothing);
         await tester.pump(FeedbackTimeout.defaultDuration);
@@ -3526,12 +3543,13 @@ void main() {
         await tester.ensureVisible(row);
         await tester.pumpAndSettle();
         expect(row, findsOneWidget);
+        // P270 (UX-2206): the plan's line is the row's only text.
         expect(
           find.descendant(
             of: find.byType(ReminderControl),
             matching: find.text(es.reminder),
           ),
-          findsOneWidget,
+          findsNothing,
         );
       },
     );
@@ -4619,7 +4637,7 @@ void main() {
         expect(line(id), findsNothing);
         expect(find.text(es.reminderNeedsDay), findsNothing);
         expect(row(id), findsOneWidget);
-        expect(inRow(id, find.text(es.reminder)), findsOneWidget);
+        expect(inRow(id, find.text(es.reminder)), findsNothing);
         expect(
           inRow(
             id,
@@ -5730,7 +5748,10 @@ void main() {
         final sheets = sheet().evaluate().length;
         await tapVisible(
           tester,
-          find.descendant(of: cardRow(), matching: find.text(es.reminder)),
+          find.descendant(
+            of: cardRow(),
+            matching: find.text(es.reminderForPersonOnly('Marta')),
+          ),
         );
         expect(sheet(), findsNWidgets(sheets));
         expect(find.text(es.chooseAlertTime), findsNothing);
@@ -6537,10 +6558,9 @@ void main() {
         await form(tester, forMarta(timed: true, minutes: 60));
         expect(formRow(), findsOneWidget);
         final tile = tester.widget<ListTile>(formRow());
-        expect(
-          (tile.subtitle! as Text).data,
-          es.reminderForPersonOnly('Marta'),
-        );
+        // P270 (UX-2206): the line names itself, alone in the row.
+        expect((tile.title! as Text).data, es.reminderForPersonOnly('Marta'));
+        expect(tile.subtitle, isNull);
         expect(tile.trailing, isNull);
         expect(tile.onTap, isNull);
         expect(chevron(find.byType(ReminderControl)), findsNothing);
@@ -6591,10 +6611,9 @@ void main() {
         await form(tester, forMarta(noDay: true, minutes: 60));
         expect(formRow(), findsOneWidget);
         final tile = tester.widget<ListTile>(formRow());
-        expect(
-          (tile.subtitle! as Text).data,
-          es.reminderForPersonOnly('Marta'),
-        );
+        // P270 (UX-2206): the line names itself, alone in the row.
+        expect((tile.title! as Text).data, es.reminderForPersonOnly('Marta'));
+        expect(tile.subtitle, isNull);
         expect(find.text(es.dateForReminder), findsNothing);
         expect(tile.onTap, isNull);
         expect(tile.trailing, isNull);
@@ -6648,7 +6667,10 @@ void main() {
         final sheets = sheet().evaluate().length;
         await tapVisible(
           tester,
-          find.descendant(of: cardRow(), matching: find.text(es.reminder)),
+          find.descendant(
+            of: cardRow(),
+            matching: find.text(es.reminderForPersonOnly('Marta')),
+          ),
         );
         expect(sheet(), findsNWidgets(sheets));
         expect(find.text(es.chooseAlertTime), findsNothing);
@@ -6717,7 +6739,8 @@ void main() {
         tester
             .getBottomLeft(
               find.ancestor(
-                of: find.byIcon(Icons.schedule_outlined),
+                // The date card: one row for the day and time (P280).
+                of: find.byIcon(Icons.calendar_today_outlined),
                 matching: find.byType(AppSurface),
               ),
             )
@@ -7586,7 +7609,7 @@ void main() {
 
     testWidgets(
       'UX-2026: a personal task’s sheet has no such line, and its title '
-      'scrolls with its rows',
+      'stays above its rows as they scroll (UX-2412)',
       (tester) async {
         await (await _App.open(
           tester,
@@ -7607,7 +7630,10 @@ void main() {
             .first;
         await tester.drag(choices, const Offset(0, -200));
         await tester.pumpAndSettle();
-        expect(tester.getRect(title).top, lessThan(before.top - 1));
+        expect(
+          tester.getRect(title).top,
+          moreOrLessEquals(before.top, epsilon: 0.5),
+        );
         await tapVisible(tester, inSheet(untilDay));
         expect(justYou, findsNothing);
         expect(tester.takeException(), isNull);
@@ -8163,13 +8189,18 @@ void main() {
         );
         expect(paragraph.text.toPlainText(), words);
         expect(paragraph.didExceedMaxLines, isFalse);
-        // Whole: every character is laid out inside the paragraph's box.
-        for (final box in paragraph.getBoxesForSelection(
-          TextSelection(baseOffset: 0, extentOffset: words.length),
-        )) {
-          expect(box.left, greaterThanOrEqualTo(-0.5));
-          expect(box.right, lessThanOrEqualTo(paragraph.size.width + 0.5));
-          expect(box.bottom, lessThanOrEqualTo(paragraph.size.height + 0.5));
+        // Whole: every visible character is laid out inside the paragraph's
+        // box. The label hugs its longest line (P317), so the space a line
+        // wraps at may hang past it, unseen.
+        for (var i = 0; i < words.length; i++) {
+          if (words[i].trim().isEmpty) continue;
+          for (final box in paragraph.getBoxesForSelection(
+            TextSelection(baseOffset: i, extentOffset: i + 1),
+          )) {
+            expect(box.left, greaterThanOrEqualTo(-0.5));
+            expect(box.right, lessThanOrEqualTo(paragraph.size.width + 0.5));
+            expect(box.bottom, lessThanOrEqualTo(paragraph.size.height + 0.5));
+          }
         }
         final text = tester.getRect(chipText(words));
         final chip = tester.getRect(find.byType(ReminderChip));
@@ -8472,16 +8503,693 @@ void main() {
 
     testWidgets(
       'UX-2035: a personal task due today, as in UX-1904, has no such line '
-      'and no Divider at all',
+      'and only the title’s edge (UX-2412)',
       (tester) async {
         await (await _App.open(tester, [
           presentation(day: DateTime(2026, 10, 22)),
         ])).detail(1);
         await openSheet(tester);
         expect(inSheet(find.text(es.reminder)), findsOneWidget);
-        expect(edge, findsNothing);
-        expect(inSheet(find.byType(Divider)), findsNothing);
+        expect(inSheet(edge), findsOneWidget);
+        expect(inSheet(find.byType(Divider)), findsOneWidget);
         expect(justYou, findsNothing);
+      },
+    );
+  });
+
+  group('P270 · the reminder line names itself once', () {
+    const small = Size(360, 800);
+    const normal = ReminderPlan.rhythm(ReminderPlan.normal);
+
+    /// «Presentar el proyecto» on Fri 13 Nov 2026 at 17:00 with Normal: its
+    /// day's notice rings at 16:50.
+    Task timed(int id) => Task(
+      id: id,
+      title: 'Presentar el proyecto',
+      priority: 1,
+      dueDate: DateTime(2026, 11, 13, 17),
+      hasTime: true,
+      reminderPlan: normal,
+    );
+
+    // What the real engine keeps once that last notice has rung.
+    late int timedId;
+    late List<Map<String, Object?>> lastRang;
+    setUpAll(() async {
+      final phone = await PhoneAlerts.open(DateTime(2026, 11, 13, 16));
+      timedId = await phone.add(timed(0));
+      phone.now = DateTime(2026, 11, 13, 17);
+      await phone.refresh();
+      lastRang = await phone.of(timedId);
+      await phone.close();
+    });
+
+    /// The capture's result for one draft [task], on a 360×800 phone.
+    Future<void> card(
+      WidgetTester tester,
+      Task task, {
+      String language = 'es',
+      double textScale = 1,
+    }) async {
+      final captures = MemoryCaptures();
+      final app = await _App.open(
+        tester,
+        const [],
+        captures: captures,
+        language: language,
+        textScale: textScale,
+        size: small,
+      );
+      captures.tasks = app.container;
+      captures.current = CaptureSession(
+        id: 'p270',
+        ownerKey: app.container.read(captureOwnerProvider),
+        timezone: 'Europe/Madrid',
+        capturedAt: now.toUtc(),
+        status: 'ready',
+        source: 'speech',
+        transcript: 'Presentar el proyecto…',
+        drafts: [CaptureDraft(id: 'd1', task: task)],
+      );
+      await openCaptureResult(tester, 'p270');
+      expect(find.byType(VoiceTaskScreen), findsOneWidget);
+    }
+
+    /// The edit form of [task] (id 1), «Más detalles» open.
+    Future<void> form(WidgetTester tester, Task task) async {
+      final app = await _App.open(tester, [task], size: small);
+      app.navigator.pushNamed('/editTask', arguments: 1);
+      await tester.pumpAndSettle();
+      await tapVisible(tester, find.byKey(const ValueKey('task-more-details')));
+    }
+
+    /// The reminder row's tile, in [within] (the card's row or the form).
+    Finder tile(Finder within) => find.descendant(
+      of: find.descendant(
+        of: within,
+        matching: find.byType(ReminderControl),
+        matchRoot: true,
+      ),
+      matching: find.byType(ListTile),
+    );
+
+    /// Every word the row draws.
+    String drawn(WidgetTester tester, Finder row) => tester
+        .widgetList<Text>(find.descendant(of: row, matching: find.byType(Text)))
+        .map((text) => text.data ?? '')
+        .join('\n');
+
+    int count(String text, String word) => word.allMatches(text).length;
+
+    /// The plan's line alone in [row]: no «Recordatorio» over it, its words
+    /// once, and TalkBack's reading names the reminder once.
+    void namedOnce(WidgetTester tester, Finder row, AppLocalizations l) {
+      expect(row, findsOneWidget);
+      final listTile = tester.widget<ListTile>(row);
+      final line = (listTile.title! as Text).data!;
+      expect(line, isNot(l.reminder));
+      expect(line, contains(' · '));
+      expect(listTile.subtitle, isNull);
+      expect(
+        find.descendant(of: row, matching: find.text(l.reminder)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: row, matching: find.text(line)),
+        findsOneWidget,
+      );
+      // «Recordatorios: …» holds the word once, and nothing repeats it.
+      expect(count(drawn(tester, row), l.reminder), 1);
+      final reading = tester.getSemantics(row).label;
+      expect(reading, contains(line));
+      expect(count(reading, l.reminder), 1);
+      expect(count(reading, line), 1);
+    }
+
+    for (final (language, l, scale) in [
+      ('es', es, 1.0),
+      ('es', es, 2.0),
+      ('ca', ca, 2.0),
+    ]) {
+      testWidgets(
+        'UX-2206: on the capture’s card, a said plan’s «Recordatorios: cada 3 días…» shows once, with no «Recordatorio» over it ($language ${scale.toInt()}×)',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          await card(
+            tester,
+            Task(
+              title: 'Presentar el proyecto',
+              priority: 1,
+              dueDate: friday13,
+              hasTime: false,
+              reminderPlan: ownersPlan,
+            ),
+            language: language,
+            textScale: scale,
+          );
+          final row = tile(find.byKey(const ValueKey('draft-reminder-d1')));
+          await tester.ensureVisible(row);
+          await tester.pumpAndSettle();
+          namedOnce(tester, row, l);
+          expect(tester.takeException(), isNull);
+          semantics.dispose();
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2206: in the form, a plan’s «Recordatorios: cada 3 días…» row shows once, with no «Recordatorio» over it',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await form(tester, presentation(plan: ownersPlan));
+        final row = tile(find.byType(EditTaskScreen));
+        await tester.ensureVisible(row);
+        await tester.pumpAndSettle();
+        namedOnce(tester, row, es);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'UX-2206: in the form, a single reminder’s row still shows «Recordatorio» over «10 minutos antes»',
+      (tester) async {
+        await form(
+          tester,
+          Task(
+            id: 1,
+            title: 'Dentista',
+            priority: 1,
+            dueDate: DateTime(2026, 10, 27, 10),
+            hasTime: true,
+            reminderMinutes: 10,
+          ),
+        );
+        final row = tile(find.byType(EditTaskScreen));
+        await tester.ensureVisible(row);
+        await tester.pumpAndSettle();
+        final listTile = tester.widget<ListTile>(row);
+        expect((listTile.title! as Text).data, es.reminder);
+        expect(
+          (listTile.subtitle! as Text).data,
+          tester.element(row).reminderLead(10),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    test('the engine kept the plan’s last notice, at 16:50', () {
+      expect(
+        lastRang.map((row) => DateTime.parse(row['fire_at']! as String)),
+        contains(DateTime(2026, 11, 13, 16, 50).toUtc()),
+      );
+    });
+
+    for (final (language, l) in [('es', es), ('en', en), ('ca', ca)]) {
+      testWidgets(
+        'UX-2401: a plan whose last notice rang at 16:50 today ends «· último: hoy, 16:50», not the passed line ($language)',
+        (tester) async {
+          final app = await _App.open(
+            tester,
+            [timed(timedId)],
+            language: language,
+            size: small,
+            at: DateTime(2026, 11, 13, 17),
+            access: FakeReminderAccess(allowed: true)..kept = [...lastRang],
+          );
+          await app.detail(timedId);
+          final chip = find.byType(ReminderChip);
+          await tester.ensureVisible(chip);
+          await tester.pumpAndSettle();
+          final line = tester
+              .widgetList<Text>(
+                find.descendant(of: chip, matching: find.byType(Text)),
+              )
+              .map((text) => text.data ?? '')
+              .join();
+          final time = tester
+              .element(chip)
+              .clockTime(DateTime(2026, 11, 13, 16, 50));
+          expect(time, '16:50');
+          final last = l.reminderPlanLast('', 'today', '', time);
+          expect(line, endsWith(last));
+          expect(line.length, greaterThan(last.length));
+          expect(line, isNot(contains(l.noReminderTimePassed)));
+          expect(
+            find.descendant(
+              of: chip,
+              matching: find.byIcon(Icons.notifications_off_outlined),
+            ),
+            findsNothing,
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    test('UX-2401: the plan’s last line in EN, ES and CA', () {
+      expect(
+        en.reminderPlanLast('', 'today', '', '16:50'),
+        ' · last: today, 16:50',
+      );
+      expect(
+        es.reminderPlanLast('', 'today', '', '16:50'),
+        ' · último: hoy, 16:50',
+      );
+      expect(
+        ca.reminderPlanLast('', 'today', '', '16:50'),
+        ' · últim: avui, 16:50',
+      );
+    });
+  });
+  group('P275 · room around «Activar recordatorios»', () {
+    const small = Size(360, 800);
+
+    /// The capture's result for one draft with a said plan, on a 360×800
+    /// phone whose reminders are off ([allowed]) or blocked by the phone.
+    Future<void> card(
+      WidgetTester tester, {
+      required bool allowed,
+      double textScale = 1,
+    }) async {
+      final captures = MemoryCaptures();
+      final app = await _App.open(
+        tester,
+        const [],
+        captures: captures,
+        reminders: allowed
+            ? const ReminderPreferences(dateOnlyTime: 540, asked: true)
+            : const ReminderPreferences(
+                enabled: true,
+                dateOnlyTime: 540,
+                asked: true,
+              ),
+        access: FakeReminderAccess(allowed: allowed),
+        textScale: textScale,
+        size: small,
+      );
+      captures.tasks = app.container;
+      captures.current = CaptureSession(
+        id: 'p275',
+        ownerKey: app.container.read(captureOwnerProvider),
+        timezone: 'Europe/Madrid',
+        capturedAt: now.toUtc(),
+        status: 'ready',
+        source: 'speech',
+        transcript: 'Presentar el proyecto…',
+        drafts: [
+          CaptureDraft(
+            id: 'd1',
+            task: Task(
+              title: 'Presentar el proyecto',
+              priority: 1,
+              dueDate: friday13,
+              reminderPlan: ownersPlan,
+            ),
+          ),
+        ],
+      );
+      await openCaptureResult(tester, 'p275');
+      expect(find.byType(VoiceTaskScreen), findsOneWidget);
+    }
+
+    for (final (name, allowed) in [
+      ('reminders off on this phone', true),
+      ('notifications blocked by the phone', false),
+    ]) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets(
+          'UX-2205: ES ${scale.toStringAsFixed(0)}× on 360×800, $name: «Activar recordatorios» sits at least 8 dp below the reminder row and 8 dp above «Más opciones»',
+          (tester) async {
+            await card(tester, allowed: allowed, textScale: scale);
+            final row = find.byKey(const ValueKey('draft-reminder-d1'));
+            final turnOn = find.ancestor(
+              of: find.descendant(
+                of: row,
+                matching: find.text(es.enableReminders),
+              ),
+              matching: find.byType(TextButton),
+            );
+            expect(turnOn, findsOneWidget);
+            await tester.ensureVisible(turnOn);
+            await tester.pumpAndSettle();
+            final line = find
+                .descendant(of: row, matching: find.byType(ListTile))
+                .first;
+            final options = find.byKey(const ValueKey('draft-options-d1'));
+            final button = tester.getRect(turnOn);
+            final above = button.top - tester.getRect(line).bottom;
+            final below = tester.getRect(options).top - button.bottom;
+            expect(
+              above,
+              greaterThanOrEqualTo(8 - 0.5),
+              reason: 'above $above',
+            );
+            expect(
+              below,
+              greaterThanOrEqualTo(8 - 0.5),
+              reason: 'below $below',
+            );
+            expect(button.height, greaterThanOrEqualTo(48));
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  });
+
+  // UX-2405: the first time «A tu manera» opens on this phone, with Pro, a
+  // line under its field says where its words go. UX-2412: «Recordatorio»
+  // stays fixed above the choices on every task, with its 1 dp edge.
+  group('P282 · UX-2405, UX-2412', () {
+    const phone = Size(360, 800);
+    const screen = Rect.fromLTWH(0, 0, 360, 800);
+    final privacy = find.byKey(const ValueKey('reminder-plan-privacy'));
+    final field = find.byKey(const ValueKey('reminder-plan-words'));
+    final apply = find.byKey(const ValueKey('reminder-plan-apply'));
+    final edge = find.byKey(const ValueKey('reminder-sheet-header-edge'));
+    final justYou = find.byKey(const ValueKey('reminder-plan-just-you'));
+    final untilDay = find.byKey(const ValueKey('reminder-plan-until-day'));
+
+    Finder choices() => find
+        .descendant(
+          of: sheet().last,
+          matching: find.byType(SingleChildScrollView),
+        )
+        .first;
+
+    /// What of the screen the sheet's choices show.
+    Rect viewport(WidgetTester tester) =>
+        tester.getRect(choices()).intersect(screen);
+
+    bool inside(Rect rect, Rect area) =>
+        rect.top >= area.top - 0.5 &&
+        rect.bottom <= area.bottom + 0.5 &&
+        rect.left >= area.left - 0.5 &&
+        rect.right <= area.right + 0.5;
+
+    Future<void> openYourWay(WidgetTester tester, AppLocalizations l) =>
+        tapVisible(tester, inSheet(find.text(l.reminderPlanYourWay)));
+
+    Future<void> closeSheet(WidgetTester tester) async {
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(sheet(), findsNothing);
+    }
+
+    /// The line, in [l]'s words, right under the field, laid out in full
+    /// and wholly inside what the sheet shows.
+    void expectWholeLineUnderField(WidgetTester tester, AppLocalizations l) {
+      expect(inSheet(privacy), findsOneWidget);
+      final text = find.descendant(of: privacy, matching: find.byType(Text));
+      expect(tester.widget<Text>(text).data, l.capturePrivacyLine);
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: privacy, matching: find.byType(RichText)),
+      );
+      expect(paragraph.text.toPlainText(), l.capturePrivacyLine);
+      expect(paragraph.didExceedMaxLines, isFalse);
+      final line = tester.getRect(text);
+      expect(
+        line.top,
+        greaterThanOrEqualTo(tester.getRect(field).bottom - 0.5),
+        reason: 'The line sits under the field.',
+      );
+      expect(
+        inside(line, viewport(tester)),
+        isTrue,
+        reason: 'line $line, choices ${viewport(tester)}',
+      );
+    }
+
+    for (final (language, l, scale) in [
+      ('es', es, 1.0),
+      ('es', es, 2.0),
+      ('ca', ca, 2.0),
+    ]) {
+      final x = scale.toStringAsFixed(0);
+      testWidgets(
+        'UX-2405: $language $x× on 360×800, Pro, «${l.reminderPlanYourWay}» '
+        'opened for the first time on this phone shows '
+        '«${l.capturePrivacyLine}» under its field, whole, and it stays '
+        'with «${l.done}» in view once the words are read',
+        (tester) async {
+          final app = await _App.open(
+            tester,
+            [presentation()],
+            language: language,
+            textScale: scale,
+            size: phone,
+            reminderPrivacyShown: false,
+          );
+          app.api.answer = {'reminder_plan': ownersPlan.toJson()};
+          await app.detail(1);
+          await openSheet(tester);
+          expect(privacy, findsNothing, reason: 'Not before the field opens.');
+          await openYourWay(tester, l);
+          expect(field, findsOneWidget);
+          expectWholeLineUnderField(tester, l);
+          expect(tester.takeException(), isNull);
+
+          // Folded and opened again in the same sheet: still there.
+          await openYourWay(tester, l);
+          expect(field, findsNothing);
+          await openYourWay(tester, l);
+          expect(inSheet(privacy), findsOneWidget);
+
+          await tester.enterText(field, ownersPlan.said!);
+          await tester.testTextInput.receiveAction(TextInputAction.done);
+          await tester.pumpAndSettle();
+          expect(app.api.requests, hasLength(1));
+          // The line stays while this sheet is open, and «Listo» is in view.
+          expect(inSheet(privacy), findsOneWidget);
+          expect(
+            tester
+                .widget<Text>(
+                  find.descendant(of: privacy, matching: find.byType(Text)),
+                )
+                .data,
+            l.capturePrivacyLine,
+          );
+          expect(apply.hitTestable(), findsOneWidget);
+          expect(inside(tester.getRect(apply), viewport(tester)), isTrue);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2405: after the first opening, «A tu manera» opened again, on the '
+      'same task or another, shows no line',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          [
+            presentation(),
+            presentation(id: 2).copyWith(title: 'Llamar al dentista'),
+          ],
+          size: phone,
+          reminderPrivacyShown: false,
+        );
+        await app.detail(1);
+        await openSheet(tester);
+        await openYourWay(tester, es);
+        expect(inSheet(privacy), findsOneWidget);
+        await closeSheet(tester);
+
+        // The same task.
+        await openSheet(tester);
+        await openYourWay(tester, es);
+        expect(field, findsOneWidget);
+        expect(privacy, findsNothing);
+        expect(find.text(es.capturePrivacyLine), findsNothing);
+        await closeSheet(tester);
+
+        // Another task.
+        app.navigator.pop();
+        await tester.pumpAndSettle();
+        await app.detail(2);
+        await openSheet(tester);
+        await openYourWay(tester, es);
+        expect(field, findsOneWidget);
+        expect(privacy, findsNothing);
+        expect(find.text(es.capturePrivacyLine), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2405: a task opened on its own «A tu manera» plan, the first time, '
+      'shows the line under the field; the next opening does not',
+      (tester) async {
+        await (await _App.open(
+          tester,
+          [presentation(plan: ownersPlan)],
+          size: phone,
+          reminderPrivacyShown: false,
+        )).detail(1);
+        await openSheet(tester);
+        expect(field, findsOneWidget);
+        await tester.ensureVisible(privacy);
+        await tester.pumpAndSettle();
+        expectWholeLineUnderField(tester, es);
+        await closeSheet(tester);
+        await openSheet(tester);
+        expect(field, findsOneWidget);
+        expect(privacy, findsNothing);
+      },
+    );
+
+    testWidgets(
+      'UX-2405: a free account’s «A tu manera», with the Pro badge, shows no '
+      'line, and its first opening with Pro still will',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          [presentation()],
+          pro: false,
+          size: phone,
+          reminderPrivacyShown: false,
+        );
+        await app.detail(1);
+        await openSheet(tester);
+        expect(inSheet(find.byType(ProBadge)), findsOneWidget);
+        expect(privacy, findsNothing);
+        expect(find.text(es.capturePrivacyLine), findsNothing);
+        await openYourWay(tester, es);
+        expect(find.byType(SubscriptionScreen), findsOneWidget);
+        expect(find.text(es.capturePrivacyLine), findsNothing);
+        app.navigator.pop();
+        await tester.pumpAndSettle();
+        expect(sheet(), findsOneWidget);
+        expect(field, findsNothing);
+        expect(privacy, findsNothing);
+        expect(find.text(es.capturePrivacyLine), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2405: a free account’s task with a dictated «A tu manera» plan '
+      'opens on it with no field and no line',
+      (tester) async {
+        await (await _App.open(
+          tester,
+          [presentation(plan: ownersPlan)],
+          pro: false,
+          size: phone,
+          reminderPrivacyShown: false,
+        )).detail(1);
+        await openSheet(tester);
+        expect(inSheet(find.byType(PlanPreview)), findsOneWidget);
+        expect(field, findsNothing);
+        expect(privacy, findsNothing);
+        expect(find.text(es.capturePrivacyLine), findsNothing);
+      },
+    );
+
+    for (final (language, l) in [('es', es), ('ca', ca)]) {
+      testWidgets(
+        'UX-2412: $language 2× on 360×800, a personal task with Normal opens '
+        'scrolled to «${l.reminderPlanUntilDay}» with «${l.reminder}» as its '
+        'first line, fixed, a 1 dp edge under it, and no '
+        '«${l.reminderPlanJustYou}»',
+        (tester) async {
+          await (await _App.open(
+            tester,
+            [
+              presentation(
+                plan: const ReminderPlan.rhythm(ReminderPlan.normal),
+              ),
+            ],
+            language: language,
+            textScale: 2,
+            size: phone,
+          )).detail(1);
+          await openSheet(tester);
+          await tester.pumpAndSettle();
+          final title = inSheet(find.text(l.reminder));
+          expect(title, findsOneWidget);
+          expect(title.hitTestable(), findsOneWidget);
+          expect(justYou, findsNothing);
+          expect(find.text(l.reminderPlanJustYou), findsNothing);
+
+          // The 1 dp edge, right under the title.
+          expect(inSheet(edge), findsOneWidget);
+          expect(tester.widget<Divider>(edge).height, 1);
+          final line = tester.getRect(edge);
+          expect(line.height, moreOrLessEquals(1, epsilon: 0.01));
+          final heading = tester.getRect(title);
+          expect(inside(heading, screen), isTrue);
+          expect(line.top, greaterThanOrEqualTo(heading.bottom - 0.5));
+          expect(line.top - heading.bottom, lessThanOrEqualTo(8));
+
+          // Opened scrolled to the plan: the single rows are above it.
+          expect(untilDay.hitTestable(), findsOneWidget);
+          expect(
+            inSheet(find.text(l.off)).hitTestable(),
+            findsNothing,
+            reason: 'The sheet opened scrolled past «${l.off}».',
+          );
+          // «Recordatorio» is the first line: every other text in view,
+          // «${l.chooseAlertTime}» included, starts under the edge.
+          final shown = inSheet(find.byType(Text)).hitTestable();
+          expect(shown, findsWidgets);
+          for (final element in shown.evaluate()) {
+            final text = element.widget as Text;
+            if (text.data == l.reminder) continue;
+            final box = element.renderObject! as RenderBox;
+            final rect = box.localToGlobal(Offset.zero) & box.size;
+            expect(
+              rect.top,
+              greaterThanOrEqualTo(line.bottom - 0.5),
+              reason: '«${text.data}» must start under «${l.reminder}».',
+            );
+          }
+          final pick = inSheet(find.text(l.chooseAlertTime));
+          if (pick.hitTestable().evaluate().isNotEmpty) {
+            expect(tester.getRect(pick).top, greaterThan(heading.bottom));
+          }
+          expect(
+            tester.getRect(choices()).top,
+            greaterThanOrEqualTo(line.bottom - 0.5),
+            reason: 'The choices scroll under the edge.',
+          );
+
+          // Fixed: scrolling the choices leaves the title and the edge.
+          for (final dy in [300.0, -300.0]) {
+            final rowBefore = tester.getRect(untilDay);
+            await tester.drag(choices(), Offset(0, dy));
+            await tester.pumpAndSettle();
+            expect(
+              tester.getRect(untilDay).top,
+              isNot(moreOrLessEquals(rowBefore.top, epsilon: 1)),
+              reason: 'The choices scrolled by $dy.',
+            );
+            expect(tester.getRect(title), heading);
+            expect(tester.getRect(edge), line);
+            expect(title.hitTestable(), findsOneWidget);
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2412: a personal task without a plan, at 1×, reads «Recordatorio», '
+      'the edge, then «Desactivado», with no «solo para ti» line',
+      (tester) async {
+        await (await _App.open(tester, [
+          presentation(),
+        ], size: phone)).detail(1);
+        await openSheet(tester);
+        final title = tester.getRect(inSheet(find.text(es.reminder)));
+        final line = tester.getRect(edge);
+        final off = tester.getRect(inSheet(find.text(es.off)));
+        expect(line.top, greaterThanOrEqualTo(title.bottom - 0.5));
+        expect(off.top, greaterThanOrEqualTo(line.bottom - 0.5));
+        expect(justYou, findsNothing);
+        expect(find.text(es.reminderPlanJustYou), findsNothing);
+        expect(tester.takeException(), isNull);
       },
     );
   });
@@ -8585,6 +9293,9 @@ class _App {
     // (e.g. one whose sync never completes) instead of [tasks] in memory.
     List<TaskListInfo> projects = const [],
     TaskNotifier Function()? notifier,
+    // «A tu manera» has shown its privacy line on this phone (P282): false
+    // for its first opening.
+    bool reminderPrivacyShown = true,
   }) async {
     final phone = access ?? FakeReminderAccess(allowed: true);
     tester.view.physicalSize = size;
@@ -8606,6 +9317,7 @@ class _App {
           language: language,
           clock: clock,
           captureTimezone: 'Europe/Madrid',
+          reminderPrivacyShown: reminderPrivacyShown,
         ),
       ),
       tasks: notifier ?? () => _Tasks(tasks),

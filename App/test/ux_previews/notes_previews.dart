@@ -2,6 +2,7 @@
 // in the capture sheet.
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/task_list_info.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -29,6 +30,7 @@ const noteOpen = Screen(
     'lib/screens/task_detail_screen.dart',
     'lib/widgets/note_text.dart',
     'lib/widgets/checklist_editor.dart',
+    'lib/widgets/task_list_picker.dart',
   ],
 );
 
@@ -91,6 +93,21 @@ List<Task> _notes() => [
     priority: 1,
   ),
 ];
+
+/// Ana's shared project, which this account can only view.
+final _choirToView = TaskListInfo(
+  id: 'coro',
+  name: 'Coro',
+  color: 'rose',
+  version: 1,
+  role: 'viewer',
+  shared: true,
+  ownerId: ana,
+  people: const [
+    ProjectMember(id: ana, name: 'Ana', role: 'owner'),
+    ProjectMember(id: me, name: 'María', role: 'viewer'),
+  ],
+);
 
 void notesPreviews() {
   previewArea('notes', 'Notas', () {
@@ -165,6 +182,53 @@ void notesPreviews() {
     );
 
     preview(
+      notesTab,
+      'viewer-project',
+      'Notas filtered to Ana’s «Coro», which this account can only view: its note, and the read-only bar in place of Añadir nota.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [
+            ...normalDay(),
+            ..._notes(),
+            Task(
+              id: 85,
+              kind: 'note',
+              title: 'Repertorio del concierto de Navidad',
+              notes: 'Noche de paz, El tamborilero y Adeste fideles.',
+              priority: 1,
+              listId: 'coro',
+            ),
+          ],
+          projects: [...allProjects, _choirToView],
+        );
+        await app.tab(p.l.notes);
+        await p.tester.tap(find.byType(DropdownButtonFormField<String>));
+        await p.tester.pumpAndSettle();
+        await p.tester.tap(find.text('Coro').last);
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      notesTab,
+      'empty-with-project',
+      'No notes yet on an account with projects: no Proyecto filter and no search, just the empty line and Añadir nota.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          projects: allProjects,
+        );
+        await app.tab(p.l.notes);
+        await p.shoot();
+      },
+    );
+
+    preview(
       noteSaid,
       'typing-free-0',
       'A free account with no dictations left: Añadir nota (+) types, with no used-up line and no Ver Pro.',
@@ -178,6 +242,26 @@ void notesPreviews() {
         );
         await app.tab(p.l.notes);
         await p.tester.tap(find.text(p.l.addNote).hitTestable());
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    // P294 (UX-2514): the chosen project carries a ✓, under a heading.
+    preview(
+      noteOpen,
+      'project-sheet',
+      'The window note in «Casa» opened, its project chip tapped: the Proyecto sheet with its drag handle and heading, and «Casa» marked with a ✓.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), ..._notes()],
+          projects: allProjects,
+        );
+        await app.tab(p.l.notes);
+        await app.tap('Medidas de la ventana del salón');
+        await p.tester.tap(find.widgetWithText(ActionChip, 'Casa'));
         await p.tester.pumpAndSettle();
         await p.shoot();
       },

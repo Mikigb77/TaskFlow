@@ -23,6 +23,8 @@ class TaskTile extends ConsumerWidget {
     this.project,
     this.showUndated = true,
     this.markOverdue = false,
+    this.lastOpen = false,
+    this.doneAt,
   });
   final Task task;
 
@@ -41,6 +43,14 @@ class TaskTile extends ConsumerWidget {
 
   /// In task lists, an open task whose day has passed says «Atrasada».
   final bool markOverdue;
+
+  /// The open task left on Calendar's shown day: ticking it says the day is
+  /// clear rather than «Tarea completada».
+  final bool lastOpen;
+
+  /// The time a row on Completadas was done at, given back when it is
+  /// ticked again, on the row or on its page.
+  final DateTime? doneAt;
 
   /// The row's date line, or null when it has nothing to say.
   String? _dateLine(BuildContext context, WidgetRef ref) {
@@ -106,7 +116,7 @@ class TaskTile extends ConsumerWidget {
     final deadline = task.deadline == null
         ? null
         : deadlinePassed
-        ? '${taskDeadlineLabel(context, task)} · ${context.l10n.deadlineOverdue}'
+        ? context.deadlinePassedLine(task)
         : taskDeadlineLabel(context, task);
     // Who a task in a shared project is for, and what TalkBack reads for it.
     final assignee = list?.shared == true
@@ -131,7 +141,7 @@ class TaskTile extends ConsumerWidget {
             task.checklist.length,
           );
     final importance = task.priority > 1
-        ? context.l10n.priorityValue(context.priorityName(task.priority))
+        ? context.priorityPhrase(task.priority)
         : null;
     final notes = (task.notes?.trim().isNotEmpty ?? false) ? task.notes! : null;
     // Each detail under the title, and what TalkBack reads for it.
@@ -140,14 +150,7 @@ class TaskTile extends ConsumerWidget {
         (iconText(Icons.schedule_rounded, when, wraps: true), when),
       if (repeat != null) (iconText(Icons.repeat_rounded, repeat), repeat),
       if (duration != null) (Text(duration, style: small), duration),
-      if (deadline != null)
-        (
-          Text(
-            deadline,
-            style: small.copyWith(color: deadlinePassed ? colors.error : null),
-          ),
-          deadline,
-        ),
+      if (deadline != null) (Text(deadline, style: small), deadline),
       if (list != null && list.id != project)
         (
           ConstrainedBox(
@@ -167,7 +170,6 @@ class TaskTile extends ConsumerWidget {
                 ? Icons.groups_outlined
                 : Icons.person_outline,
             assignee,
-            textColor: unassigned ? colors.error : null,
             semanticsLabel: assigneeSpoken,
             wraps: true,
           ),
@@ -203,10 +205,18 @@ class TaskTile extends ConsumerWidget {
           taskId: task.id!,
           occurrenceDate: task.occurrenceDate,
           occurrenceKey: task.occurrenceId,
+          doneAt: doneAt,
         ),
       ),
     );
     void reschedule() => TaskInteractions.reschedule(context, ref, task);
+    Future<void> toggle() => TaskInteractions.toggle(
+      context,
+      ref,
+      task,
+      doneMessage: lastOpen ? context.l10n.dayAllClear : null,
+      doneAt: doneAt,
+    );
     return Semantics(
       container: true,
       // A row that can't be changed is one button that opens the task. An
@@ -225,13 +235,16 @@ class TaskTile extends ConsumerWidget {
           ? {CustomSemanticsAction(label: context.l10n.reschedule): reschedule}
           : null,
       child: Dismissible(
-        direction: editable
+        // With TalkBack or Switch Access on, the swipe's scroll actions
+        // would complete or move the task unseen: the circle completes and
+        // «Cambiar fecha» stays as the row's custom action.
+        direction: editable && !MediaQuery.accessibleNavigationOf(context)
             ? DismissDirection.horizontal
             : DismissDirection.none,
         key: ValueKey('gesture:${task.id}:${task.occurrenceId}'),
         confirmDismiss: (direction) async {
           if (direction == DismissDirection.startToEnd) {
-            await TaskInteractions.toggle(context, ref, task);
+            await toggle();
           } else {
             await TaskInteractions.reschedule(context, ref, task);
           }
@@ -283,7 +296,7 @@ class TaskTile extends ConsumerWidget {
                         value: task.isCompleted,
                         shape: const CircleBorder(),
                         onChanged: editable
-                            ? (_) => TaskInteractions.toggle(context, ref, task)
+                            ? (_) => toggle()
                             : null,
                       ),
                     ),
@@ -296,8 +309,6 @@ class TaskTile extends ConsumerWidget {
                         if (!titleOnly) const SizedBox(height: 3),
                         Text(
                           task.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.titleMedium!
                               .copyWith(
                                 color: task.isCompleted
@@ -370,6 +381,7 @@ class LandedTaskTile extends StatelessWidget {
     this.project,
     this.showUndated = true,
     this.markOverdue = false,
+    this.lastOpen = false,
   });
   final Task task;
   final bool lit;
@@ -377,6 +389,7 @@ class LandedTaskTile extends StatelessWidget {
   final String? project;
   final bool showUndated;
   final bool markOverdue;
+  final bool lastOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -393,6 +406,7 @@ class LandedTaskTile extends StatelessWidget {
         project: project,
         showUndated: showUndated,
         markOverdue: markOverdue,
+        lastOpen: lastOpen,
       ),
     );
   }

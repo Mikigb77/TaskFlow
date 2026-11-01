@@ -50,7 +50,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
+import 'package:record/record.dart';
 
+import 'support/button_label.dart';
 import 'support/capture_fixtures.dart' show SilentRecorder;
 import 'support/design_fixtures.dart';
 
@@ -328,7 +330,7 @@ void main() {
   );
 
   testWidgets(
-    'U8 / UX-204: without Pro, while billing hasn’t answered, Añadir tarea opens typing; Dentista viernes 10:00 → Listo shows Dentista on vie, … · 10:00 with Según lo que has escrito · Dejar como está and no network call; Dejar como está restores the words and no date',
+    'U8 / UX-204: without Pro, while billing hasn’t answered, Añadir tarea opens typing; Dentista viernes 10:00 → Listo shows Dentista on vie, … · 10:00 with Según tus palabras · Dejar como está and no network call; Dejar como está restores the words and no date',
     (tester) async {
       final start = monday();
       final friday = plus(start, 4);
@@ -358,7 +360,7 @@ void main() {
       expect(line, '${calendar.weekdayDate(friday)} · 10:00');
       expect(line, startsWith('vie, '));
       expect(find.text(es.fromYourWords), findsOneWidget);
-      expect(es.fromYourWords, 'Según lo que has escrito');
+      expect(es.fromYourWords, 'Según tus palabras');
       final keep = find.widgetWithText(TextButton, es.keepAsTyped);
       expect(keep, findsOneWidget);
       expect(es.keepAsTyped, 'Dejar como está');
@@ -723,7 +725,7 @@ void main() {
   // ---- P40 · U7: the assistant slow or failing ----
 
   testWidgets(
-    'U7: with an assistant that never answers, after 8 s the sheet says Está tardando más de lo normal. with Guardar como tarea; it saves Llamar al médico on Friday, lands with Deshacer, and the late answer changes nothing',
+    'U7: with an assistant that never answers, after 8 s the sheet says Está tardando más de lo normal. with Guardar como tarea; it shows Llamar al médico on its card, whose Añadir al calendario saves it on Friday, lands with Deshacer, and the late answer changes nothing',
     (tester) async {
       final start = monday();
       final friday = plus(start, 4);
@@ -746,11 +748,25 @@ void main() {
       await tester.pump(const Duration(milliseconds: 1200));
       expect(es.captureSlow, 'Está tardando más de lo normal.');
       expect(find.text(es.captureSlow), findsOneWidget);
-      final save = find.widgetWithText(FilledButton, es.captureSaveAsWritten);
+      // UX-2103: nothing is ready to confirm, so no filled button.
+      expect(
+        find.widgetWithText(FilledButton, es.captureSaveAsWritten),
+        findsNothing,
+      );
+      final save = find.widgetWithText(TextButton, es.captureSaveAsWritten);
       expect(save, findsOneWidget);
       expect(es.captureSaveAsWritten, 'Guardar como tarea');
 
       await tester.tap(save);
+      await tester.pumpAndSettle();
+      // D1 (UX-2612): the words show on a result card first; nothing is
+      // saved until its button is tapped.
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(titleText(tester), 'Llamar al médico');
+      expect(app.tasks.titles(), isEmpty);
+      final add = find.widgetWithText(FilledButton, es.captureAddToCalendar);
+      expect(add, findsOneWidget);
+      await tester.tap(add);
       await tester.pumpAndSettle();
       expect(find.byType(BottomSheet), findsNothing);
       expect(app.tasks.titles(), ['Llamar al médico']);
@@ -1003,7 +1019,7 @@ void main() {
       );
       expect(
         en.captureFailed,
-        'That didn’t work. Your words are saved here — try again.',
+        'That didn’t work. Your words are still here — try again.',
       );
     });
 
@@ -1016,28 +1032,28 @@ void main() {
       for (final error in [unreachable, timeout, ApiException(502, 'x')]) {
         expect(
           text(es, error),
-          'No he podido contactar con el asistente; tus palabras se conservan.',
+          'Ahora no puedo convertir tus palabras en tareas; se conservan.',
         );
         expect(
           text(ca, error),
-          'No he pogut contactar amb l’assistent; les teves paraules es conserven.',
+          'Ara no puc convertir les teves paraules en tasques; es conserven.',
         );
         expect(
           text(en, error),
-          'Couldn’t reach the assistant — your words are kept.',
+          'I can’t turn your words into tasks right now; they’re kept.',
         );
       }
       expect(
         text(es, offline),
-        'Sin conexión. Tus palabras están guardadas; inténtalo cuando tengas internet.',
+        'Sin conexión. Toca Guardar como tarea o reinténtalo cuando tengas internet.',
       );
       expect(
         text(ca, offline),
-        'Sense connexió. Les teves paraules estan desades; torna-ho a provar quan tinguis internet.',
+        'Sense connexió. Toca Desa-ho com a tasca o torna-ho a provar quan tinguis internet.',
       );
       expect(
         text(en, offline),
-        'No internet. Your words are saved — try again when you’re online.',
+        'No internet. Tap Save as a task, or try again when you’re online.',
       );
       final short = ApiException(422, 'Audio too short');
       expect(
@@ -1706,7 +1722,7 @@ void main() {
   );
 
   testWidgets(
-    'UX-604: with the assistant offline, a spoken “Médico el viernes a las 5 de la tarde” saved with Guardar como tarea is saved at once on Friday at 17:00, titled Médico',
+    'UX-604: with the assistant offline, a spoken “Médico el viernes a las 5 de la tarde” saved with Guardar como tarea shows Médico on its card with no time question, and is saved on Friday at 17:00',
     (tester) async {
       final start = monday();
       final friday = plus(start, 4);
@@ -1724,7 +1740,15 @@ void main() {
       expect(save, findsOneWidget);
       await tester.tap(save);
       await tester.pumpAndSettle();
-      // Saved at once: no result to check, no time question.
+      // Its card shows first (UX-2612), with no time question.
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(titleText(tester), 'Médico');
+      expect(find.text(es.captureWhatTime), findsNothing);
+      expect(app.tasks.titles(), isEmpty);
+      await tester.tap(
+        find.widgetWithText(FilledButton, es.captureAddToCalendar),
+      );
+      await tester.pumpAndSettle();
       expect(find.byType(CaptureResult), findsNothing);
       expect(find.byType(BottomSheet), findsNothing);
       expect(app.tasks.titles(), ['Médico']);
@@ -1742,7 +1766,7 @@ void main() {
   // next day ----
 
   testWidgets(
-    'UX-618: at 10:00 with the assistant offline, a spoken “Llamar a Juan a las 9 de la mañana” saved with Guardar como tarea is saved on the next day at 09:00, titled Llamar a Juan',
+    'UX-618: at 10:00 with the assistant offline, a spoken “Llamar a Juan a las 9 de la mañana” saved with Guardar como tarea shows Llamar a Juan on its card with no question, and is saved on the next day at 09:00',
     (tester) async {
       final wednesday = plus(monday(), 2);
       final start = DateTime(
@@ -1766,7 +1790,16 @@ void main() {
       expect(save, findsOneWidget);
       await tester.tap(save);
       await tester.pumpAndSettle();
-      // Saved at once, with no question, and not in the past.
+      // Its card shows first (UX-2612), with no question.
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(titleText(tester), 'Llamar a Juan');
+      expect(find.text(es.captureWhatTime), findsNothing);
+      expect(app.tasks.titles(), isEmpty);
+      await tester.tap(
+        find.widgetWithText(FilledButton, es.captureAddToCalendar),
+      );
+      await tester.pumpAndSettle();
+      // Saved not in the past.
       expect(find.byType(CaptureResult), findsNothing);
       expect(find.byType(BottomSheet), findsNothing);
       expect(app.tasks.titles(), ['Llamar a Juan']);
@@ -2090,7 +2123,7 @@ void main() {
 
   for (final language in ['es', 'en', 'ca']) {
     testWidgets(
-      'UX-919 ($language): after 8 s of waiting the filled button reads «${saveAsATask[language]}», and after a failure the same label shows below Reintentar',
+      'UX-919 ($language): after 8 s of waiting the text button reads «${saveAsATask[language]}» (UX-2103), and after a failure the same label shows below Reintentar',
       (tester) async {
         final l = lang(language);
         expect(l.captureSaveAsWritten, saveAsATask[language]);
@@ -2101,7 +2134,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 8200));
         expect(find.text(l.captureSlow), findsOneWidget);
         expect(
-          find.widgetWithText(FilledButton, l.captureSaveAsWritten),
+          find.widgetWithText(TextButton, l.captureSaveAsWritten),
           findsOneWidget,
         );
         hold.complete();
@@ -2718,7 +2751,8 @@ void main() {
         );
         await frames(tester);
         await tester.pump(const Duration(milliseconds: 8200));
-        final save = find.widgetWithText(FilledButton, l.captureSaveAsWritten);
+        // A text button while the assistant still works (UX-2103).
+        final save = find.widgetWithText(TextButton, l.captureSaveAsWritten);
         expect(save, findsOneWidget);
         await tester.ensureVisible(save);
         await tester.pump(const Duration(milliseconds: 400));
@@ -2787,8 +2821,9 @@ void main() {
       await frames(tester);
       await tester.pump(const Duration(milliseconds: 8200));
       expect(find.text(es.captureSlow), findsOneWidget);
+      // A text button while the assistant still works (UX-2103).
       final save = inSheet(
-        find.widgetWithText(FilledButton, es.captureSaveAsWritten),
+        find.widgetWithText(TextButton, es.captureSaveAsWritten),
       );
       expect(save, findsOneWidget);
       final label = find.descendant(
@@ -2858,6 +2893,1503 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- UX loop 2026-10-28-app, round 1 · P273 (UX-2103, UX-2104, UX-2109),
+  // with Manrope (loaded above) ----
+
+  group('P273 · understanding and failing', () {
+    Future<void> manrope() async => (FontLoader(
+      'Manrope',
+    )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+
+    void at2x(WidgetTester tester) {
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    }
+
+    /// The sheet's one problem banner, showing [text], whole: every line
+    /// laid out, inside the screen and inside every scroll view around it;
+    /// with [still], none of those scroll views can scroll.
+    Rect expectWholeBanner(
+      WidgetTester tester,
+      String text, {
+      Size screen = const Size(360, 800),
+      bool still = false,
+    }) {
+      final banner = inSheet(find.byType(MessageBanner));
+      expect(banner, findsOneWidget);
+      final label = find.descendant(of: banner, matching: find.text(text));
+      expect(label, findsOneWidget);
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: label, matching: find.byType(RichText)),
+      );
+      expect(paragraph.didExceedMaxLines, isFalse);
+      final rect = tester.getRect(banner);
+      expect(rect.top, greaterThanOrEqualTo(-0.5));
+      expect(rect.bottom, lessThanOrEqualTo(screen.height + 0.5));
+      expect(
+        rect.bottom,
+        lessThanOrEqualTo(tester.getRect(find.byType(BottomSheet)).bottom),
+      );
+      final scrollables = find.ancestor(
+        of: banner,
+        matching: find.byType(Scrollable),
+      );
+      for (final element in scrollables.evaluate()) {
+        final viewport = tester.getRect(find.byWidget(element.widget));
+        expect(
+          rect.top,
+          greaterThanOrEqualTo(viewport.top - 0.5),
+          reason: 'the banner’s top edge is in its scroll view',
+        );
+        expect(
+          rect.bottom,
+          lessThanOrEqualTo(viewport.bottom + 0.5),
+          reason:
+              'the banner’s last line and bottom edge are in its scroll '
+              'view (banner $rect, view $viewport)',
+        );
+        if (still) {
+          final position =
+              (element as StatefulElement).state as ScrollableState;
+          expect(
+            position.position.maxScrollExtent,
+            0,
+            reason: 'only the words scroll',
+          );
+        }
+      }
+      return rect;
+    }
+
+    /// The typed-words field's top border shows under [banner]: in view and
+    /// what a tap just inside it reaches.
+    void expectFieldTopVisible(WidgetTester tester, Rect banner) {
+      final decorator = find.descendant(
+        of: words(),
+        matching: find.byType(InputDecorator),
+      );
+      expect(decorator, findsOneWidget);
+      final field = tester.getRect(decorator);
+      expect(
+        field.top,
+        greaterThanOrEqualTo(banner.bottom - 0.5),
+        reason: 'the field starts below the banner',
+      );
+      expect(field.top, lessThan(800));
+      final inside = <RenderObject>{
+        for (final element
+            in find
+                .descendant(
+                  of: words(),
+                  matching: find.byWidgetPredicate((_) => true),
+                )
+                .evaluate())
+          if (element.renderObject != null) element.renderObject!,
+      };
+      final hit = tester.hitTestOnBinding(
+        Offset(field.center.dx, field.top + 2),
+      );
+      expect(
+        hit.path.any((entry) => inside.contains(entry.target)),
+        isTrue,
+        reason: 'the field’s top border is in view at ${field.top}',
+      );
+    }
+
+    // UX-2103: at 8 s, nothing is ready to confirm.
+    for (final scale in [1, 2]) {
+      testWidgets(
+        'UX-2103: ES $scale× on 360×800, after 8 s of understanding no filled button shows, and «Guardar como tarea» is a text button at least 48 dp tall under «Está tardando más de lo normal.»',
+        (tester) async {
+          await manrope();
+          if (scale == 2) at2x(tester);
+          final hold = Completer<void>();
+          await typeAndSend(
+            tester,
+            'es',
+            'Mañana, llamar al dentista y comprar pan',
+            size: const Size(360, 800),
+            hold: hold,
+          );
+          await frames(tester);
+          await tester.pump(const Duration(milliseconds: 8200));
+          final slow = inSheet(find.text(es.captureSlow));
+          expect(slow, findsOneWidget);
+          expect(
+            find.widgetWithText(FilledButton, es.captureSaveAsWritten),
+            findsNothing,
+          );
+          expect(inSheet(find.byType(FilledButton)), findsNothing);
+          final save = inSheet(
+            find.widgetWithText(TextButton, es.captureSaveAsWritten),
+          );
+          expect(save, findsOneWidget);
+          await tester.ensureVisible(save);
+          await tester.pump(const Duration(milliseconds: 400));
+          final button = tester.getRect(save);
+          expect(button.height, greaterThanOrEqualTo(48));
+          expect(
+            button.top,
+            greaterThanOrEqualTo(tester.getRect(slow).bottom - 0.5),
+            reason: 'under the slow line',
+          );
+          expect(button.bottom, lessThanOrEqualTo(800.5));
+          expect(save.hitTestable(), findsOneWidget);
+          expect(tester.takeException(), isNull);
+          hold.complete();
+          await tester.pumpAndSettle();
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2103: ES 1× on 360×800, after a 503 «Guardar como tarea» is a filled button again, under «Reintentar»',
+      (tester) async {
+        await manrope();
+        await typeAndSend(
+          tester,
+          'es',
+          'Mañana, llamar al dentista y comprar pan',
+          size: const Size(360, 800),
+          failure: ApiException(503, 'Service unavailable'),
+        );
+        await tester.pumpAndSettle();
+        final retry = inSheet(find.widgetWithText(FilledButton, es.tryAgain));
+        final save = inSheet(
+          find.widgetWithText(FilledButton, es.captureSaveAsWritten),
+        );
+        expect(retry, findsOneWidget);
+        expect(save, findsOneWidget);
+        expect(
+          tester.getRect(retry).bottom,
+          lessThanOrEqualTo(tester.getRect(save).top),
+          reason: 'under Reintentar',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    // UX-2104 and UX-2109: offline with typed words, at 2×.
+    for (final language in ['es', 'ca']) {
+      testWidgets(
+        'UX-2104 / UX-2109 ($language 2× on 360×800): offline with typed words, the banner says to tap «Guardar como tarea», whole, with the field’s top border in view',
+        (tester) async {
+          await manrope();
+          at2x(tester);
+          final l = lang(language);
+          await typeAndSend(
+            tester,
+            language,
+            'Llamar al médico el viernes a las diez',
+            size: const Size(360, 800),
+            failure: ApiException(0, 'Offline. Retry when connected.'),
+          );
+          await tester.pumpAndSettle();
+          expect(l.captureOffline, contains(l.captureSaveAsWritten));
+          final banner = expectWholeBanner(tester, l.captureOffline);
+          expectFieldTopVisible(tester, banner);
+          expect(
+            inSheet(find.widgetWithText(FilledButton, l.captureSaveAsWritten)),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull, reason: 'no overflow');
+        },
+      );
+    }
+
+    test('UX-2104: the offline line names the button and says what to tap', () {
+      expect(
+        es.captureOffline,
+        'Sin conexión. Toca Guardar como tarea o reinténtalo cuando tengas internet.',
+      );
+      expect(
+        ca.captureOffline,
+        'Sense connexió. Toca Desa-ho com a tasca o torna-ho a provar quan tinguis internet.',
+      );
+      expect(
+        en.captureOffline,
+        'No internet. Tap Save as a task, or try again when you’re online.',
+      );
+      for (final l in [es, en, ca]) {
+        expect(l.captureOffline, contains(l.captureSaveAsWritten));
+      }
+    });
+
+    // UX-2104: the server that understands the words can't be reached.
+    for (final language in ['es', 'en', 'ca']) {
+      testWidgets(
+        'UX-2104 ($language): unreachable (503), the banner says the words can’t become tasks now and are kept',
+        (tester) async {
+          final l = lang(language);
+          await typeAndSend(
+            tester,
+            language,
+            'llamar al médico',
+            size: const Size(360, 800),
+            failure: ApiException(503, 'Service unavailable'),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.descendant(
+              of: inSheet(find.byType(MessageBanner)),
+              matching: find.text(l.captureUnavailable),
+            ),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    test('UX-2104: the unreachable line reads as written', () {
+      expect(
+        es.captureUnavailable,
+        'Ahora no puedo convertir tus palabras en tareas; se conservan.',
+      );
+      expect(
+        en.captureUnavailable,
+        'I can’t turn your words into tasks right now; they’re kept.',
+      );
+      expect(
+        ca.captureUnavailable,
+        'Ara no puc convertir les teves paraules en tasques; es conserven.',
+      );
+    });
+
+    // UX-2109: today's limit with many typed words, at CA 2×.
+    testWidgets(
+      'UX-2109 (ca 2× on 360×800): typed words refused by today’s limit, the banner shows whole and only the words scroll',
+      (tester) async {
+        await manrope();
+        at2x(tester);
+        await typeAndSend(
+          tester,
+          'ca',
+          [
+            'Trucar al metge divendres a les deu',
+            'Comprar pa i llet a la botiga del costat',
+            'Recollir el paquet de correus abans de dinar',
+            'Enviar la factura a la gestoria',
+            'Portar el cotxe al taller dimarts',
+            'Regar les plantes del balcó',
+          ].join('\n'),
+          size: const Size(360, 800),
+          failure: ApiException(
+            429,
+            'Daily limit reached.',
+            null,
+            const Duration(seconds: 3600),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final banner = expectWholeBanner(
+          tester,
+          ca.captureAllowance,
+          still: true,
+        );
+        expectFieldTopVisible(tester, banner);
+        // The words are what scrolls: they don't all fit.
+        final wordsScroll = find.descendant(
+          of: words(),
+          matching: find.byType(Scrollable),
+        );
+        expect(wordsScroll, findsOneWidget);
+        expect(
+          tester.state<ScrollableState>(wordsScroll).position.maxScrollExtent,
+          greaterThan(0),
+          reason: 'the words run out of room and scroll',
+        );
+        expect(tester.takeException(), isNull, reason: 'no overflow');
+      },
+    );
+  });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P289 (UX-2108): the capture taps
+  // are 60 dp tall, with Manrope ----
+
+  group('P289 · 60 dp capture taps', () {
+    void at2x(WidgetTester tester) {
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    }
+
+    void expectTall(WidgetTester tester, Finder button, String what) {
+      expect(button, findsOneWidget, reason: what);
+      expect(
+        tester.getRect(button).height,
+        greaterThanOrEqualTo(58),
+        reason: '$what is at least 58 dp tall',
+      );
+    }
+
+    /// Listening in the sheet, opened from Calendar's «Añadir tarea», with
+    /// words heard so «Listo» sends them.
+    Future<_App> listen(
+      WidgetTester tester, {
+      Size size = const Size(360, 800),
+      List<Map<String, dynamic>> found = const [],
+    }) async {
+      final app = await _App.open(tester, pro: true, size: size);
+      app.api.found = found;
+      await tester.tap(filledButtonWithText(es.addTask));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(app.speech.starts, 1, reason: 'listening');
+      app.speech.send('ready');
+      app.speech.send('segment', text: 'Llamar al médico mañana a las 5');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      return app;
+    }
+
+    /// [finder] is whole on the [screen], inside every scroll view around
+    /// it, and what a tap at its centre reaches: no scrolling needed.
+    void expectInViewWithoutScrolling(
+      WidgetTester tester,
+      Finder finder,
+      Size screen,
+      String what,
+    ) {
+      final rect = tester.getRect(finder);
+      expect(rect.top, greaterThanOrEqualTo(-0.5), reason: what);
+      expect(rect.bottom, lessThanOrEqualTo(screen.height + 0.5), reason: what);
+      for (final element in find
+          .ancestor(of: finder, matching: find.byType(Scrollable))
+          .evaluate()) {
+        final view = tester.getRect(find.byWidget(element.widget));
+        expect(
+          rect.top >= view.top - 0.5 && rect.bottom <= view.bottom + 0.5,
+          isTrue,
+          reason: '$what whole in its scroll view ($rect in $view)',
+        );
+      }
+      expect(finder.hitTestable(), findsOneWidget, reason: what);
+    }
+
+    testWidgets(
+      'UX-2108: ES 1× on 360×800, Calendar’s «Añadir tarea» is at least 58 dp tall, with the tab bar still 12 dp under it',
+      (tester) async {
+        await loadManrope();
+        await _App.open(tester, pro: true, size: const Size(360, 800));
+        final add = filledButtonWithText(es.addTask);
+        expectTall(tester, add, '«Añadir tarea»');
+        expect(add.hitTestable(), findsOneWidget);
+        final bar = tester.getRect(find.byType(NavigationBar));
+        expect(
+          bar.top - tester.getRect(add).bottom,
+          moreOrLessEquals(12, epsilon: 0.5),
+          reason: 'the 12 dp gap under «Añadir tarea» is unchanged',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2108: ES 1× on 360×800, while listening «Listo» is at least 58 dp tall, with «Cancelar» and «Escribir» still 12 dp under it',
+      (tester) async {
+        await loadManrope();
+        await listen(tester);
+        final done = inSheet(find.widgetWithText(FilledButton, es.done));
+        expectTall(tester, done, '«Listo»');
+        final rect = tester.getRect(done);
+        final cancel = inSheet(find.widgetWithText(TextButton, es.cancel));
+        final type = find.byKey(const ValueKey('capture-type-instead'));
+        expect(cancel, findsOneWidget);
+        expect(type, findsOneWidget);
+        for (final (what, under) in [('«Cancelar»', cancel), ('«Escribir»', type)]) {
+          expect(
+            tester.getRect(under).top - rect.bottom,
+            moreOrLessEquals(12, epsilon: 0.5),
+            reason: 'the 12 dp gap between «Listo» and $what is unchanged',
+          );
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2108: ES 1× on 360×800, «Empezar a hablar» in a sheet that waits to listen is at least 58 dp tall',
+      (tester) async {
+        await loadManrope();
+        await _App.open(tester, pro: true, size: const Size(360, 800));
+        unawaited(
+          showCaptureSheet(
+            tester.element(find.byType(CalendarScreen)),
+            startListening: false,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expectTall(
+          tester,
+          inSheet(find.widgetWithText(FilledButton, es.captureStartTalking)),
+          '«Empezar a hablar»',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2108: ES 1× on 360×800, after a pause «Seguir» and «Listo» are each at least 58 dp tall',
+      (tester) async {
+        await loadManrope();
+        await listen(tester);
+        for (final state in [
+          AppLifecycleState.inactive,
+          AppLifecycleState.hidden,
+          AppLifecycleState.paused,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        await tester.pumpAndSettle();
+        for (final state in [
+          AppLifecycleState.hidden,
+          AppLifecycleState.inactive,
+          AppLifecycleState.resumed,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+        }
+        await tester.pumpAndSettle();
+        expectTall(
+          tester,
+          inSheet(filledButtonWithText(es.captureContinue)),
+          '«Seguir»',
+        );
+        expectTall(
+          tester,
+          inSheet(find.widgetWithText(FilledButton, es.done)),
+          '«Listo»',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2108: ES 1× on 360×800, after a failure «Reintentar» and «Guardar como tarea» are each at least 58 dp tall',
+      (tester) async {
+        await loadManrope();
+        await typeAndSend(
+          tester,
+          'es',
+          'Mañana, llamar al dentista',
+          size: const Size(360, 800),
+          failure: ApiException(503, 'Service unavailable'),
+        );
+        await tester.pumpAndSettle();
+        expectTall(
+          tester,
+          inSheet(filledButtonWithText(es.tryAgain)),
+          '«Reintentar»',
+        );
+        expectTall(
+          tester,
+          inSheet(filledButtonWithText(es.captureSaveAsWritten)),
+          '«Guardar como tarea»',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2108: ES 1× on 360×800, a one-task result’s «Añadir al calendario» is at least 58 dp tall',
+      (tester) async {
+        await loadManrope();
+        final now = DateTime.now();
+        await listen(
+          tester,
+          found: [
+            dated(
+              'Llamar al médico',
+              DateTime(now.year, now.month, now.day + 1, 17),
+            ),
+          ],
+        );
+        await tester.tap(inSheet(find.widgetWithText(FilledButton, es.done)));
+        await tester.pumpAndSettle();
+        expect(find.byType(CaptureResult), findsOneWidget);
+        final save = find.byKey(const ValueKey('save-drafts'));
+        expect(
+          find.descendant(of: save, matching: find.text(es.captureAddToCalendar)),
+          findsOneWidget,
+        );
+        expectTall(tester, save, '«Añadir al calendario»');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2108 / UX-1302: ES 2× on 360×740, the sheet’s primary shows whole without scrolling while listening («Listo») and on a one-task result («Añadir al calendario»)',
+      (tester) async {
+        await loadManrope();
+        at2x(tester);
+        const screen = Size(360, 740);
+        final now = DateTime.now();
+        await listen(
+          tester,
+          size: screen,
+          found: [
+            dated(
+              'Llamar al médico',
+              DateTime(now.year, now.month, now.day + 1, 17),
+            ),
+          ],
+        );
+        final done = inSheet(find.widgetWithText(FilledButton, es.done));
+        expectTall(tester, done, '«Listo»');
+        expectInViewWithoutScrolling(tester, done, screen, '«Listo»');
+        await tester.tap(done);
+        await tester.pumpAndSettle();
+        expect(find.byType(CaptureResult), findsOneWidget);
+        final save = find.byKey(const ValueKey('save-drafts'));
+        expectTall(tester, save, '«Añadir al calendario»');
+        expectInViewWithoutScrolling(
+          tester,
+          save,
+          screen,
+          '«Añadir al calendario»',
+        );
+        expect(tester.takeException(), isNull, reason: 'no overflow');
+      },
+    );
+  });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P292 (UX-2110): a double tap
+  // from outside the app opens one sheet ----
+  group('P292 · one sheet per double tap', () {
+    testWidgets(
+      'UX-2110: two VOICE entries 300 ms apart while the first entry’s sheet is open with no words open one capture sheet; Cancelar lands on Calendar, with no second sheet under it',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          pro: true,
+          entries: [_entry('voice')],
+        );
+        expect(find.byType(VoiceTaskScreen), findsOneWidget);
+        expect(app.speech.starts, 1);
+        await tester.pump(const Duration(milliseconds: 300));
+        app.entries.queue.add(_entry('voice'));
+        app.entries.changed();
+        await tester.pumpAndSettle();
+        expect(find.byType(VoiceTaskScreen), findsOneWidget);
+        expect(find.byType(BottomSheet), findsOneWidget);
+        expect(app.speech.starts, 1, reason: 'no second listening');
+        expect(app.entries.acknowledged, hasLength(2));
+        expect(app.entries.queue, isEmpty);
+
+        await tester.tap(inSheet(find.widgetWithText(TextButton, es.cancel)));
+        await tester.pumpAndSettle();
+        expect(find.byType(VoiceTaskScreen), findsNothing);
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(find.byType(CalendarScreen).hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2110 / UX-2637: a shortcut’s TEXT entry while the widget’s empty sheet waits leaves one sheet, typing',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          pro: true,
+          entries: [_entry('voice')],
+        );
+        expect(find.byType(VoiceTaskScreen), findsOneWidget);
+        app.entries.queue.add(_entry('text'));
+        app.entries.changed();
+        await tester.pumpAndSettle();
+        expect(find.byType(VoiceTaskScreen), findsOneWidget);
+        expect(app.entries.acknowledged, hasLength(2));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2110: a share entry that arrives while a capture sheet is open still opens its own form, with the shared words',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          pro: false,
+          freeLeft: 5,
+          entries: [_entry('voice')],
+        );
+        expect(find.byType(VoiceTaskScreen), findsOneWidget);
+        app.entries.queue.add(_entry('share', text: 'Comprar pilas'));
+        app.entries.changed();
+        await tester.pumpAndSettle();
+        expect(app.store.accepted, hasLength(1));
+        expect(find.byType(TaskEditor), findsOneWidget);
+        expect(titleText(tester), 'Comprar pilas');
+        expect(app.entries.acknowledged, hasLength(2));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P299 (UX-2612, D1): «Guardar
+  // como tarea» shows its card; only its button saves ----
+  group('P299 · Guardar como tarea shows its card', () {
+    final asWritten = find.widgetWithText(TextButton, es.captureSaveAsWritten);
+    final filledAsWritten = find.widgetWithText(
+      FilledButton,
+      es.captureSaveAsWritten,
+    );
+    final add = find.byKey(const ValueKey('save-drafts'));
+    String addLabel(WidgetTester tester) => tester
+        .widgetList<Text>(find.descendant(of: add, matching: find.byType(Text)))
+        .map((text) => text.data)
+        .whereType<String>()
+        .join();
+
+    testWidgets(
+      'UX-2612: ES 1× on 360×800, «Mañana, llamar al dentista y comprar pan» with the assistant still working at 8 s: «Guardar como tarea» shows one task, «Llamar al dentista y comprar pan», tomorrow, with «Añadir al calendario»; nothing is saved until that tap, which saves exactly that task and lands on it',
+      (tester) async {
+        final app = await dictateTo(
+          tester,
+          'Mañana, llamar al dentista y comprar pan',
+          hold: Completer<void>(),
+          settle: false,
+        );
+        await tester.pump(const Duration(seconds: 8));
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.text(es.captureSlow), findsOneWidget);
+        expect(asWritten, findsOneWidget);
+        await tester.tap(asWritten);
+        await tester.pumpAndSettle();
+
+        final now = DateTime.now();
+        final tomorrow = DateTime(now.year, now.month, now.day + 1);
+        expect(find.byType(CaptureResult), findsOneWidget);
+        expect(find.byKey(const ValueKey('task-title')), findsOneWidget);
+        expect(titleText(tester), 'Llamar al dentista y comprar pan');
+        final result = tester.element(find.byType(CaptureResult));
+        expect(
+          dateLine(tester),
+          anyOf(
+            result.weekdayDate(tomorrow),
+            contains(result.weekdayDate(tomorrow)),
+            contains(es.tomorrow),
+          ),
+        );
+        expect(addLabel(tester), es.captureAddToCalendar);
+        expect(
+          find.widgetWithText(FilledButton, es.captureAddToCalendar),
+          findsOneWidget,
+        );
+        expect(app.tasks.titles(), isEmpty, reason: 'nothing saved yet');
+
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(app.tasks.titles(), ['Llamar al dentista y comprar pan']);
+        expect(
+          Task.day(app.tasks.state.requireValue.single.dueDate!),
+          tomorrow,
+        );
+        expect(find.text(selectedHeader(tomorrow)), findsOneWidget);
+        final row = find.widgetWithText(TaskTile, 'Llamar al dentista y comprar pan');
+        expect(row.hitTestable(), findsOneWidget);
+        expect(find.text(es.undo), findsOneWidget);
+        app.api.hold!.complete();
+        await tester.pumpAndSettle();
+        expect(app.tasks.titles(), ['Llamar al dentista y comprar pan']);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final (what, failure, expectFilled) in [
+      ('a 503', ApiException(503, 'Service unavailable'), true),
+      (
+        'today’s dictation limit (429)',
+        ApiException(
+          429,
+          'Too many requests',
+          null,
+          const Duration(seconds: 3600),
+        ),
+        true,
+      ),
+    ]) {
+      testWidgets(
+        'UX-2612: after $what, the filled «Guardar como tarea» shows the words on a result card; the task list doesn’t change until the card’s button is tapped',
+        (tester) async {
+          final app = await typeAndSend(
+            tester,
+            'es',
+            'Comprar pan el viernes',
+            failure: failure,
+          );
+          await tester.pumpAndSettle();
+          expect(
+            inSheet(expectFilled ? filledAsWritten : asWritten),
+            findsOneWidget,
+          );
+          await tester.tap(inSheet(filledAsWritten));
+          await tester.pumpAndSettle();
+          expect(find.byType(CaptureResult), findsOneWidget);
+          expect(titleText(tester), 'Comprar pan');
+          expect(addLabel(tester), es.captureAddToCalendar);
+          expect(app.tasks.titles(), isEmpty);
+          await tester.pump(const Duration(seconds: 30));
+          expect(app.tasks.titles(), isEmpty, reason: 'still nothing saved');
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          expect(app.tasks.titles(), ['Comprar pan']);
+          expect(app.tasks.state.requireValue.single.dueDate, isNotNull);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2612: on «No he encontrado ninguna tarea…», «Guardar como tarea» shows the words on a result card; nothing is saved until its button',
+      (tester) async {
+        final app = await dictateTo(tester, 'Mañana, regar las plantas');
+        expect(find.text(es.captureNoTasks), findsOneWidget);
+        await tester.tap(inSheet(asWritten));
+        await tester.pumpAndSettle();
+        expect(find.byType(CaptureResult), findsOneWidget);
+        expect(titleText(tester), 'Regar las plantas');
+        expect(addLabel(tester), es.captureAddToCalendar);
+        expect(app.tasks.titles(), isEmpty);
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        expect(app.tasks.titles(), ['Regar las plantas']);
+        expect(app.api.requests, 1, reason: 'no second request');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2612: words with no day: the card shows the task without a date, and its button reads «Añadir tarea»',
+      (tester) async {
+        final app = await typeAndSend(
+          tester,
+          'es',
+          'Comprar pan',
+          failure: ApiException(503, 'Service unavailable'),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(inSheet(filledAsWritten));
+        await tester.pumpAndSettle();
+        expect(find.byType(CaptureResult), findsOneWidget);
+        expect(titleText(tester), 'Comprar pan');
+        expect(addLabel(tester), es.captureAddTask);
+        expect(app.tasks.titles(), isEmpty);
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        expect(app.tasks.titles(), ['Comprar pan']);
+        expect(app.tasks.state.requireValue.single.dueDate, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final hour in [5, 17]) {
+      testWidgets(
+        'UX-2612: «Mañana a las 5, llamar a Ana»: the card asks which, and its button saves only after the answer, at ${hour.toString().padLeft(2, '0')}:00',
+        (tester) async {
+          final app = await typeAndSend(
+            tester,
+            'es',
+            'Mañana a las 5, llamar a Ana',
+            failure: ApiException(503, 'Service unavailable'),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(inSheet(filledAsWritten));
+          await tester.pumpAndSettle();
+          final result = find.byType(CaptureResult);
+          expect(result, findsOneWidget);
+          expect(
+            find.descendant(of: result, matching: find.text(es.captureWhatTime)),
+            findsOneWidget,
+          );
+          // Not before the answer.
+          if (tester.widget<ButtonStyleButton>(add).onPressed != null) {
+            await tester.tap(add);
+            await tester.pumpAndSettle();
+          }
+          expect(app.tasks.titles(), isEmpty);
+          expect(find.byType(CaptureResult), findsOneWidget);
+          final context = tester.element(result);
+          final day = DateTime(2030, 1, 1);
+          await tester.tap(
+            find.widgetWithText(
+              ActionChip,
+              context.clockTime(day.add(Duration(hours: hour))),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          expect(app.tasks.titles(), ['Llamar a Ana']);
+          final saved = app.tasks.state.requireValue.single;
+          final now = DateTime.now();
+          expect(
+            saved.dueDate,
+            DateTime(now.year, now.month, now.day + 1, hour),
+          );
+          expect(saved.hasTime, isTrue);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2612: the fake assistant answers 3 s after «Guardar como tarea»: the card still shows the phone’s one task, and «Añadir al calendario» adds exactly one task',
+      (tester) async {
+        final hold = Completer<void>();
+        final app = await typeAndSend(
+          tester,
+          'es',
+          'llamar al médico el viernes',
+          hold: hold,
+        );
+        app.api.found = [_found('Otra cosa'), _found('Y otra más')];
+        await frames(tester);
+        await tester.pump(const Duration(seconds: 8));
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.tap(inSheet(asWritten));
+        await tester.pumpAndSettle();
+        expect(titleText(tester), 'Llamar al médico');
+        await tester.pump(const Duration(seconds: 3));
+        hold.complete();
+        await tester.pumpAndSettle();
+        expect(find.byType(CaptureResult), findsOneWidget);
+        expect(titleText(tester), 'Llamar al médico');
+        expect(find.text('Otra cosa'), findsNothing);
+        expect(addLabel(tester), es.captureAddToCalendar);
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        expect(app.tasks.titles(), ['Llamar al médico']);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2612: Cancelar on the card asks «¿Conservar lo que has dicho para más tarde?»; «Conservar» closes with «Sin guardar · 1», and opening that shows the same one-task card',
+      (tester) async {
+        final app = await dictateTo(
+          tester,
+          'Mañana, llamar al dentista y comprar pan',
+          failure: ApiException(503, 'Service unavailable'),
+        );
+        await tester.tap(inSheet(filledAsWritten));
+        await tester.pumpAndSettle();
+        expect(titleText(tester), 'Llamar al dentista y comprar pan');
+        await tester.tap(
+          find.descendant(
+            of: find.byType(CaptureResult),
+            matching: find.widgetWithText(TextButton, es.cancel),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text(es.captureKeepQuestion), findsOneWidget);
+        await tester.tap(find.widgetWithText(FilledButton, es.keep));
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(app.tasks.titles(), isEmpty);
+        final pending = find.text(es.pendingCaptureCount(1));
+        expect(pending, findsOneWidget);
+        await tester.tap(pending);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byType(ListTile).hitTestable().first);
+        await tester.pumpAndSettle();
+        expect(find.byType(CaptureResult), findsOneWidget);
+        expect(find.byKey(const ValueKey('task-title')), findsOneWidget);
+        expect(titleText(tester), 'Llamar al dentista y comprar pan');
+        expect(addLabel(tester), es.captureAddToCalendar);
+        expect(app.tasks.titles(), isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2612: Cancelar on the card, then «Descartar», leaves no pending capture and no new task',
+      (tester) async {
+        final app = await dictateTo(
+          tester,
+          'Mañana, llamar al dentista y comprar pan',
+          failure: ApiException(503, 'Service unavailable'),
+        );
+        await tester.tap(inSheet(filledAsWritten));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.descendant(
+            of: find.byType(CaptureResult),
+            matching: find.widgetWithText(TextButton, es.cancel),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text(es.captureKeepQuestion), findsOneWidget);
+        await tester.tap(find.widgetWithText(TextButton, es.discard));
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(waiting(app), isEmpty);
+        expect(find.text(es.pendingCaptureCount(1)), findsNothing);
+        expect(app.tasks.titles(), isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- UX loop 2026-10-28-app, round 2 · P308 (UX-2110, UX-2637): one
+  // entry from outside the app, one sheet, in the mode it asks for ----
+  group('P308 · one entry, one sheet or form', () {
+    /// Every capture sheet built, on top or under another.
+    Finder sheets() => find.byType(VoiceTaskScreen, skipOffstage: false);
+    Finder cancel() =>
+        inSheet(find.widgetWithText(TextButton, es.cancel)).hitTestable();
+
+    /// The one sheet on screen waits for typing: its field focused, no mic.
+    void expectTyping(WidgetTester tester) {
+      expect(words(), findsOneWidget, reason: 'a field to type in');
+      expect(
+        tester.widget<TextField>(words()).focusNode!.hasFocus,
+        isTrue,
+        reason: 'the keyboard is up',
+      );
+    }
+
+    /// The one sheet on screen listens: no field to type in, «Listo» shows.
+    void expectListening(WidgetTester tester) {
+      expect(words(), findsNothing, reason: 'no field focused for typing');
+      expect(
+        inSheet(find.widgetWithText(FilledButton, es.done)),
+        findsOneWidget,
+        reason: '«Listo» shows',
+      );
+    }
+
+    Future<void> cancelToCalendar(WidgetTester tester) async {
+      await tester.tap(cancel());
+      await tester.pumpAndSettle();
+      expect(sheets(), findsNothing, reason: 'nothing under it');
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.byType(CalendarScreen).hitTestable(), findsOneWidget);
+    }
+
+    testWidgets(
+      'UX-2637: Pro, ES 1× on 360×800: a TEXT entry opens the typing sheet; with nothing typed, a VOICE entry 300 ms later leaves one capture sheet, listening, with «Listo»; Cancelar lands on Calendar, with no typing sheet under it',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          pro: true,
+          size: const Size(360, 800),
+          entries: [_entry('text')],
+        );
+        expect(sheets(), findsOneWidget);
+        expectTyping(tester);
+        expect(app.speech.starts, 0);
+
+        await tester.pump(const Duration(milliseconds: 300));
+        app.entries.queue.add(_entry('voice'));
+        app.entries.changed();
+        await tester.pumpAndSettle();
+        expect(sheets(), findsOneWidget, reason: 'exactly one capture sheet');
+        expect(find.byType(BottomSheet), findsOneWidget);
+        expectListening(tester);
+        expect(app.speech.starts, 1, reason: 'the mic listens');
+        expect(app.entries.acknowledged, hasLength(2));
+
+        await cancelToCalendar(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2637: Pro: a VOICE entry opens the listening sheet; with nothing heard, a TEXT entry 300 ms later leaves one capture sheet, typing; Cancelar lands on Calendar, with nothing under it',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          pro: true,
+          size: const Size(360, 800),
+          entries: [_entry('voice')],
+        );
+        expect(sheets(), findsOneWidget);
+        expectListening(tester);
+        expect(app.speech.starts, 1);
+
+        await tester.pump(const Duration(milliseconds: 300));
+        app.entries.queue.add(_entry('text'));
+        app.entries.changed();
+        await tester.pumpAndSettle();
+        expect(sheets(), findsOneWidget, reason: 'exactly one capture sheet');
+        expect(find.byType(BottomSheet), findsOneWidget);
+        expectTyping(tester);
+        expect(app.speech.starts, 1, reason: 'no second listening');
+        expect(app.entries.acknowledged, hasLength(2));
+
+        await cancelToCalendar(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2110: Pro: two TEXT entries 300 ms apart open one typing sheet; Cancelar lands on Calendar',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          pro: true,
+          size: const Size(360, 800),
+          entries: [_entry('text')],
+        );
+        expect(sheets(), findsOneWidget);
+        await tester.pump(const Duration(milliseconds: 300));
+        app.entries.queue.add(_entry('text'));
+        app.entries.changed();
+        await tester.pumpAndSettle();
+        expect(sheets(), findsOneWidget);
+        expect(find.byType(BottomSheet), findsOneWidget);
+        expectTyping(tester);
+        expect(app.speech.starts, 0);
+        expect(app.entries.acknowledged, hasLength(2));
+        expect(app.entries.queue, isEmpty);
+
+        await cancelToCalendar(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2110: Pro: two VOICE entries already pending when the app looks open one listening sheet; Cancelar lands on Calendar',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          pro: true,
+          size: const Size(360, 800),
+          entries: [_entry('voice'), _entry('voice')],
+        );
+        expect(sheets(), findsOneWidget);
+        expectListening(tester);
+        expect(app.speech.starts, 1);
+        expect(app.entries.acknowledged, hasLength(2));
+        await cancelToCalendar(tester);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2110: Pro: a TEXT entry, «pan» typed, then a VOICE entry opens a voice sheet over it; Cancelar on the voice sheet shows the typing sheet with «pan» still in its field',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          pro: true,
+          size: const Size(360, 800),
+          entries: [_entry('text')],
+        );
+        expectTyping(tester);
+        await tester.enterText(words(), 'pan');
+        await tester.pumpAndSettle();
+
+        app.entries.queue.add(_entry('voice'));
+        app.entries.changed();
+        await tester.pumpAndSettle();
+        expect(sheets(), findsNWidgets(2), reason: 'the words are kept under');
+        expect(app.speech.starts, 1, reason: 'the new sheet listens');
+        // The top sheet listens: its «Listo» is the one that can be tapped.
+        expect(
+          inSheet(find.widgetWithText(FilledButton, es.done)).hitTestable(),
+          findsOneWidget,
+        );
+
+        await tester.tap(cancel().last);
+        await tester.pumpAndSettle();
+        expect(sheets(), findsOneWidget);
+        expect(words(), findsOneWidget);
+        expect(tester.widget<TextField>(words()).controller!.text, 'pan');
+        expect(app.entries.acknowledged, hasLength(2));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2110: a share entry that arrives while an empty form is on top (no Pro, dictations left) still opens its own form, with the shared words',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          pro: false,
+          freeLeft: 5,
+          entries: [_entry('text')],
+        );
+        expect(find.byType(TaskEditor), findsOneWidget);
+        expect(titleText(tester), isEmpty);
+        app.entries.queue.add(_entry('share', text: 'Comprar pilas'));
+        app.entries.changed();
+        await tester.pumpAndSettle();
+        expect(app.store.accepted, hasLength(1));
+        expect(
+          find.byType(TaskEditor, skipOffstage: false),
+          findsNWidgets(2),
+          reason: 'its own form, over the empty one',
+        );
+        expect(titleText(tester), 'Comprar pilas');
+        expect(app.entries.acknowledged, hasLength(2));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2110: a share entry that arrives while an empty typing sheet is on top (Pro) still opens its own sheet',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          pro: true,
+          entries: [_entry('text')],
+        );
+        expect(sheets(), findsOneWidget);
+        app.entries.queue.add(_entry('share', text: 'Comprar pilas'));
+        app.entries.changed();
+        await tester.pumpAndSettle();
+        expect(app.store.accepted, hasLength(1));
+        expect(sheets(), findsNWidgets(2), reason: 'its own sheet');
+        expect(app.entries.acknowledged, hasLength(2));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- UX loop 2026-10-28-app, round 2 · P309 (UX-2636): the words' card
+  // says «Según tus palabras», typed or spoken ----
+  group('P309 · Según tus palabras', () {
+    test(
+      'UX-2636: the line under a date read from the words, and its button, read as planned in ES, EN and CA, and none says the words were written',
+      () {
+        expect(es.fromYourWords, 'Según tus palabras');
+        expect(es.keepAsTyped, 'Dejar como está');
+        expect(en.fromYourWords, 'From your words');
+        expect(en.keepAsTyped, 'Keep my words');
+        expect(ca.fromYourWords, 'Segons les teves paraules');
+        expect(ca.keepAsTyped, 'Deixa-ho com està');
+        for (final line in [es.fromYourWords, es.keepAsTyped]) {
+          expect(line, isNot(contains('escrit')), reason: line);
+        }
+        for (final line in [ca.fromYourWords, ca.keepAsTyped]) {
+          expect(line, isNot(contains('escrit')), reason: line);
+        }
+        for (final line in [en.fromYourWords, en.keepAsTyped]) {
+          expect(line.toLowerCase(), isNot(contains('typed')), reason: line);
+        }
+      },
+    );
+
+    testWidgets(
+      'UX-2636: EN, typing «Dentist Friday 10:00» → Done shows “From your words” · “Keep my words”; “Keep my words” restores the words with no date',
+      (tester) async {
+        final start = monday();
+        await openTyping(tester, clock: start, language: 'en');
+        await tester.tap(find.text(en.addTask).hitTestable());
+        await tester.pumpAndSettle();
+        await tester.enterText(words(), 'Dentist Friday 10:00');
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(FilledButton, en.done));
+        await tester.pumpAndSettle();
+        expect(find.byType(CaptureResult), findsOneWidget);
+        expect(titleText(tester), 'Dentist');
+        expect(find.text(en.fromYourWords), findsOneWidget);
+        final keep = find.widgetWithText(TextButton, en.keepAsTyped);
+        expect(keep, findsOneWidget);
+        await tester.tap(keep);
+        await tester.pumpAndSettle();
+        expect(titleText(tester), 'Dentist Friday 10:00');
+        expect(dateLine(tester), en.noDate);
+        expect(find.text(en.fromYourWords), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2636: a spoken «Guardar como tarea» card (ES 1× on 360×800) reads «Según tus palabras» · «Dejar como está» under its date, and nothing on it says «escrito»',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await dictateTo(
+          tester,
+          'Mañana, llamar al dentista y comprar pan',
+          hold: Completer<void>(),
+          settle: false,
+        );
+        await tester.pump(const Duration(seconds: 8));
+        await tester.pump(const Duration(milliseconds: 300));
+        final asWritten = find.widgetWithText(
+          TextButton,
+          es.captureSaveAsWritten,
+        );
+        expect(asWritten, findsOneWidget);
+        await tester.tap(asWritten);
+        await tester.pumpAndSettle();
+        expect(find.byType(CaptureResult), findsOneWidget);
+        final line = find.text(es.fromYourWords);
+        expect(line, findsOneWidget);
+        expect(
+          find.widgetWithText(TextButton, es.keepAsTyped),
+          findsOneWidget,
+        );
+        // Under the date line.
+        final date = find.byWidgetPredicate(
+          (widget) =>
+              widget.key is ValueKey<String> &&
+              (widget.key! as ValueKey<String>).value.startsWith(
+                'draft-schedule-',
+              ),
+        );
+        expect(
+          tester.getRect(line).top,
+          greaterThanOrEqualTo(tester.getRect(date.first).top),
+        );
+        expect(find.textContaining('escrito'), findsNothing);
+        expect(
+          find.bySemanticsLabel(RegExp('escrito')),
+          findsNothing,
+          reason: 'TalkBack reads no «escrito»',
+        );
+        semantics.dispose();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- UX loop 2026-10-28-app, round 3 · P313 (UX-2641): an entry from
+  // outside the app never closes a sheet that keeps a recording ----
+  // The P313 group's helpers, shared with P314's: a Pro sheet listening
+  // online, the person speaking, and the app left and resumed.
+  /// Every capture sheet built, on top or under another.
+  Finder sheets() => find.byType(VoiceTaskScreen, skipOffstage: false);
+
+  /// A VOICE entry while the phone's own recognizer can't start: the sheet
+  /// listens online, with the app's recorder.
+  Future<_App> openOnline(WidgetTester tester) async {
+    final app = await _App.open(
+      tester,
+      pro: true,
+      size: const Size(360, 800),
+      record: true,
+      speechStartError: PlatformException(code: 'recognizer-busy'),
+      entries: [_entry('voice')],
+    );
+    expect(sheets(), findsOneWidget);
+    expect(app.speech.starts, 1, reason: 'the phone’s recognizer was tried');
+    expect(app.recorders, hasLength(1));
+    expect(app.recorders.single.starts, 1, reason: 'listening online');
+    expect(
+      find.text(es.captureListeningOnline),
+      findsOneWidget,
+      reason: 'online, no words show while speaking',
+    );
+    return app;
+  }
+
+  /// The person speaks: the recorder measures audio, and the capture
+  /// keeps it. No words show online.
+  Future<CaptureSession> speak(WidgetTester tester, _App app) async {
+    app.recorders.single.hear();
+    await tester.pump(const Duration(milliseconds: 120));
+    await tester.pump();
+    final kept = [
+      for (final session in app.store.sessions.values)
+        if (session.audioPath != null) session,
+    ];
+    expect(kept, hasLength(1), reason: 'the recording is kept');
+    expect(words(), findsNothing, reason: 'no words show online');
+    return kept.single;
+  }
+
+  Future<void> leaveAndComeBack(WidgetTester tester) async {
+    for (final state in [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+    await tester.pumpAndSettle();
+    for (final state in [
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+    await tester.pumpAndSettle();
+  }
+
+  group('P313 · an entry never closes what holds something', () {
+    Finder cancel() =>
+        inSheet(find.widgetWithText(TextButton, es.cancel)).hitTestable();
+
+    testWidgets(
+      'UX-2641: Pro, ES 1× on 360×800, online listening: a recording paused when the app was left, no words shown; a TEXT entry opens a typing sheet over it, with no question skipped; Cancelar on it shows the paused voice sheet, and the capture is kept, not discarded',
+      (tester) async {
+        final app = await openOnline(tester);
+        final capture = await speak(tester, app);
+
+        await leaveAndComeBack(tester);
+        expect(app.recorders.single.stops, 1, reason: 'paused with its audio');
+        expect(sheets(), findsOneWidget);
+        expect(
+          find.text(es.recordingKept),
+          findsOneWidget,
+          reason: 'the paused sheet says its recording is kept',
+        );
+        expect(words(), findsNothing);
+
+        app.entries.queue.add(_entry('text'));
+        app.entries.changed();
+        await tester.pumpAndSettle();
+        expect(app.entries.acknowledged, hasLength(2));
+        expect(
+          sheets(),
+          findsNWidgets(2),
+          reason: 'the typing sheet opens over the one with the recording',
+        );
+        expect(
+          find.text(es.captureKeepQuestion),
+          findsNothing,
+          reason: 'no keep-or-discard question was asked or skipped',
+        );
+        // The top sheet types: its field takes the keyboard.
+        expect(words(), findsOneWidget);
+        expect(tester.widget<TextField>(words()).focusNode!.hasFocus, isTrue);
+        expect(app.store.sessions[capture.id]!.status, isNot('discarded'));
+
+        // Nothing typed: Cancelar just closes it.
+        await tester.tap(cancel().last);
+        await tester.pumpAndSettle();
+        expect(sheets(), findsOneWidget, reason: 'the voice sheet shows again');
+        expect(find.text(es.recordingKept).hitTestable(), findsOneWidget);
+        expect(words(), findsNothing);
+        final kept = app.store.sessions[capture.id]!;
+        expect(kept.status, isNot('discarded'));
+        expect(kept.terminal, isFalse);
+        expect(kept.audioPath, capture.audioPath);
+        expect(find.byType(CalendarScreen).hitTestable(), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2641 / UX-2110: Pro, online listening with audio kept: two VOICE entries 300 ms apart leave exactly one capture sheet, still listening',
+      (tester) async {
+        final app = await openOnline(tester);
+        await speak(tester, app);
+
+        await tester.pump(const Duration(milliseconds: 300));
+        app.entries.queue.add(_entry('voice'));
+        app.entries.changed();
+        await tester.pumpAndSettle();
+        expect(sheets(), findsOneWidget, reason: 'exactly one capture sheet');
+        expect(find.byType(BottomSheet), findsOneWidget);
+        expect(app.entries.acknowledged, hasLength(2));
+        expect(app.recorders, hasLength(1), reason: 'no second recorder');
+        expect(app.recorders.single.starts, 1);
+        expect(app.recorders.single.stops, 0, reason: 'still recording');
+        expect(
+          find.textContaining(es.listeningSeconds('')),
+          findsOneWidget,
+          reason: 'still listening',
+        );
+        expect(app.speech.starts, 1, reason: 'no second listening');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2642: no Pro, dictations left: a share entry and a TEXT entry pending together open the shared words’ form and a second, empty form over it; Back shows the shared words’ form, its words kept',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          pro: false,
+          freeLeft: 5,
+          size: const Size(360, 800),
+          entries: [
+            _entry('share', text: 'Comprar pilas'),
+            _entry('text'),
+          ],
+        );
+        expect(app.store.accepted, hasLength(1));
+        expect(app.entries.acknowledged, hasLength(2));
+        expect(sheets(), findsNothing);
+        expect(
+          find.byType(TaskEditor, skipOffstage: false),
+          findsNWidgets(2),
+          reason: 'the TEXT entry’s own form, over the shared words’ form',
+        );
+        expect(titleText(tester), isEmpty, reason: 'the top form is empty');
+
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byType(TaskEditor, skipOffstage: false), findsOneWidget);
+        expect(titleText(tester), 'Comprar pilas', reason: 'its words kept');
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- UX loop 2026-11-01-screens, round 1 · P314 (UX-2644): what a close
+  // uncovers may take the entry ----
+  group('P314 · an entry closes only what is as it opened', () {
+    testWidgets(
+      'UX-2644: Pro, ES 1× on 360×800, online listening: a recording paused when the app was left; a TEXT entry opens a typing sheet over it; a VOICE entry then leaves exactly one capture sheet, the paused voice sheet, with one recorder started once, all three entries acknowledged and the capture kept',
+      (tester) async {
+        final app = await openOnline(tester);
+        final capture = await speak(tester, app);
+
+        await leaveAndComeBack(tester);
+        expect(sheets(), findsOneWidget);
+        expect(find.text(es.recordingKept), findsOneWidget, reason: 'paused');
+
+        app.entries.queue.add(_entry('text'));
+        app.entries.changed();
+        await tester.pumpAndSettle();
+        expect(
+          sheets(),
+          findsNWidgets(2),
+          reason: 'the typing sheet opens over the paused one',
+        );
+        expect(words(), findsOneWidget, reason: 'the top sheet types');
+        // The typing sheet builds its own recorder, never started.
+        final built = app.recorders.length;
+
+        app.entries.queue.add(_entry('voice'));
+        app.entries.changed();
+        await tester.pumpAndSettle();
+        expect(
+          sheets(),
+          findsOneWidget,
+          reason: 'exactly one capture sheet: no second voice sheet',
+        );
+        expect(find.byType(BottomSheet), findsOneWidget);
+        expect(words(), findsNothing, reason: 'the typing sheet closed');
+        expect(
+          find.text(es.recordingKept).hitTestable(),
+          findsOneWidget,
+          reason: 'the paused voice sheet shows',
+        );
+        expect(app.entries.acknowledged, hasLength(3));
+        expect(app.entries.queue, isEmpty);
+        expect(
+          app.recorders,
+          hasLength(built),
+          reason: 'no sheet was built for the VOICE entry',
+        );
+        expect(
+          [for (final recorder in app.recorders) recorder.starts],
+          [1, for (var i = 1; i < built; i++) 0],
+          reason: 'one recorder, started once: no second recording',
+        );
+        expect(app.recorders.first.stops, 1, reason: 'still paused');
+        expect(app.speech.starts, 1, reason: 'no second listening');
+        expect(
+          find.text(es.captureKeepQuestion),
+          findsNothing,
+          reason: 'no keep-or-discard question',
+        );
+        final kept = app.store.sessions[capture.id]!;
+        expect(kept.status, isNot('discarded'));
+        expect(kept.terminal, isFalse);
+        expect(kept.audioPath, capture.audioPath);
+        expect(find.byType(CalendarScreen).hitTestable(), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }
 
 Map<String, dynamic> _found(String title) => {
@@ -2889,14 +4421,19 @@ class _App {
     this.api,
     this.tasks,
     this.speech,
-    this.entries,
-  );
+    this.entries, {
+    this.recorders = const [],
+  });
   final ProviderContainer container;
   final _Captures store;
   final _Api api;
   final _Tasks tasks;
   final _Speech speech;
   final _Entries entries;
+
+  /// The recorders the sheets opened, in order, when [open] was asked to
+  /// [record].
+  final List<_Recorder> recorders;
 
   /// [freeLeft] gives the account this month's free dictations left, as the
   /// server counts them; without it the server sends no count.
@@ -2912,6 +4449,8 @@ class _App {
     List<Map<String, Object>> entries = const [],
     bool settle = true,
     Size size = const Size(390, 844),
+    bool record = false,
+    Object? speechStartError,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -2919,7 +4458,8 @@ class _App {
     final store = _Captures();
     final api = _Api();
     final tasks = _Tasks();
-    final speech = _Speech();
+    final speech = _Speech()..startError = speechStartError;
+    final recorders = <_Recorder>[];
     final outside = _Entries(tester, [...entries]);
     final container = ProviderContainer(
       overrides: [
@@ -2950,7 +4490,15 @@ class _App {
         themeStoreProvider.overrideWithValue(MemoryThemeStore()),
         captureStoreProvider.overrideWithValue(store),
         nativeSpeechProvider.overrideWithValue(speech),
-        captureRecorderFactoryProvider.overrideWithValue(SilentRecorder.new),
+        captureRecorderFactoryProvider.overrideWithValue(
+          record
+              ? () {
+                  final recorder = _Recorder();
+                  recorders.add(recorder);
+                  return recorder;
+                }
+              : SilentRecorder.new,
+        ),
         captureEntriesProvider.overrideWithValue(outside.entries),
         if (clock != null) calendarClockProvider.overrideWithValue(() => clock),
       ],
@@ -2981,7 +4529,15 @@ class _App {
       outside.changed();
       await wait();
     }
-    return _App(container, store, api, tasks, speech, outside);
+    return _App(
+      container,
+      store,
+      api,
+      tasks,
+      speech,
+      outside,
+      recorders: recorders,
+    );
   }
 }
 
@@ -3114,9 +4670,10 @@ class _Captures extends CaptureStore {
     String? id,
     String? language,
   }) async {
+    final key = id ?? 'capture-${_next++}';
     final session = CaptureSession(
       language: language,
-      id: id ?? 'capture-${_next++}',
+      id: key,
       ownerKey: ownerKey,
       timezone: timezone,
       capturedAt: (now ?? DateTime.now()).toUtc(),
@@ -3125,9 +4682,19 @@ class _Captures extends CaptureStore {
       projectId: projectId,
       source: source,
       day: day,
+      // A recording's capture keeps its audio, as the phone's store does.
+      audioPath: audio ? _audioPath(key) : null,
     );
     return sessions[session.id] = session;
   }
+
+  static String _audioPath(String id) => '/synthetic/$id.wav';
+
+  @override
+  Future<String> audioPathForId(String id) async => _audioPath(id);
+
+  @override
+  Future<void> removeAudioFile(String id) async {}
 
   @override
   Future<CaptureSession?> acceptEntry(
@@ -3209,6 +4776,10 @@ class _Speech extends NativeSpeech {
   final _events = StreamController<SpeechEvent>.broadcast(sync: true);
   int starts = 0;
   int? _run;
+
+  /// What a start throws, if anything: the phone can't listen by itself,
+  /// so the sheet listens online.
+  Object? startError;
   @override
   Future<SpeechCapability> capability({String? language}) async =>
       const SpeechCapability(
@@ -3228,6 +4799,8 @@ class _Speech extends NativeSpeech {
   }) async {
     starts++;
     _run = id;
+    final error = startError;
+    if (error != null) throw error;
   }
 
   void send(String kind, {String? text, String? error}) =>
@@ -3239,4 +4812,49 @@ class _Speech extends NativeSpeech {
 
   @override
   Future<void> cancel(int id) async {}
+}
+
+/// The app's own recorder, for online listening: it records until stopped,
+/// and the test sends the levels it measures.
+class _Recorder extends Fake implements AudioRecorder {
+  final _states = StreamController<RecordState>.broadcast(sync: true);
+  // Its cancel completes in the test's zone, as the plugin's does.
+  final _levels = StreamController<Amplitude>(onCancel: () async {});
+  int starts = 0;
+  int stops = 0;
+  bool recording = false;
+
+  /// The recorder measures [level] dBFS: someone speaking.
+  void hear({double level = -20}) =>
+      _levels.add(Amplitude(current: level, max: level));
+
+  @override
+  Stream<RecordState> onStateChanged() => _states.stream;
+  @override
+  Stream<Amplitude> onAmplitudeChanged(Duration interval) => _levels.stream;
+  @override
+  Future<bool> hasPermission({bool request = true}) async => true;
+  @override
+  Future<void> start(RecordConfig config, {required String path}) async {
+    starts++;
+    recording = true;
+  }
+
+  @override
+  Future<bool> isPaused() async => false;
+  @override
+  Future<bool> isRecording() async => recording;
+  @override
+  Future<String?> stop() async {
+    stops++;
+    recording = false;
+    _states.add(RecordState.stop);
+    return null;
+  }
+
+  @override
+  Future<void> dispose() async {
+    await _levels.close();
+    await _states.close();
+  }
 }

@@ -366,7 +366,7 @@ void main() {
     expect(api.meRequests, 1);
     expect(c.read(authProvider).account!.storage!.usedBytes, 82 * _megabyte);
     expect(c.read(taskRepositoryProvider), same(repository));
-    expect(find.text('Files: 82 of 100 MB used'), findsOneWidget);
+    expect(find.text('Files: 82 of 100 MB used'), findsOneWidget);
     expect(find.text(en.storageUsage(82, 100)).hitTestable(), findsOneWidget,
         reason: 'the usage line shows where the user is');
     expect(

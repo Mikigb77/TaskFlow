@@ -359,7 +359,7 @@ void main() {
   );
 
   testWidgets(
-    'UX-461: a first capture’s Cancelar during Entendiendo… still closes the sheet, and the capture is pending once understood',
+    'UX-2102: a first capture’s Cancelar during Entendiendo… asks, and Conservar closes the sheet with the capture pending once understood',
     (tester) async {
       final app = await _App.open(tester);
       app.api.found = [_found('Comprar pan')];
@@ -374,6 +374,9 @@ void main() {
       expect(find.text(es.captureUnderstanding), findsOneWidget);
 
       await tester.tap(find.widgetWithText(TextButton, es.cancel));
+      await frames(tester);
+      expect(find.text(es.captureKeepQuestion), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, es.keep));
       await tester.pumpAndSettle();
       expect(find.text(es.captureUnderstanding), findsNothing);
       expect(find.byType(AlertDialog), findsNothing);
@@ -469,7 +472,9 @@ void main() {
 
       await tester.tap(start);
       await frames(tester);
-      expect(app.speech.starts, 3, reason: 'Empezar a hablar listens at once');
+      // With TalkBack the microphone opens a second after `Escuchando`.
+      await tester.pump(const Duration(seconds: 1));
+      expect(app.speech.starts, 3, reason: 'Empezar a hablar listens');
       app.speech.send('ready');
       await frames(tester);
       expect(find.text(es.listeningSeconds('00:00')), findsOneWidget);
@@ -685,7 +690,7 @@ void main() {
   );
 
   testWidgets(
-    'UX-605: with every batch card removed, Back closes the sheet with no question and nothing is pending',
+    'UX-605 / P275: with a batch card removed, the task left is a single result, dropped with Cancelar → Descartar; the sheet closes and nothing is pending',
     (tester) async {
       final app = await _App.open(tester);
       final session = _spoken(app, 'Comprar pan', null);
@@ -702,25 +707,21 @@ void main() {
         ),
       );
       expect(app.store.pendingIds, hasLength(1));
-      // ✕ on the first card; the one left shows as a single result, removed
-      // with Quitar under Más opciones.
+      // ✕ on the first card; the one left shows as a single result, whose
+      // only way out is Cancelar (P275: no Quitar under Más opciones).
       await tester.tap(find.byTooltip(es.removeCaptureItem('Comprar pan')));
       await tester.pumpAndSettle();
       // Past the `Quitada` message, which sits over the card.
       await tester.pump(const Duration(seconds: 11));
       await tester.pumpAndSettle();
-      final options = find.byKey(const ValueKey('draft-options-b'));
-      await tester.ensureVisible(options);
+      expect(
+        find.byTooltip(es.removeCaptureItem('Llamar a mamá')),
+        findsNothing,
+      );
+      await tester.tap(resultButton(es.cancel));
       await tester.pumpAndSettle();
-      await tester.tap(options);
-      await tester.pumpAndSettle();
-      final remove = find.widgetWithText(TextButton, es.reviewRemove);
-      await tester.ensureVisible(remove);
-      await tester.pumpAndSettle();
-      await tester.tap(remove);
-      await tester.pumpAndSettle();
-      expect(find.text(es.captureNothingToReview), findsOneWidget);
-      await tester.binding.handlePopRoute();
+      expectKeepQuestion(tester);
+      await tester.tap(find.widgetWithText(TextButton, es.discard));
       await tester.pumpAndSettle();
       expect(dialog(), findsNothing);
       expect(find.byType(BottomSheet), findsNothing);

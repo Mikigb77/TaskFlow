@@ -452,6 +452,7 @@ Near midnight the daily refusal's wait is short: 30 seconds before 00:00 UTC it 
 - **Older entries** were recorded before the server kept the assignee: they have neither field, and the app keeps today's sentence for them. Other actions never have them.
 - The server records the new assignee's id in the event's `details` as `assignee_id` when the assignment happens (`core/collaboration.py`), never the name. So the name shown is today's, like `actor_name`, and deleting that account clears the id with the rest of its activity (`docs/ACCOUNT_DELETION.md`).
 - Someone who assigns a task to themselves is both `actor_name` and `assignee_name`.
+- **What an update changed (UX-2508, 2026-10-31):** an entry whose `action` is `"updated"` also has `fields`, the task fields it changed (as `core/collaboration.py` records them: `title`, `scheduled_date`, `due_date`, `notes` and so on). The app says «Ana ha movido: …» when they're only the day or the time. Older entries have no `fields`, and keep «ha actualizado».
 
 Code: `NotificationSerializer` in `core/group_views.py`. Tests: `core/test_assignment_activity.py`.
 

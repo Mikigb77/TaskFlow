@@ -14,6 +14,8 @@ import 'package:agenda/services/reminder_engine.dart';
 import 'package:agenda/services/reminder_plans.dart';
 import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/services/task_database.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'
+    show AndroidNotificationAction;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -1208,6 +1210,220 @@ void main() {
         isNull,
       );
     });
+  });
+
+  // ---- 2026-10-28-app · P271 (UX-2403, D9): a reader's reminders never
+  // offer «Completar», and a «Completar» left in the shade writes nothing ----
+
+  group('P271 · a reader’s reminders', () {
+    final es = lookupAppLocalizations(const Locale('es'));
+    const reader = 'http://reader.test/users/1';
+    const choir = '91111111-1111-4111-8111-111111111111';
+
+    setUp(() async {
+      await ReminderPreferenceStore(database).write(
+        reader,
+        const ReminderPreferences(
+          enabled: true,
+          dateOnlyTime: 540,
+          asked: true,
+        ),
+      );
+      await (await database.database).insert('task_lists', {
+        'id': choir,
+        'name': 'Coro',
+        'owner_key': reader,
+        'role': 'editor',
+        'shared': 1,
+      });
+      await engine.activate(reader);
+    });
+
+    /// [task] in «Coro» for «Todos», saved and sent, where this account is
+    /// [role].
+    Future<Task> inChoir(Task task, {String role = 'viewer'}) async {
+      final sql = await database.database;
+      final id = await database.insertTask(
+        task.copyWith(listId: choir, assignment: 'group'),
+        ownerKey: reader,
+      );
+      await sql.update(
+        'tasks',
+        {'sync_pending': 0},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      await sql.update(
+        'task_lists',
+        {'role': role},
+        where: 'id = ? AND owner_key = ?',
+        whereArgs: [choir, reader],
+      );
+      return (await database.getTasks(
+        ownerKey: reader,
+      )).singleWhere((t) => t.id == id);
+    }
+
+    /// The choir rehearsal today at 19:00, with a reminder 10 minutes before.
+    final rehearsal = Task(
+      title: 'Ensayo del coro',
+      priority: 1,
+      dueDate: DateTime(2026, 10, 22, 19),
+      hasTime: true,
+      reminderMinutes: 10,
+    );
+
+    List<String> actionIds(PlannedReminder reminder) => [
+      for (final action
+          in reminderNotificationDetails(reminder).android!.actions ??
+              const <AndroidNotificationAction>[])
+        action.id,
+    ];
+    List<String> actionTitles(PlannedReminder reminder) => [
+      for (final action
+          in reminderNotificationDetails(reminder).android!.actions ??
+              const <AndroidNotificationAction>[])
+        action.title,
+    ];
+    Iterable<PlannedReminder> of(Task task) =>
+        driver.pending.values.where((r) => r.taskId == task.id);
+
+    test(
+      'UX-2403: a reader’s single reminder on a «Todos» task offers only «Posponer 10 min»',
+      () async {
+        final task = await inChoir(rehearsal);
+        await engine.reconcile(reader);
+        final single = of(task).single;
+        expect(single.when, DateTime(2026, 10, 22, 18, 50));
+        expect(actionIds(single), ['snooze']);
+        expect(actionTitles(single), [es.notificationSnooze]);
+        expect(
+          reminderNotificationDetails(single).iOS!.categoryIdentifier,
+          isNot(anyOf('task_es', 'plan_es')),
+          reason: 'an iOS category with no «complete»',
+        );
+      },
+    );
+
+    test(
+      'UX-2403: a reader’s plan notices on a «Todos» task have no button',
+      () async {
+        final task = await inChoir(presentation());
+        await engine.reconcile(reader);
+        final notices = of(task).toList();
+        expect(notices, isNotEmpty);
+        for (final notice in notices) {
+          expect(ReminderEngine.isPlanAlert(notice.identity), isTrue);
+          if (ReminderEngine.isPlanDayAlert(notice.identity)) continue;
+          expect(actionIds(notice), isEmpty, reason: notice.body);
+          expect(
+            reminderNotificationDetails(notice).iOS!.categoryIdentifier,
+            isNull,
+            reason: notice.body,
+          );
+        }
+      },
+    );
+
+    test(
+      'UX-2403: an editor’s are unchanged: «Completar» and «Posponer 10 min» on a single reminder, «Completar» on a plan notice',
+      () async {
+        final single = await inChoir(rehearsal, role: 'editor');
+        final planned = await inChoir(presentation(), role: 'editor');
+        await engine.reconcile(reader);
+        expect(actionIds(of(single).single), ['complete', 'snooze']);
+        expect(actionTitles(of(single).single), [
+          es.notificationComplete,
+          es.notificationSnooze,
+        ]);
+        expect(
+          reminderNotificationDetails(
+            of(single).single,
+          ).iOS!.categoryIdentifier,
+          'task_es',
+        );
+        final notices = of(
+          planned,
+        ).where((r) => !ReminderEngine.isPlanDayAlert(r.identity));
+        expect(notices, isNotEmpty);
+        for (final notice in notices) {
+          expect(actionIds(notice), ['complete'], reason: notice.body);
+        }
+      },
+    );
+
+    test(
+      'UX-2403: «Completar» on a reader’s reminder still in the shade returns false; the task is unchanged and not pending',
+      () async {
+        // Rung while this account could still edit; a reader since.
+        final task = await inChoir(rehearsal, role: 'editor');
+        await engine.reconcile(reader);
+        now = DateTime(2026, 10, 22, 18, 50);
+        driver.ring(now);
+        final alert = driver.shade.entries.singleWhere(
+          (entry) => entry.value.taskId == task.id,
+        );
+        final sql = await database.database;
+        await sql.update(
+          'task_lists',
+          {'role': 'viewer'},
+          where: 'id = ? AND owner_key = ?',
+          whereArgs: [choir, reader],
+        );
+        final before = (await sql.query(
+          'tasks',
+          where: 'id = ?',
+          whereArgs: [task.id],
+        )).single;
+        final token =
+            (await sql.query(
+                  'reminder_state',
+                  where: 'id = ?',
+                  whereArgs: [alert.key],
+                )).single['token']
+                as String?;
+
+        expect(
+          await engine.action(alert.key, 'complete', token: token),
+          isFalse,
+        );
+        expect(await engine.action(alert.key, 'complete'), isFalse);
+        final after = (await sql.query(
+          'tasks',
+          where: 'id = ?',
+          whereArgs: [task.id],
+        )).single;
+        expect(after, before, reason: 'nothing written');
+        expect(after['isCompleted'], 0);
+        expect(after['sync_pending'], 0);
+        expect(await database.pending(reader), isEmpty);
+        expect(
+          driver.shown.values.whereType<String>(),
+          isEmpty,
+          reason: 'no «Completada» line with Deshacer',
+        );
+      },
+    );
+
+    test(
+      'UX-2403: for an editor, «Completar» from the same notice still completes the task',
+      () async {
+        final task = await inChoir(rehearsal, role: 'editor');
+        await engine.reconcile(reader);
+        now = DateTime(2026, 10, 22, 18, 50);
+        driver.ring(now);
+        final alert = driver.shade.entries.singleWhere(
+          (entry) => entry.value.taskId == task.id,
+        );
+        expect(await engine.action(alert.key, 'complete'), isTrue);
+        expect(
+          (await database.getTasks(
+            ownerKey: reader,
+          )).singleWhere((t) => t.id == task.id).isCompleted,
+          isTrue,
+        );
+      },
+    );
   });
 }
 

@@ -11,6 +11,8 @@ import 'package:agenda/services/attachment_store.dart';
 import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
+import 'package:agenda/widgets/reminder_control.dart';
+import 'package:agenda/widgets/task_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -39,6 +41,7 @@ const projectPage = Screen(
   'A project\'s page (Tareas filtered to one project)',
   sources: [
     'lib/screens/home_screen.dart',
+    'lib/screens/task_lists_screen.dart',
     'lib/widgets/project_scope_control.dart',
     'lib/widgets/project_preferences.dart',
     'lib/widgets/task_tile.dart',
@@ -159,6 +162,53 @@ Future<void> _openProject(PreviewApp app, String id) async {
   await app.pushPage(HomeScreen(isRoot: false, listId: id));
 }
 
+/// «Pagar la luz», today at 09:50 with «10 minutos antes», opened at 09:41:
+/// its alert rang at 09:40, or, [snoozed] then, rings again at 09:51.
+Future<void> _rangAlert(Preview p, {bool snoozed = false}) async {
+  final due = day(0, 9, 50);
+  final rang = day(0, 9, 40);
+  final again = day(0, 9, 51);
+  final app = await PreviewApp.open(
+    p,
+    tasks: [
+      ...normalDay(),
+      Task(
+        id: 78,
+        title: 'Pagar la luz',
+        dueDate: due,
+        hasTime: true,
+        priority: 1,
+        reminderMinutes: 10,
+      ),
+    ],
+    projects: allProjects,
+    reminders: const ReminderPreferences(enabled: true, asked: true),
+    // As the reminder engine keeps it: a snooze sets the alert again at its
+    // own time.
+    phoneAlerts: [
+      {
+        'identity': 'owner/task/78/once',
+        'task_id': 78,
+        'occurrence': null,
+        'due_at': due.toIso8601String(),
+        'fire_at': (snoozed ? again : rang).toUtc().toIso8601String(),
+        'status': snoozed ? 'scheduled' : 'elapsed',
+        'error': null,
+        'snooze_at': snoozed ? again.toUtc().toIso8601String() : null,
+      },
+    ],
+  );
+  await app.push('/taskDetails', arguments: 78);
+  // The chip in view, below the date at large text.
+  await p.tester.scrollUntilVisible(
+    find.byType(ReminderChip),
+    200,
+    scrollable: app.mainScroll(),
+  );
+  await p.tester.pumpAndSettle();
+  await p.shoot();
+}
+
 /// Tasks for the many-people project, given to several of them.
 List<Task> _excursionTasks() => [
   Task(
@@ -252,6 +302,68 @@ void tasksPreviews() {
       },
     );
 
+    preview(
+      tasksTab,
+      'deadline-passed',
+      'An overdue row whose deadline passed three days ago, among today\'s: it reads «Venció el <date>» once, in the row\'s usual grey, with «Prioridad alta».',
+      [es1, es2, ca1, ca2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [
+            ...normalDay(),
+            Task(
+              id: 90,
+              title: 'Entregar la declaración de la renta',
+              dueDate: day(-4),
+              hasTime: false,
+              deadline: day(-3),
+              priority: 3,
+            ),
+          ],
+          projects: allProjects,
+        );
+        await app.tab(p.l.tasks);
+        // The row at the top of the view: at 2× the header fills the screen.
+        final row = find.widgetWithText(
+          TaskTile,
+          'Entregar la declaración de la renta',
+        );
+        await p.tester.scrollUntilVisible(
+          row,
+          200,
+          scrollable: app.mainScroll(),
+        );
+        await Scrollable.ensureVisible(p.tester.element(row));
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      tasksTab,
+      'no-match',
+      'A search that finds nothing, «dentista»: «No hay tareas que coincidan…», and the ✕ at the search\'s end that empties it in one tap.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: busyDay(),
+          projects: allProjects,
+        );
+        await app.tab(p.l.tasks);
+        await p.tester.enterText(
+          find.widgetWithText(TextField, p.l.findTask),
+          'dentista',
+        );
+        await p.tester.pumpAndSettle();
+        // The keyboard down, so the empty state shows under the search.
+        FocusManager.instance.primaryFocus?.unfocus();
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
     // ------------------------------------------------------ project page
     preview(
       projectPage,
@@ -328,7 +440,7 @@ void tasksPreviews() {
     preview(
       projectPage,
       'personal',
-      'A personal project, «Casa»: no people.',
+      'A personal project, «Casa»: no people; its ⋮ («Gestionar Casa») open, with what Proyectos ⋮ offers for it but «Compartir proyecto», the page’s own button, and «Fijar proyecto», which only reorders Proyectos: Editar, Archivar and Eliminar proyecto.',
       [es1],
       (p) async {
         final app = await PreviewApp.open(
@@ -345,6 +457,32 @@ void tasksPreviews() {
           projects: allProjects,
         );
         await _openProject(app, 'casa');
+        await p.tester.tap(find.byTooltip(p.l.manageItem('Casa')));
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      projectPage,
+      'empty',
+      'A new personal project, «Huerto», with nothing in it yet: no search, only what to do next and «Añadir tarea».',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          projects: [
+            ...allProjects,
+            TaskListInfo(
+              id: 'huerto',
+              name: 'Huerto',
+              color: 'amber',
+              version: 1,
+            ),
+          ],
+        );
+        await _openProject(app, 'huerto');
         await p.shoot();
       },
     );
@@ -437,6 +575,25 @@ void tasksPreviews() {
 
     preview(
       detail,
+      'responsible-sheet',
+      'The same task, its person chip «Ana» tapped: «¿Quién es responsable?» '
+          'opens with its heading, then «Todos» and each person who can edit '
+          '(María, yours, «· Yo»; Ana, chosen, with its ✓; Paul).',
+      [es1, ca2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), ...sharedProjectTasks()],
+          projects: allProjects,
+        );
+        await app.push('/taskDetails', arguments: 31);
+        await app.tap('Ana');
+        await p.shoot();
+      },
+    );
+
+    preview(
+      detail,
       'full',
       'A task with a day and time, repeat, reminder, notes and steps.',
       [es1, esDark],
@@ -506,6 +663,44 @@ void tasksPreviews() {
           scrollable: app.mainScroll(),
         );
         await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      detail,
+      'remove-file',
+      'After «Quitar archivo» on a task’s uploaded file: «¿Quitar este archivo de la tarea?», the file’s name, that it leaves the task and the other devices while the original file stays, «Cancelar» and «Quitar archivo» in the error colour.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), ..._fileTasks()],
+          projects: [...allProjects, _choir],
+          overrides: [
+            taskRepositoryProvider.overrideWithValue(_FileTasks(_fileUsage)),
+            attachmentEntriesProvider.overrideWith(
+              (ref, taskId) async => [
+                if (taskId == 80)
+                  const AttachmentEntry(
+                    'Billetes de avión.pdf',
+                    '/preview/billetes.pdf',
+                    true,
+                    item: TaskAttachment(
+                      id: 'billetes',
+                      taskId: 'viaje',
+                      name: 'Billetes de avión.pdf',
+                      size: 2 * _megabyte,
+                      sha256: '',
+                      remote: true,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        );
+        await app.push('/taskDetails', arguments: 80);
+        await app.tap(p.l.fileRemove);
         await p.shoot();
       },
     );
@@ -633,6 +828,92 @@ void tasksPreviews() {
       },
     );
 
+    preview(
+      detail,
+      'alert-rang',
+      'Opened from its notice at 09:41: «Pagar la luz», today at 09:50 with «10 minutos antes», rang at 09:40. The chip, with the usual bell, reads «Recordatorio enviado: hoy, 09:40»; a tap opens the reminder choices.',
+      [es1, ca2],
+      (p) async {
+        await _rangAlert(p);
+      },
+    );
+
+    preview(
+      detail,
+      'alert-snoozed',
+      'The same task after «Posponer 10 min» at 09:41: the chip, with the usual bell, reads «Recordatorio pospuesto: hoy, 09:51» until the snoozed notice rings.',
+      [es1, ca2],
+      (p) async {
+        await _rangAlert(p, snoozed: true);
+      },
+    );
+
+    preview(
+      detail,
+      'reader',
+      'A «Todos» task in Ana’s «Coro», where this account is «lector», as it opens: «Solo puedes ver esta tarea y elegir tus recordatorios.», no ✏, 🗑 or bottom bar, and (in view at 1×) the chip «Recordatorio: 10 minutos antes», which opens this account’s own reminder choices.',
+      [es1, ca2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [
+            ...normalDay(),
+            Task(
+              id: 79,
+              title: 'Ensayo del coro',
+              dueDate: day(1, 19),
+              priority: 1,
+              listId: 'coro',
+              assignment: 'group',
+              reminderMinutes: 10,
+            ),
+          ],
+          projects: [...allProjects, _choirToView],
+          reminders: const ReminderPreferences(enabled: true, asked: true),
+        );
+        await app.push('/taskDetails', arguments: 79);
+        await p.shoot();
+        // The chip in view, below the date at large text.
+        await p.tester.scrollUntilVisible(
+          find.byType(ReminderChip),
+          200,
+          scrollable: app.mainScroll(),
+        );
+        await p.tester.pumpAndSettle();
+        await p.shoot('reader-chip');
+      },
+      then: {
+        'reader-chip':
+            'The same page scrolled to its reminder chip, «Recordatorio: 10 minutos antes», drawn as a button with its outline.',
+      },
+    );
+
+    preview(
+      detail,
+      'labels',
+      'A task with two labels and a day but no time: the labels read as one grey line, «#casa · #recados», with no outline; the day is one row, «Planificado para» over the date, with no «Hora» row.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [
+            ...normalDay(),
+            Task(
+              id: 78,
+              title: 'Comprar bombillas',
+              dueDate: day(2),
+              hasTime: false,
+              priority: 1,
+              labels: ['casa', 'recados'],
+            ),
+          ],
+          projects: allProjects,
+        );
+        await app.push('/taskDetails', arguments: 78);
+        await p.shoot();
+      },
+    );
+
     // --------------------------------------------------- tasks with files
     preview(
       tasksWithFiles,
@@ -693,10 +974,16 @@ void tasksPreviews() {
       },
     );
 
-    preview(projects, 'empty', 'No projects yet.', [es1], (p) async {
-      final app = await PreviewApp.open(p, tasks: normalDay());
-      await app.push('/lists');
-      await p.shoot();
-    });
+    preview(
+      projects,
+      'empty',
+      'No projects yet: no «Grupos» until something is shared.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(p, tasks: normalDay());
+        await app.push('/lists');
+        await p.shoot();
+      },
+    );
   });
 }

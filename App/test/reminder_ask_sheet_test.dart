@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/main.dart';
@@ -14,10 +15,12 @@ import 'package:agenda/screens/notes_screen.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/feedback_timeout.dart';
+import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/task_editor.dart';
 import 'package:agenda/widgets/task_tile.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -713,7 +716,7 @@ void main() {
     }
 
     testWidgets(
-      'UX-448: ticking the just-saved task keeps Tarea completada and Deshacer free of the sheet; the next dated save asks',
+      'UX-448: ticking the just-saved task keeps its completion message and Deshacer free of the sheet; the next dated save asks',
       (tester) async {
         final store = MemoryReminderStore();
         final access = FakeReminderAccess();
@@ -736,7 +739,8 @@ void main() {
               .isCompleted,
           isTrue,
         );
-        expect(find.text(l.taskCompleted).hitTestable(), findsOneWidget);
+        // The day's only task: its tick says the day is clear (WD34).
+        expect(find.text(l.dayAllClear).hitTestable(), findsOneWidget);
         expect(find.text(l.undo).hitTestable(), findsOneWidget);
         expect(sheet(), findsNothing);
         expect(question(l), findsNothing);
@@ -1313,6 +1317,280 @@ void main() {
       },
     );
   });
+
+  group('P272 · allowing notifications in Android finishes the job', () {
+    void leaveApp(WidgetTester tester) {
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+    }
+
+    void returnToApp(WidgetTester tester) {
+      for (final state in [
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+    }
+
+    /// The first dated save → «Sí, recuérdamelo» → Android's «No permitir»
+    /// → the message's «Permitir avisos», which opens the notifications
+    /// page; the person is now in Android's settings.
+    Future<void> refuseThenAllowNotifications(
+      WidgetTester tester,
+      MemoryReminderStore store,
+      _CountingAccess access,
+    ) async {
+      final l = strings(tester);
+      await typeDatedTask(tester, 'Comprar pan');
+      await letSaveMessageClose(tester);
+      expect(question(l), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, l.reminderAskYes));
+      await tester.pumpAndSettle();
+      expect(access.permissionRequests, 1);
+      expect(store.value.enabled, isFalse);
+      expect(
+        find.descendant(
+          of: find.byType(SnackBar),
+          matching: find.text(l.notificationPermissionOff),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.widgetWithText(SnackBarAction, l.allowNotifications),
+      );
+      await tester.pump();
+      expect(access.notificationSettingsOpened, 1);
+      leaveApp(tester);
+      await tester.pump();
+    }
+
+    for (final chosen in [null, 600]) {
+      testWidgets(
+        'UX-2601: Sí → No permitir → Permitir avisos → allowed in Android → back: reminders on, ${chosen == null ? '9:00' : 'the time already chosen'} for tasks without a time, asked, alerts set, and Listo. Recordatorios activados.',
+        (tester) async {
+          final store = MemoryReminderStore(
+            ReminderPreferences(dateOnlyTime: chosen),
+          );
+          final access = _CountingAccess();
+          await openApp(tester, store, access);
+          final l = strings(tester);
+          await refuseThenAllowNotifications(tester, store, access);
+
+          // In Android's page, the person switches notifications on.
+          access.allowed = true;
+          final reconcilesBefore = access.reconciles;
+          returnToApp(tester);
+          await tester.pumpAndSettle();
+
+          expect(store.value.enabled, isTrue);
+          expect(store.value.dateOnlyTime, chosen ?? 540);
+          expect(store.value.asked, isTrue);
+          expect(access.reconciles, greaterThan(reconcilesBefore));
+          expect(
+            find.descendant(
+              of: find.byType(SnackBar),
+              matching: find.text(l.remindersOnConfirmation),
+            ),
+            findsOneWidget,
+          );
+          expect(find.text(l.notificationPermissionOff), findsNothing);
+          // Exact alarms are allowed here: no sheet about them.
+          expect(find.text(l.exactAlarmsNextScreen), findsNothing);
+          expect(access.permissionRequests, 1);
+
+          // Done, so forgotten: a later trip out and back says nothing.
+          await tester.pump(FeedbackTimeout.defaultDuration);
+          await tester.pumpAndSettle();
+          expect(find.byType(SnackBar), findsNothing);
+          leaveApp(tester);
+          await tester.pump();
+          returnToApp(tester);
+          await tester.pumpAndSettle();
+          expect(find.byType(SnackBar), findsNothing);
+          expect(store.value.enabled, isTrue);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2601: back from Android still refusing: preferences unchanged, no second message, and the request is forgotten',
+      (tester) async {
+        final store = MemoryReminderStore();
+        final access = _CountingAccess();
+        await openApp(tester, store, access);
+        final l = strings(tester);
+        await refuseThenAllowNotifications(tester, store, access);
+        final before = store.value;
+
+        // The person comes back without switching notifications on.
+        returnToApp(tester);
+        await tester.pumpAndSettle();
+        expect(store.value.enabled, before.enabled);
+        expect(store.value.enabled, isFalse);
+        expect(store.value.dateOnlyTime, before.dateOnlyTime);
+        expect(store.value.leadMinutes, before.leadMinutes);
+        expect(store.value.asked, before.asked);
+        expect(find.byType(SnackBar), findsNothing);
+        expect(find.text(l.notificationPermissionOff), findsNothing);
+        expect(find.text(l.remindersOnConfirmation), findsNothing);
+        expect(access.permissionRequests, 1);
+        expect(access.notificationSettingsOpened, 1);
+
+        // Forgotten: allowing later, outside the app, and coming back
+        // turns nothing on by itself.
+        leaveApp(tester);
+        await tester.pump();
+        access.allowed = true;
+        returnToApp(tester);
+        await tester.pumpAndSettle();
+        expect(store.value.enabled, isFalse);
+        expect(store.value.dateOnlyTime, before.dateOnlyTime);
+        expect(find.byType(SnackBar), findsNothing);
+        expect(find.text(l.remindersOnConfirmation), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P293 (UX-2417): the plan offer
+  // keeps its date whole ----
+  group('P293 · the plan offer keeps its date whole', () {
+    DateTime dayAhead(int days) {
+      final now = DateTime.now();
+      return DateTime(now.year, now.month, now.day + days);
+    }
+
+    /// The edit form of task 90, its day moved from 20 to 21 days away and
+    /// saved, with reminders on: the offer comes once the message has gone.
+    Future<void> moveAndSave(WidgetTester tester) async {
+      unawaited(
+        tester
+            .state<NavigatorState>(find.byType(Navigator).first)
+            .pushNamed('/editTask', arguments: 90),
+      );
+      await tester.pumpAndSettle();
+      final date = find.byKey(const ValueKey('task-date'));
+      await tester.ensureVisible(date);
+      await tester.pumpAndSettle();
+      await tester.tap(date);
+      await tester.pumpAndSettle();
+      final calendar = find.byType(CalendarDatePicker);
+      if (dayAhead(21).month != dayAhead(20).month) {
+        await tester.tap(
+          find.descendant(
+            of: calendar,
+            matching: find.byTooltip(
+              MaterialLocalizations.of(
+                tester.element(calendar),
+              ).nextMonthTooltip,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+      final target = find.descendant(
+        of: calendar,
+        matching: find.text('${dayAhead(21).day}'),
+      );
+      await tester.ensureVisible(target);
+      await tester.pumpAndSettle();
+      await tester.tap(target);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('schedule-done')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('task-save')));
+      await tester.pumpAndSettle();
+      await tester.pump(FeedbackTimeout.defaultDuration);
+      await tester.pumpAndSettle();
+    }
+
+    for (final (language, scale) in [('es', 1.0), ('ca', 2.0)]) {
+      for (final title in [
+        'Presentar el proyecto de empresa',
+        'Presentar el proyecto',
+        'Revisar el informe del trimestre',
+        'Presentar el proyecto de la empresa nueva',
+        'Llamar a Ana',
+      ]) {
+        testWidgets(
+          'UX-2417: reminders/offer.asked, $language at ${scale.toInt()}× on 360×800, «$title»: the day phrase never splits across lines, and TalkBack reads the whole line',
+          (tester) async {
+            await openApp(
+              tester,
+              MemoryReminderStore(const ReminderPreferences(enabled: true)),
+              FakeReminderAccess(allowed: true),
+              tasks: [
+                Task(
+                  id: 90,
+                  title: title,
+                  dueDate: dayAhead(20),
+                  hasTime: false,
+                  priority: 2,
+                ),
+              ],
+              language: language,
+              size: const Size(360, 800),
+              textScale: scale,
+            );
+            await moveAndSave(tester);
+            final line = find.descendant(
+              of: sheet(),
+              matching: find.byWidgetPredicate(
+                (widget) =>
+                    widget is Text &&
+                    (widget.semanticsLabel ?? '').startsWith('$title · '),
+              ),
+            );
+            expect(line, findsOneWidget, reason: 'the offer shows the task');
+            final context = tester.element(line);
+            final day = context.weekdayDate(dayAhead(21));
+            final full = tester.widget<Text>(line).semanticsLabel!;
+            expect(full, contains(day), reason: 'TalkBack reads the date');
+            expect(full, startsWith('$title · '));
+            final paragraph = tester.renderObject<RenderParagraph>(
+              find.descendant(of: line, matching: find.byType(RichText)),
+            );
+            final drawn = paragraph.text.toPlainText();
+            final bound = day.replaceAll(' ', ' ');
+            final start = drawn.indexOf(bound);
+            expect(
+              start,
+              greaterThanOrEqualTo(0),
+              reason: 'the date is drawn whole and bound: «$drawn»',
+            );
+            final tops = {
+              for (var i = start; i < start + bound.length; i++)
+                for (final box in paragraph.getBoxesForSelection(
+                  TextSelection(baseOffset: i, extentOffset: i + 1),
+                ))
+                  box.top.round(),
+            };
+            expect(tops, hasLength(1), reason: '«$day» on one line: «$drawn»');
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  });
+}
+
+/// P272: the phone refuses notifications until a test allows them, and
+/// counts each setting of the alerts.
+class _CountingAccess extends FakeReminderAccess {
+  _CountingAccess() : super(grant: false);
+  int reconciles = 0;
+  @override
+  Future<void> reconcile(String owner) async {
+    reconciles++;
+  }
 }
 
 class _GivenTasks extends DesignTaskNotifier {

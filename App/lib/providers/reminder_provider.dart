@@ -11,3 +11,10 @@ final reminderPreferencesProvider = FutureProvider<ReminderPreferences>((ref) =>
         .watch(reminderPreferenceStoreProvider)
         .read(ref.watch(taskRepositoryProvider).ownerKey));
 final reminderAccessProvider = Provider((ref) => const ReminderAccess());
+
+/// The accounts that asked for reminders on this phone, were refused by it
+/// and went by «Permitir avisos» to its notifications page. Each request
+/// settles once the person is back in the app: reminders on if the phone now
+/// allows them, nothing more if it still refuses. Forgotten either way.
+final reminderRequestsProvider =
+    Provider<Map<String, Future<void>>>((ref) => {});

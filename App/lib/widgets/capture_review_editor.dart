@@ -372,13 +372,18 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
   /// Tapping it opens the date sheet. TalkBack says what the line is:
   /// `Fecha y hora: Hoy`. A collapsed row for a task with only a deadline
   /// shows the deadline (`Vence jue, 12 nov`) instead of `Sin fecha`; the
-  /// opened card keeps `Sin fecha` with its deadline row under it.
+  /// opened card keeps `Sin fecha` with its deadline row under it. While
+  /// a question offering times is open, the line shows the day only: the
+  /// time is what it asks (UX-2212).
   Widget _dateLine({required bool main}) {
     final text = Theme.of(context).textTheme;
     final due = !main && task.dueDate == null && task.deadline != null;
+    final asking =
+        task.dueDate != null &&
+        _openQuestions('schedule').any((q) => q.times.isNotEmpty);
     final day = due
         ? taskDeadlineLabel(context, task)
-        : taskDayLine(context, task);
+        : taskDayLine(context, asking ? task.copyWith(hasTime: false) : task);
     return Semantics(
       label: '${context.l10n.reviewSchedule}: $day',
       button: true,
@@ -475,6 +480,7 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
+    final strings = MaterialLocalizations.of(context);
     final colors = Theme.of(context).colorScheme;
     final repairTitle = suggestTextEncodingRepair(task.title);
     final repairNotes = suggestTextEncodingRepair(task.notes ?? '');
@@ -626,7 +632,7 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
     );
     final optionsSummary = [
       if (task.priority > 1)
-        l.priorityValue(context.priorityName(task.priority)),
+        context.priorityPhrase(task.priority),
       if (task.isRecurring) context.repeatLabel(task),
     ];
     final repair = [
@@ -679,19 +685,35 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // The title opens the card to edit; TalkBack hears that it is
+              // collapsed, and what its tap does (UX-2211).
               Expanded(
-                child: TextButton(
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    alignment: Alignment.centerLeft,
-                    foregroundColor: colors.onSurface,
-                  ),
-                  onPressed: widget.enabled ? widget.onExpand : null,
-                  child: Text(
-                    task.title,
-                    style: Theme.of(context).textTheme.titleMedium,
+                child: MergeSemantics(
+                  child: Semantics(
+                    expanded: expanded,
+                    onTapHint: l.editTask,
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        alignment: Alignment.centerLeft,
+                        foregroundColor: colors.onSurface,
+                      ),
+                      onPressed: widget.enabled ? widget.onExpand : null,
+                      child: Text(
+                        task.title,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
                   ),
                 ),
+              ),
+              // The title ends 8 dp short of ✕ (UX-2205); a tap in between,
+              // aimed at the title's end, opens the card too, never removes.
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                excludeFromSemantics: true,
+                onTap: widget.enabled ? widget.onExpand : null,
+                child: const SizedBox(width: 8, height: 48),
               ),
               IconButton(
                 tooltip: l.removeCaptureItem(task.title),
@@ -748,9 +770,10 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
               maxLines: null,
               maxLength: 8000,
               textCapitalization: TextCapitalization.sentences,
+              // A note's text is «Tu nota», as in the form (UX-2207).
               decoration: InputDecoration(
-                labelText: l.notes,
-                hintText: l.addNotes,
+                labelText: task.isNote ? l.noteBody : l.notes,
+                hintText: task.isNote ? l.noteHint : l.addNotes,
                 filled: false,
                 border: fieldBorders.border,
                 disabledBorder: fieldBorders.border,
@@ -801,7 +824,7 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
                 if (task.priority > 1)
                   Chip(
                     label: Text(
-                      l.priorityValue(context.priorityName(task.priority)),
+                      context.priorityPhrase(task.priority),
                     ),
                   ),
                 if (task.isRecurring)
@@ -822,28 +845,39 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
           // The notes field's underline already separates it from the row,
           // when nothing else sits between them.
           if (!notesLast) const Divider(height: 1),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            key: ValueKey('draft-options-${widget.draft.id}'),
-            leading: const Icon(Icons.tune_rounded, size: 22),
-            title: Text(l.reviewOptions),
-            // Only what differs from the defaults; nothing when all are.
-            subtitle: reminderInOptions
-                ? Consumer(
-                    builder: (context, ref, _) => Text(
-                      [
-                        ...optionsSummary,
-                        reminderLine(context, ref, task)!.text,
-                      ].join(' · '),
-                    ),
-                  )
-                : optionsSummary.isEmpty
-                ? null
-                : Text(optionsSummary.join(' · ')),
-            trailing: Icon(
-              _options ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+          // Announced as ExpansionTile's header is: expanded or collapsed
+          // (UX-2211).
+          Semantics(
+            expanded: _options,
+            hint: _options ? strings.collapsedHint : strings.expandedHint,
+            onTapHint: _options
+                ? strings.expansionTileExpandedTapHint
+                : strings.expansionTileCollapsedTapHint,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              key: ValueKey('draft-options-${widget.draft.id}'),
+              leading: const Icon(Icons.tune_rounded, size: 22),
+              title: Text(l.reviewOptions),
+              // Only what differs from the defaults; nothing when all are.
+              subtitle: reminderInOptions
+                  ? Consumer(
+                      builder: (context, ref, _) => Text(
+                        [
+                          ...optionsSummary,
+                          reminderLine(context, ref, task)!.text,
+                        ].join(' · '),
+                      ),
+                    )
+                  : optionsSummary.isEmpty
+                  ? null
+                  : Text(optionsSummary.join(' · ')),
+              trailing: Icon(
+                _options
+                    ? Icons.expand_less_rounded
+                    : Icons.expand_more_rounded,
+              ),
+              onTap: () => setState(() => _options = !_options),
             ),
-            onTap: () => setState(() => _options = !_options),
           ),
           if (_options) ...[
             if (!showNotes)
@@ -870,11 +904,15 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
                     ? null
                     : (p) => _change(task.copyWith(priority: p)),
               ),
+              // With no day there is nothing to repeat yet: the row says so
+              // and opens the day first, as the no-day line does (UX-2620).
               _row(
                 Icons.repeat_rounded,
-                context.repeatLabel(task),
+                task.dueDate == null
+                    ? l.repeatNeedsDate
+                    : context.repeatLabel(task),
                 onTap: task.dueDate == null
-                    ? null
+                    ? (widget.enabled ? _schedule : null)
                     : () async {
                         final result = await editTaskRepeat(context, task);
                         if (result != null && mounted) _change(result);
@@ -900,11 +938,6 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
                     ? null
                     : (items) => _change(task.copyWith(checklist: items)),
               ),
-            TextButton.icon(
-              onPressed: widget.enabled ? widget.onRemove : null,
-              icon: const Icon(Icons.remove_circle_outline, size: 18),
-              label: Text(l.reviewRemove),
-            ),
           ],
         ] else ...[
           // A collapsed row: its title, its date line and ✕, with every open

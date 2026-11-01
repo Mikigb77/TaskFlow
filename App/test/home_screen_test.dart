@@ -27,6 +27,7 @@ import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/completed_tasks_screen.dart';
 import 'package:flutter/rendering.dart';
 import 'ux_previews/support/fixtures.dart' as fx;
+import 'support/search_clear.dart';
 
 final _project = TaskListInfo(id: 'school', name: 'Col·legi');
 
@@ -2092,7 +2093,8 @@ void main() {
             ProjectMember(id: 3, name: 'Luis', role: 'viewer'),
           ],
         ),
-      ]);
+        // A task to search for: an empty project's page has no search (P286).
+      ], tasks: [Task(id: 1, title: 'Comprar pan', priority: 1, listId: 'casa')]);
       final members = find.widgetWithText(
         TextButton,
         es.projectMembersCount(3),
@@ -2221,6 +2223,253 @@ void main() {
       },
     );
   }
+
+  group('P286 · a new project’s empty page shows no search', () {
+    const luis = ProjectMember(id: 3, name: 'Luis', role: 'editor');
+
+    /// Project 'p1''s page in Spanish at 360x740, over [notifier]'s tasks.
+    Future<void> openPage(
+      WidgetTester tester,
+      _GrowingTasks notifier,
+      TaskListInfo project,
+    ) async {
+      tester.view.physicalSize = const Size(360, 740);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final container = designContainer(
+        tasks: () => notifier,
+        projects: [project],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        _app(container, const HomeScreen(listId: 'p1', isRoot: false), 'es'),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    Finder search() => find.widgetWithText(TextField, es.findTask);
+
+    TaskListInfo huerto() =>
+        TaskListInfo(id: 'p1', name: 'Huerto', version: 1, color: 'amber');
+
+    testWidgets(
+      'UX-2517: a new project’s empty page has no Buscar una tarea…, only Un nuevo comienzo and what to do; the search appears with its first task',
+      (tester) async {
+        final tasks = _GrowingTasks();
+        await openPage(tester, tasks, huerto());
+        expect(search(), findsNothing);
+        expect(find.byType(TextField), findsNothing);
+        expect(find.byIcon(Icons.search_rounded), findsNothing);
+        expect(find.text(es.freshStart), findsOneWidget);
+        expect(find.text(es.listEmpty), findsOneWidget);
+
+        // Its first task, saved as the page stays open.
+        tasks.show([
+          Task(id: 1, title: 'Plantar tomates', priority: 1, listId: 'p1'),
+        ]);
+        await tester.pumpAndSettle();
+        expect(
+          find.widgetWithText(TaskTile, 'Plantar tomates'),
+          findsOneWidget,
+        );
+        expect(search(), findsOneWidget);
+        expect(search().hitTestable(), findsOneWidget);
+        expect(find.text(es.freshStart), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2517: a task in another project doesn’t bring the search to an empty project’s page',
+      (tester) async {
+        final tasks = _GrowingTasks([
+          Task(id: 1, title: 'Llamar al banco', priority: 1),
+          Task(id: 2, title: 'Pintar la valla', priority: 1, listId: 'p2'),
+        ]);
+        await openPage(tester, tasks, huerto());
+        expect(search(), findsNothing);
+        expect(find.text(es.freshStart), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2517: with a person chosen whose tasks there are none of, the page keeps its search',
+      (tester) async {
+        final tasks = _GrowingTasks([
+          Task(
+            id: 1,
+            title: 'Pintar la valla',
+            priority: 1,
+            listId: 'p1',
+            assignment: 'member',
+            assigneeId: 2,
+            assigneeName: 'Ana',
+          ),
+        ]);
+        await openPage(
+          tester,
+          tasks,
+          TaskListInfo(
+            id: 'p1',
+            name: 'Obra',
+            version: 2,
+            shared: true,
+            ownerId: 1,
+            people: const [me, ana, luis],
+          ),
+        );
+        expect(search(), findsOneWidget);
+        await tester.tap(find.widgetWithText(ChoiceChip, 'Luis').first);
+        await tester.pumpAndSettle();
+        expect(
+          find.widgetWithText(TaskTile, 'Pintar la valla'),
+          findsNothing,
+          reason: 'nothing for Luis',
+        );
+        expect(search(), findsOneWidget);
+        expect(find.text(es.freshStart), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2517: a search that finds nothing keeps the search field, with No hay tareas que coincidan',
+      (tester) async {
+        final tasks = _GrowingTasks([
+          Task(id: 1, title: 'Plantar tomates', priority: 1, listId: 'p1'),
+        ]);
+        await openPage(tester, tasks, huerto());
+        expect(search(), findsOneWidget);
+        await tester.enterText(search(), 'zanahorias');
+        await tester.pumpAndSettle();
+        expect(
+          find.widgetWithText(TaskTile, 'Plantar tomates'),
+          findsNothing,
+        );
+        expect(find.byType(TextField), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(TextField),
+            matching: find.text('zanahorias'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byType(EmptyState),
+            matching: find.text(es.noMatches),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- P288 (UX-2509): every search clears in one tap ----
+
+  group('P288 · search clears in one tap', () {
+    final tasks = [
+      Task(id: 1, title: 'Ir al dentista', priority: 1, listId: 'p1'),
+      Task(id: 2, title: 'Comprar pan', priority: 1, listId: 'p1'),
+      Task(id: 3, title: 'Llamar a mamá', priority: 1, listId: 'p1'),
+    ];
+    final titles = [for (final task in tasks) task.title];
+
+    /// [home] in [language] at 1× on 360×800, over [tasks].
+    Future<void> show(WidgetTester tester, Widget home, String language) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final container = designContainer(
+        tasks: () => _GivenTasks(tasks),
+        projects: [TaskListInfo(id: 'p1', name: 'Casa', version: 1)],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(_app(container, home, language));
+      await tester.pumpAndSettle();
+    }
+
+    void expectRows(Iterable<String> shown, {Iterable<String> hidden = const []}) {
+      for (final title in shown) {
+        expect(find.widgetWithText(TaskTile, title), findsOneWidget,
+            reason: '$title shows');
+      }
+      for (final title in hidden) {
+        expect(find.widgetWithText(TaskTile, title), findsNothing,
+            reason: '$title is filtered out');
+      }
+    }
+
+    test('UX-2509: the ✕’s tooltip reads «Borrar búsqueda» / “Clear search” / «Esborra la cerca»', () {
+      expect(es.clearSearch, 'Borrar búsqueda');
+      expect(lookupAppLocalizations(const Locale('en')).clearSearch,
+          'Clear search');
+      expect(lookupAppLocalizations(const Locale('ca')).clearSearch,
+          'Esborra la cerca');
+    });
+
+    for (final (name, home) in [
+      ('Tareas', const HomeScreen()),
+      ('a project page', const HomeScreen(listId: 'p1', isRoot: false)),
+    ]) {
+      for (final language in ['es', 'en', 'ca']) {
+        testWidgets(
+          'UX-2509: ($language, 1×, 360×800) on $name, an empty search has no ✕; typing «dent» shows a 48 dp ✕ at the field’s end, read as «Borrar búsqueda»; one tap clears the field, every row comes back and the ✕ goes',
+          (tester) async {
+            final l = lookupAppLocalizations(Locale(language));
+            final semantics = tester.ensureSemantics();
+            await show(tester, home, language);
+            final field = searchField();
+            expect(field, findsOneWidget);
+            expectRows(titles);
+            expectNoClear(field, l);
+
+            await tester.enterText(field, 'dent');
+            await tester.pumpAndSettle();
+            expectRows(['Ir al dentista'],
+                hidden: ['Comprar pan', 'Llamar a mamá']);
+            expectClear(tester, field, l);
+
+            await tapClear(tester, field, l);
+            expect(searchText(tester, field), isEmpty);
+            expectRows(titles);
+            expectNoClear(field, l);
+            expect(tester.takeException(), isNull);
+            semantics.dispose();
+          },
+        );
+      }
+
+      testWidgets(
+        'UX-2509: (es, 1×, 360×800) on $name, in the no-match state («No hay tareas que coincidan…») the ✕ is in view and brings the list back',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          await show(tester, home, 'es');
+          final field = searchField();
+          await tester.enterText(field, 'zanahorias');
+          await tester.pumpAndSettle();
+          expectRows(const [], hidden: titles);
+          expect(
+            find.descendant(
+              of: find.byType(EmptyState),
+              matching: find.text(es.noMatches),
+            ),
+            findsOneWidget,
+          );
+          expectClear(tester, field, es);
+
+          await tapClear(tester, field, es);
+          expect(find.text(es.noMatches), findsNothing);
+          expectRows(titles);
+          expectNoClear(field, es);
+          expect(tester.takeException(), isNull);
+          semantics.dispose();
+        },
+      );
+    }
+  });
 }
 
 /// Taps the tab named [label] in the navigation bar.
@@ -2259,4 +2508,16 @@ class _MemoryLists extends TaskListStore {
       for (final current in lists) current.id == list.id ? list : current,
     ];
   }
+}
+
+/// Tasks the test can change while a page is open, as a save would.
+class _GrowingTasks extends DesignTaskNotifier {
+  _GrowingTasks([this.initial = const []]);
+  final List<Task> initial;
+  @override
+  Future<void> loadTasks() async {
+    if (!state.hasValue) state = AsyncData(initial);
+  }
+
+  void show(List<Task> tasks) => state = AsyncData(tasks);
 }

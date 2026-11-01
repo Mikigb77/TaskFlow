@@ -488,7 +488,7 @@ void main() {
     await tester.runAsync(() => store.sync(api, 1));
     await tester.pumpAndSettle();
     expect(find.text(en.storageUsage(82, 100)), findsOneWidget);
-    expect(find.text('Files: 82 of 100 MB used'), findsOneWidget);
+    expect(find.text('Files: 82 of 100 MB used'), findsOneWidget);
     expect(api.meRequests, 1);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());

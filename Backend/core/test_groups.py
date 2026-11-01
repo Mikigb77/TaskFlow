@@ -186,7 +186,7 @@ class GroupTests(TestCase):
         self.assertEqual(response.status_code, 200)
         current = self.c.get(f"/api/tasks/{data['id']}/")
         self.assertEqual(current.data["assignment"], "unassigned")
-        self.assertEqual(self.c.put(f"/api/tasks/{data['id']}/", current.data, format="json").status_code, 403)
+        self.assertEqual(self.c.put(f"/api/tasks/{data['id']}/", {**current.data, "title": "Changed"}, format="json").status_code, 403)
 
     def test_transfer_owner_preserves_projects_and_former_owner_can_leave(self):
         data = self.task()

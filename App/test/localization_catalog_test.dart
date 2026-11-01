@@ -209,11 +209,7 @@ void main() {
         ['Removed', 'Quitada', 'Treta'],
       );
       expect(
-        [en.reviewRemove, es.reviewRemove, ca.reviewRemove],
-        ['Remove', 'Quitar', 'Treu'],
-      );
-      expect(
-        [en.reviewUndoSaved, es.reviewUndoSaved, ca.reviewUndoSaved],
+        [en.reviewUndoSaved(2), es.reviewUndoSaved(2), ca.reviewUndoSaved(2)],
         [
           'They’re back here, not saved yet.',
           'Han vuelto aquí, sin guardar.',
@@ -236,8 +232,8 @@ void main() {
         [en.capturesEmptyHelp, es.capturesEmptyHelp, ca.capturesEmptyHelp],
         [
           'Recordings and tasks you leave unfinished are kept here.',
-          'Aquí se guardan las grabaciones y las tareas que dejes a medias.',
-          'Aquí es guarden les gravacions i les tasques que deixis a mig fer.',
+          'Aquí se conservan las grabaciones y las tareas que dejes a medias.',
+          'Aquí es conserven les gravacions i les tasques que deixis a mig fer.',
         ],
       );
       expect(
@@ -306,14 +302,14 @@ void main() {
   // ---- Round 1 · P22 · UX-225, UX-122, UX-123: Spanish and Catalan slips ----
 
   test(
-    'UX-225: in Spanish, agendaCounts(1, 1) reads 1 pendiente · 1 completada',
+    'UX-225, UX-2312: in Spanish, agendaCounts(1, 1) reads 1 pendiente · 1 completada, and with nothing left only the done half',
     () {
       final es = lookupAppLocalizations(const Locale('es'));
-      expect(es.agendaCounts(1, 1), '1 pendiente · 1 completada');
-      expect(es.agendaCounts(0, 1), '0 pendientes · 1 completada');
-      expect(es.agendaCounts(2, 3), '2 pendientes · 3 completadas');
+      expect(es.agendaCounts(1, 1), '1\u00a0pendiente · 1\u00a0completada');
+      expect(es.agendaCounts(0, 1), '1\u00a0completada');
+      expect(es.agendaCounts(2, 3), '2\u00a0pendientes · 3\u00a0completadas');
       final ca = lookupAppLocalizations(const Locale('ca'));
-      expect(ca.agendaCounts(1, 1), isNot(contains('1 completades')));
+      expect(ca.agendaCounts(1, 1), isNot(contains('1\u00a0completades')));
     },
   );
 
@@ -381,13 +377,11 @@ void main() {
     final ca = lookupAppLocalizations(const Locale('ca'));
     expect(ca.reviewEditDetail, 'Canvia aquesta dada');
     expect(ca.reviewRepair, 'Corregeix el text');
-    expect(ca.reviewRemove, startsWith('Treu'));
     // No review button starts with an infinitive (Desar, Canviar, Treure…).
     final infinitive = RegExp(r'^\S+(ar|er|re|ir)$');
     for (final label in [
       ca.reviewEditDetail,
       ca.reviewRepair,
-      ca.reviewRemove,
       ca.reviewOriginal,
       ca.reviewResolve,
       ca.reviewOptions,
@@ -487,7 +481,6 @@ void main() {
             noList,
             notSaved,
             notSavedCount,
-            remove,
           )
           in [
             (
@@ -499,7 +492,6 @@ void main() {
               'No project',
               'Not saved yet',
               'Not saved yet · 1',
-              'Remove',
             ),
             (
               es,
@@ -510,7 +502,6 @@ void main() {
               'Sin proyecto',
               'Sin guardar',
               'Sin guardar · 1',
-              'Quitar',
             ),
             (
               ca,
@@ -521,7 +512,6 @@ void main() {
               'Sense projecte',
               'Sense desar',
               'Sense desar · 1',
-              'Treu',
             ),
           ]) {
         expect(l.inbox, inbox);
@@ -531,7 +521,6 @@ void main() {
         expect(l.noList, noList);
         expect(l.unfinishedCaptures, notSaved);
         expect(l.pendingCaptureCount(1), notSavedCount);
-        expect(l.reviewRemove, remove);
       }
       expect(
         es.inboxEmpty,
@@ -1159,9 +1148,9 @@ void main() {
         ca.captureListeningOnline,
       ],
       [
-        'I’m listening. You’ll see your words when you tap Done.',
-        'Te escucho. Verás tus palabras al tocar Listo.',
-        'T’escolto. Veuràs les paraules quan toquis Fet.',
+        'I’m listening. Tap Done to see what I understood.',
+        'Te escucho. Al tocar Listo verás lo que he entendido.',
+        'T’escolto. En tocar Fet veuràs el que he entès.',
       ],
     );
     expect(
@@ -1373,7 +1362,16 @@ void main() {
   // the right word there; only the file-upload jargon goes.
   for (final (language, words, except) in [
     ('es', ['transferencia'], <String>{}),
-    ('en', ['transfer'], {'groupTransfer', 'archiveCsvPersonalCopies'}),
+    (
+      'en',
+      ['transfer'],
+      {
+        'groupTransfer',
+        'groupTransferConfirm',
+        'groupTransferAction',
+        'archiveCsvPersonalCopies',
+      },
+    ),
     ('ca', ['transferència'], <String>{}),
   ]) {
     test(
@@ -1481,13 +1479,18 @@ void main() {
   // ---- Run 2026-10-19-app, round 2 · P205 (UX-1414, UX-1421, UX-1638) ----
 
   test(
-    'UX-1414: the only EN values saying “transfer” are groupTransfer and archiveCsvPersonalCopies (ownership, not files)',
+    'UX-1414: the only EN values saying “transfer” are the group’s ownership transfer and archiveCsvPersonalCopies (ownership, not files)',
     () {
       final keys = {
         for (final MapEntry(:key, :value) in values('en').entries)
           if (value.toLowerCase().contains('transfer')) key,
       };
-      expect(keys, {'groupTransfer', 'archiveCsvPersonalCopies'});
+      expect(keys, {
+        'groupTransfer',
+        'groupTransferConfirm',
+        'groupTransferAction',
+        'archiveCsvPersonalCopies',
+      });
     },
   );
 
@@ -1777,8 +1780,8 @@ void main() {
         [
           'Live transcription uses on-device speech where available; no audio '
               'is retained in that mode.',
-          'To add, find or change tasks, your words go over the internet to '
-              'Google’s AI.',
+          'To add, find or change tasks, or to ask for reminders your way, '
+              'your words go over the internet to Google’s AI.',
           'Saved audio is transcribed online.',
           'Anything not saved yet stays on this phone until you save or '
               'discard it.',
@@ -1790,8 +1793,8 @@ void main() {
         [
           'La transcripción en directo usa el reconocimiento local cuando está '
               'disponible; ese modo no conserva audio.',
-          'Para añadir, buscar o cambiar tareas, tus palabras van por internet '
-              'a la IA de Google.',
+          'Para añadir, buscar o cambiar tareas, o pedir recordatorios a tu '
+              'manera, tus palabras van por internet a la IA de Google.',
           'El audio guardado se transcribe en línea.',
           'Lo que aún no has guardado se queda en este teléfono hasta que lo '
               'guardes o lo descartes.',
@@ -1803,8 +1806,9 @@ void main() {
         [
           'La transcripció en directe utilitza el reconeixement local quan '
               'està disponible; en aquest mode no es conserva l’àudio.',
-          'Per afegir, cercar o canviar tasques, les teves paraules van per '
-              'internet a la IA de Google.',
+          'Per afegir, cercar o canviar tasques, o demanar recordatoris a la '
+              'teva manera, les teves paraules van per internet a la IA de '
+              'Google.',
           'L’àudio desat es transcriu en línia.',
           'El que encara no has desat es queda en aquest telèfon fins que ho '
               'desis o ho descartis.',
@@ -1832,8 +1836,302 @@ void main() {
       description,
       'The full voice privacy note at the end of the Voice screen in '
       'Settings: on-device or online transcription, why the words go to '
-      'Google’s AI, saved audio, and what stays on the phone. '
-      'capturePrivacyLine is its short form in the capture sheet.',
+      'Google’s AI (adding, finding or changing tasks, and reminders asked '
+      'for in «Your way», reminderPlanYourWay), saved audio, and what stays '
+      'on the phone. capturePrivacyLine is its short form in the capture '
+      'sheet and the reminder sheet.',
     );
+  });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P273 (UX-2104, UX-2105) ----
+
+  group('P273 · understanding and failing', () {
+    Map<String, dynamic> catalog(String language) =>
+        jsonDecode(
+              File('${directory.path}/app_$language.arb').readAsStringSync(),
+            )
+            as Map<String, dynamic>;
+
+    test(
+      'UX-2104: no capture string names an assistant («asistente», “assistant”, «assistent»)',
+      () {
+        const assistant = {
+          'es': 'asistente',
+          'en': 'assistant',
+          'ca': 'assistent',
+        };
+        for (final MapEntry(key: language, value: word) in assistant.entries) {
+          final messages = catalog(language);
+          final capture = [
+            for (final key in keys)
+              if (key.startsWith('capture') || key == 'recordingKept') key,
+          ];
+          expect(capture, isNotEmpty);
+          for (final key in capture) {
+            expect(
+              (messages[key] as String).toLowerCase(),
+              isNot(contains(word)),
+              reason: '$language: $key',
+            );
+          }
+        }
+      },
+    );
+
+    test(
+      'UX-2105: words and recordings waiting in «Sin guardar» are kept, never saved, in recordingKept, capturesEmptyHelp, captureFailed and captureOffline',
+      () {
+        const banned = [
+          'guardad',
+          'se guardan',
+          'es guarden',
+          'desad',
+          'saved',
+        ];
+        for (final language in ['en', 'es', 'ca']) {
+          final messages = catalog(language);
+          for (final key in [
+            'recordingKept',
+            'capturesEmptyHelp',
+            'captureFailed',
+            'captureOffline',
+          ]) {
+            final value = (messages[key] as String).toLowerCase();
+            for (final word in banned) {
+              expect(
+                value,
+                isNot(contains(word)),
+                reason: '$language: $key: $value',
+              );
+            }
+          }
+        }
+      },
+    );
+
+    test('UX-2105: the reviewer’s copy for the kept words', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final es = lookupAppLocalizations(const Locale('es'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(
+        en.captureFailed,
+        'That didn’t work. Your words are still here — try again.',
+      );
+      expect(es.recordingKept, 'Grabación conservada en este teléfono');
+      expect(
+        es.capturesEmptyHelp,
+        'Aquí se conservan las grabaciones y las tareas que dejes a medias.',
+      );
+      expect(
+        ca.capturesEmptyHelp,
+        'Aquí es conserven les gravacions i les tasques que deixis a mig fer.',
+      );
+    });
+  });
+
+  group('P284 · sharing copy', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+
+    test('UX-2511: removeAccessHelp, sharingRemovalHelp, sharingRolesHelp and '
+        'updatesAssigned carry review C’s values in EN, ES and CA', () {
+      expect(
+        en.removeAccessHelp,
+        'This person will lose access to this project and its tasks, notes '
+        'and files. Changes they haven’t sent yet will be lost.',
+      );
+      expect(
+        es.removeAccessHelp,
+        'Esta persona perderá el acceso al proyecto y a sus tareas, notas y '
+        'archivos. Los cambios que aún no haya enviado se perderán.',
+      );
+      expect(
+        ca.removeAccessHelp,
+        'Aquesta persona perdrà l’accés al projecte i a les seves tasques, '
+        'notes i fitxers. Els canvis que encara no hagi enviat es perdran.',
+      );
+      expect(
+        en.sharingRemovalHelp,
+        'When you leave or lose access, the project leaves this phone the '
+        'next time it connects. Copies you exported stay.',
+      );
+      expect(
+        es.sharingRemovalHelp,
+        'Al salir o perder el acceso, el proyecto desaparece de este teléfono '
+        'la próxima vez que se conecte. Las copias que hayas exportado se '
+        'quedan.',
+      );
+      expect(
+        ca.sharingRemovalHelp,
+        'Quan surts del projecte o en perds l’accés, el projecte desapareix '
+        'd’aquest telèfon el pròxim cop que es connecti. Les còpies que hagis '
+        'exportat es queden.',
+      );
+      expect(en.sharingRolesHelp, endsWith(' Shared tasks stay in this project.'));
+      expect(
+        es.sharingRolesHelp,
+        endsWith(' Las tareas compartidas se quedan en este proyecto.'),
+      );
+      expect(
+        ca.sharingRolesHelp,
+        endsWith(' Les tasques compartides es queden en aquest projecte.'),
+      );
+      for (final help in [
+        en.sharingRolesHelp,
+        es.sharingRolesHelp,
+        ca.sharingRolesHelp,
+      ]) {
+        expect(help, isNot(contains(';')), reason: 'the export clause goes');
+        expect(help.toLowerCase(), isNot(contains('export')));
+      }
+      expect(en.updatesAssigned, 'Only what’s for me');
+      expect(es.updatesAssigned, 'Solo lo que es para mí');
+      expect(ca.updatesAssigned, 'Només el que és per a mi');
+      for (final strings in [en, es, ca]) {
+        for (final text in [
+          strings.removeAccessHelp,
+          strings.sharingRemovalHelp,
+          strings.sharingRolesHelp,
+          strings.updatesAssigned,
+        ]) {
+          final lower = text.toLowerCase();
+          expect(lower, isNot(contains('sincroniz')), reason: text);
+          expect(lower, isNot(contains('sincronitz')), reason: text);
+          expect(lower, isNot(contains('sync')), reason: text);
+          expect(lower, isNot(contains('asignaci')), reason: text);
+          expect(lower, isNot(contains('assignaci')), reason: text);
+          expect(lower, isNot(contains('assignment')), reason: text);
+        }
+      }
+    });
+
+    test('UX-2511: a network error with keptNote false ends at “try again”; '
+        'by default (Calendar, Tareas) it still says the tasks are kept', () {
+      final offline = ApiException(0, 'offline');
+      expect(
+        requestProblemText(es, offline, keptNote: false),
+        'No hay conexión. Revisa el wifi o los datos móviles e inténtalo de '
+        'nuevo.',
+      );
+      for (final strings in [en, es, ca]) {
+        final plain = requestProblemText(strings, offline, keptNote: false);
+        expect(plain, strings.requestError('network'));
+        final kept = requestProblemText(strings, offline);
+        expect(kept, strings.requestError('networkKept'));
+        expect(kept, startsWith(plain));
+        expect(kept.length, greaterThan(plain.length));
+      }
+      expect(
+        requestProblemText(es, offline),
+        endsWith('Tus tareas siguen guardadas en este teléfono.'),
+      );
+      expect(
+        requestProblemText(es, StateError('boom'), keptNote: false),
+        es.requestError('other'),
+      );
+      // onSignIn keeps its own meaning: a rate limit still says how long.
+      final limited = ApiException(
+        429,
+        'Request was throttled. Expected available in 120 seconds.',
+      );
+      expect(
+        requestProblemText(es, limited, onSignIn: true, keptNote: false),
+        es.tooManyTriesWait(2),
+      );
+    });
+  });
+
+  // ---- Run 2026-10-28-app, round 1 · P279 (UX-2313, UX-2312): row and
+  // count copy ----
+
+  group('P279 · row and count copy', () {
+    final es = lookupAppLocalizations(const Locale('es'));
+    final en = lookupAppLocalizations(const Locale('en'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    const nb = ' ';
+
+    test('UX-2312: priorityValue is a phrase on the level, in each language', () {
+      expect(
+        [for (final level in ['high', 'medium', 'low']) es.priorityValue(level)],
+        ['Prioridad alta', 'Prioridad media', 'Prioridad baja'],
+      );
+      expect(
+        [for (final level in ['high', 'medium', 'low']) ca.priorityValue(level)],
+        ['Prioritat alta', 'Prioritat mitjana', 'Prioritat baixa'],
+      );
+      expect(
+        [for (final level in ['high', 'medium', 'low']) en.priorityValue(level)],
+        ['High priority', 'Medium priority', 'Low priority'],
+      );
+    });
+
+    test(
+      'UX-2312: agendaCounts keeps each number with its words, and with nothing left gives only the done half',
+      () {
+        expect(es.agendaCounts(4, 1), '4${nb}pendientes · 1${nb}completada');
+        expect(ca.agendaCounts(4, 1), '4${nb}per${nb}fer · 1${nb}completada');
+        expect(en.agendaCounts(4, 1), '4${nb}to${nb}do · 1${nb}completed');
+        expect(es.agendaCounts(1, 0), '1${nb}pendiente');
+        expect(ca.agendaCounts(4, 0), '4${nb}per${nb}fer');
+        expect(en.agendaCounts(4, 0), '4${nb}to${nb}do');
+        // Nothing left: the done half alone, no zero.
+        expect(es.agendaCounts(0, 1), '1${nb}completada');
+        expect(es.agendaCounts(0, 5), '5${nb}completadas');
+        expect(en.agendaCounts(0, 1), '1${nb}completed');
+        expect(en.agendaCounts(0, 5), '5${nb}completed');
+        expect(ca.agendaCounts(0, 1), '1${nb}completada');
+        expect(ca.agendaCounts(0, 5), '5${nb}completades');
+        // The only break is around the « · ».
+        for (final l in [es, en, ca]) {
+          for (final (open, done) in [(4, 1), (2, 3), (1, 0), (0, 5)]) {
+            final count = l.agendaCounts(open, done);
+            expect(
+              count.replaceAll(' · ', ''),
+              isNot(contains(' ')),
+              reason: '«$count» (${l.localeName})',
+            );
+          }
+        }
+      },
+    );
+
+    test('UX-2312: Completadas in Spanish says «Toca»', () {
+      expect(
+        es.completedTaskSummary(1),
+        '1 tarea completada. Toca su casilla para reabrirla.',
+      );
+      expect(
+        es.completedTaskSummary(3),
+        '3 tareas completadas. Toca una casilla para reabrir una.',
+      );
+    });
+
+    test('UX-2313: deadlinePassedOn says a passed deadline once', () {
+      expect(es.deadlinePassedOn('lun, 26 oct'), 'Venció el lun, 26 oct');
+      expect(en.deadlinePassedOn('Mon, 26 Oct'), 'Was due Mon, 26 Oct');
+      expect(
+        ca.deadlinePassedOn('dl., 26 d’oct.'),
+        'Termini vençut: dl., 26 d’oct.',
+      );
+    });
+
+    test('UX-2313: no deadlineOverdue key remains, and nothing uses it', () {
+      for (final code in ['en', 'es', 'ca']) {
+        final catalog =
+            jsonDecode(File('${directory.path}/app_$code.arb').readAsStringSync())
+                as Map<String, dynamic>;
+        expect(catalog.containsKey('deadlineOverdue'), isFalse, reason: code);
+        expect(catalog.containsKey('@deadlineOverdue'), isFalse, reason: code);
+      }
+      final users = [
+        for (final file in Directory('lib').listSync(recursive: true))
+          if (file is File &&
+              file.path.endsWith('.dart') &&
+              file.readAsStringSync().contains('deadlineOverdue'))
+            file.path,
+      ];
+      expect(users, isEmpty);
+    });
   });
 }

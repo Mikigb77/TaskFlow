@@ -1,0 +1,130 @@
+{
+ "runId": "2026-10-28-app",
+ "mode": "app",
+ "round": 2,
+ "batch": "b1",
+ "packages": [
+  {
+   "id": "P296",
+   "title": "D9: a reader's reminder choice is sent, never copied, even when the owner changed the task first",
+   "area": "B",
+   "size": "M",
+   "severity": 3,
+   "findings": [
+    "UX-2032"
+   ],
+   "files": [
+    "App/lib/services/task_database.dart",
+    "App/lib/repositories/cloud_task_repository.dart",
+    "App/test/sharing_sync_test.dart",
+    "App/test/sync_test.dart"
+   ],
+   "brief": [
+    "Round 2 of P271 (UX-2032, S1; the gap itself is S3 in verify-b1-r1-B2.md). Keep everything round 1 built, which the reviewer verified: the reader's task page (task_detail_screen.dart:166-172 `ownReminders`, :231-233 the `viewOnlyTaskReminders` banner, :388-409 `setOwnReminders` → `TaskDatabase.updateOwnReminders` → `showLocal`), the notices without «Completar» (UX-2403, verified), `syncCopySuffix`, and the sync's two covered paths in App/lib/repositories/cloud_task_repository.dart (`_sendReminders` :122-151; 200 → acknowledged; 409 → `acceptKeepingReminders`). No copy, no ARB change, no UI change.",
+    "Why round 1 failed: the viewer branch (cloud_task_repository.dart:203-225) sends a reader's row with `_sendReminders` only when `_sameContent({...data, ..._reminders(remote)}, remote)` (:217-220), that is only when everything except the reminders on the phone still equals the server's copy right now. When the owner changed the task (title, time, completed dates…) before this phone pulled the change (the reader was offline, the change came while the app was closed, or the reader tapped before the sync's pull), the gate fails, the row goes to `preserveConflict` (:221), «Ensayo del coro (copia local)» appears as a new personal task, and `syncError` sets the red read-only notice (:225-226). That is the failure UX-2032 and UX-2403 exist to end, and P271's brief named this case («a change the owner makes to the task meanwhile»). The 409 test (App/test/sharing_sync_test.dart:252) changes the task only between the GET and the PUT (`beforePut`), the one window the code handles.",
+    "Fix (the reviewer's): remember, on the phone, that a row's pending change is reminders-only, and send such a row whatever else differs. (1) In App/lib/services/task_database.dart, a persisted per-row marker, for example a new column `own_reminders_pending INTEGER NOT NULL DEFAULT 0` added through the existing `upgrade` path (:86-200) with `schemaVersion` (:17, now 19) raised by one, and in the create path. Another persisted way is fine; say which you chose. It must survive a restart. (2) `updateOwnReminders` (:582-607) sets it only when the row was not pending, or was already marked: a row already pending with another change (an editor's offline edit, then the editor was made «lector») stays unmarked. (3) Every other write that marks a row pending (`updateTask`, completing, deleting, `restoreTask`, the occurrence and schedule writes, and any other path that sets `sync_pending = 1`) clears it, and so do `acknowledge`, `acceptKeepingReminders`, `preserveConflict`, `recoverReadOnlyDraft` and a pull that overwrites the row. Read the marker into the row map the sync reads (`database.pending`).",
+    "(4) In the viewer branch of `_synchronize` (cloud_task_repository.dart:203-226): keep the GET and the «equal → acknowledge» check (:212-215) first. Then a marked row goes to `_sendReminders(row, data, remote)` whatever else differs; an unmarked row keeps today's order (the reminders-only `_sameContent` check, then `preserveConflict` and the notice). The PUT already carries the server's fields and version plus the reader's `reminder_minutes`, `reminder_time` and `reminder_plan` (the anchor stays the server's), so nothing but the reminders can go out. (5) On 200, take the returned task as the row's content keeping the reader's reminders: call `acceptKeepingReminders(ownerKey, row, saved)` instead of `acknowledge` (:140-144). Today's `acknowledge` writes only `remote_version` and `sync_pending`, so in the stale case the row would keep the old title under the new version and never pull the owner's change. On 409, `acceptKeepingReminders` with `current`, as now. A choice made after the send stays pending (the `revision` rule in both).",
+    "Server: nothing changes (bc80025; Backend/docs/REMINDER_PLANS.md:39, :89): a reader's PUT whose non-reminder fields equal the server's saves the reminders and answers 200 with the task, version unchanged; with a stale version it saves them and answers 409 with `current`. Backend/ is out of scope.",
+    "Tests: add a group 'P296 · a reader's reminders after the owner's change' at the end of App/test/sharing_sync_test.dart's main(), with the acceptance cases below. Existing P271 tests, including :252, must keep passing; say which, if any, you changed and why.",
+    "Not yours: task_detail_screen.dart, reminder_control.dart, notification_service.dart, reminder_engine.dart and the ARB files (round 1, verified); voice_task_screen.dart (P297); capture_review_editor.dart (P298)."
+   ],
+   "acceptance": [
+    "Repository, viewer project «Coro»: the reader sets «1 hora antes» (`updateOwnReminders`, 60) on a «Todos» task; the server's task is then renamed «Ensayo general» and its version raised BEFORE the sync's GET. After one sync: exactly one task with that sync_id, titled «Ensayo general», reminderMinutes 60; no task titled with «(copia local)» / “(offline copy)”; `syncError` is null; the row is not pending; its remote_version is the server's.",
+    "Repository, the same case: the PUT body carries the server's title, fields and version, with the reader's reminder_minutes, reminder_time and reminder_plan, and the server's reminder_anchor.",
+    "Repository, the same case when the server answers that PUT with 409 and a newer `current`: the row becomes `current` with reminderMinutes 60 kept; no copy; `syncError` null.",
+    "Repository: the reader's marked row survives a restart: a new TaskDatabase on the same file, then a sync, gives the same end state as above.",
+    "Repository: an editor edits the title offline, is then made «lector», then sets a reminder on that task: the sync keeps today's behaviour, a personal copy and the read-only notice (the marker was never set).",
+    "Repository: a database at schema 19 with pending rows opens and upgrades; its rows are unmarked and sync as before.",
+    "The P271 tests in App/test/sharing_sync_test.dart (the 200 path, the 409 between GET and PUT at ~:252, the equal row acknowledged, a reader's title change copied) still pass."
+   ],
+   "deviceChecks": [
+    "Emulator lane, two accounts on the local Docker server (migration 0026): the reader's phone offline, the owner renames a «Todos» task in «Coro», the reader sets «1 hora antes», then goes online: no «(copia local)» task, no red notice on Calendar, the new title shows, and the reminder rings only on the reader's phone with only «Posponer 10 min»."
+   ],
+   "dependsOn": [
+    "P271"
+   ]
+  },
+  {
+   "id": "P297",
+   "title": "After a voice save or Deshacer: the message names the landing day, Deshacer lands on what came back, and «¿Cuál…?» opens at its top",
+   "area": "A",
+   "size": "M",
+   "severity": 2,
+   "findings": [
+    "UX-2203",
+    "UX-2619",
+    "UX-2618"
+   ],
+   "files": [
+    "App/lib/screens/voice_task_screen.dart",
+    "App/lib/widgets/capture_command_cards.dart",
+    "App/test/capture_landing_test.dart",
+    "App/test/bulk_voice_commands_test.dart",
+    "App/test/voice_command_cards_test.dart",
+    "App/test/ux_previews/calendar_previews.dart",
+    "App/test/ux_previews/commands_previews.dart"
+   ],
+   "brief": [
+    "Keep everything P274 and P267 built that the reviewer verified (verify-b1-r1-A1.md): UX-2202 (Deshacer on a result that added nothing restores with no sheet, `takesBackOnly`, App/lib/screens/voice_task_screen.dart:4040-4096; «Eliminada: …»), UX-2213, UX-2204 (`_Choice`'s outlined choices in a `_QuestionPanel`, App/lib/widgets/capture_command_cards.dart:1232-1315), and UX-2203 part 1 (`captureTasksAddedOn` when every dated task lands on one day: :3352-3368 and :3902-3929). No new copy anywhere in this package: no ARB change.",
+    "1 · UX-2203 (S2, partly fixed, failed once). What round 1 did: the message names the day when all new tasks share one; the landing (`_scrollToLit`, App/lib/screens/calendar_screen.dart) keeps the day heading in view when it fits with the lit rows above the message. Why it failed: in `calendar/agenda.added.es.light.1x` (360×800: three tasks, two today and one on Friday, status and gesture bars) the heading and both lit rows need 474 px and only about 429 px sit above the message, so the heading and week strip scroll away (correct by P274's brief: «lets it go only when they don't fit»), and the message «3 tareas añadidas · también el vie, 6 de nov» names no day for the lit rows. The tester's check (App/test/capture_landing_test.dart, group 'P274 · the day heading after a landing', the loop over 360×800 and 393×852 at ~:1832, failing at ~:1798) cannot pass in that fixture. Fix (the reviewer's; no new copy): make the message name the landing day when a save spans several days, and leave calendar_screen.dart as it is.",
+    "1a · The save path (`voice_task_screen.dart` ~:3338-3390, `added` / `otherDays` / `message`): when several tasks are saved (`ready.length > 1`), `allOn` is null, every one is dated (`tasks.length == ready.length` and each has `dueDate ?? deadline`), there are two or more `days`, and nothing is kept for review (`remaining == 0`): `added` names Calendar's landing day `days.first` with the number of new tasks on it, n: n > 1 → `captureTasksAddedOn(n, context.weekdayDate(days.first))`; n == 1 → `taskAddedOn(context.weekdayDate(days.first))` (or `taskAddedDue` when that task has only a deadline, as the one-task message does). The other days follow as now (`captureAlsoOn` / `captureAlsoOnDays` from `days.skip(1)`). Example (ES): «2 tareas añadidas al dom, 1 de nov · también el vie, 6 de nov». A mix with an undated task, and a save with tasks kept for review, keep today's message.",
+    "1b · The command path (~:3900-3995, `parts` / `named` / `otherDays`): the same rule for the new tasks part when `allOn` is null, `ready.length > 1`, every new task has a `landing(...)` day, there are two or more `addedDays`, and `remaining == 0`: name the earliest of `addedDays` with the count of new tasks on it, as in 1a, and add that day to `named`, so «· también el …» never repeats it. Everything else in `parts` is unchanged.",
+    "1c · Test and preview: in the P274 group of App/test/capture_landing_test.dart, keep the 393×852 case as it is (heading and both lit rows above the message); at 360×800 replace the heading assertion with: the message reads `captureTasksAddedOn(2, today) · captureAlsoOn(Friday)` as the generated AppLocalizations writes them, and both lit rows show above it. That check changed by the organizer's decision (plan.md, Round 2 (b1)); say so in your notes. In App/test/ux_previews/calendar_previews.dart ~:285-288 (`agenda` 'added'), make the description true: «2 tareas añadidas al … · también el vie, …» with Deshacer; at 1× on 360×800 the day heading scrolls away because it doesn't fit with the two lit rows. Re-render calendar/.",
+    "2 · UX-2619 (S2, regression R1A1-2): Deshacer on a voice deletion can show nothing at all. Since UX-2202, Deshacer on a result that added nothing (`takesBackOnly`, ~:4045-4096) only takes the change back, with no sheet. When the task came back on a day Calendar isn't showing, nothing on screen changes: renders `commands/applied.delete-applied.es.light.1x` → `applied.delete-undone.es.light.1x` are identical but for the snackbar («Borra lo de la peluquería», a task on sáb, 31 de oct, while Calendar shows today). A change («Cambia el dentista al viernes») is similar: its lit row leaves the day Calendar landed on, and nothing says where it went. Fix (no new copy): in the `takesBackOnly` branch, when the undo was whole, after `narrowAfterUndo(container, focus)`, set `calendarFocusProvider` to a new `CalendarFocus(firstDay, ids, page: origin?.page, showCalendar: origin?.showCalendar ?? false, undated: …)` built from what came back: the deleted tasks (`applied.deleted`), the changed tasks' `before` (`applied.updates`) and the completed tasks' `before` (`applied.completed`), their days by `landing(task)` (`displayDate ?? deadline`), earliest first, and their ids (`restoreTask` keeps a task's id). Calendar then lands on them, lit, as a save does; on the day already shown, the same focus only lights the rows. Nothing is undated → `undated: false`. If no task came back (the undo failed), nothing changes: the `undoError` message stays.",
+    "3 · UX-2618 (S1, regression R1A1-1): at 2×, «¿Cuál…?» opens with its ✕ cut off. `_reveal` (voice_task_screen.dart:2915-2928) finds no `QuestionBox` in a `_Choice` card (`_questionIn`, :2885-2886), so it aligns the whole card's bottom with the view's bottom (`alignment: 1`); at 2× the outlined choices make the card taller than the view, and it opens past its top: render `commands/cards.change-which.es.light.2x`, AUDIT «No cambiar ninguna» 48 × 32 dp (48 × 48 at 1×), the pencil half hidden. Fix (no copy): give the `_Choice` panel a key in capture_command_cards.dart (for example `ValueKey('command-choice')` on its `_QuestionPanel`), and in `_reveal` treat a card holding it as a set's heading is treated: `Scrollable.ensureVisible(card, alignment: 0)`. Other cards keep today's reveal. Don't touch `_Choice`'s look.",
+    "Tests: the UX-2202 checks in App/test/bulk_voice_commands_test.dart (UX-1707's, now «restored, no sheet») must keep passing; add your checks in a group 'P297 · landing after a save and after Deshacer' at the end of main() in capture_landing_test.dart and voice_command_cards_test.dart. Re-render commands/ (applied.*, cards.change-which) and calendar/ (agenda.added).",
+    "Not yours: calendar_screen.dart (the landing scroll stays as P274 left it), the cloud sync (P296), capture_review_editor.dart (P298), the speed bar (a plain one-task dictation is unchanged)."
+   ],
+   "acceptance": [
+    "Save path, ES 1× on 360×800 (the `agenda.added` fixture: three tasks, two today and one on Friday): the message reads «2 tareas añadidas al {today} · también el {Friday}», both as the generated AppLocalizations writes `captureTasksAddedOn` and `captureAlsoOn`, and both lit rows show above it; the day heading may be scrolled away.",
+    "The same save at ES 1× on 393×852: «Agenda de hoy» and both lit rows show above the message (P274's check, unchanged).",
+    "The same save in EN and in CA at 2× on 360×800: the message names today with “2 tasks added to …” / «2 tasques afegides al …» followed by the other day, whole (no ellipsis, nothing clipped).",
+    "Two tasks today and one undated: the message keeps «3 tareas añadidas». Two tasks for tomorrow: «2 tareas añadidas al {tomorrow}» (P274, unchanged). One task today and one Friday: «Añadida al {today} · también el {Friday}».",
+    "Voice deletion, ES 1× on 360×800: Calendar shows today; «Borra lo de la peluquería» deletes a task on another day; Deshacer → Calendar shows that day, «Ir a la peluquería» is there and lit, and no CaptureResult is on screen.",
+    "Voice change: «Cambia el dentista al viernes» lands on Friday; Deshacer → Calendar shows the dentist's original day with its row lit, and no sheet opens.",
+    "Deshacer of a deletion of a task on the day Calendar shows: the row is back and lit, the day doesn't change.",
+    "`commands/cards.change-which` at ES 2× and CA 2× on 360×800: the card's top edge and its pencil are in view when it opens, and «No cambiar ninguna» (✕) measures 48 × 48 dp; at ES 1× the render is unchanged.",
+    "The speed-bar test 'a plain single-task dictation looks and saves exactly as before, with no new tap' still passes."
+   ],
+   "deviceChecks": [],
+   "dependsOn": [
+    "P274",
+    "P267"
+   ]
+  },
+  {
+   "id": "P298",
+   "title": "«Añade una fecha para repetir» opens the date sheet",
+   "area": "A",
+   "size": "S",
+   "severity": 2,
+   "findings": [
+    "UX-2620"
+   ],
+   "files": [
+    "App/lib/widgets/capture_review_editor.dart",
+    "App/test/review_tasks_test.dart",
+    "App/test/ux_previews/capture_previews.dart"
+   ],
+   "brief": [
+    "UX-2620 (S2, regression R1A2-1 from P275's UX-2208). In the result card › «Más opciones» on a task with no day, the repeat row (App/lib/widgets/capture_review_editor.dart:907-919, `_row(Icons.repeat_rounded, task.dueDate == null ? l.repeatNeedsDate : context.repeatLabel(task), onTap: task.dueDate == null ? null : …)`) now reads an instruction, «Añade una fecha para repetir», but has no tap and no chevron, and keeps the primary-coloured icon of its tappable neighbours. On the same card the no-day line «Para recordártelo, ponle un día.» (`_needsDayLine`, :451-475) opens the date sheet, and the form's repeat row (task_editor.dart:1322-1334) keeps a chevron and a tap.",
+    "Fix (no copy change): when `task.dueDate == null`, the row's tap is `widget.enabled ? _schedule : null`, exactly as `_needsDayLine` does, so the chevron shows (`_row` draws it when `onTap` isn't null). With a day, the row keeps opening `editTaskRepeat` as now. Update the comment above it (:905-906): with no day, the row opens the day first. Don't touch `_needsDayLine`, the date sheet, or the form.",
+    "Tests: the P275 checks in App/test/review_tasks_test.dart that expect this row to have no tap are rightly broken; update them and say which. Add your checks in a group 'P298 · repeat row with no day' at the end of main(). Previews: add a state for it in App/test/ux_previews/capture_previews.dart, at P275's place, for example `result.more-no-day` (es 1×, ca 2×): a one-task result with no day and «Más opciones» open. Re-render capture/.",
+    "Not yours: voice_task_screen.dart and capture_command_cards.dart (P297), the sync (P296)."
+   ],
+   "acceptance": [
+    "One-task result with no day, «Más opciones» open, ES 1× on 360×800: the row «Añade una fecha para repetir» has a chevron and, for TalkBack, is an enabled button; tapping it opens the date sheet.",
+    "After a day is picked there, the row reads «No se repite», and tapping it opens the repeat editor.",
+    "With a day from the start, the row reads «No se repite» and opens the repeat editor (unchanged).",
+    "`capture/result.more-no-day` renders at ES 1× and CA 2×, whole, with the row and its chevron in view."
+   ],
+   "deviceChecks": [],
+   "dependsOn": [
+    "P275"
+   ]
+  }
+ ],
+ "decisions": [],
+ "skipped": [],
+ "escalated": []
+}

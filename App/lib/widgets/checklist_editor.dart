@@ -138,45 +138,64 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
               key: ValueKey('checklist-${items[index].id}'),
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Checkbox(
-                  value: items[index].done(occurrence: occurrence),
-                  semanticLabel: items[index].title,
-                  onChanged:
-                      onChanged == null || (recurring && occurrence == null)
-                      ? null
-                      : (value) => onChanged(
-                          items
-                              .map(
-                                (item) => item.id == items[index].id
-                                    ? item.setDone(
-                                        value == true,
-                                        occurrence: occurrence,
-                                      )
-                                    : item,
-                              )
-                              .toList(),
-                        ),
-                ),
+                // The step reads once: its checkbox, labelled with its title,
+                // then its ⋮. While renaming, the field stays its own node.
                 Expanded(
-                  child: _renaming == items[index].id
-                      ? TextField(
-                          key: const ValueKey('checklist-title'),
-                          controller: _rename,
-                          focusNode: _renameFocus,
-                          maxLength: 160,
-                          minLines: 1,
-                          maxLines: 3,
-                          textCapitalization: TextCapitalization.sentences,
-                          textInputAction: TextInputAction.done,
-                          decoration: InputDecoration(
-                            labelText: context.l10n.editStep,
-                            counterText: '',
-                          ),
-                        )
-                      : Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          child: Text(items[index].title),
+                  child: _mergeUnless(
+                    _renaming == items[index].id,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Checkbox(
+                          value: items[index].done(occurrence: occurrence),
+                          semanticLabel: items[index].title,
+                          onChanged:
+                              onChanged == null ||
+                                  (recurring && occurrence == null)
+                              ? null
+                              : (value) => onChanged(
+                                  items
+                                      .map(
+                                        (item) => item.id == items[index].id
+                                            ? item.setDone(
+                                                value == true,
+                                                occurrence: occurrence,
+                                              )
+                                            : item,
+                                      )
+                                      .toList(),
+                                ),
                         ),
+                        Expanded(
+                          child: _renaming == items[index].id
+                              ? TextField(
+                                  key: const ValueKey('checklist-title'),
+                                  controller: _rename,
+                                  focusNode: _renameFocus,
+                                  maxLength: 160,
+                                  minLines: 1,
+                                  maxLines: 3,
+                                  textCapitalization:
+                                      TextCapitalization.sentences,
+                                  textInputAction: TextInputAction.done,
+                                  decoration: InputDecoration(
+                                    labelText: context.l10n.editStep,
+                                    counterText: '',
+                                  ),
+                                )
+                              : Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 13,
+                                  ),
+                                  // The checkbox already reads the step's title.
+                                  child: ExcludeSemantics(
+                                    child: Text(items[index].title),
+                                  ),
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
                 PopupMenuButton<String>(
                   tooltip: context.l10n.editCaptureItem(items[index].title),
@@ -258,4 +277,8 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
       ],
     );
   }
+
+  /// [child] as one TalkBack node, unless [separate].
+  static Widget _mergeUnless(bool separate, Widget child) =>
+      separate ? child : MergeSemantics(child: child);
 }

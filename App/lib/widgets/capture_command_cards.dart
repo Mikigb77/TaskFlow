@@ -346,23 +346,31 @@ class QuestionBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(question, style: theme.textTheme.bodyMedium),
-            child,
-          ],
-        ),
+    return _QuestionPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(question, style: theme.textTheme.bodyMedium),
+          child,
+        ],
       ),
     );
   }
+}
+
+/// A [QuestionBox]'s panel, around its line and its answers.
+class _QuestionPanel extends StatelessWidget {
+  const _QuestionPanel({super.key, required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Padding(padding: const EdgeInsets.all(14), child: child),
+  );
 }
 
 /// One tap each: create the project said, take one like it ([first], the
@@ -1224,51 +1232,86 @@ class _ChoiceState extends State<_Choice> {
     final onChanged = widget.onChanged;
     final matches = view.matches;
     final more = _all ? 0 : matches.length - _Choice.shown;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final task in more > 0 ? matches.take(_Choice.shown) : matches)
-          Semantics(
-            button: true,
-            child: InkWell(
-              key: ValueKey('choose-${view.command.id}-${task.id}'),
-              borderRadius: BorderRadius.circular(12),
-              onTap: enabled
-                  ? () => onChanged(view.command.copyWith(taskId: task.id))
-                  : null,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(34, 8, 8, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(task.title, style: theme.textTheme.bodyLarge),
-                    Text(
-                      [
-                        _dayOf(context, task),
-                        if (_completed(task)) l.commandCompleted,
-                      ].join(' · '),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+    final shape = RoundedRectangleBorder(
+      side: BorderSide(color: theme.colorScheme.outline),
+      borderRadius: BorderRadius.circular(12),
+    );
+    // The answers to the card's first line, in a question box's panel,
+    // which spans the card as the other questions' do. The line isn't
+    // repeated in the panel (UX-2204). Its key opens the card at its top.
+    return Padding(
+      padding: const EdgeInsets.only(right: 10, top: 4, bottom: 8),
+      child: _QuestionPanel(
+        key: const ValueKey('command-choice'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final (index, task)
+                in (more > 0 ? matches.take(_Choice.shown) : matches)
+                    .indexed) ...[
+              if (index > 0) const SizedBox(height: 8),
+              Semantics(
+                button: true,
+                // Filled as the chips are, so the day line keeps its
+                // contrast on the panel.
+                child: Material(
+                  color: theme.colorScheme.surface,
+                  shape: shape,
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    key: ValueKey('choose-${view.command.id}-${task.id}'),
+                    customBorder: shape,
+                    onTap: enabled
+                        ? () =>
+                              onChanged(view.command.copyWith(taskId: task.id))
+                        : null,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 48),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(task.title, style: theme.textTheme.bodyLarge),
+                            Text(
+                              [
+                                _dayOf(context, task),
+                                if (_completed(task)) l.commandCompleted,
+                              ].join(' · '),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
-        if (more > 0)
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 22),
-              child: TextButton(
-                key: ValueKey('choose-more-${view.command.id}'),
-                onPressed: enabled ? () => setState(() => _all = true) : null,
-                child: Text(l.commandShowMore(more)),
+            ],
+            if (more > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton(
+                    key: ValueKey('choose-more-${view.command.id}'),
+                    onPressed: enabled
+                        ? () => setState(() => _all = true)
+                        : null,
+                    child: Text(l.commandShowMore(more)),
+                  ),
+                ),
               ),
-            ),
-          ),
-      ],
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1352,11 +1395,12 @@ class UpdateCommandCard extends ConsumerWidget {
       );
     }
     final question = _projectQuestion(context, view, onChanged, enabled);
+    // Nothing found: the search's icon, not the pencil (UX-2210).
     if (view.notFound) {
       return _Frame(
         question: question,
         children: [
-          _Header(icon: Icons.edit_outlined, text: _notFound(context, view)),
+          _Header(icon: Icons.search_rounded, text: _notFound(context, view)),
         ],
       );
     }
@@ -1379,29 +1423,38 @@ class UpdateCommandCard extends ConsumerWidget {
     final task = plan.task;
     final shown = plan.shown;
     final accountId = ref.watch(authProvider).account?.id;
-    Widget line(IconData icon, String label, String before, String after) =>
-        Semantics(
-          label: l.commandChangeSemantics(label, before, after),
-          excludeSemantics: true,
-          child: Padding(
-            padding: const EdgeInsets.only(left: 34, right: 8, bottom: 6),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 2, right: 8),
-                  child: Icon(icon, size: 18, color: theme.colorScheme.primary),
-                ),
-                Expanded(
-                  child: Text(
-                    '$before → $after',
-                    style: theme.textTheme.bodyLarge,
-                  ),
-                ),
-              ],
+    // A [named] line writes its field, «Prioridad: Media → Alta», where the
+    // icon alone doesn't say it (UX-2209).
+    Widget line(
+      IconData icon,
+      String label,
+      String before,
+      String after, {
+      bool named = false,
+    }) => Semantics(
+      label: l.commandChangeSemantics(label, before, after),
+      excludeSemantics: true,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 34, right: 8, bottom: 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2, right: 8),
+              child: Icon(icon, size: 18, color: theme.colorScheme.primary),
             ),
-          ),
-        );
+            Expanded(
+              child: Text(
+                named
+                    ? l.commandChangeLine(label, before, after)
+                    : '$before → $after',
+                style: theme.textTheme.bodyLarge,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
     // Moved to a day, by a day or by days: the new day is a chip, and a day
     // picked is as if it had been said.
     final moves =
@@ -1423,8 +1476,9 @@ class UpdateCommandCard extends ConsumerWidget {
       String label,
       String before,
       String after,
-      DateTime day,
-    ) => Padding(
+      DateTime day, {
+      bool named = false,
+    }) => Padding(
       padding: const EdgeInsets.only(left: 34, right: 8, bottom: 6),
       child: Wrap(
         crossAxisAlignment: WrapCrossAlignment.center,
@@ -1442,7 +1496,12 @@ class UpdateCommandCard extends ConsumerWidget {
                   child: Icon(icon, size: 18, color: theme.colorScheme.primary),
                 ),
                 Flexible(
-                  child: Text('$before →', style: theme.textTheme.bodyLarge),
+                  child: Text(
+                    named
+                        ? l.commandChangeLineFrom(label, before)
+                        : '$before →',
+                    style: theme.textTheme.bodyLarge,
+                  ),
                 ),
               ],
             ),
@@ -1573,6 +1632,7 @@ class UpdateCommandCard extends ConsumerWidget {
               scheduleText(context, deadline, none: l.deadlineUnset),
               scheduleText(context, changed, none: l.deadlineUnset),
               changed.date!,
+              named: true,
             )
           else
             line(
@@ -1580,6 +1640,7 @@ class UpdateCommandCard extends ConsumerWidget {
               l.deadline,
               scheduleText(context, deadline, none: l.deadlineUnset),
               scheduleText(context, changed, none: l.deadlineUnset),
+              named: true,
             ),
         if (plan.priority case final priority?)
           line(
@@ -1587,6 +1648,7 @@ class UpdateCommandCard extends ConsumerWidget {
             l.priority,
             context.priorityName(task.priority),
             context.priorityName(priority),
+            named: true,
           ),
         if (plan.notes case final notes?)
           _Note(l.commandNotesAdd(notes), icon: Icons.notes_rounded),
@@ -1745,14 +1807,12 @@ class DeleteCommandCard extends StatelessWidget {
       );
     }
     final question = _projectQuestion(context, view, onChanged, enabled);
+    // Nothing found: the search's icon, not the bin (UX-2210).
     if (view.notFound) {
       return _Frame(
         question: question,
         children: [
-          _Header(
-            icon: Icons.delete_outline_rounded,
-            text: _notFound(context, view),
-          ),
+          _Header(icon: Icons.search_rounded, text: _notFound(context, view)),
         ],
       );
     }
@@ -2087,7 +2147,7 @@ String _bulkNone(BuildContext context, CommandTarget target) {
 /// Nothing changes before the confirming tap. Or one line saying why there
 /// is nothing to do: nothing matched, more than 200 did, or a project or a
 /// person wasn't found.
-class BulkCommandCard extends ConsumerStatefulWidget {
+class BulkCommandCard extends ConsumerWidget {
   const BulkCommandCard({
     super.key,
     required this.view,
@@ -2100,42 +2160,23 @@ class BulkCommandCard extends ConsumerStatefulWidget {
   final VoidCallback onRemove;
   final bool enabled;
 
-  @override
-  ConsumerState<BulkCommandCard> createState() => _BulkCommandCardState();
-}
-
-class _BulkCommandCardState extends ConsumerState<BulkCommandCard> {
-  final _scroll = ScrollController();
-
-  @override
-  void dispose() {
-    _scroll.dispose();
-    super.dispose();
-  }
-
   void _toggle(String key) {
-    final command = widget.view.command;
+    final command = view.command;
     final excluded = {...command.excluded};
     if (!excluded.remove(key)) excluded.add(key);
-    widget.onChanged(command.copyWith(excluded: excluded.toList()));
+    onChanged(command.copyWith(excluded: excluded.toList()));
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l = context.l10n;
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final view = widget.view;
     final command = view.command;
     // As the card looks for it: with the project tapped, when it asked.
     final target = view.asked.target;
     final bulk = view.bulk!;
-    final question = _projectQuestion(
-      context,
-      view,
-      widget.onChanged,
-      widget.enabled,
-    );
+    final question = _projectQuestion(context, view, onChanged, enabled);
     final projects = ref.watch(taskListsProvider).valueOrNull ?? const [];
     final accountId = ref.watch(authProvider).account?.id;
     final delete = command.kind == CommandKind.delete;
@@ -2153,32 +2194,34 @@ class _BulkCommandCardState extends ConsumerState<BulkCommandCard> {
         label: l.commandMoveDay(moved.when, moved.day),
         day: moveTo,
         style: theme.textTheme.titleMedium,
-        onPicked: widget.enabled
-            ? (day) => widget.onChanged(
+        onPicked: enabled
+            ? (day) => onChanged(
                 command.copyWith(changes: command.changes.movedTo(day)),
               )
             : null,
       );
     }
 
+    // Only the card that will act has the action's icon and its ✕; one
+    // with nothing to do, or that can't act, has the search's (UX-2210).
     Widget header(
       String text, {
       bool removable = false,
       Widget? chip,
       String? semanticsLabel,
     }) => _Header(
-      icon: icon,
+      icon: removable ? icon : Icons.search_rounded,
       text: text,
       chip: chip,
       semanticsLabel: semanticsLabel,
       color: delete && removable ? colors.error : null,
-      onRemove: removable ? widget.onRemove : null,
+      onRemove: removable ? onRemove : null,
       removeLabel: switch (command.kind) {
         CommandKind.delete => l.commandDontDeleteAny,
         CommandKind.complete => l.commandDontCompleteAny,
         _ => l.commandDontChangeAny,
       },
-      enabled: widget.enabled,
+      enabled: enabled,
     );
     String person(String name) => command.issues.contains('ambiguous_member')
         ? l.commandAmbiguousMember(name)
@@ -2302,7 +2345,7 @@ class _BulkCommandCardState extends ConsumerState<BulkCommandCard> {
       return CheckboxListTile(
         key: ValueKey('bulk-${command.id}-${item.key}'),
         value: !bulk.excluded.contains(item.key),
-        onChanged: widget.enabled ? (_) => _toggle(item.key) : null,
+        onChanged: enabled ? (_) => _toggle(item.key) : null,
         controlAffinity: ListTileControlAffinity.leading,
         contentPadding: const EdgeInsetsDirectional.only(end: 8),
         activeColor: delete ? colors.error : null,
@@ -2320,31 +2363,6 @@ class _BulkCommandCardState extends ConsumerState<BulkCommandCard> {
       );
     }
 
-    // A long list scrolls inside the card, so a result's other cards stay
-    // near. At large text a window that small would show one task at a
-    // time, so the rows go in the sheet's own scroll instead.
-    final large = MediaQuery.textScalerOf(context).scale(10) >= 15;
-    final list = large
-        ? Column(children: [for (final item in bulk.items) row(item)])
-        : ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: math.max(
-                160.0,
-                MediaQuery.sizeOf(context).height * 0.4,
-              ),
-            ),
-            child: Scrollbar(
-              controller: _scroll,
-              thumbVisibility: true,
-              child: ListView.builder(
-                controller: _scroll,
-                shrinkWrap: true,
-                padding: EdgeInsets.zero,
-                itemCount: bulk.items.length,
-                itemBuilder: (context, index) => row(bulk.items[index]),
-              ),
-            ),
-          );
     return _Frame(
       question: question,
       destructive: delete,
@@ -2362,7 +2380,10 @@ class _BulkCommandCardState extends ConsumerState<BulkCommandCard> {
         if (problem != null) _Note(problem, icon: Icons.info_outline),
         // Apart from the ✕ above, so the first task isn't tapped for it.
         const SizedBox(height: 8),
-        list,
+        // Every task in the sheet's own scroll, at any text size, so none
+        // the button acts on is out of sight in a scroll of its own
+        // (UX-2201).
+        for (final item in bulk.items) row(item),
         // What was left out, in one line, after the list.
         if (leftOut != null)
           Padding(

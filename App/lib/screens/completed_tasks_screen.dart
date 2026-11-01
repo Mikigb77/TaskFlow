@@ -11,7 +11,7 @@ import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/task_list.dart';
 import 'package:agenda/models/task.dart';
 
-class CompletedTasksScreen extends ConsumerWidget {
+class CompletedTasksScreen extends ConsumerStatefulWidget {
   const CompletedTasksScreen({
     super.key,
     this.listId,
@@ -27,7 +27,44 @@ class CompletedTasksScreen extends ConsumerWidget {
   final int? person;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CompletedTasksScreen> createState() =>
+      _CompletedTasksScreenState();
+}
+
+class _CompletedTasksScreenState extends ConsumerState<CompletedTasksScreen> {
+  // Rows seen done on this page, by task occurrence, with the time each had
+  // when first seen, which orders the page. One reopened here, its time now
+  // cleared, keeps its place, unticked, until the person leaves the page:
+  // Tareas' rule. Ticked again, it is done at that time, not now, so it keeps
+  // its place on the next visit too.
+  final _doneHere = <String, DateTime?>{};
+
+  static String _row(Task task) => '${task.id}:${task.occurrenceId}';
+
+  /// [task]'s done rows, and those reopened here since they were seen done.
+  List<Task> _rowsOf(Task task) {
+    if (!task.isRecurring) {
+      return task.isCompleted || _doneHere.containsKey(_row(task))
+          ? [task]
+          : const [];
+    }
+    final prefix = '${task.id}:';
+    return [
+      ...task.completedDates.map(task.completedOccurrence).whereType<Task>(),
+      for (final row in _doneHere.keys)
+        if (row.startsWith(prefix) &&
+            !task.completedDates.contains(row.substring(prefix.length)))
+          ?task.occurrenceByKey(row.substring(prefix.length)),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final listId = widget.listId;
+    final team = widget.team;
+    final person = widget.person;
+    // The page is covered by another screen: the person has left it.
+    if (!TickerMode.valuesOf(context).enabled) _doneHere.clear();
     final projects = ref.watch(taskListsProvider).valueOrNull ?? [];
     final accountId = ref.watch(authProvider).account?.id;
     final project = projects.where((p) => p.id == listId).firstOrNull;
@@ -61,16 +98,11 @@ class CompletedTasksScreen extends ConsumerWidget {
         appBar: CustomAppBar(title: context.l10n.completedTasks),
         body: ref.watch(taskProvider).when(
               data: (tasks) {
-                final completed = tasks
-                    .where(shown)
-                    .expand((task) => task.isRecurring
-                        ? task.completedDates
-                            .map(task.completedOccurrence)
-                            .whereType<Task>()
-                        : task.isCompleted
-                            ? [task]
-                            : <Task>[])
-                    .toList();
+                final completed = tasks.where(shown).expand(_rowsOf).toList();
+                final done = completed.where((task) => task.isCompleted);
+                for (final task in done) {
+                  _doneHere.putIfAbsent(_row(task), () => task.completedTime);
+                }
                 if (completed.isEmpty) {
                   return SingleChildScrollView(
                       child: Column(
@@ -97,15 +129,17 @@ class CompletedTasksScreen extends ConsumerWidget {
                               children: [
                                 if (name != null) ...[
                                   name,
-                                  const SizedBox(height: 8),
+                                  if (done.isNotEmpty) const SizedBox(height: 8),
                                 ],
-                                Text(context.l10n
-                                    .completedTaskSummary(completed.length)),
+                                // Every row reopened here: no count to give.
+                                if (done.isNotEmpty)
+                                  Text(context.l10n
+                                      .completedTaskSummary(done.length)),
                               ])),
                       Expanded(
                           child: TaskList(
                               tasks: completed,
-                              newestFirst: true,
+                              completedTime: (task) => _doneHere[_row(task)],
                               project: listId)),
                     ]);
               },

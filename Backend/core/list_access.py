@@ -77,12 +77,15 @@ def require_list(task_list, user, *, write=False, owner=False):
     return role
 
 
-def lock_task(pk, user, *, target_list=None, write=True):
+def lock_task(pk, user, *, target_list=None, write=True, reader_ok=False):
     """Inside atomic(): lists first, then task. Membership changes lock the list.
 
     Recheck the task after locks: a concurrent personal-list move cannot use a
     stale access decision. Shared-list tasks stay in their list; exports create
     explicit personal copies instead of changing the group's ownership.
+
+    reader_ok lets a viewer through for a task already in their list, so the
+    caller can save their own reminders (D9); the caller refuses the rest.
     """
     before = Task.objects.filter(pk=pk).first()
     list_ids = {before.task_list_id} if before and before.task_list_id else set()
@@ -97,12 +100,13 @@ def lock_task(pk, user, *, target_list=None, write=True):
         if task.task_list_id:
             if task.task_list_id not in locked:
                 raise ValidationError("This task moved while syncing. Retry to refresh access.")
-            require_list(locked[task.task_list_id], user, write=write)
+            require_list(locked[task.task_list_id], user, write=write and not reader_ok)
         elif task.owner_id != user.pk:
             raise NotFound()
     if target_list is not None:
         target = locked.get(uuid.UUID(str(target_list)))
         if target is None or list_role(target, user) is None:
             raise ValidationError({"list_id": "Choose a list from this account."})
-        require_list(target, user, write=write)
+        stays = task is not None and target.pk == task.task_list_id
+        require_list(target, user, write=write and not (reader_ok and stays))
     return task, locked

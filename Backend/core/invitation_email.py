@@ -16,6 +16,8 @@ from django.utils.html import escape
 from .models import User
 
 WEBSITE = "https://taskflow.garbar.tech/"
+# The website in the email's own language, as the app's site_links.dart links it.
+WEBSITES = {"en": WEBSITE, "es": WEBSITE + "es/", "ca": WEBSITE + "ca/"}
 KINDS = ("list", "group")  # A list is a project.
 
 COPY = {
@@ -36,6 +38,7 @@ COPY = {
                       "If you weren’t expecting it, you can ignore this email.",
         "eyebrow": "Invitation",
         "someone": "Someone",
+        "website": WEBSITES["en"],
     },
     "es": {
         "subject": {"list": "Te han invitado a un proyecto en TaskFlow", "group": "Te han invitado a un grupo en TaskFlow"},
@@ -54,6 +57,7 @@ COPY = {
                       "Si no la esperabas, puedes ignorar este correo.",
         "eyebrow": "Invitación",
         "someone": "Alguien",
+        "website": WEBSITES["es"],
     },
     "ca": {
         "subject": {"list": "T’han convidat a un projecte a TaskFlow", "group": "T’han convidat a un grup a TaskFlow"},
@@ -72,6 +76,7 @@ COPY = {
                       "Si no l’esperaves, pots ignorar aquest correu.",
         "eyebrow": "Invitació",
         "someone": "Algú",
+        "website": WEBSITES["ca"],
     },
 }
 # Emails queued before this design started the same way.
@@ -127,7 +132,7 @@ def _text(copy, kind, *, sender, name, link, email, code, new_user, staging):
     paragraphs = [copy["headline"][kind].format(sender=sender, name=name) + "\n" + copy["what"][kind],
                   copy["button"] + ":\n" + link]
     if new_user:
-        new = copy["new_question"] + " " + copy["new"].format(website=WEBSITE)
+        new = copy["new_question"] + " " + copy["new"].format(website=copy["website"])
         paragraphs.append(new + ("\n" + copy["tester"] if staging else ""))
         paragraphs.append(copy["code_new"].format(email=email) + "\n" + code)
     else:
@@ -247,8 +252,8 @@ def invitation_html(body):
     paragraph = f"margin:24px 0 0;{FONT}font-size:15px;line-height:1.6;"
     blocks = []
     if new_user:
-        website = (f'<a class="tf-link" href="{WEBSITE}" style="color:{ACCENT};text-decoration:underline;">'
-                   f'{escape(WEBSITE.removeprefix("https://").rstrip("/"))}</a>')
+        website = (f'<a class="tf-link" href="{copy["website"]}" style="color:{ACCENT};text-decoration:underline;">'
+                   f'{escape(copy["website"].removeprefix("https://").rstrip("/"))}</a>')
         blocks.append(f'<p class="tf-ink" style="{paragraph}color:{INK};">'
                       f'<strong>{escape(copy["new_question"])}</strong> {_fill(copy["new"], website=website)}</p>')
         if staging:

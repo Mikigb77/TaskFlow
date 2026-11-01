@@ -89,7 +89,7 @@ The fourth command fails after writing its PNGs; that's expected (see `KNOWN_FAI
 
 ### Device captures
 
-Previews can't draw what Android draws around the app. Capture it from the separate `TaskFlow_Review` test emulator, never from the owner's phone or his own emulators. How the lane works, and its safety rules: `.claude/skills/ux/scripts/emulator/README.md`.
+Previews can't draw what Android draws around the app. Capture it from the separate `TaskFlow_Review` test emulator, never from the owner's own phone or emulators. How the lane works, and its safety rules: `.claude/skills/ux/scripts/emulator/README.md`.
 
 - **When:**
   - always in **app** mode;

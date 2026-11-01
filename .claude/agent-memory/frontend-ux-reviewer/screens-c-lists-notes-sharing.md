@@ -90,4 +90,9 @@ Current as of 2026-10-13 (whole-app run, slice C). Paths are under `App/lib/`.
 - **Accept an invitation inside the app:** 5 taps, plus a code from outside the app.
 - **Other flows:** write a note, 5 taps; edit a note, 5; leave a group, 6.
 
+## Run 2026-10-28-app (closed in code 2026-11-01)
+- **Notes get their own words:** `shareNoteConfirm`, `sharedNoteStays`, `moveNoteError`, `deleteNote` («Eliminar nota»), passed via `TaskListPicker(note: task.isNote)`.
+- **Project sheet:** picker shape and ✓ selection (see [[ui-patterns]]); person/project chips wrap with `runSpacing: 8`.
+- **«Novedades del proyecto»** (`showProjectPreferences`, opened from `list_sharing_screen.dart`, `task_lists_screen.dart` and the muted reminder line in `reminder_control.dart`): heading + project name line, 70%-cap picker shape (2026-11-01).
+
 Related: [[ui-patterns]], [[screens-b-calendar-tasks]].

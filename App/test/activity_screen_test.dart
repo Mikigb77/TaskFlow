@@ -1,7 +1,7 @@
 // Round 1 of 2026-10-13-app (b9), P25 (UX-407, UX-321) and P27 (UX-320):
 // the header's Activity button shows only to people who share something,
-// with a people icon; Activity rows lead with who did what; a failed load
-// says so and offers Reintentar.
+// with a feed icon (UX-2506); Activity rows lead with who did what; a
+// failed load says so and offers Reintentar.
 import 'dart:async';
 import 'dart:io';
 
@@ -20,11 +20,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:agenda/models/task.dart';
+import 'package:agenda/screens/calendar_screen.dart';
+import 'package:agenda/screens/home_screen.dart';
+import 'package:agenda/screens/notes_screen.dart';
 import 'package:agenda/screens/task_detail_screen.dart';
+import 'package:agenda/screens/task_lists_screen.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'support/capture_fixtures.dart';
 import 'support/design_fixtures.dart';
+import 'support/reading_order.dart';
 import 'support/hanging_sync.dart';
 
 void main() {
@@ -86,7 +92,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byTooltip(es.groupActivity), findsNothing);
       expect(find.byTooltip(es.activity), findsNothing);
-      expect(find.byIcon(Icons.groups_outlined), findsNothing);
+      expect(find.byIcon(Icons.campaign_outlined), findsNothing);
       expect(find.byIcon(Icons.notifications_outlined), findsNothing);
       expect(find.byIcon(Icons.notifications_none_rounded), findsNothing);
       // The account button stays.
@@ -96,7 +102,7 @@ void main() {
   );
 
   testWidgets(
-    'UX-407: with a shared project the header button shows a people icon, the tooltip Novedades and the unread badge, and opens Activity',
+    'UX-407: with a shared project the header button shows a feed icon (UX-2506), the tooltip Novedades and the unread badge, and opens Activity',
     (tester) async {
       final container = designContainer(
         projects: [
@@ -115,7 +121,7 @@ void main() {
       expect(
         find.descendant(
           of: button,
-          matching: find.byIcon(Icons.groups_outlined),
+          matching: find.byIcon(Icons.campaign_outlined),
         ),
         findsOneWidget,
       );
@@ -1234,6 +1240,425 @@ void main() {
     expect(find.text(es.activity), findsOneWidget);
     expect(find.text(es.groupActivity), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+  // ---- Run 2026-10-28-app, round 1 · P287 (UX-2506, UX-2508, UX-2615) ----
+
+  group('P287 · Novedades icon, moved tasks, one Actividad stop', () {
+    // A shared project and a private one, with 3 unread updates.
+    ProviderContainer sharedContainer() {
+      final container = designContainer(
+        projects: [
+          TaskListInfo(id: 'casa', name: 'Casa', version: 2, shared: true),
+          TaskListInfo(id: 'obra', name: 'Obra', version: 2),
+        ],
+        overrides: [
+          ...captureSheetOverrides(),
+          collaborationUnreadProvider.overrideWith((ref) async => 3),
+          collaborationActivityProvider.overrideWith((ref) async => []),
+        ],
+      );
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    for (final (name, screen) in [
+      ('Calendario', const CalendarScreen() as Widget),
+      ('Tareas', const HomeScreen()),
+      ('Notas', const NotesScreen()),
+    ]) {
+      testWidgets(
+        'UX-2506: on $name, with a shared project, the header’s Novedades button shows the feed icon with its badge and tooltip, not the people icon',
+        (tester) async {
+          tester.view.physicalSize = const Size(390, 844);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          await tester.pumpWidget(app(sharedContainer(), screen));
+          await tester.pumpAndSettle();
+          final button = find.byTooltip(es.groupActivity);
+          expect(button, findsOneWidget);
+          expect(es.groupActivity, 'Novedades');
+          expect(
+            find.descendant(
+              of: button,
+              matching: find.byIcon(Icons.campaign_outlined),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(
+              of: button,
+              matching: find.byIcon(Icons.groups_outlined),
+            ),
+            findsNothing,
+          );
+          // The unread badge stays.
+          expect(
+            find.descendant(of: button, matching: find.text('3')),
+            findsOneWidget,
+          );
+          // The megaphone means Novedades and nothing else on the screen.
+          expect(find.byIcon(Icons.campaign_outlined), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2506: shared projects in Todos los proyectos and the Grupos button keep the people icon',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(app(sharedContainer(), const HomeScreen()));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(ActionChip, es.projectsAll));
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        expect(sheet, findsOneWidget);
+        Finder row(String project) => find.descendant(
+          of: sheet,
+          matching: find.widgetWithText(ListTile, project),
+        );
+        expect(
+          find.descendant(
+            of: row('Casa'),
+            matching: find.byIcon(Icons.groups_outlined),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: row('Obra'),
+            matching: find.byIcon(Icons.groups_outlined),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: sheet,
+            matching: find.byIcon(Icons.campaign_outlined),
+          ),
+          findsNothing,
+        );
+
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpWidget(
+          app(sharedContainer(), const TaskListsScreen()),
+        );
+        await tester.pumpAndSettle();
+        final groups = find.widgetWithText(TextButton, es.groups);
+        await tester.scrollUntilVisible(
+          groups,
+          120,
+          scrollable: find.byType(Scrollable).first,
+        );
+        expect(
+          find.descendant(
+            of: groups,
+            matching: find.byIcon(Icons.groups_outlined),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    Map<String, dynamic> update(String id, {Object? fields}) => {
+      'id': id,
+      'action': 'updated',
+      'actor_name': 'Ana',
+      'task_title': 'Recoger a los niños',
+      'project_name': 'Casa',
+      'created_at': created.toIso8601String(),
+      'read_at': created.toIso8601String(),
+      if (fields != null) 'fields': fields,
+    };
+
+    for (final language in ['es', 'en', 'ca']) {
+      testWidgets(
+        'UX-2508: ($language) in Novedades an update that only moved the day reads «ha movido»; one that changed the title, or carries no or odd fields, reads «ha actualizado»',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          final (moved, updated) = switch (language) {
+            'es' => (
+              'Ana ha movido: Recoger a los niños',
+              'Ana ha actualizado: Recoger a los niños',
+            ),
+            'en' => (
+              'Ana moved: Recoger a los niños',
+              'Ana updated: Recoger a los niños',
+            ),
+            _ => (
+              'Ana ha mogut: Recoger a los niños',
+              'Ana ha actualitzat: Recoger a los niños',
+            ),
+          };
+          expect(l.activityEntry('moved', 'Ana', 'Recoger a los niños'), moved);
+          expect(
+            l.activityEntry('updated', 'Ana', 'Recoger a los niños'),
+            updated,
+          );
+          await openActivity(
+            tester,
+            () async => [
+              update('n1', fields: ['scheduled_date']),
+              update('n2', fields: ['due_date']),
+              update('n3', fields: ['scheduled_date', 'due_date']),
+              update('n4', fields: ['title']),
+              update('n5', fields: ['scheduled_date', 'title']),
+              // Today's server sends no fields.
+              update('n6'),
+              // Anything unexpected keeps the general sentence.
+              update('n7', fields: <String>[]),
+              update('n8', fields: 'scheduled_date'),
+            ],
+            language: language,
+          );
+          expect(find.text(moved), findsNWidgets(3));
+          expect(find.text(updated), findsNWidgets(5));
+          expect(tester.takeException(), isNull);
+        },
+      );
+
+      testWidgets(
+        'UX-2508: ($language) a task’s Actividad, opened, says the task was moved when its details changed only the day, and «Ha actualizado la tarea» for another update',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          final (moved, updated) = switch (language) {
+            'es' => ('Ha movido la tarea', 'Ha actualizado la tarea'),
+            'en' => ('Moved the task', 'Updated the task'),
+            _ => ('Ha mogut la tasca', 'Ha actualitzat la tasca'),
+          };
+          expect(l.activityMoved, moved);
+          expect(l.activityUpdated, updated);
+          Map<String, dynamic> event(Object? details) => {
+            'action': 'updated',
+            'actor_name': 'Ana',
+            'created_at': created.toIso8601String(),
+            'details': details,
+          };
+          final container = designContainer(
+            overrides: [
+              taskHistoryProvider(1).overrideWith(
+                (ref) async => [
+                  event({
+                    'fields': ['scheduled_date'],
+                  }),
+                  event({
+                    'fields': ['title'],
+                  }),
+                  event({
+                    'fields': ['scheduled_date', 'notes'],
+                  }),
+                  event(null),
+                  event(<String, dynamic>{}),
+                  event({'fields': 'scheduled_date'}),
+                  event('scheduled_date'),
+                ],
+              ),
+            ],
+          );
+          addTearDown(container.dispose);
+          await tester.pumpWidget(
+            app(
+              container,
+              const Scaffold(
+                body: SingleChildScrollView(child: TaskActivity(taskId: 1)),
+              ),
+              language: language,
+            ),
+          );
+          await tester.pumpAndSettle();
+          // Closed, the history isn't shown.
+          expect(find.text(moved), findsNothing);
+          await tester.tap(find.text(l.activity));
+          await tester.pumpAndSettle();
+          expect(find.text(moved), findsOneWidget);
+          expect(find.text(updated), findsNWidgets(6));
+          // Who and when stay under each entry.
+          expect(find.textContaining('Ana · '), findsNWidgets(7));
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2615: TalkBack hears Actividad as one stop carrying its collapsed state, with no separate Contraído stop, and expanded once opened',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final container = designContainer(
+          overrides: [
+            taskHistoryProvider(1).overrideWith(
+              (ref) async => [
+                {
+                  'action': 'created',
+                  'actor_name': 'Ana',
+                  'created_at': created.toIso8601String(),
+                },
+              ],
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+        await tester.pumpWidget(
+          app(
+            container,
+            const Scaffold(
+              body: SingleChildScrollView(child: TaskActivity(taskId: 1)),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final strings = MaterialLocalizations.of(
+          tester.element(find.byType(TaskActivity)),
+        );
+        final title = find.text(es.activity);
+
+        void expectStop({required bool open}) {
+          expect(
+            tester.getSemantics(title),
+            isSemantics(
+              label: es.activity,
+              hasExpandedState: true,
+              isExpanded: open,
+              isButton: true,
+              hasTapAction: true,
+            ),
+            reason: 'open: $open',
+          );
+          final stops = readingOrder(tester).map((s) => s.label).toList();
+          expect(
+            stops.where((label) => label.contains(es.activity)),
+            hasLength(1),
+            reason: 'Actividad is one stop: $stops',
+          );
+          for (final word in {
+            strings.expandedHint,
+            strings.collapsedHint,
+            strings.expansionTileCollapsedHint,
+            strings.expansionTileExpandedHint,
+          }) {
+            expect(
+              stops.where((label) => label == word),
+              isEmpty,
+              reason: '«$word» is not a stop of its own: $stops',
+            );
+          }
+          // Nothing reads by itself as it appears or changes.
+          expect(readingOrder(tester).where((s) => s.live), isEmpty);
+        }
+
+        expectStop(open: false);
+        await tester.tap(title);
+        await tester.pumpAndSettle();
+        expectStop(open: true);
+        expect(find.text(es.activityCreated), findsOneWidget);
+        await tester.tap(title);
+        await tester.pumpAndSettle();
+        expectStop(open: false);
+        expect(find.text(es.activityCreated), findsNothing);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+  });
+
+  // ---- Run 2026-10-28-app, round 2 · P303 (UX-2625) ----
+
+  group('P303 · Novedades gets an icon of its own', () {
+    // A shared project and a private one, with 3 unread updates.
+    ProviderContainer sharedContainer() {
+      final container = designContainer(
+        projects: [
+          TaskListInfo(id: 'casa', name: 'Casa', version: 2, shared: true),
+          TaskListInfo(id: 'obra', name: 'Obra', version: 2),
+        ],
+        overrides: [
+          ...captureSheetOverrides(),
+          collaborationUnreadProvider.overrideWith((ref) async => 3),
+          collaborationActivityProvider.overrideWith((ref) async => []),
+        ],
+      );
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    for (final (name, screen) in [
+      ('Calendario', const CalendarScreen() as Widget),
+      ('Tareas', const HomeScreen()),
+      ('Notas', const NotesScreen()),
+    ]) {
+      testWidgets(
+        'UX-2625: (es, 1x, 360x800) on $name, with a shared project, Novedades is a megaphone with its badge and tooltip, and no page-with-lines icon is left in the header',
+        (tester) async {
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          await tester.pumpWidget(app(sharedContainer(), screen));
+          await tester.pumpAndSettle();
+          expect(es.groupActivity, 'Novedades');
+          final button = find.byTooltip(es.groupActivity);
+          expect(button, findsOneWidget);
+          expect(
+            find.descendant(
+              of: button,
+              matching: find.byIcon(Icons.campaign_outlined),
+            ),
+            findsOneWidget,
+          );
+          // The badge with the unread count stays on the button.
+          final badge = find.descendant(
+            of: button,
+            matching: find.byType(Badge),
+          );
+          expect(badge, findsOneWidget);
+          expect(tester.widget<Badge>(badge).isLabelVisible, isTrue);
+          expect(
+            find.descendant(of: badge, matching: find.text('3')),
+            findsOneWidget,
+          );
+          // Not the feed page, nor Notas' own tab icon, a page with lines.
+          expect(find.byIcon(Icons.feed_outlined), findsNothing);
+          expect(
+            find.descendant(
+              of: button,
+              matching: find.byIcon(Icons.description_outlined),
+            ),
+            findsNothing,
+          );
+          // In the header, inside the screen.
+          final screenRect = tester.getRect(find.byType(Scaffold).first);
+          final rect = tester.getRect(button);
+          expect(rect.left, greaterThanOrEqualTo(screenRect.left));
+          expect(rect.right, lessThanOrEqualTo(screenRect.right));
+          expect(
+            find.ancestor(of: button, matching: find.byType(AppBar)),
+            findsWidgets,
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    test('UX-2625: no screen or widget uses Icons.feed_outlined', () {
+      final users = [
+        for (final file in Directory('lib').listSync(recursive: true))
+          if (file is File &&
+              file.path.endsWith('.dart') &&
+              file.readAsStringSync().contains('Icons.feed_outlined'))
+            file.path,
+      ];
+      expect(users, isEmpty);
+      // And the megaphone means Novedades only: one place draws it.
+      final megaphone = [
+        for (final file in Directory('lib').listSync(recursive: true))
+          if (file is File &&
+              file.path.endsWith('.dart') &&
+              file.readAsStringSync().contains('Icons.campaign_outlined'))
+            file.path.replaceAll(r'\', '/'),
+      ];
+      expect(megaphone, ['lib/screens/activity_screen.dart']);
+    });
   });
 }
 

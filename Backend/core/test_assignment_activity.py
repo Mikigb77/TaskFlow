@@ -91,3 +91,14 @@ class AssignmentActivityTests(TestCase):
         self.assertIsNone(event.details["assignee_id"])
         [entry] = self.assigned(self.miki)
         self.assertEqual((entry["assignee_name"], entry["assignee_is_you"]), (None, False))
+
+
+class UpdatedFieldsActivityTests(AssignmentActivityTests):
+    """An update says what it changed (UX-2508), so the app can say «ha movido» for a move."""
+
+    def test_an_update_lists_its_changed_fields_and_other_actions_do_not(self):
+        moved = self.save(self.paul, self.task, scheduled_date="2026-11-03")
+        self.save(self.paul, moved, title="Reservar el autobús grande")
+        updates = [item for item in self.activity(self.miki) if item["action"] == "updated"]  # Its assignee hears.
+        self.assertEqual([item["fields"] for item in updates], [["title"], ["scheduled_date"]])
+        self.assertTrue(all("fields" not in item for item in self.activity(self.miki) if item["action"] != "updated"))

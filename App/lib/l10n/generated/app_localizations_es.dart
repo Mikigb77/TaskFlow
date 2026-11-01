@@ -36,13 +36,18 @@ class AppLocalizationsEs extends AppLocalizations {
   String get reviewOriginalText => 'Texto original';
 
   @override
-  String get reviewRemove => 'Quitar';
-
-  @override
   String get reviewRemoved => 'Quitada';
 
   @override
-  String get reviewUndoSaved => 'Han vuelto aquí, sin guardar.';
+  String reviewUndoSaved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Han vuelto aquí, sin guardar.',
+      one: 'Ha vuelto aquí, sin guardar.',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get reviewUndoChanged =>
@@ -223,9 +228,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get notesSavedOnDevice => 'Tus notas siguen en este teléfono.';
 
   @override
-  String get allNotes => 'Todas las notas';
-
-  @override
   String get viewOnlyNote =>
       'Nota de solo lectura. Si quieres hacer cambios, pídeselo al propietario del proyecto.';
 
@@ -273,9 +275,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get deadlineTime => 'Hora límite';
 
   @override
-  String get deadlineEndDay => 'Antes de que termine el día';
-
-  @override
   String get removeDeadline => 'Quitar fecha límite';
 
   @override
@@ -287,11 +286,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'El plan termina después de la fecha límite. Revisa el inicio o la duración.';
 
   @override
-  String get deadlineOverdue => 'Fecha límite vencida';
-
-  @override
   String deadlineLabel(String date) {
     return 'Vence $date';
+  }
+
+  @override
+  String deadlinePassedOn(String date) {
+    return 'Venció el $date';
   }
 
   @override
@@ -336,10 +337,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get calendarChoose => 'Elegir calendarios';
 
   @override
-  String get calendarChooseHelp =>
-      'Selecciona hasta 50 calendarios. Las horas siguen la zona de tu dispositivo; los eventos de día completo conservan sus fechas originales.';
-
-  @override
   String get calendarDenied =>
       'Permite el acceso al calendario para mostrar tus eventos. Tus tareas siguen funcionando sin él.';
 
@@ -364,10 +361,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get calendarRefresh => 'Actualizar calendarios';
-
-  @override
-  String get calendarReadError =>
-      'No se pudieron leer los eventos. Actualiza para volver a intentarlo; pueden faltar compromisos en esta vista.';
 
   @override
   String get calendarReadRetry =>
@@ -398,14 +391,8 @@ class AppLocalizationsEs extends AppLocalizations {
   String get calendarAllDay => 'Todo el día';
 
   @override
-  String calendarEventCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count eventos',
-      one: '1 evento',
-    );
-    return '$_temp0';
+  String calendarSeeAllEvents(int count) {
+    return 'Ver los $count eventos';
   }
 
   @override
@@ -571,9 +558,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get delete => 'Eliminar';
-
-  @override
-  String get keepChanges => 'Guardar cambios';
 
   @override
   String get taskTitle => 'Título de la tarea';
@@ -763,7 +747,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get homeCaptureInstructions =>
-      'En Android, mantén pulsado el icono de TaskFlow para ver los accesos directos, o añade el widget de micrófono desde el lanzador. Comparte texto con TaskFlow desde otra aplicación.';
+      'En Android, mantén pulsado el icono de TaskFlow para ver los accesos directos, o añade el widget Dictar una tarea desde la pantalla de inicio. Comparte texto con TaskFlow desde otra aplicación.';
 
   @override
   String get widgetPickerHelp =>
@@ -788,6 +772,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get findTask => 'Buscar una tarea…';
+
+  @override
+  String get clearSearch => 'Borrar búsqueda';
 
   @override
   String get allTasks => 'Todas las tareas';
@@ -911,6 +898,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get deleteTask => 'Eliminar tarea';
 
   @override
+  String get deleteNote => 'Eliminar nota';
+
+  @override
   String get keepTask => 'Conservar tarea';
 
   @override
@@ -950,6 +940,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get moveError => 'No se pudo mover esta tarea. Inténtalo de nuevo.';
 
   @override
+  String get moveNoteError => 'No se pudo mover esta nota. Inténtalo de nuevo.';
+
+  @override
   String get occurrence => 'Repetición';
 
   @override
@@ -975,7 +968,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get reset => 'Restablecer';
 
   @override
-  String get recordingKept => 'Grabación guardada en este teléfono';
+  String get recordingKept => 'Grabación conservada en este teléfono';
 
   @override
   String get onDeviceTranscript => 'En el teléfono, mientras hablas';
@@ -1020,11 +1013,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get capturePrivacy =>
-      'La transcripción en directo usa el reconocimiento local cuando está disponible; ese modo no conserva audio. Para añadir, buscar o cambiar tareas, tus palabras van por internet a la IA de Google. El audio guardado se transcribe en línea. Lo que aún no has guardado se queda en este teléfono hasta que lo guardes o lo descartes.';
+      'La transcripción en directo usa el reconocimiento local cuando está disponible; ese modo no conserva audio. Para añadir, buscar o cambiar tareas, o pedir recordatorios a tu manera, tus palabras van por internet a la IA de Google. El audio guardado se transcribe en línea. Lo que aún no has guardado se queda en este teléfono hasta que lo guardes o lo descartes.';
 
   @override
   String get capturePrivacyLine =>
-      'Tus palabras van por internet. Más en Ajustes.';
+      'Tus palabras van a la IA de Google. Más en Otros ajustes › Voz.';
 
   @override
   String get lookRight => '¿Está bien así?';
@@ -1044,28 +1037,30 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String agendaCounts(int remaining, int done) {
     String _temp0 = intl.Intl.pluralLogic(
-      remaining,
-      locale: localeName,
-      other: '$remaining pendientes',
-      one: '1 pendiente',
-    );
-    String _temp1 = intl.Intl.pluralLogic(
-      remaining,
-      locale: localeName,
-      other: '$remaining pendientes',
-      one: '1 pendiente',
-    );
-    String _temp2 = intl.Intl.pluralLogic(
-      remaining,
-      locale: localeName,
-      other: '$remaining pendientes',
-      one: '1 pendiente',
-    );
-    String _temp3 = intl.Intl.pluralLogic(
       done,
       locale: localeName,
-      other: '$_temp0 · $done completadas',
-      one: '$_temp1 · 1 completada',
+      other: '$remaining pendientes · $done completadas',
+      one: '$remaining pendientes · 1 completada',
+      zero: '$remaining pendientes',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      done,
+      locale: localeName,
+      other: '1 pendiente · $done completadas',
+      one: '1 pendiente · 1 completada',
+      zero: '1 pendiente',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      done,
+      locale: localeName,
+      other: '$done completadas',
+      one: '1 completada',
+    );
+    String _temp3 = intl.Intl.pluralLogic(
+      remaining,
+      locale: localeName,
+      other: '$_temp0',
+      one: '$_temp1',
       zero: '$_temp2',
     );
     return '$_temp3';
@@ -1153,8 +1148,13 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String priorityValue(String priority) {
-    return 'Prioridad $priority';
+  String priorityValue(String level) {
+    String _temp0 = intl.Intl.selectLogic(level, {
+      'high': 'Prioridad alta',
+      'medium': 'Prioridad media',
+      'other': 'Prioridad baja',
+    });
+    return '$_temp0';
   }
 
   @override
@@ -1197,6 +1197,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get taskCompleted => 'Tarea completada';
+
+  @override
+  String get dayAllClear => 'Todo listo. Respira.';
 
   @override
   String get undoError => 'No se pudo deshacer el cambio. Inténtalo de nuevo.';
@@ -1307,7 +1310,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get titleRequiredField => 'Introduce un título para la tarea';
 
   @override
-  String get fromYourWords => 'Según lo que has escrito';
+  String get fromYourWords => 'Según tus palabras';
 
   @override
   String get keepAsTyped => 'Dejar como está';
@@ -1373,6 +1376,11 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String reminderBeforeDeadline(String lead) {
+    return '$lead · fecha límite';
+  }
+
+  @override
   String reminderForPersonOnly(String name) {
     return 'Recordatorio para $name';
   }
@@ -1387,6 +1395,36 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get noReminderTimePassed =>
       'Sin recordatorio: ya ha pasado la hora del aviso';
+
+  @override
+  String reminderSent(String when, String date, String time) {
+    String _temp0 = intl.Intl.selectLogic(when, {
+      'today': 'hoy',
+      'tomorrow': 'mañana',
+      'other': '$date',
+    });
+    return 'Recordatorio enviado: $_temp0, $time';
+  }
+
+  @override
+  String reminderSnoozed(String when, String date, String time) {
+    String _temp0 = intl.Intl.selectLogic(when, {
+      'today': 'hoy',
+      'tomorrow': 'mañana',
+      'other': '$date',
+    });
+    return 'Recordatorio pospuesto: $_temp0, $time';
+  }
+
+  @override
+  String reminderPlanLast(String plan, String when, String date, String time) {
+    String _temp0 = intl.Intl.selectLogic(when, {
+      'today': 'hoy',
+      'tomorrow': 'mañana',
+      'other': '$date',
+    });
+    return '$plan · último: $_temp0, $time';
+  }
 
   @override
   String get fileLocal => 'Solo en este dispositivo';
@@ -1419,7 +1457,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get fileRetry => 'Volver a subir';
 
   @override
-  String get fileRemove => 'Eliminar archivo adjunto';
+  String get fileRemove => 'Quitar archivo';
 
   @override
   String removeFileNamed(String file) {
@@ -1427,11 +1465,11 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get fileRemoveQuestion => '¿Eliminar este archivo adjunto?';
+  String get fileRemoveQuestion => '¿Quitar este archivo de la tarea?';
 
   @override
   String get fileRemoveHelp =>
-      'Se eliminará de la tarea y, si lo has subido, de tus otros dispositivos al sincronizar. Tu archivo original no se elimina.';
+      'Se quitará de la tarea y, si lo has subido, de tus otros dispositivos al sincronizar. Tu archivo original no se elimina.';
 
   @override
   String get yourAccount => 'Tu cuenta';
@@ -1500,6 +1538,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get signInHeading => 'Inicia sesión';
+
+  @override
+  String get signInOrUpHeading => 'Entra o crea tu cuenta';
 
   @override
   String get authPitch =>
@@ -1884,7 +1925,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get sharingRolesHelp =>
-      'Los editores pueden añadir, cambiar, completar y eliminar tareas y archivos. Solo el propietario gestiona el proyecto y las personas. Las tareas compartidas permanecen en este proyecto; al exportarlas se crea una copia personal.';
+      'Los editores pueden añadir, cambiar, completar y eliminar tareas y archivos. Solo el propietario gestiona el proyecto y las personas. Las tareas compartidas se quedan en este proyecto.';
 
   @override
   String get listSharing => 'Compartir proyecto';
@@ -1915,7 +1956,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get removeAccessHelp =>
-      'Esta persona perderá el acceso al proyecto y a sus tareas, notas y archivos. Sus cambios compartidos pendientes se eliminarán en la próxima sincronización correcta.';
+      'Esta persona perderá el acceso al proyecto y a sus tareas, notas y archivos. Los cambios que aún no haya enviado se perderán.';
 
   @override
   String get pendingInvitations => 'Invitaciones pendientes';
@@ -1934,7 +1975,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get sharingRemovalHelp =>
-      'Al salir o perder el acceso, las tareas y notas compartidas, los cambios pendientes y las copias descargadas se eliminarán de este teléfono en la próxima sincronización correcta. No se pueden borrar a distancia los dispositivos sin conexión ni las copias ya exportadas.';
+      'Al salir o perder el acceso, el proyecto desaparece de este teléfono la próxima vez que se conecte. Las copias que hayas exportado se quedan.';
 
   @override
   String get deleteList => 'Eliminar proyecto';
@@ -2045,10 +2086,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get fileUploadHelp =>
       'Los archivos nuevos se suben a tu cuenta al guardar, hasta 6 MB cada uno. Los archivos locales anteriores permanecen aquí hasta que elijas Subir en los detalles de la tarea.';
-
-  @override
-  String get fileLocalHelp =>
-      'Los archivos permanecen en este dispositivo hasta que inicies sesión y elijas Subir en los detalles de la tarea. Hasta 6 MB por archivo.';
 
   @override
   String get fileLimit =>
@@ -2742,11 +2779,15 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get captureOffline =>
-      'Sin conexión. Tus palabras están guardadas; inténtalo cuando tengas internet.';
+      'Sin conexión. Toca Guardar como tarea o reinténtalo cuando tengas internet.';
+
+  @override
+  String get captureOfflineRecording =>
+      'Sin conexión. La grabación se conserva; reinténtalo cuando tengas internet.';
 
   @override
   String get captureUnavailable =>
-      'No he podido contactar con el asistente; tus palabras se conservan.';
+      'Ahora no puedo convertir tus palabras en tareas; se conservan.';
 
   @override
   String get captureTooFast =>
@@ -2819,7 +2860,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get captureListeningOnline =>
-      'Te escucho. Verás tus palabras al tocar Listo.';
+      'Te escucho. Al tocar Listo verás lo que he entendido.';
 
   @override
   String captureTimeLeft(int seconds) {
@@ -2907,7 +2948,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get capturesEmptyHelp =>
-      'Aquí se guardan las grabaciones y las tareas que dejes a medias.';
+      'Aquí se conservan las grabaciones y las tareas que dejes a medias.';
 
   @override
   String captureDraftSummary(int count) {
@@ -2937,6 +2978,17 @@ class AppLocalizationsEs extends AppLocalizations {
       locale: localeName,
       other: '$count tareas añadidas',
       one: '1 tarea añadida',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String captureTasksAddedOn(int count, String date) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tareas añadidas al $date',
+      one: '1 tarea añadida al $date',
     );
     return '$_temp0';
   }
@@ -3041,8 +3093,8 @@ class AppLocalizationsEs extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count tareas completadas. Pulsa una casilla para reabrir una.',
-      one: '1 tarea completada. Pulsa su casilla para reabrirla.',
+      other: '$count tareas completadas. Toca una casilla para reabrir una.',
+      one: '1 tarea completada. Toca su casilla para reabrirla.',
     );
     return '$_temp0';
   }
@@ -3096,6 +3148,13 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get viewOnlyTask => 'Solo puedes ver esta tarea.';
+
+  @override
+  String get viewOnlyTaskReminders =>
+      'Solo puedes ver esta tarea y elegir tus recordatorios.';
+
+  @override
+  String get syncCopySuffix => '(copia local)';
 
   @override
   String get stepUpdateError =>
@@ -3191,11 +3250,14 @@ class AppLocalizationsEs extends AppLocalizations {
   String get taskflowPro => 'TaskFlow Pro';
 
   @override
-  String get billingSettingsHelp => 'Suscripción, compras y facturación';
+  String get proBenefitDictation =>
+      'Dictados y espacio para archivos sin límite';
 
   @override
-  String get billingIntro =>
-      'Dictados sin límite y espacio para todos tus archivos.';
+  String get proBenefitTyping => 'Tus frases escritas se convierten en tareas';
+
+  @override
+  String get proBenefitReminders => 'Pide los recordatorios con tus palabras';
 
   @override
   String get billingComplimentary =>
@@ -3241,7 +3303,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get billingRenewalHelp =>
-      'Se renueva automáticamente cada mes hasta que la canceles. Revisa el precio final y las condiciones de prueba antes de confirmar.';
+      'Se renueva automáticamente cada mes hasta que la canceles. Revisa el precio final y las condiciones de cualquier prueba antes de confirmar.';
 
   @override
   String get billingViewPlans => 'Ver suscripción';
@@ -3425,6 +3487,15 @@ class AppLocalizationsEs extends AppLocalizations {
       'Las tareas compartidas se quedan en su proyecto.';
 
   @override
+  String shareNoteConfirm(String name) {
+    return '¿Compartir con $name? Todos verán esta nota y no podrás volver a hacerla privada.';
+  }
+
+  @override
+  String get sharedNoteStays =>
+      'Las notas compartidas se quedan en su proyecto.';
+
+  @override
   String get assignmentIsRight => '¿Es correcto?';
 
   @override
@@ -3492,6 +3563,24 @@ class AppLocalizationsEs extends AppLocalizations {
       'Solo puedes eliminar un grupo vacío. Archívalo para conservar sus proyectos y contenido.';
 
   @override
+  String get groupDeleteAction => 'Eliminar grupo';
+
+  @override
+  String groupDeleteConfirm(String name) {
+    return '¿Eliminar «$name»? Sus miembros dejarán de verlo. No se puede deshacer.';
+  }
+
+  @override
+  String groupTransferConfirm(String group, String person) {
+    return '¿Transferir «$group» a $person?';
+  }
+
+  @override
+  String groupTransferAction(String person) {
+    return 'Transferir a $person';
+  }
+
+  @override
   String get groupActionError =>
       'No se ha podido guardar el cambio. Comprueba la conexión y actualiza; los permisos pueden haber cambiado.';
 
@@ -3532,7 +3621,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get updatesAll => 'Todos los cambios';
 
   @override
-  String get updatesAssigned => 'Mis asignaciones';
+  String get updatesAssigned => 'Solo lo que es para mí';
 
   @override
   String get updatesMuted => 'Silenciado: sin novedades ni recordatorios';
@@ -3554,7 +3643,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get activityCreated => 'Ha creado una tarea';
 
   @override
-  String get activityUpdated => 'Ha actualizado una tarea';
+  String get activityUpdated => 'Ha actualizado la tarea';
+
+  @override
+  String get activityMoved => 'Ha movido la tarea';
 
   @override
   String get activityAssigned => 'Ha cambiado el responsable';
@@ -3591,6 +3683,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'unassigned': '$actor ha quitado el responsable de: $title',
       'completed': '$actor ha completado: $title',
       'reopened': '$actor ha reabierto: $title',
+      'moved': '$actor ha movido: $title',
       'deleted': '$actor ha eliminado: $title',
       'shared': '$actor ha compartido: $title',
       'other': '$actor ha actualizado: $title',
@@ -3689,7 +3782,7 @@ class AppLocalizationsEs extends AppLocalizations {
       other: 'te quedan $left',
       one: 'te queda 1',
     );
-    return 'Dictados gratis: $_temp0 de $limit este mes. Más el $date.';
+    return 'Dictados gratis: $_temp0 de $limit este mes. El $date tendrás más.';
   }
 
   @override
@@ -3736,7 +3829,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String storageUsage(int used, int limit) {
-    return 'Archivos: $used de $limit MB usados';
+    return 'Archivos: $used de $limit MB usados';
   }
 
   @override
@@ -4284,6 +4377,11 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String commandDeletedTitle(String title) {
+    return 'Eliminada: $title';
+  }
+
+  @override
   String commandProjectsCreated(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -4297,6 +4395,16 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String commandChangeSemantics(String label, String before, String after) {
     return '$label: de $before a $after';
+  }
+
+  @override
+  String commandChangeLine(String label, String before, String after) {
+    return '$label: $before → $after';
+  }
+
+  @override
+  String commandChangeLineFrom(String label, String before) {
+    return '$label: $before →';
   }
 
   @override

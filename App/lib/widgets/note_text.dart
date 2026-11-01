@@ -27,21 +27,27 @@ class NoteText extends StatelessWidget {
   const NoteText(this.text, {super.key, this.onTap});
   final String text;
 
-  /// Called for a tap on the text; long-press still selects it. The caller
-  /// then names the text for TalkBack, as a button, so it isn't read as an
-  /// unnamed field.
+  /// Called for a tap on the text; long-press still selects it.
   final VoidCallback? onTap;
+
+  // The words aren't a node of their own: the caller names them for
+  // TalkBack (a button when [onTap] is set), so they aren't read as an
+  // unnamed field. The links stay their own buttons.
   @override
   Widget build(BuildContext context) {
     final links = noteLinks(text);
     final words =
         SelectableText(text, style: const TextStyle(height: 1.6), onTap: onTap);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      onTap == null ? words : ExcludeSemantics(child: words),
+      ExcludeSemantics(child: words),
       if (links.isNotEmpty) ...[
         const SizedBox(height: 16),
-        Text(context.l10n.noteLinks,
-            style: Theme.of(context).textTheme.labelLarge),
+        // Its own node, so the caller's «Notas» doesn't take it in.
+        Semantics(
+          container: true,
+          child: Text(context.l10n.noteLinks,
+              style: Theme.of(context).textTheme.labelLarge),
+        ),
         for (final uri in links)
           TextButton.icon(
               style: TextButton.styleFrom(alignment: Alignment.centerLeft),

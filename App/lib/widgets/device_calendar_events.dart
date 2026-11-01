@@ -15,11 +15,19 @@ Future<void> showDeviceCalendarEvent(
         showDragHandle: true,
         builder: (_) => _CalendarSheet(day: day, eventKey: event.identity));
 
-/// One line under the day's tasks: the phone-calendar event count and the
-/// first start times. Tapping it opens every event; access problems take the
-/// same line and open calendar choice, read problems retry, and a day without
-/// events shows nothing. A tapped retry keeps its line, busy, until the read
-/// settles.
+/// Every phone-calendar event of [day], in a sheet.
+Future<void> _showDeviceCalendarEvents(BuildContext context, DateTime day) =>
+    showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (_) => _CalendarSheet(day: day));
+
+/// Under the day's tasks, its phone-calendar events by name, up to three
+/// rows: «Cita con el dentista · 17:00». Each row opens its event; with more,
+/// a fourth row opens every event. Access problems take one line and open
+/// calendar choice, read problems retry, and a day without events shows
+/// nothing. A tapped retry keeps its line, busy, until the read settles.
 class DeviceCalendarEvents extends ConsumerStatefulWidget {
   const DeviceCalendarEvents({super.key, required this.day});
   final DateTime day;
@@ -28,48 +36,40 @@ class DeviceCalendarEvents extends ConsumerStatefulWidget {
       _DeviceCalendarEventsState();
 }
 
-class _DeviceCalendarEventsState extends ConsumerState<DeviceCalendarEvents> {
-  bool _retrying = false;
-
+class _DeviceCalendarEventsState extends ConsumerState<DeviceCalendarEvents>
+    with CalendarReadRetry {
   @override
   void didUpdateWidget(DeviceCalendarEvents oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (Task.dateKey(oldWidget.day) != Task.dateKey(widget.day)) {
-      _retrying = false;
+      retrying = false;
     }
-  }
-
-  Future<void> _retry(Future<void> Function() read) async {
-    setState(() => _retrying = true);
-    try {
-      await read();
-    } catch (_) {
-      // A failed retry shows the retry line again.
-    }
-    if (mounted) setState(() => _retrying = false);
   }
 
   @override
   Widget build(BuildContext context) {
+    final shown = _shown(context);
+    // 8 dp keep whatever shows apart from «Sin fecha · N» under it.
+    return shown == null
+        ? const SizedBox.shrink()
+        : Padding(padding: const EdgeInsets.only(bottom: 8), child: shown);
+  }
+
+  Widget? _shown(BuildContext context) {
     final day = widget.day;
     final state = ref.watch(deviceCalendarProvider);
-    if (!state.preferences.enabled) return const SizedBox.shrink();
+    if (!state.preferences.enabled) return null;
     final l = context.l10n;
-    final busy = _EventsLine(l.calendarReadRetry, onTap: null, busy: true);
+    const busy = CalendarReadRetryLine(busy: true);
     void choose() => Navigator.pushNamed(context, '/deviceCalendars');
-    void showAll() => showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        builder: (context) => _CalendarSheet(day: day));
     if (state.error) {
-      if (_retrying) return busy;
-      return _EventsLine(l.calendarReadRetry,
-          onTap: () =>
-              _retry(() => ref.read(deviceCalendarProvider.notifier).refresh()));
+      if (retrying) return busy;
+      return CalendarReadRetryLine(
+          onRetry: () =>
+              retry(() => ref.read(deviceCalendarProvider.notifier).refresh()));
     }
     if (state.access == CalendarAccess.checking) {
-      return _retrying ? busy : const SizedBox.shrink();
+      return retrying ? busy : null;
     }
     if (state.access != CalendarAccess.granted) {
       return _EventsLine(l.calendarDenied, onTap: choose);
@@ -81,25 +81,64 @@ class _DeviceCalendarEventsState extends ConsumerState<DeviceCalendarEvents> {
     return ref.watch(deviceEventsProvider(key)).when(
         skipLoadingOnRefresh: false,
         skipLoadingOnReload: false,
-        loading: () => _retrying ? busy : const SizedBox.shrink(),
-        error: (_, __) => _retrying
+        loading: () => retrying ? busy : null,
+        error: (_, __) => retrying
             ? busy
-            : _EventsLine(l.calendarReadRetry,
-                onTap: () => _retry(() {
-                      ref.invalidate(deviceEventsProvider(key));
-                      return ref.read(deviceEventsProvider(key).future);
-                    })),
+            : CalendarReadRetryLine(
+                onRetry: () => retry(() => readDayEventsAgain(ref, key))),
         data: (result) {
-          if (result.items.isEmpty) return const SizedBox.shrink();
-          final times = result.items
-              .take(3)
-              .map((event) => _startTime(context, event, day));
-          return _EventsLine(
-              [l.calendarEventCount(result.items.length), ...times]
-                  .join(' · '),
-              onTap: showAll);
+          final events = result.items;
+          if (events.isEmpty) return null;
+          return Column(mainAxisSize: MainAxisSize.min, children: [
+            for (final event in events.take(3))
+              _EventRow(event: event, day: day),
+            if (events.length > 3)
+              _EventRow(
+                  key: const ValueKey('calendar-events-all'),
+                  text: l.calendarSeeAllEvents(events.length),
+                  day: day),
+          ]);
         });
   }
+}
+
+/// Reads a day's phone events again, for a retry.
+Future<void> readDayEventsAgain(WidgetRef ref, String dateKey) {
+  ref.invalidate(deviceEventsProvider(dateKey));
+  return ref.read(deviceEventsProvider(dateKey).future);
+}
+
+/// A tapped retry keeps its line on screen, busy, until its read settles,
+/// while the read itself shows as loading.
+mixin CalendarReadRetry<T extends StatefulWidget> on State<T> {
+  bool retrying = false;
+
+  Future<void> retry(Future<void> Function() read) async {
+    setState(() => retrying = true);
+    try {
+      await read();
+    } catch (_) {
+      // A failed retry shows the retry line again.
+    }
+    if (mounted) setState(() => retrying = false);
+  }
+}
+
+/// «No se pudieron leer los eventos. Toca para reintentar.»: a failed
+/// phone-calendar read, which a tap reads again. While [busy], a spinner takes
+/// the icon's place and the line takes no tap. [inset] is its side margin.
+class CalendarReadRetryLine extends StatelessWidget {
+  const CalendarReadRetryLine(
+      {super.key, this.onRetry, this.busy = false, this.inset = 20});
+  final VoidCallback? onRetry;
+  final bool busy;
+  final double inset;
+  @override
+  Widget build(BuildContext context) => _EventsLine(
+      context.l10n.calendarReadRetry,
+      onTap: busy ? null : onRetry,
+      busy: busy,
+      inset: inset);
 }
 
 String _startTime(
@@ -111,18 +150,79 @@ String _startTime(
       : context.shortDate(start);
 }
 
+/// One of the day's events on Calendar, title first: «Cita con el dentista ·
+/// 17:00»; a tap opens it. Without [event], [text] opens every event. Events,
+/// not tasks: no circle and no swipe.
+class _EventRow extends StatelessWidget {
+  const _EventRow({super.key, this.event, this.text, required this.day});
+  final DeviceCalendarEvent? event;
+  final String? text;
+  final DateTime day;
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final event = this.event;
+    final l = context.l10n;
+    final Widget label;
+    final VoidCallback onTap;
+    if (event == null) {
+      label = Text(text!,
+          style: TextStyle(color: colors.primary, fontWeight: FontWeight.w600));
+      onTap = () => _showDeviceCalendarEvents(context, day);
+    } else {
+      label = Text.rich(
+          TextSpan(children: [
+            TextSpan(
+                text: event.title.isEmpty ? l.calendarUntitled : event.title),
+            TextSpan(
+                text: ' · ${_startTime(context, event, day)}',
+                style: TextStyle(color: colors.onSurfaceVariant)),
+          ]),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis);
+      onTap = () => showDeviceCalendarEvent(context, day, event);
+    }
+    return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Semantics(
+            button: true,
+            child: InkWell(
+                key: event == null
+                    ? null
+                    : ValueKey('calendar-event-${event.identity}'),
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(12),
+                child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 48),
+                    child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 8),
+                        child: Row(children: [
+                          if (event == null)
+                            const SizedBox(width: 20)
+                          else
+                            Icon(Icons.event_outlined,
+                                size: 20, color: colors.onSurfaceVariant),
+                          const SizedBox(width: 10),
+                          Expanded(child: label),
+                        ]))))));
+  }
+}
+
 class _EventsLine extends StatelessWidget {
-  const _EventsLine(this.text, {required this.onTap, this.busy = false});
+  const _EventsLine(this.text,
+      {required this.onTap, this.busy = false, this.inset = 20});
   final String text;
   final VoidCallback? onTap;
 
   /// A tapped retry in progress: a spinner takes the icon's place.
   final bool busy;
+  final double inset;
   @override
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme.onSurfaceVariant;
     return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: EdgeInsets.symmetric(horizontal: inset),
         child: Semantics(
             button: true,
             enabled: onTap != null,
@@ -183,36 +283,47 @@ class _EventTile extends ConsumerWidget {
                     Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
                 subtitle: Text(
                     '${deviceEventTime(context, event, day)}\n${event.sources.map((c) => c.name).join(' · ')}'),
-                onTap: () => showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    showDragHandle: true,
-                    builder: (context) =>
-                        _CalendarSheet(day: day, eventKey: event.identity)))));
+                onTap: () => showDeviceCalendarEvent(context, day, event))));
   }
 }
 
 /// A sheet observes the same live permission/selection snapshot as the agenda;
 /// opening an event never freezes its contents across permission revocation.
-class _CalendarSheet extends ConsumerWidget {
+/// It is as tall as its content, up to three quarters of the screen, and ends
+/// with «Cerrar».
+class _CalendarSheet extends ConsumerStatefulWidget {
   const _CalendarSheet({required this.day, this.eventKey});
   final DateTime day;
   final String? eventKey;
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CalendarSheet> createState() => _CalendarSheetState();
+}
+
+class _CalendarSheetState extends ConsumerState<_CalendarSheet>
+    with CalendarReadRetry {
+  @override
+  Widget build(BuildContext context) {
+    final day = widget.day;
+    final eventKey = widget.eventKey;
     final state = ref.watch(deviceCalendarProvider);
     final l = context.l10n;
+    final key = Task.dateKey(day);
+    const busy = CalendarReadRetryLine(busy: true, inset: 0);
     Widget body;
     if (state.access == CalendarAccess.checking) {
       body = const LinearProgressIndicator();
     } else if (!state.showing) {
       body = Text(l.calendarEventGone);
     } else {
-      body = ref.watch(deviceEventsProvider(Task.dateKey(day))).when(
+      body = ref.watch(deviceEventsProvider(key)).when(
           skipLoadingOnRefresh: false,
           skipLoadingOnReload: false,
-          loading: () => const LinearProgressIndicator(),
-          error: (_, __) => Text(l.calendarReadError),
+          loading: () => retrying ? busy : const LinearProgressIndicator(),
+          error: (_, __) => retrying
+              ? busy
+              : CalendarReadRetryLine(
+                  inset: 0,
+                  onRetry: () => retry(() => readDayEventsAgain(ref, key))),
           data: (result) {
             if (eventKey == null) {
               return Column(children: [
@@ -272,9 +383,24 @@ class _CalendarSheet extends ConsumerWidget {
       ]);
     }
     return SafeArea(
-        child: SizedBox(
-            height: MediaQuery.sizeOf(context).height * .75,
-            child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24), child: body)));
+        child: ConstrainedBox(
+            constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * .75),
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Flexible(
+                      child: SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+                          child: body)),
+                  // A way out that shows, as Back, the scrim or a drag do.
+                  Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                      child: TextButton(
+                          key: const ValueKey('calendar-sheet-close'),
+                          onPressed: () => Navigator.pop(context),
+                          child: Text(l.close))),
+                ])));
   }
 }

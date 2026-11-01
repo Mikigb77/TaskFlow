@@ -36,13 +36,18 @@ class AppLocalizationsCa extends AppLocalizations {
   String get reviewOriginalText => 'Text original';
 
   @override
-  String get reviewRemove => 'Treu';
-
-  @override
   String get reviewRemoved => 'Treta';
 
   @override
-  String get reviewUndoSaved => 'Tornen a ser aquí, sense desar.';
+  String reviewUndoSaved(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Tornen a ser aquí, sense desar.',
+      one: 'Torna a ser aquí, sense desar.',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get reviewUndoChanged =>
@@ -223,9 +228,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get notesSavedOnDevice => 'Les notes continuen en aquest telèfon.';
 
   @override
-  String get allNotes => 'Totes les notes';
-
-  @override
   String get viewOnlyNote =>
       'Nota de només lectura. Si vols fer canvis, demana-ho al propietari del projecte.';
 
@@ -273,9 +275,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get deadlineTime => 'Hora límit';
 
   @override
-  String get deadlineEndDay => 'Abans que acabi el dia';
-
-  @override
   String get removeDeadline => 'Treu el termini';
 
   @override
@@ -286,11 +285,13 @@ class AppLocalizationsCa extends AppLocalizations {
       'Aquesta planificació acaba després del termini. Revisa l’inici o la durada.';
 
   @override
-  String get deadlineOverdue => 'Termini vençut';
-
-  @override
   String deadlineLabel(String date) {
     return 'Termini: $date';
+  }
+
+  @override
+  String deadlinePassedOn(String date) {
+    return 'Termini vençut: $date';
   }
 
   @override
@@ -335,10 +336,6 @@ class AppLocalizationsCa extends AppLocalizations {
   String get calendarChoose => 'Tria els calendaris';
 
   @override
-  String get calendarChooseHelp =>
-      'Selecciona fins a 50 calendaris. Les hores segueixen el fus del dispositiu; els esdeveniments de tot el dia mantenen la data original.';
-
-  @override
   String get calendarDenied =>
       'Permet l’accés al calendari per mostrar els esdeveniments. Les tasques continuen funcionant sense aquest permís.';
 
@@ -363,10 +360,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get calendarRefresh => 'Actualitza els calendaris';
-
-  @override
-  String get calendarReadError =>
-      'No s’han pogut llegir els esdeveniments. Actualitza per tornar-ho a provar; pot ser que faltin compromisos en aquesta vista.';
 
   @override
   String get calendarReadRetry =>
@@ -397,14 +390,8 @@ class AppLocalizationsCa extends AppLocalizations {
   String get calendarAllDay => 'Tot el dia';
 
   @override
-  String calendarEventCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count esdeveniments',
-      one: '1 esdeveniment',
-    );
-    return '$_temp0';
+  String calendarSeeAllEvents(int count) {
+    return 'Mostra els $count esdeveniments';
   }
 
   @override
@@ -570,9 +557,6 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get delete => 'Suprimeix';
-
-  @override
-  String get keepChanges => 'Conserva els canvis';
 
   @override
   String get taskTitle => 'Títol de la tasca';
@@ -789,6 +773,9 @@ class AppLocalizationsCa extends AppLocalizations {
   String get findTask => 'Cerca una tasca…';
 
   @override
+  String get clearSearch => 'Esborra la cerca';
+
+  @override
   String get allTasks => 'Totes les tasques';
 
   @override
@@ -910,6 +897,9 @@ class AppLocalizationsCa extends AppLocalizations {
   String get deleteTask => 'Suprimeix la tasca';
 
   @override
+  String get deleteNote => 'Suprimeix la nota';
+
+  @override
   String get keepTask => 'Conserva la tasca';
 
   @override
@@ -948,6 +938,10 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get moveError =>
       'No s’ha pogut moure aquesta tasca. Torna-ho a provar.';
+
+  @override
+  String get moveNoteError =>
+      'No s’ha pogut moure aquesta nota. Torna-ho a provar.';
 
   @override
   String get occurrence => 'Repetició';
@@ -1020,11 +1014,11 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get capturePrivacy =>
-      'La transcripció en directe utilitza el reconeixement local quan està disponible; en aquest mode no es conserva l’àudio. Per afegir, cercar o canviar tasques, les teves paraules van per internet a la IA de Google. L’àudio desat es transcriu en línia. El que encara no has desat es queda en aquest telèfon fins que ho desis o ho descartis.';
+      'La transcripció en directe utilitza el reconeixement local quan està disponible; en aquest mode no es conserva l’àudio. Per afegir, cercar o canviar tasques, o demanar recordatoris a la teva manera, les teves paraules van per internet a la IA de Google. L’àudio desat es transcriu en línia. El que encara no has desat es queda en aquest telèfon fins que ho desis o ho descartis.';
 
   @override
   String get capturePrivacyLine =>
-      'Les paraules van per internet. Més a Configuració.';
+      'Les paraules van a la IA de Google. Més a Altres opcions › Veu.';
 
   @override
   String get lookRight => 'Tot correcte?';
@@ -1047,11 +1041,23 @@ class AppLocalizationsCa extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       done,
       locale: localeName,
-      other: '$remaining per fer · $done completades',
-      one: '$remaining per fer · 1 completada',
-      zero: '$remaining per fer',
+      other: '$remaining per fer · $done completades',
+      one: '$remaining per fer · 1 completada',
+      zero: '$remaining per fer',
     );
-    return '$_temp0';
+    String _temp1 = intl.Intl.pluralLogic(
+      done,
+      locale: localeName,
+      other: '$done completades',
+      one: '1 completada',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      remaining,
+      locale: localeName,
+      other: '$_temp0',
+      zero: '$_temp1',
+    );
+    return '$_temp2';
   }
 
   @override
@@ -1136,8 +1142,13 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
-  String priorityValue(String priority) {
-    return 'Prioritat $priority';
+  String priorityValue(String level) {
+    String _temp0 = intl.Intl.selectLogic(level, {
+      'high': 'Prioritat alta',
+      'medium': 'Prioritat mitjana',
+      'other': 'Prioritat baixa',
+    });
+    return '$_temp0';
   }
 
   @override
@@ -1180,6 +1191,9 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get taskCompleted => 'Tasca completada';
+
+  @override
+  String get dayAllClear => 'Tot fet. Respira.';
 
   @override
   String get undoError => 'No s’ha pogut desfer. Torna-ho a provar.';
@@ -1289,7 +1303,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get titleRequiredField => 'Introdueix un títol per a la tasca';
 
   @override
-  String get fromYourWords => 'Segons el que has escrit';
+  String get fromYourWords => 'Segons les teves paraules';
 
   @override
   String get keepAsTyped => 'Deixa-ho com està';
@@ -1356,6 +1370,11 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
+  String reminderBeforeDeadline(String lead) {
+    return '$lead · termini';
+  }
+
+  @override
   String reminderForPersonOnly(String name) {
     return 'Recordatori per a $name';
   }
@@ -1369,6 +1388,36 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get noReminderTimePassed =>
       'Sense recordatori: l’hora de l’avís ja ha passat';
+
+  @override
+  String reminderSent(String when, String date, String time) {
+    String _temp0 = intl.Intl.selectLogic(when, {
+      'today': 'avui',
+      'tomorrow': 'demà',
+      'other': '$date',
+    });
+    return 'Recordatori enviat: $_temp0, $time';
+  }
+
+  @override
+  String reminderSnoozed(String when, String date, String time) {
+    String _temp0 = intl.Intl.selectLogic(when, {
+      'today': 'avui',
+      'tomorrow': 'demà',
+      'other': '$date',
+    });
+    return 'Recordatori ajornat: $_temp0, $time';
+  }
+
+  @override
+  String reminderPlanLast(String plan, String when, String date, String time) {
+    String _temp0 = intl.Intl.selectLogic(when, {
+      'today': 'avui',
+      'tomorrow': 'demà',
+      'other': '$date',
+    });
+    return '$plan · últim: $_temp0, $time';
+  }
 
   @override
   String get fileLocal => 'Només en aquest dispositiu';
@@ -1483,6 +1532,9 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get signInHeading => 'Inicia la sessió';
+
+  @override
+  String get signInOrUpHeading => 'Entra o crea el teu compte';
 
   @override
   String get authPitch =>
@@ -1869,7 +1921,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get sharingRolesHelp =>
-      'Els editors poden afegir, modificar, completar i suprimir tasques i fitxers. Només el propietari gestiona el projecte i les persones. Les tasques compartides es queden en aquest projecte; exportar-les crea una còpia personal.';
+      'Els editors poden afegir, modificar, completar i suprimir tasques i fitxers. Només el propietari gestiona el projecte i les persones. Les tasques compartides es queden en aquest projecte.';
 
   @override
   String get listSharing => 'Comparteix el projecte';
@@ -1900,7 +1952,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get removeAccessHelp =>
-      'Aquesta persona perdrà l’accés al projecte i a les seves tasques, notes i fitxers. Els canvis compartits pendents d’enviar se suprimiran en la pròxima sincronització correcta.';
+      'Aquesta persona perdrà l’accés al projecte i a les seves tasques, notes i fitxers. Els canvis que encara no hagi enviat es perdran.';
 
   @override
   String get pendingInvitations => 'Invitacions pendents';
@@ -1919,7 +1971,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get sharingRemovalHelp =>
-      'Sortir del projecte o perdre-hi l’accés elimina les tasques, notes, canvis pendents i còpies baixades d’aquest telèfon en la pròxima sincronització correcta. Els dispositius sense connexió i les còpies ja exportades no es poden esborrar remotament.';
+      'Quan surts del projecte o en perds l’accés, el projecte desapareix d’aquest telèfon el pròxim cop que es connecti. Les còpies que hagis exportat es queden.';
 
   @override
   String get deleteList => 'Suprimeix el projecte';
@@ -2031,10 +2083,6 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get fileUploadHelp =>
       'Els fitxers nous es pugen al compte després de desar, fins a 6 MB cadascun. Els fitxers locals anteriors es queden al dispositiu fins que triïs Puja als detalls de la tasca.';
-
-  @override
-  String get fileLocalHelp =>
-      'Els fitxers es queden en aquest dispositiu fins que iniciïs la sessió i triïs Puja als detalls de la tasca. Fins a 6 MB per fitxer.';
 
   @override
   String get fileLimit =>
@@ -2720,11 +2768,15 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get captureOffline =>
-      'Sense connexió. Les teves paraules estan desades; torna-ho a provar quan tinguis internet.';
+      'Sense connexió. Toca Desa-ho com a tasca o torna-ho a provar quan tinguis internet.';
+
+  @override
+  String get captureOfflineRecording =>
+      'Sense connexió. La gravació es conserva; torna-ho a provar quan tinguis internet.';
 
   @override
   String get captureUnavailable =>
-      'No he pogut contactar amb l’assistent; les teves paraules es conserven.';
+      'Ara no puc convertir les teves paraules en tasques; es conserven.';
 
   @override
   String get captureTooFast =>
@@ -2796,7 +2848,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get captureListeningOnline =>
-      'T’escolto. Veuràs les paraules quan toquis Fet.';
+      'T’escolto. En tocar Fet veuràs el que he entès.';
 
   @override
   String captureTimeLeft(int seconds) {
@@ -2883,7 +2935,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get capturesEmptyHelp =>
-      'Aquí es guarden les gravacions i les tasques que deixis a mig fer.';
+      'Aquí es conserven les gravacions i les tasques que deixis a mig fer.';
 
   @override
   String captureDraftSummary(int count) {
@@ -2913,6 +2965,17 @@ class AppLocalizationsCa extends AppLocalizations {
       locale: localeName,
       other: '$count tasques afegides',
       one: '1 tasca afegida',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String captureTasksAddedOn(int count, String date) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tasques afegides al $date',
+      one: '1 tasca afegida al $date',
     );
     return '$_temp0';
   }
@@ -3075,6 +3138,13 @@ class AppLocalizationsCa extends AppLocalizations {
   String get viewOnlyTask => 'Només pots veure aquesta tasca.';
 
   @override
+  String get viewOnlyTaskReminders =>
+      'Només pots veure aquesta tasca i triar els teus recordatoris.';
+
+  @override
+  String get syncCopySuffix => '(còpia local)';
+
+  @override
   String get stepUpdateError =>
       'No s’ha pogut actualitzar aquest pas. Torna-ho a provar.';
 
@@ -3168,11 +3238,15 @@ class AppLocalizationsCa extends AppLocalizations {
   String get taskflowPro => 'TaskFlow Pro';
 
   @override
-  String get billingSettingsHelp => 'Subscripció, compres i facturació';
+  String get proBenefitDictation => 'Dictats i espai per a fitxers sense límit';
 
   @override
-  String get billingIntro =>
-      'Dictats sense límit i espai per a tots els fitxers.';
+  String get proBenefitTyping =>
+      'Les frases que escrius es converteixen en tasques';
+
+  @override
+  String get proBenefitReminders =>
+      'Demana els recordatoris amb les teves paraules';
 
   @override
   String get billingComplimentary =>
@@ -3403,6 +3477,15 @@ class AppLocalizationsCa extends AppLocalizations {
       'Les tasques compartides es queden al seu projecte.';
 
   @override
+  String shareNoteConfirm(String name) {
+    return 'Vols compartir-la amb $name? Tothom la veurà i no la podràs tornar a fer privada.';
+  }
+
+  @override
+  String get sharedNoteStays =>
+      'Les notes compartides es queden al seu projecte.';
+
+  @override
   String get assignmentIsRight => 'És correcte?';
 
   @override
@@ -3470,6 +3553,24 @@ class AppLocalizationsCa extends AppLocalizations {
       'Només pots suprimir un grup buit. Arxiva’l per conservar-ne els projectes i el contingut.';
 
   @override
+  String get groupDeleteAction => 'Suprimeix el grup';
+
+  @override
+  String groupDeleteConfirm(String name) {
+    return 'Vols suprimir «$name»? Els membres el deixaran de veure. No es pot desfer.';
+  }
+
+  @override
+  String groupTransferConfirm(String group, String person) {
+    return 'Vols transferir «$group» a $person?';
+  }
+
+  @override
+  String groupTransferAction(String person) {
+    return 'Transfereix a $person';
+  }
+
+  @override
   String get groupActionError =>
       'No s’ha pogut desar el canvi. Comprova la connexió i actualitza; els permisos poden haver canviat.';
 
@@ -3510,7 +3611,7 @@ class AppLocalizationsCa extends AppLocalizations {
   String get updatesAll => 'Tots els canvis';
 
   @override
-  String get updatesAssigned => 'Les meves assignacions';
+  String get updatesAssigned => 'Només el que és per a mi';
 
   @override
   String get updatesMuted => 'Silenciat: sense novetats ni recordatoris';
@@ -3532,7 +3633,10 @@ class AppLocalizationsCa extends AppLocalizations {
   String get activityCreated => 'Ha creat una tasca';
 
   @override
-  String get activityUpdated => 'Ha actualitzat una tasca';
+  String get activityUpdated => 'Ha actualitzat la tasca';
+
+  @override
+  String get activityMoved => 'Ha mogut la tasca';
 
   @override
   String get activityAssigned => 'Ha canviat el responsable';
@@ -3569,6 +3673,7 @@ class AppLocalizationsCa extends AppLocalizations {
       'unassigned': '$actor ha tret el responsable de: $title',
       'completed': '$actor ha completat: $title',
       'reopened': '$actor ha reobert: $title',
+      'moved': '$actor ha mogut: $title',
       'deleted': '$actor ha suprimit: $title',
       'shared': '$actor ha compartit: $title',
       'other': '$actor ha actualitzat: $title',
@@ -3715,7 +3820,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String storageUsage(int used, int limit) {
-    return 'Fitxers: $used de $limit MB utilitzats';
+    return 'Fitxers: $used de $limit MB utilitzats';
   }
 
   @override
@@ -4262,6 +4367,11 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
+  String commandDeletedTitle(String title) {
+    return 'Suprimida: $title';
+  }
+
+  @override
   String commandProjectsCreated(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -4275,6 +4385,16 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String commandChangeSemantics(String label, String before, String after) {
     return '$label: de $before a $after';
+  }
+
+  @override
+  String commandChangeLine(String label, String before, String after) {
+    return '$label: $before → $after';
+  }
+
+  @override
+  String commandChangeLineFrom(String label, String before) {
+    return '$label: $before →';
   }
 
   @override

@@ -540,8 +540,8 @@ void main() {
         await tester.tap(find.text(es.undo));
         await tester.pumpAndSettle();
         expect(app.tasks.byId(1)!.dueDate, day(3, 10));
-        // The result is back to apply again.
-        expect(find.text(es.reschedule), findsOneWidget);
+        // UX-2202: put back, and the result doesn't reopen.
+        expect(find.byType(CaptureResult), findsNothing);
       },
     );
 
@@ -683,7 +683,10 @@ void main() {
         );
         expect(find.text('Informe → Informe final'), findsOneWidget);
         expect(find.text('${es.assignedToGroup} → Paul'), findsOneWidget);
-        expect(find.text('${es.medium} → ${es.high}'), findsOneWidget);
+        expect(
+          find.text(es.commandChangeLine(es.priority, es.medium, es.high)),
+          findsOneWidget,
+        );
         expect(find.text(es.commandNotesAdd('Con IVA')), findsOneWidget);
         expect(
           find.text(es.commandMemberNotIn('Pol', 'Equipo')),
@@ -776,7 +779,7 @@ void main() {
         );
         final next = DateTime(start.year, start.month, start.day + 7);
         final app = await _App.open(tester, tasks: [weekly]);
-        await app.showResult(
+        Future<void> say() => app.showResult(
           tester,
           commands: [
             command({
@@ -791,6 +794,7 @@ void main() {
             }),
           ],
         );
+        await say();
         expect(find.text(es.thisOccurrence), findsOneWidget);
         expect(find.text(es.wholeSeries), findsOneWidget);
         await tester.tap(find.byKey(const ValueKey('save-drafts')));
@@ -806,6 +810,9 @@ void main() {
         await tester.tap(find.text(es.undo));
         await tester.pumpAndSettle();
         expect(app.tasks.byId(9)!.exceptions, isEmpty);
+        // Deshacer doesn't reopen the result (UX-2202): said again.
+        expect(find.byType(CaptureResult), findsNothing);
+        await say();
         await tester.tap(find.byKey(const ValueKey('command-series-true')));
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('save-drafts')));
@@ -820,7 +827,7 @@ void main() {
 
     testWidgets(
       'a deletion in the error colour: «Se eliminará: Ir al médico (…)»; '
-      '«Eliminar» deletes it, then «Tarea eliminada · Deshacer»',
+      '«Eliminar» deletes it, then «Eliminada: Ir al médico · Deshacer»',
       (tester) async {
         final app = await _App.open(
           tester,
@@ -856,8 +863,10 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('save-drafts')));
         await tester.pumpAndSettle();
         expect(app.tasks.byId(1), isNull);
-        expect(find.text(es.commandTasksDeleted(1)), findsOneWidget);
-        expect(es.commandTasksDeleted(1), es.taskDeleted);
+        expect(
+          find.text(es.commandDeletedTitle('Ir al médico')),
+          findsOneWidget,
+        );
         await tester.tap(find.text(es.undo));
         await tester.pumpAndSettle();
         expect(app.tasks.byId(1)!.notes, 'Llevar los análisis');
@@ -962,7 +971,7 @@ void main() {
             [
               es.taskAddedOn(weekday(day(1))),
               es.movedOccurrenceDate(weekday(day(7))),
-              es.commandTasksDeleted(1),
+              es.commandDeletedTitle('Dentista'),
             ].join(' · '),
           ),
           findsOneWidget,
@@ -1876,6 +1885,15 @@ void main() {
       },
     );
   });
+
+  // UX loop 2026-10-28-app, round 1 · P267 (UX-2204, UX-2209, UX-2210).
+  _p267CommandCards();
+
+  // UX loop 2026-10-28-app, round 1 · P274 (UX-2202, UX-2203, UX-2213).
+  _p274AfterTheTap();
+
+  // UX loop 2026-10-28-app, round 2 · P297 (UX-2203, UX-2619, UX-2618).
+  _p297Landing();
 }
 
 /// The phone's recognizer, shared by the tests: it listens until stopped,
@@ -2423,10 +2441,11 @@ void _commandsRound1() {
     );
 
     testWidgets(
-      'UX-901: «Guardar como tarea» sends nothing more to the assistant, saves '
-      '«Cambia el aceite del coche» on Saturday with no command applied, '
-      'closes the sheet, and Calendar shows Saturday with the row lit and '
-      '«Añadida al …» with Deshacer',
+      'UX-901: «Guardar como tarea» sends nothing more to the assistant, shows '
+      '«Cambia el aceite del coche» on its card, whose «Añadir al calendario» '
+      'saves it on Saturday with no command applied, closes the sheet, and '
+      'Calendar shows Saturday with the row lit and «Añadida al …» with '
+      'Deshacer',
       (tester) async {
         final app = await _App.open(
           tester,
@@ -2436,6 +2455,20 @@ void _commandsRound1() {
         await app.speak(tester, 'Cambia el aceite del coche el sábado');
         expect(app.api.drafts, hasLength(1));
         await tester.tap(_asWritten());
+        await tester.pumpAndSettle();
+        // The words show on a card of their own first (UX-2612).
+        expect(find.byType(CaptureResult), findsOneWidget);
+        expect(_asWritten(), findsNothing);
+        expect(app.tasks.named('Cambia el aceite del coche'), isNull);
+        final add = find.byKey(const ValueKey('save-drafts'));
+        expect(
+          find.descendant(
+            of: add,
+            matching: find.text(es.captureAddToCalendar),
+          ),
+          findsOneWidget,
+        );
+        await tester.tap(add);
         await tester.pumpAndSettle();
         expect(app.api.drafts, hasLength(1), reason: 'no second request');
         final saved = app.tasks.named('Cambia el aceite del coche');
@@ -2713,12 +2746,13 @@ void _commandsRound1() {
         expect(find.text(es.freeVoiceLeft(3)), findsOneWidget);
         expect(_asWritten(), findsOneWidget);
         await tester.tap(_asWritten());
-        // Before the sheet closes, it still says 3.
-        await tester.pump();
-        if (find.byType(CaptureResult).evaluate().isNotEmpty) {
-          expect(find.text(es.freeVoiceLeft(3)), findsOneWidget);
-          expect(find.text(es.freeVoiceLeft(2)), findsNothing);
-        }
+        await tester.pumpAndSettle();
+        // On the words' own card (UX-2612), it still says 3.
+        expect(find.byType(CaptureResult), findsOneWidget);
+        expect(find.text(es.freeVoiceLeft(3)), findsOneWidget);
+        expect(find.text(es.freeVoiceLeft(2)), findsNothing);
+        expect(app.api.drafts, hasLength(1), reason: 'no second dictation');
+        await tester.tap(find.byKey(const ValueKey('save-drafts')));
         await tester.pumpAndSettle();
         expect(app.api.drafts, hasLength(1), reason: 'no second dictation');
         expect(app.tasks.named('Cambia el aceite del coche'), isNotNull);
@@ -3356,9 +3390,11 @@ void _commandsRound1() {
           expect(row.hitTestable(), findsOneWidget);
           expect(tester.widget<TaskTile>(row).color, _lit(tester));
           expect(_row('Entregar el informe'), findsNothing);
+          // The landing day is named with its task (P297).
           expect(
             find.text(
-              '${es.captureTasksAdded(2)} · ${es.captureAlsoOn(weekday(due))}',
+              '${es.taskAddedOn(weekday(day(1)))} · '
+              '${es.captureAlsoOn(weekday(due))}',
             ),
             findsOneWidget,
           );
@@ -4743,7 +4779,9 @@ void _commandsRound2() {
             }),
           ],
         );
-        final line = find.text('${es.medium} → ${es.high}');
+        final line = find.text(
+          es.commandChangeLine(es.priority, es.medium, es.high),
+        );
         expect(line, findsOneWidget);
         final row = find.ancestor(of: line, matching: find.byType(Row)).first;
         expect(
@@ -5849,9 +5887,14 @@ void _commandsRound3b() {
             matching: find.byIcon(Icons.edit_outlined),
           );
           expect(pencil, findsOneWidget);
+          // After the row's ✓ (P294, UX-2514), last.
           expect(
             tester.widget<ListTile>(row).trailing,
-            isA<Icon>().having((i) => i.icon, 'icon', Icons.edit_outlined),
+            isA<Row>().having(
+              (r) => (r.children.last as Icon).icon,
+              'last icon',
+              Icons.edit_outlined,
+            ),
             reason: 'at the end of the row',
           );
           expect(
@@ -6956,6 +6999,966 @@ void _round20261021() {
           expect(es.captureSaveAsWritten, 'Guardar como tarea');
         },
       );
+    }
+  });
+}
+
+// ------------------------------------------- P267 of run 2026-10-28-app
+//
+// UX-2204: «¿Cuál quieres cambiar?» answers are the question's outlined
+// choices. UX-2209: the priority's change line names its field. UX-2210: a
+// card that found nothing shows the search icon; a card that will act keeps
+// its action's.
+
+/// The two tasks «llamar Ana» matches (commands/cards.change-which).
+List<Task> _p267Ana() => [
+  Task(id: 43, title: 'Llamar a Ana', priority: 1, dueDate: day(2, 9)),
+  Task(
+    id: 44,
+    title: 'Llamar a Ana por el viaje',
+    priority: 1,
+    dueDate: day(4, 9),
+  ),
+];
+
+CaptureCommand _p267ChangeAna() => command({
+  'kind': 'update',
+  'target': {
+    'words': ['llamar', 'ana'],
+  },
+  'changes': {'time': '18:00'},
+});
+
+/// [finder] in the result's sheet.
+Finder _p267InResult(Finder finder) =>
+    find.descendant(of: find.byType(CaptureResult), matching: finder);
+
+/// The «¿Cuál…?» choices, in the order shown (not «Ver N más»).
+Finder get _p267Choices => _p267InResult(
+  find.byWidgetPredicate((widget) {
+    final key = widget.key;
+    return widget is InkWell &&
+        key is ValueKey<String> &&
+        key.value.startsWith('choose-') &&
+        !key.value.startsWith('choose-more-');
+  }),
+);
+
+/// The command card around [finder]: the result's 22 dp-cornered frame.
+Finder _p267Card(Finder finder) => find
+    .ancestor(
+      of: finder,
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is Material &&
+            widget.shape is RoundedRectangleBorder &&
+            (widget.shape! as RoundedRectangleBorder).borderRadius ==
+                BorderRadius.circular(22),
+      ),
+    )
+    .first;
+
+/// The question box's tinted panel around [finder]: surfaceContainerHigh,
+/// 16 dp corners, as every QuestionBox draws it.
+Finder _p267Panel(WidgetTester tester, Finder finder) {
+  final colors = Theme.of(tester.element(finder)).colorScheme;
+  return find
+      .ancestor(
+        of: finder,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is DecoratedBox &&
+              widget.decoration is BoxDecoration &&
+              (widget.decoration as BoxDecoration).color ==
+                  colors.surfaceContainerHigh &&
+              (widget.decoration as BoxDecoration).borderRadius ==
+                  BorderRadius.circular(16),
+        ),
+      )
+      .first;
+}
+
+/// The icon on the first line of each card in the result, in order.
+List<IconData?> _p267HeaderIcons(WidgetTester tester) => [
+  for (final headline in tester.elementList(
+    _p267InResult(find.byKey(const ValueKey('command-headline'))),
+  ))
+    tester
+        .widget<Icon>(
+          find.descendant(
+            of: find
+                .ancestor(
+                  of: find.byElementPredicate((e) => e == headline),
+                  matching: find.byType(Row),
+                )
+                .first,
+            matching: find.byWidgetPredicate(
+              (widget) => widget is Icon && widget.size == 22,
+            ),
+          ),
+        )
+        .icon,
+];
+
+/// [text] lies whole inside [card]: not cut, on as many lines as it needs.
+void _p267ExpectWhole(WidgetTester tester, Finder text, Finder card) {
+  expect(text, findsOneWidget);
+  final paragraph = tester.renderObject<RenderParagraph>(
+    find.descendant(of: text, matching: find.byType(RichText)).first,
+  );
+  expect(paragraph.didExceedMaxLines, isFalse, reason: 'not cut');
+  final rect = tester.getRect(text);
+  final frame = tester.getRect(card);
+  expect(rect.left, greaterThanOrEqualTo(frame.left - 0.5), reason: '$rect');
+  expect(rect.right, lessThanOrEqualTo(frame.right + 0.5), reason: '$rect');
+  expect(rect.bottom, lessThanOrEqualTo(frame.bottom + 0.5), reason: '$rect');
+}
+
+void _p267CommandCards() {
+  group('P267 · command cards', () {
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+    });
+
+    // ------------------------------------------------------------ UX-2204
+    for (final (language, scale) in [('es', 1.0), ('es', 2.0), ('ca', 2.0)]) {
+      testWidgets(
+        'UX-2204: $language ${scale}x on 360×800 (cards.change-which): the '
+        'matches sit in a question box under «¿Cuál quieres cambiar?», each '
+        'an outlined full-width choice at least 48 dp tall, 8 dp apart; one '
+        'tap picks it and enables the main button',
+        (tester) async {
+          final l = language == 'ca' ? ca : es;
+          final app = await _App.open(
+            tester,
+            tasks: _p267Ana(),
+            language: language,
+            textScale: scale,
+            size: const Size(360, 800),
+          );
+          await app.showResult(tester, commands: [_p267ChangeAna()]);
+          final question = _p267InResult(find.text(l.commandWhichToChange));
+          expect(question, findsOneWidget);
+          expect(_p267Choices, findsNWidgets(2));
+          final cardRect = tester.getRect(_p267Card(question));
+          final questionRect = tester.getRect(question);
+          final colors = Theme.of(tester.element(question)).colorScheme;
+          Rect? previous;
+          Rect? panelRect;
+          for (final choice in tester.elementList(_p267Choices)) {
+            final finder = find.byElementPredicate((e) => e == choice);
+            // In the question's tinted box, under the question, inside the
+            // same card.
+            final box = tester.getRect(_p267Panel(tester, finder));
+            panelRect ??= box;
+            expect(box, panelRect, reason: 'one box holds every match');
+            expect(box.top, greaterThanOrEqualTo(questionRect.bottom - 0.5));
+            expect(box.left, greaterThanOrEqualTo(cardRect.left - 0.5));
+            expect(box.right, lessThanOrEqualTo(cardRect.right + 0.5));
+            // Outlined, in the theme's outline colour.
+            final material = find
+                .ancestor(of: finder, matching: find.byType(Material))
+                .first;
+            final shape = tester.widget<Material>(material).shape;
+            expect(shape, isA<OutlinedBorder>());
+            final side = (shape! as OutlinedBorder).side;
+            expect(side.color, colors.outline);
+            expect(side.style, BorderStyle.solid);
+            expect(side.width, greaterThan(0));
+            // The box's full width, and as tall as a tap needs.
+            final rect = tester.getRect(material);
+            expect(
+              rect.left - box.left,
+              lessThanOrEqualTo(14.5),
+              reason: '$rect in $box',
+            );
+            expect(
+              box.right - rect.right,
+              lessThanOrEqualTo(14.5),
+              reason: '$rect in $box',
+            );
+            expect(rect.height, greaterThanOrEqualTo(48), reason: '$rect');
+            if (previous != null) {
+              expect(
+                rect.top - previous.bottom,
+                greaterThanOrEqualTo(8 - 0.01),
+                reason: 'gap between $previous and $rect',
+              );
+            }
+            previous = rect;
+            // Each match's title and day show whole.
+            for (final text in tester.elementList(
+              find.descendant(of: finder, matching: find.byType(Text)),
+            )) {
+              _p267ExpectWhole(
+                tester,
+                find.byElementPredicate((e) => e == text),
+                material,
+              );
+            }
+          }
+          expect(saveButton(tester).onPressed, isNull);
+          final ana = _p267InResult(
+            find.byWidgetPredicate(
+              (widget) =>
+                  widget is InkWell &&
+                  widget.key is ValueKey<String> &&
+                  (widget.key! as ValueKey<String>).value.startsWith(
+                    'choose-',
+                  ) &&
+                  (widget.key! as ValueKey<String>).value.endsWith('-43'),
+            ),
+          );
+          expect(ana, findsOneWidget);
+          await tester.ensureVisible(ana);
+          await tester.pumpAndSettle();
+          await tester.tap(ana);
+          await tester.pumpAndSettle();
+          expect(find.text(l.commandWhichToChange), findsNothing);
+          expect(saveButton(tester).onPressed, isNotNull);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    // ------------------------------------------------------------ UX-2209
+    for (final (language, scale) in [('es', 1.0), ('ca', 2.0)]) {
+      testWidgets(
+        'UX-2209: $language ${scale}x on 360×800 (cards.change-details): the '
+        'priority line names its field, «Prioridad: Media → Alta» / '
+        '«Prioritat: Mitjana → Alta», whole; TalkBack still hears «Prioridad: '
+        'de Media a Alta»; the title line keeps only its icon',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          final l = language == 'ca' ? ca : es;
+          final app = await _App.open(
+            tester,
+            projects: [team],
+            language: language,
+            textScale: scale,
+            size: const Size(360, 800),
+            tasks: [
+              Task(
+                id: 1,
+                title: 'Informe',
+                priority: 1,
+                listId: 'team',
+                assignment: 'group',
+              ),
+              Task(
+                id: 2,
+                title: 'Presupuesto',
+                priority: 2,
+                listId: 'team',
+                assignment: 'group',
+              ),
+            ],
+          );
+          await app.showResult(
+            tester,
+            commands: [
+              command({
+                'kind': 'update',
+                'target': {
+                  'words': ['informe'],
+                },
+                'changes': {'title': 'Informe final'},
+              }),
+              command({
+                'kind': 'update',
+                'target': {
+                  'words': ['presupuesto'],
+                },
+                'changes': {'priority': 3},
+              }),
+            ],
+          );
+          expect(
+            es.commandChangeLine(es.priority, es.medium, es.high),
+            'Prioridad: Media → Alta',
+          );
+          expect(
+            ca.commandChangeLine(ca.priority, ca.medium, ca.high),
+            'Prioritat: Mitjana → Alta',
+          );
+          final line = _p267InResult(
+            find.text(l.commandChangeLine(l.priority, l.medium, l.high)),
+          );
+          _p267ExpectWhole(tester, line, _p267Card(line));
+          // TalkBack hears the field, as before.
+          expect(
+            es.commandChangeSemantics(es.priority, es.medium, es.high),
+            'Prioridad: de Media a Alta',
+          );
+          expect(
+            find.bySemanticsLabel(
+              l.commandChangeSemantics(l.priority, l.medium, l.high),
+            ),
+            findsOneWidget,
+          );
+          // The title's line still has only its icon.
+          expect(
+            _p267InResult(find.text('Informe → Informe final')),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+          semantics.dispose();
+        },
+      );
+    }
+
+    // ------------------------------------------------------------ UX-2210
+    testWidgets(
+      'UX-2210: es 1x (cards.not-found): a change and a deletion that found '
+      'nothing show the search icon, not the pencil or the bin',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          tasks: [Task(id: 1, title: 'Ir al médico', priority: 1)],
+          size: const Size(360, 800),
+        );
+        await app.showResult(
+          tester,
+          commands: [
+            command({
+              'kind': 'update',
+              'target': {
+                'words': ['dentista'],
+              },
+              'changes': {'date': key(day(3))},
+            }),
+            command({
+              'kind': 'delete',
+              'target': {
+                'words': ['gimnasio'],
+              },
+            }),
+          ],
+        );
+        expect(
+          _p267InResult(find.text(es.commandTaskNotFound('dentista'))),
+          findsOneWidget,
+        );
+        expect(
+          _p267InResult(find.text(es.commandTaskNotFound('gimnasio'))),
+          findsOneWidget,
+        );
+        expect(_p267HeaderIcons(tester), [
+          Icons.search_rounded,
+          Icons.search_rounded,
+        ]);
+        expect(_p267InResult(find.byIcon(Icons.edit_outlined)), findsNothing);
+        expect(
+          _p267InResult(find.byIcon(Icons.delete_outline_rounded)),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2210: es 1x: cards that will act keep their action’s icon: the '
+      'pencil on a change that found its task and on «¿Cuál quieres '
+      'cambiar?», the bin on a deletion that found its task',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          tasks: [
+            ..._p267Ana(),
+            Task(id: 49, title: 'Dentista', priority: 1, dueDate: day(5, 9)),
+            Task(id: 50, title: 'Peluquería', priority: 1, dueDate: day(3, 10)),
+          ],
+          size: const Size(360, 800),
+        );
+        await app.showResult(
+          tester,
+          commands: [
+            command({
+              'kind': 'update',
+              'target': {
+                'words': ['peluquería'],
+              },
+              'changes': {'priority': 3},
+            }),
+            _p267ChangeAna(),
+            command({
+              'kind': 'delete',
+              'target': {
+                'words': ['dentista'],
+              },
+            }),
+          ],
+        );
+        expect(
+          _p267InResult(find.text(es.commandWhichToChange)),
+          findsOneWidget,
+        );
+        expect(_p267HeaderIcons(tester), [
+          Icons.edit_outlined,
+          Icons.edit_outlined,
+          Icons.delete_outline_rounded,
+        ]);
+        expect(_p267InResult(find.byIcon(Icons.search_rounded)), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+}
+
+// ---- UX loop 2026-10-28-app, round 1 · P274 (UX-2202, UX-2203, UX-2213):
+// after the tap, what Deshacer brings back and what the message names ----
+void _p274AfterTheTap() {
+  group('P274 · after the tap', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+
+    /// A draft the assistant wasn't sure of: it waits for a choice, so a
+    /// save leaves it, and the sheet, open.
+    CaptureDraft unsure(String title, DateTime date) => CaptureDraft.fromAI(
+      TaskDraft.fromJson({
+        ...serverTask(title, date: date),
+        'questions': ['¿Por la mañana o por la tarde?'],
+        'transcript': 'Lo que dije',
+      }),
+    );
+
+    Finder inMessage(Finder finder) =>
+        find.descendant(of: find.byType(SnackBar), matching: finder);
+
+    List<String> titles(_App app) => [
+      for (final task in app.container.read(taskProvider).requireValue)
+        task.title,
+    ];
+
+    // ------------------------------------------------------------ UX-2202
+    testWidgets('UX-2202: a dictation that added two tasks: Deshacer takes '
+        'them out and reopens the sheet on its result, as before', (
+      tester,
+    ) async {
+      final app = await _App.open(tester);
+      await app.showResult(
+        tester,
+        drafts: [
+          draft('Llamar al dentista', date: day(1)),
+          draft('Comprar pan', date: day(1)),
+        ],
+      );
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+      expect(find.byType(CaptureResult), findsNothing);
+      expect(titles(app), containsAll(['Llamar al dentista', 'Comprar pan']));
+      await tester.tap(inMessage(find.text(es.undo)));
+      await tester.pumpAndSettle();
+      expect(titles(app), isNot(contains('Llamar al dentista')));
+      expect(titles(app), isNot(contains('Comprar pan')));
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(find.byKey(const ValueKey('save-drafts')), findsOneWidget);
+      expect(find.text(es.captureAddTasks(2)), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-2202: a task added with a change in the same dictation: '
+        'Deshacer takes both back and reopens the sheet on its result', (
+      tester,
+    ) async {
+      final app = await _App.open(
+        tester,
+        tasks: [
+          Task(id: 1, title: 'Ir al médico', priority: 1, dueDate: day(3, 10)),
+        ],
+      );
+      await app.showResult(
+        tester,
+        drafts: [draft('Comprar pan', date: day(1))],
+        commands: [
+          command({
+            'kind': 'update',
+            'target': {
+              'words': ['médico'],
+            },
+            'changes': {'date': key(day(5))},
+          }),
+        ],
+      );
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+      expect(find.byType(CaptureResult), findsNothing);
+      expect(Task.day(app.tasks.byId(1)!.dueDate!), day(5));
+      expect(app.tasks.named('Comprar pan'), isNotNull);
+      await tester.tap(inMessage(find.text(es.undo)));
+      await tester.pumpAndSettle();
+      expect(app.tasks.named('Comprar pan'), isNull);
+      expect(app.tasks.byId(1)!.dueDate, day(3, 10));
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(find.byKey(const ValueKey('save-drafts')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    // ------------------------------------------------------------ UX-2203
+    for (final (language, l, start, scale, size) in [
+      ('es', es, '2 tareas añadidas al ', 1.0, const Size(390, 844)),
+      ('en', en, '2 tasks added to ', 1.0, const Size(390, 844)),
+      ('ca', ca, '2 tasques afegides al ', 2.0, const Size(360, 800)),
+    ]) {
+      testWidgets('UX-2203: $language ${scale}x on '
+          '${size.width.round()}×${size.height.round()}, two tasks said for '
+          'tomorrow: the message reads «$start…» with tomorrow’s date as '
+          'taskAddedOn writes it, whole', (tester) async {
+        final app = await _App.open(
+          tester,
+          language: language,
+          textScale: scale,
+          size: size,
+        );
+        await app.showResult(
+          tester,
+          drafts: [
+            draft('Llamar al dentista', date: day(1)),
+            draft('Comprar pan', date: day(1)),
+          ],
+        );
+        await tester.tap(find.byKey(const ValueKey('save-drafts')));
+        await tester.pumpAndSettle();
+        expect(find.byType(CaptureResult), findsNothing);
+        final date = weekday(day(1));
+        // The same date a single task's message names.
+        expect(l.taskAddedOn(date), endsWith(date));
+        final message = l.captureTasksAddedOn(2, date);
+        expect(message, '$start$date');
+        final text = inMessage(find.text(message));
+        expect(text, findsOneWidget);
+        expect(inMessage(find.textContaining(l.captureAlsoOn(''))), findsNothing);
+        // Whole: not cut, inside the message and the screen.
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: text, matching: find.byType(RichText)).first,
+        );
+        expect(paragraph.didExceedMaxLines, isFalse);
+        final box = tester.getRect(text);
+        final bar = tester.getRect(find.byType(SnackBar));
+        expect(box.left, greaterThanOrEqualTo(bar.left - 0.5));
+        expect(box.right, lessThanOrEqualTo(bar.right + 0.5));
+        expect(box.top, greaterThanOrEqualTo(bar.top - 0.5));
+        expect(box.bottom, lessThanOrEqualTo(bar.bottom + 0.5));
+        expect(bar.right, lessThanOrEqualTo(size.width));
+        expect(bar.bottom, lessThanOrEqualTo(size.height));
+        expect(inMessage(find.text(l.undo)), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('UX-2203 / P297: three tasks on two days: «2 tareas añadidas '
+        'al … · también el …», the landing day named once', (tester) async {
+      final app = await _App.open(tester);
+      await app.showResult(
+        tester,
+        drafts: [
+          draft('Llamar al dentista', date: day(1)),
+          draft('Comprar pan', date: day(1)),
+          draft('Pagar el alquiler', date: day(4)),
+        ],
+      );
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+      expect(
+        inMessage(
+          find.text(
+            '${es.captureTasksAddedOn(2, weekday(day(1)))} · '
+            '${es.captureAlsoOn(weekday(day(4)))}',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        inMessage(find.textContaining(es.captureTasksAdded(3))),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    // ------------------------------------------------------------ UX-2213
+    for (final (language, l, one, several) in [
+      (
+        'es',
+        es,
+        'Ha vuelto aquí, sin guardar.',
+        'Han vuelto aquí, sin guardar.',
+      ),
+      (
+        'en',
+        en,
+        'It’s back here, not saved yet.',
+        'They’re back here, not saved yet.',
+      ),
+      (
+        'ca',
+        ca,
+        'Torna a ser aquí, sense desar.',
+        'Tornen a ser aquí, sense desar.',
+      ),
+    ]) {
+      for (final (count, line) in [(1, one), (2, several)]) {
+        testWidgets('UX-2213: $language, after a partial save, a '
+            '${l.undo} that brings back $count says «$line»', (tester) async {
+          final app = await _App.open(tester, language: language);
+          await app.showResult(
+            tester,
+            drafts: [
+              draft('Comprar pan', date: day(1)),
+              if (count == 2) draft('Llamar al dentista', date: day(1)),
+              unsure('Ir al gimnasio', day(2)),
+            ],
+          );
+          await tester.tap(find.byKey(const ValueKey('save-drafts')));
+          await tester.pumpAndSettle();
+          // The unsure one waits: the sheet stays, and so does its message.
+          expect(find.byType(CaptureResult), findsOneWidget);
+          expect(app.tasks.named('Comprar pan'), isNotNull);
+          expect(app.tasks.named('Ir al gimnasio'), isNull);
+          await tester.tap(inMessage(find.text(l.undo)));
+          await tester.pumpAndSettle();
+          expect(app.tasks.named('Comprar pan'), isNull);
+          expect(app.tasks.named('Llamar al dentista'), isNull);
+          expect(find.byType(CaptureResult), findsOneWidget);
+          expect(l.reviewUndoSaved(count), line);
+          expect(inMessage(find.text(line)), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+  });
+}
+
+// UX loop 2026-10-28-app, round 2 · P297 (UX-2203, UX-2619, UX-2618): the
+// command path names the landing day; Deshacer on a result that added
+// nothing lands Calendar on what came back; «¿Cuál…?» opens at its top.
+void _p297Landing() {
+  group('P297 · landing after a save and after Deshacer', () {
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    });
+
+    const size = Size(360, 800);
+
+    Finder inMessage(Finder finder) =>
+        find.descendant(of: find.byType(SnackBar), matching: finder);
+
+    /// The first Friday at least three days away: never today, tomorrow or
+    /// the dentist's own day.
+    DateTime friday() {
+      var days = 3;
+      while (day(days).weekday != DateTime.friday) {
+        days++;
+      }
+      return day(days);
+    }
+
+    /// Calendar's day heading: «Agenda de hoy» or the selected day.
+    Finder heading(DateTime date) => find.descendant(
+      of: find.byType(CalendarScreen),
+      matching: find.text(
+        Task.day(date) == day(0)
+            ? es.todayAgenda
+            : DateFormat.MMMMEEEEd('es').format(date),
+      ),
+    );
+
+    /// [title]'s row on Calendar, on screen and lit.
+    void expectLit(WidgetTester tester, String title) {
+      final row = find.byWidgetPredicate(
+        (widget) => widget is LandedTaskTile && widget.task.title == title,
+      );
+      expect(row, findsOneWidget, reason: '$title is on Calendar');
+      expect(row.hitTestable(), findsOneWidget, reason: '$title in view');
+      expect(tester.widget<LandedTaskTile>(row).lit, isTrue, reason: title);
+    }
+
+    /// Taps the result's button and waits past the message's entrance.
+    Future<void> apply(WidgetTester tester) async {
+      await tester.tap(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+      expect(find.byType(CaptureResult), findsNothing);
+    }
+
+    /// Deshacer, then the landing, inside the 1.5 s highlight; no result
+    /// comes back at any step.
+    Future<void> undo(WidgetTester tester) async {
+      await tester.tap(inMessage(find.text(es.undo)));
+      for (var frame = 0; frame < 40; frame++) {
+        await tester.pump(const Duration(milliseconds: 25));
+        expect(find.byType(CaptureResult), findsNothing);
+      }
+      expect(find.byType(BottomSheet), findsNothing);
+    }
+
+    List<Task> someToday() => [
+      Task(id: 2, title: 'Llamar al médico', priority: 1, dueDate: day(0, 10)),
+      Task(id: 3, title: 'Comer con Ana', priority: 1, dueDate: day(0, 13)),
+    ];
+
+    CaptureCommand deleteHaircut() => command({
+      'kind': 'delete',
+      'target': {
+        'words': ['peluquería'],
+      },
+    });
+
+    // ------------------------------------------------------------ UX-2619
+    testWidgets('UX-2619: ES 1x on 360×800, Calendar on today, «Borra lo de '
+        'la peluquería» deletes a task on another day; Deshacer → Calendar '
+        'shows that day with «Ir a la peluquería» back and lit, no result on '
+        'screen', (tester) async {
+      final other = day(3, 10);
+      final app = await _App.open(
+        tester,
+        size: size,
+        tasks: [
+          ...someToday(),
+          Task(
+            id: 40,
+            title: 'Ir a la peluquería',
+            priority: 1,
+            dueDate: other,
+          ),
+        ],
+      );
+      expect(heading(day(0)), findsOneWidget);
+      await app.showResult(tester, commands: [deleteHaircut()]);
+      await apply(tester);
+      expect(app.tasks.byId(40), isNull);
+      // Calendar still shows today, where the task isn't.
+      expect(heading(day(0)), findsOneWidget);
+      expect(
+        inMessage(find.text(es.commandDeletedTitle('Ir a la peluquería'))),
+        findsOneWidget,
+      );
+      await undo(tester);
+      expect(app.tasks.byId(40)?.dueDate, other);
+      expect(heading(other), findsOneWidget);
+      expect(heading(day(0)), findsNothing);
+      expectLit(tester, 'Ir a la peluquería');
+      expect(find.byType(CaptureResult), findsNothing);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-2619: «Cambia el dentista al viernes» lands on Friday; '
+        'Deshacer → Calendar shows the dentist’s own day with its row lit, '
+        'and no sheet opens', (tester) async {
+      final fri = friday();
+      final own = day(2, 9);
+      final app = await _App.open(
+        tester,
+        size: size,
+        tasks: [
+          ...someToday(),
+          Task(id: 9, title: 'Dentista', priority: 1, dueDate: own),
+        ],
+      );
+      await app.showResult(
+        tester,
+        commands: [
+          command({
+            'kind': 'update',
+            'target': {
+              'words': ['dentista'],
+            },
+            'changes': {'date': key(fri)},
+          }),
+        ],
+      );
+      await apply(tester);
+      expect(Task.day(app.tasks.byId(9)!.dueDate!), fri);
+      expect(heading(fri), findsOneWidget);
+      await undo(tester);
+      expect(app.tasks.byId(9)!.dueDate, own);
+      expect(heading(own), findsOneWidget);
+      expect(heading(fri), findsNothing);
+      expectLit(tester, 'Dentista');
+      expect(find.byType(CaptureResult), findsNothing);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-2619: Deshacer of a deletion of a task on the day '
+        'Calendar shows: the row is back and lit, the day doesn’t change', (
+      tester,
+    ) async {
+      final app = await _App.open(
+        tester,
+        size: size,
+        tasks: [
+          ...someToday(),
+          Task(
+            id: 40,
+            title: 'Ir a la peluquería',
+            priority: 1,
+            dueDate: day(0, 18),
+          ),
+        ],
+      );
+      expect(heading(day(0)), findsOneWidget);
+      await app.showResult(tester, commands: [deleteHaircut()]);
+      await apply(tester);
+      expect(app.tasks.byId(40), isNull);
+      expect(heading(day(0)), findsOneWidget);
+      await undo(tester);
+      expect(app.tasks.byId(40), isNotNull);
+      expect(heading(day(0)), findsOneWidget);
+      expectLit(tester, 'Ir a la peluquería');
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+
+    // ------------------------------------------------------- UX-2203 (1b)
+    testWidgets('UX-2203: a dictation with three new tasks on two days and a '
+        'deletion: «2 tareas añadidas al … · Eliminada: … · también el …», '
+        'the landing day named once', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: [
+          Task(id: 9, title: 'Dentista', priority: 1, dueDate: day(6, 9)),
+        ],
+      );
+      await app.showResult(
+        tester,
+        drafts: [
+          draft('Llamar al fontanero', date: day(1)),
+          draft('Comprar pan', date: day(1)),
+          draft('Pagar el alquiler', date: day(4)),
+        ],
+        commands: [
+          command({
+            'kind': 'delete',
+            'target': {
+              'words': ['dentista'],
+            },
+          }),
+        ],
+      );
+      await apply(tester);
+      expect(app.tasks.byId(9), isNull);
+      final first = weekday(day(1));
+      expect(
+        inMessage(
+          find.text(
+            '${es.captureTasksAddedOn(2, first)} · '
+            '${es.commandDeletedTitle('Dentista')} · '
+            '${es.captureAlsoOn(weekday(day(4)))}',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        inMessage(find.textContaining(es.captureAlsoOn(first))),
+        findsNothing,
+      );
+      expect(heading(day(1)), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+
+    // ------------------------------------------------------------ UX-2618
+    for (final (language, scale) in [('es', 2.0), ('ca', 2.0), ('es', 1.0)]) {
+      testWidgets('UX-2618: $language ${scale}x on 360×800 '
+          '(cards.change-which): the card opens with its top edge and pencil '
+          'in view, and «No cambiar ninguna» (✕) is a whole 48 × 48 dp', (
+        tester,
+      ) async {
+        final l = language == 'ca' ? ca : es;
+        await _App.open(
+          tester,
+          tasks: [
+            ...someToday(),
+            Task(
+              id: 43,
+              title: 'Llamar a Ana',
+              priority: 1,
+              dueDate: day(2, 9),
+            ),
+            Task(
+              id: 44,
+              title: 'Llamar a Ana por el viaje',
+              priority: 1,
+              dueDate: day(4, 9),
+            ),
+          ],
+          language: language,
+          textScale: scale,
+          size: size,
+        ).then(
+          (app) => app.showResult(
+            tester,
+            commands: [
+              command({
+                'kind': 'update',
+                'target': {
+                  'words': ['llamar', 'ana'],
+                },
+                'changes': {'time': '18:00'},
+              }),
+            ],
+          ),
+        );
+        Finder inResult(Finder finder) =>
+            find.descendant(of: find.byType(CaptureResult), matching: finder);
+        final question = inResult(find.text(l.commandWhichToChange));
+        expect(question, findsOneWidget);
+        final card = find
+            .ancestor(
+              of: question,
+              matching: find.byWidgetPredicate(
+                (widget) =>
+                    widget is Material &&
+                    widget.shape is RoundedRectangleBorder &&
+                    (widget.shape! as RoundedRectangleBorder).borderRadius ==
+                        BorderRadius.circular(22),
+              ),
+            )
+            .first;
+        final view = tester.getRect(
+          inResult(find.byType(Scrollable)).first,
+        );
+        final cardRect = tester.getRect(card);
+        expect(
+          cardRect.top,
+          greaterThanOrEqualTo(view.top - 0.5),
+          reason: 'card $cardRect in $view',
+        );
+        final pencil = find
+            .descendant(of: card, matching: find.byIcon(Icons.edit_outlined))
+            .first;
+        final pencilRect = tester.getRect(pencil);
+        expect(
+          pencilRect.top,
+          greaterThanOrEqualTo(view.top - 0.5),
+          reason: 'pencil $pencilRect in $view',
+        );
+        expect(pencilRect.bottom, lessThanOrEqualTo(view.bottom + 0.5));
+        final close = find.descendant(
+          of: card,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is IconButton &&
+                widget.tooltip == l.commandDontChangeAny,
+          ),
+        );
+        expect(close, findsOneWidget);
+        final closeRect = tester.getRect(close);
+        expect(closeRect.width, greaterThanOrEqualTo(48));
+        expect(closeRect.height, greaterThanOrEqualTo(48));
+        // Whole in the view: none of it scrolled off.
+        final shown = closeRect.intersect(view);
+        expect(shown.width, greaterThanOrEqualTo(48 - 0.5), reason: '$shown');
+        expect(shown.height, greaterThanOrEqualTo(48 - 0.5), reason: '$shown');
+        expect(close.hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
     }
   });
 }

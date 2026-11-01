@@ -2,6 +2,17 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-10-31 (later) — D1 and D2 of run 2026-10-28-app
+The owner: "D1 and D2 both yes, as recommended".
+- **D1 (UX-2612), «Guardar como tarea»:** (a). The phone's own reading shows as a normal result card with «Añadir al calendario» before it's saved, after the 8 s wait, after a failure and on «No se encontraron tareas». One more tap on a rare path; the person sees the day it read, and that it's one task.
+- **D2 (UX-2311), Completadas newest first:** (a). Each completion's time is kept, per task and per repeat, on the phone and on the server, and Completadas lists by it, newest first; older completions without a time keep today's order after them. Nothing shows the time; only the order uses it. Server first, then one small app package.
+
+## 2026-10-31 — "do everything": D9, WD34, the stopped whole-app review
+The owner answered the list of what waited on him with "do everything", then: "after everything finishes, make a pr and merge it onto main". Each item below is the recommendation he was given.
+- **D9 of run 2026-10-22-changes (UX-2032), a reader's own reminders:** (b). A «lector» can choose their own reminders on the tasks that ring for them. The server accepts a reader's change that touches only their own reminders, with no version, activity or notification, as for anyone; nothing else a reader sends changes. Server first, then one small app package.
+- **WD34 of the website run 2026-10-28-site (WEB-1317):** yes, through /ux. When the day's last task is ticked in Calendar, the app shows the demo's line: "All clear. Take a breath." (ES «Todo listo. Respira.», CA «Tot fet. Respira.», the site's own words).
+- **The whole-app review 2026-10-28-app** is rerun, and its plan is carried through `ux fix` without a stop for approval, since he asked for everything to be done. Its product questions still go to him.
+
 ## 2026-10-23 — D8 of run 2026-10-22-changes, and the single reminder on shared tasks
 - **D8 (UX-2022), a time said for the day itself:** (b), as recommended: "yeah, absolutely, it should be kept". A plan with a time of its own, said or typed («recuérdamelo el mismo día a las 9», «cada día a las 8»), keeps that time on the task's own day too. Only plans without a time of their own (the strengths, «Sí» to the offer, a rhythm said without an hour) move the day's notice to the task's usual reminder, as D1 says.
 - **«Una vez» on shared tasks is personal, like plans:** "one person change affects everyone's phone. That shouldn't happen. So it should become personal, like plans. Absolutely." Every reminder choice for a task (none, once and its lead or time, a plan) is each person's own: it rings only for them, and changing it changes nobody else's. Someone who hasn't chosen gets their own defaults from Settings. This closes the Open item of 2026-10-22.
@@ -340,7 +351,7 @@ The owner said: "from D1 to D15 go with your recommendations". In more detail:
   - **Also for later:**
     - deleting the RevenueCat customer;
     - stopping someone who signs up again from getting new free dictations (which needs a hashed email);
-    - the website's delete-account page, which still says the app has no deletion option.
+    - (done: the website's delete-account page now gives the in-app option, WEB-202 and WEB-204.)
 - **From the capture-speed review (run 2026-10-14-speed; details in its `plan.md`):**
   - **UX-615: should a spoken result with nothing to ask save itself, with Deshacer?** It would cut a capture to 2 taps (Añadir tarea, Listo) and save about 1–2 s, but it removes D3/U4's confirming tap, so a misheard date would be saved without a look. Recommendation: keep the tap until the §7 test with the owner's father, then decide.
   - **UX-616: should the assistant's wait be cut on the server,** with a faster model, or by understanding while the person is still speaking? Staging took 1.3, 4.8, 4.8, 4.8 and once 20.5 s. Recommendation: measure first (P101 adds the phone's share to Diagnóstico de captura). Then, if the server is most of the wait, try a faster extraction model on staging and compare cost and accuracy.

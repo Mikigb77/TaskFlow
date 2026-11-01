@@ -392,6 +392,9 @@ class _PlanOfferSheet extends StatelessWidget {
     final when = task.deadline != null
         ? taskDeadlineLabel(context, task)
         : taskDayLine(context, task);
+    final date = task.deadline != null
+        ? task.displayDeadline
+        : task.displayDate;
     final rhythm = planRhythm(
       strings,
       plan,
@@ -419,6 +422,7 @@ class _PlanOfferSheet extends StatelessWidget {
                   _TaskLine(
                     title: task.title,
                     when: when,
+                    day: date == null ? null : context.weekdayDate(date),
                     style: theme.textTheme.titleMedium?.copyWith(
                       color: theme.colorScheme.onSurface,
                     ),
@@ -457,9 +461,18 @@ class _PlanOfferSheet extends StatelessWidget {
 /// cut with an ellipsis, never the day: it's what says which task. TalkBack
 /// reads the whole line.
 class _TaskLine extends StatelessWidget {
-  const _TaskLine({required this.title, required this.when, this.style});
+  const _TaskLine({
+    required this.title,
+    required this.when,
+    this.day,
+    this.style,
+  });
   final String title;
   final String when;
+
+  /// The day phrase inside [when] («mié, 18 de nov»), shown bound with
+  /// no-break spaces: the line breaks before it, never inside it.
+  final String? day;
   final TextStyle? style;
 
   static const _lines = 2;
@@ -468,6 +481,9 @@ class _TaskLine extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final full = '$title · $when';
+      final bound = day == null
+          ? when
+          : when.replaceFirst(day!, day!.replaceAll(' ', '\u00A0'));
       final scaler = MediaQuery.textScalerOf(context);
       final direction = Directionality.of(context);
       bool fits(String text) {
@@ -482,13 +498,13 @@ class _TaskLine extends StatelessWidget {
         return fits;
       }
 
-      var shown = full;
-      if (!fits(full)) {
+      var shown = '$title · $bound';
+      if (!fits(shown)) {
         // The longest start of the title that fits with the day.
         final letters = title.characters;
         // The dot stays with the cut title, not at the start of a line.
         String cut(int length) =>
-            '${letters.take(length).toString().trimRight()}… · $when';
+            '${letters.take(length).toString().trimRight()}… · $bound';
         var low = 0;
         var high = letters.length;
         while (low < high) {

@@ -357,7 +357,7 @@ class CaptureStore {
         );
       } else {
         await tx.rawUpdate(
-          'UPDATE tasks SET is_deleted = 1, sync_pending = 1, revision = revision + 1 WHERE id = ? AND owner_key = ?',
+          'UPDATE tasks SET is_deleted = 1, sync_pending = 1, own_reminders_pending = 0, revision = revision + 1 WHERE id = ? AND owner_key = ?',
           [id, before.ownerKey],
         );
       }

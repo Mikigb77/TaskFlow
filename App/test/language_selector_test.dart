@@ -620,6 +620,84 @@ void main() {
     );
   });
 
+  // ---- UX loop 2026-10-28-app, round 1 · P295 (UX-2609): the language
+  // sheet closes at once ----
+  group('P295 · the language sheet closes at once', () {
+    testWidgets(
+      'UX-2609: on Android, with the per-app-language bridge never answering after start, choosing Català closes the sheet at once and the app shows in Catalan',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        try {
+          final never = Completer<List<String>>();
+          var calls = 0;
+          tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            AppLanguageBridge.channel,
+            (_) async {
+              calls++;
+              // The start's apply answers; the choice's never does.
+              if (calls == 1) return <String>['es-ES'];
+              return never.future;
+            },
+          );
+          addTearDown(
+            () => tester.binding.defaultBinaryMessenger
+                .setMockMethodCallHandler(AppLanguageBridge.channel, null),
+          );
+          final store = MemoryRegionalStore(
+            const RegionalPreferences(language: 'es'),
+          );
+          final container = designContainer(regionalStore: store);
+          addTearDown(container.dispose);
+          await tester.pumpWidget(
+            UncontrolledProviderScope(
+              container: container,
+              child: const MyApp(),
+            ),
+          );
+          await tester.pumpAndSettle();
+          tester
+              .state<NavigatorState>(find.byType(Navigator))
+              .pushNamed('/settings');
+          await tester.pumpAndSettle();
+          final selector = find.byKey(const ValueKey('settings-language'));
+          await tester.scrollUntilVisible(
+            selector,
+            180,
+            scrollable: find
+                .descendant(
+                  of: find.byType(SettingsScreen),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(selector);
+          await tester.pumpAndSettle();
+          expect(find.byType(BottomSheet), findsOneWidget);
+          await tester.tap(find.byKey(const ValueKey('language-ca')));
+          // The sheet's closing starts with the save, not after the bridge.
+          await tester.pumpAndSettle(const Duration(milliseconds: 100));
+          expect(find.byType(BottomSheet), findsNothing);
+          expect(store.value.language, 'ca');
+          expect(calls, 2, reason: 'the bridge was asked, and never answers');
+          expect(never.isCompleted, isFalse);
+          final ca = lookupAppLocalizations(const Locale('ca'));
+          expect(find.text(ca.language), findsWidgets);
+          expect(find.text('Català'), findsOneWidget);
+          expect(
+            Localizations.localeOf(
+              tester.element(find.byType(SettingsScreen)),
+            ).languageCode,
+            'ca',
+          );
+          expect(tester.takeException(), isNull);
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
+  });
+
 }
 
 class _FailingStore extends MemoryRegionalStore {

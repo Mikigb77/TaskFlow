@@ -46,59 +46,89 @@ Future<TaskListChoice?> chooseTaskList(
       .toList();
   final chosen = await showModalBottomSheet<String>(
     context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
     builder: (context) => SafeArea(
-      child: ListView(
-        shrinkWrap: true,
-        children: [
-          ListTile(title: Text(context.l10n.list)),
-          // A tap opens its name to correct; nothing is created yet.
-          if (creating)
-            ListTile(
-              leading: const Icon(Icons.create_new_folder_outlined),
-              title: Text(context.l10n.commandNewProject(newName)),
-              trailing: onRename == null
-                  ? null
-                  : Icon(
-                      Icons.edit_outlined,
-                      size: 20,
-                      semanticLabel: context.l10n.commandRenameProject,
-                    ),
-              selected: true,
-              onTap: () => Navigator.pop(
-                context,
-                onRename == null ? null : _renameProject,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * .7,
+        ),
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+              child: Semantics(
+                header: true,
+                child: Text(
+                  context.l10n.list,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
               ),
             ),
-          if (none)
-            ListTile(
-              leading: const Icon(Icons.folder_off_outlined),
-              title: Text(context.l10n.noList),
-              selected: selectedNone && listId == null && newName == null,
-              onTap: () => Navigator.pop(context, ''),
-            ),
-          for (final list in choices)
-            ListTile(
-              leading: Icon(
-                Icons.folder_outlined,
-                color: taskListColor(list.color),
+            // A tap opens its name to correct; nothing is created yet.
+            if (creating)
+              ListTile(
+                leading: const Icon(Icons.create_new_folder_outlined),
+                title: Text(context.l10n.commandNewProject(newName)),
+                // ✓ marks the choice, not colour alone (UX-2514).
+                trailing: onRename == null
+                    ? const Icon(Icons.check_rounded)
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.check_rounded),
+                          const SizedBox(width: 12),
+                          Icon(
+                            Icons.edit_outlined,
+                            size: 20,
+                            semanticLabel: context.l10n.commandRenameProject,
+                          ),
+                        ],
+                      ),
+                selected: true,
+                onTap: () => Navigator.pop(
+                  context,
+                  onRename == null ? null : _renameProject,
+                ),
               ),
-              title: Text(list.name),
-              subtitle: list.shared
-                  ? Text(list.groupName ?? context.l10n.sharedProject)
-                  : list.inactive
-                  ? Text(context.l10n.archived)
-                  : null,
-              selected: listId == list.id,
-              onTap: () => Navigator.pop(context, list.id),
-            ),
-          // Last, unless the dictated project is already the new one.
-          if (!creating)
-            ListTile(
-              leading: const Icon(Icons.add_rounded),
-              title: Text(context.l10n.newList),
-              onTap: () => Navigator.pop(context, _newProject),
-            ),
-        ],
+            if (none)
+              ListTile(
+                leading: const Icon(Icons.folder_off_outlined),
+                title: Text(context.l10n.noList),
+                trailing: selectedNone && listId == null && newName == null
+                    ? const Icon(Icons.check_rounded)
+                    : null,
+                selected: selectedNone && listId == null && newName == null,
+                onTap: () => Navigator.pop(context, ''),
+              ),
+            for (final list in choices)
+              ListTile(
+                leading: Icon(
+                  Icons.folder_outlined,
+                  color: taskListColor(list.color),
+                ),
+                title: Text(list.name),
+                subtitle: list.shared
+                    ? Text(list.groupName ?? context.l10n.sharedProject)
+                    : list.inactive
+                    ? Text(context.l10n.archived)
+                    : null,
+                trailing: listId == list.id
+                    ? const Icon(Icons.check_rounded)
+                    : null,
+                selected: listId == list.id,
+                onTap: () => Navigator.pop(context, list.id),
+              ),
+            // Last, unless the dictated project is already the new one.
+            if (!creating)
+              ListTile(
+                leading: const Icon(Icons.add_rounded),
+                title: Text(context.l10n.newList),
+                onTap: () => Navigator.pop(context, _newProject),
+              ),
+          ],
+        ),
       ),
     ),
   );
@@ -152,7 +182,10 @@ class _ProjectNameDialogState extends State<_ProjectNameDialog> {
       controller: _name,
       maxLength: 80,
       autofocus: true,
-      decoration: InputDecoration(labelText: context.l10n.listName),
+      decoration: InputDecoration(
+        labelText: context.l10n.listName,
+        counterText: '',
+      ),
     ),
     actions: [
       TextButton(
@@ -186,6 +219,7 @@ class TaskListPicker extends ConsumerWidget {
     this.lockShared = false,
     this.newName,
     this.onRename,
+    this.note = false,
   });
   final String? listId;
   final ValueChanged<TaskListInfo?>? onChanged;
@@ -201,6 +235,9 @@ class TaskListPicker extends ConsumerWidget {
 
   /// [newName] corrected in the sheet. Nothing is created yet.
   final ValueChanged<String>? onRename;
+
+  /// The item is a note: the share question and the locked chip say so.
+  final bool note;
 
   Future<void> _choose(
     BuildContext context,
@@ -223,7 +260,13 @@ class TaskListPicker extends ConsumerWidget {
         builder: (context) => AlertDialog(
           scrollable: true,
           content: Text(
-            context.l10n.shareTaskConfirm(project!.groupName ?? project.name),
+            note
+                ? context.l10n.shareNoteConfirm(
+                    project!.groupName ?? project.name,
+                  )
+                : context.l10n.shareTaskConfirm(
+                    project!.groupName ?? project.name,
+                  ),
           ),
           actions: [
             TextButton(
@@ -263,7 +306,7 @@ class TaskListPicker extends ConsumerWidget {
     final VoidCallback? onPressed = locked
         ? () => showFeedback(
             ScaffoldMessenger.of(context),
-            context.l10n.sharedTaskStays,
+            note ? context.l10n.sharedNoteStays : context.l10n.sharedTaskStays,
           )
         : onChanged == null
         ? null
@@ -298,8 +341,7 @@ class TaskListPicker extends ConsumerWidget {
                 Text(name, overflow: TextOverflow.ellipsis),
               ),
             ),
-            if (!locked && onChanged != null)
-              const DropDownMark(),
+            if (!locked && onChanged != null) const DropDownMark(),
           ],
         ),
       ),

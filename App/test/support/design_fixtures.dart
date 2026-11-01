@@ -142,7 +142,7 @@ class DesignTaskNotifier extends TaskNotifier {
   }
 
   @override
-  Future<void> setCompleted(Task task, bool completed) =>
+  Future<void> setCompleted(Task task, bool completed, {DateTime? at}) =>
       updateTask(task.copyWith(isCompleted: completed));
 
   @override

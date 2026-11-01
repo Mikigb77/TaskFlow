@@ -17,6 +17,14 @@ extension TaskFlowLocale on BuildContext {
   String fullDate(DateTime date) =>
       DateFormat.yMMMMEEEEd(localeName).format(date);
 
+  /// A day in full as a heading, as of [now]: `miércoles, 28 de octubre`.
+  /// The current year goes without saying, as on Calendar's month heading;
+  /// a day of another year keeps it.
+  String dayHeading(DateTime date, DateTime now) =>
+      date.year == now.year
+          ? DateFormat.MMMMEEEEd(localeName).format(date)
+          : fullDate(date);
+
   /// Weekday first (`vie, 17 oct`), so a date can be checked without knowing
   /// today's date.
   String weekdayDate(DateTime date) =>
@@ -51,6 +59,22 @@ extension TaskFlowLocale on BuildContext {
     2 => l10n.medium,
     _ => l10n.low,
   };
+
+  /// A task's priority as a phrase: `Prioridad alta`.
+  String priorityPhrase(int priority) => l10n.priorityValue(switch (priority) {
+    3 => 'high',
+    2 => 'medium',
+    _ => 'low',
+  });
+
+  /// A passed deadline, said once: `Venció el lun, 26 de oct`, with its time
+  /// when it has one, as taskDeadlineLabel gives the date.
+  String deadlinePassedLine(Task task) {
+    final date = task.displayDeadline!;
+    return l10n.deadlinePassedOn(
+      '${weekdayDate(date)}${task.deadlineHasTime ? ' · ${clockTime(date)}' : ''}',
+    );
+  }
   String listRole(String role) => switch (role) {
     'owner' => l10n.roleOwner,
     'admin' => l10n.groupAdmin,
