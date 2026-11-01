@@ -26,6 +26,7 @@ class TaskDetailScreen extends ConsumerStatefulWidget {
     this.occurrenceDate,
     this.occurrenceKey,
     this.showFiles = false,
+    this.doneAt,
   });
   final int taskId;
   final DateTime? occurrenceDate;
@@ -33,6 +34,10 @@ class TaskDetailScreen extends ConsumerStatefulWidget {
 
   /// Opened to free file space: scrolls the Files section into view.
   final bool showFiles;
+
+  /// The time Completadas remembers for the row the page was opened from:
+  /// Completar gives it back rather than stamping now (UX-2646).
+  final DateTime? doneAt;
 
   @override
   ConsumerState<TaskDetailScreen> createState() => _TaskDetailScreenState();
@@ -68,7 +73,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       _leaving = task;
       _closing = true;
     });
-    unawaited(TaskInteractions.toggle(context, ref, task));
+    unawaited(
+      TaskInteractions.toggle(context, ref, task, doneAt: widget.doneAt),
+    );
     await Future<void>.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
     final route = ModalRoute.of(context);

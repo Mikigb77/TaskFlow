@@ -145,8 +145,22 @@ class TaskAssignmentPicker extends ConsumerWidget {
                               child: ListView(
                                 shrinkWrap: true,
                                 children: [
-                                  ListTile(
-                                    title: Text(context.l10n.assignmentChoose),
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      24,
+                                      0,
+                                      24,
+                                      8,
+                                    ),
+                                    child: Semantics(
+                                      header: true,
+                                      child: Text(
+                                        context.l10n.assignmentChoose,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleMedium,
+                                      ),
+                                    ),
                                   ),
                                   ListTile(
                                     leading: const Icon(Icons.groups_outlined),

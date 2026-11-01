@@ -9,6 +9,7 @@ import 'package:agenda/main.dart';
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_list_info.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/repositories/task_repository.dart';
@@ -22,6 +23,7 @@ import 'package:agenda/l10n/region.dart';
 import 'package:agenda/screens/calendar_screen.dart';
 import 'package:agenda/widgets/task_tile.dart';
 import 'package:agenda/widgets/task_actions.dart';
+import 'package:agenda/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -29,6 +31,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:io';
 import 'dart:ui' show Tristate;
 
@@ -2805,6 +2808,262 @@ void main() {
         },
       );
     }
+  });
+
+  // ---- UX loop 2026-11-01-screens, round 1 · P317 (UX-2635) ----
+  group('P317 · wrapped labels centre beside their icon', () {
+    setUpAll(() async {
+      await loadManrope();
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    });
+
+    final today = DateTime(now.year, now.month, now.day);
+    // 09:41 today, with reminders on at 9:00 for tasks with no time.
+    final at = DateTime(now.year, now.month, now.day, 9, 41);
+    final reminders = reminderOverrides(
+      MemoryReminderStore(
+        const ReminderPreferences(
+          enabled: true,
+          dateOnlyTime: 540,
+          asked: true,
+        ),
+      ),
+      FakeReminderAccess(allowed: true),
+    );
+    Task marta() => Task(
+      id: 1,
+      title: 'Llamar a Marta',
+      dueDate: today,
+      hasTime: false,
+      priority: 1,
+    );
+
+    /// «Llamar a Marta»'s page (tasks/detail.alert-passed): today, no time,
+    /// opened at 09:41, so its 9:00 alert has passed.
+    Future<void> openPassed(
+      WidgetTester tester,
+      String language,
+      double scale,
+    ) async {
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final repository = _Repository([marta()]);
+      final container = designContainer(
+        regionalStore: MemoryRegionalStore(
+          RegionalPreferences(language: language),
+        ),
+        tasks: () => TaskNotifier(repository),
+        overrides: [
+          ...reminders,
+          calendarClockProvider.overrideWithValue(() => at),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const MyApp()),
+      );
+      await tester.pumpAndSettle();
+      await _App.detail(tester, 1);
+      final chip = find.byType(ReminderChip);
+      await tester.ensureVisible(chip);
+      await tester.pumpAndSettle();
+    }
+
+    /// The reminder chip's [text], line by line, and its paragraph's box.
+    ({List<Rect> lines, Rect box, double longest}) chipText(
+      WidgetTester tester,
+      String text,
+    ) {
+      final chip = find.byType(ReminderChip);
+      final paragraph = labelParagraph(tester, chip, text);
+      expect(paragraph.didExceedMaxLines, isFalse, reason: '«$text» whole');
+      final lines = labelLines(tester, chip, text);
+      return (
+        lines: lines,
+        box: paragraph.localToGlobal(Offset.zero) & paragraph.size,
+        longest: lines.map((line) => line.width).reduce(math.max),
+      );
+    }
+
+    /// The chip hugs [text]'s longest line: its label box is no wider than
+    /// that line, the bell sits beside it, and the chip ends no further from
+    /// the text than its own padding.
+    void expectHugs(WidgetTester tester, String text, Finder shape) {
+      final t = chipText(tester, text);
+      expect(t.box.width - t.longest, lessThanOrEqualTo(1),
+          reason: '«$text»: the label ${t.box} hugs its longest line '
+              '(${t.longest} dp)');
+      final bell = tester.getRect(
+        find.descendant(
+          of: find.byType(ReminderChip),
+          matching: find.byType(Icon),
+        ),
+      );
+      final chip = tester.getRect(shape);
+      final textLeft = t.lines.map((line) => line.left).reduce(math.min);
+      final textRight = t.lines.map((line) => line.right).reduce(math.max);
+      expect(textLeft - bell.right, inInclusiveRange(0, 12),
+          reason: 'the bell $bell beside the text (from $textLeft)');
+      // A chip pads its label by 8 dp and itself by 8 dp, plus its outline.
+      expect(chip.right - textRight, lessThanOrEqualTo(17.5),
+          reason: '«$text»: no empty band after the text in the chip $chip '
+              '(${chip.right - textRight} dp)');
+    }
+
+    for (final (language, lines) in [('ca', 4), ('es', 3)]) {
+      testWidgets(
+        'UX-2635: $language 2× on 360×800 (tasks/detail.alert-passed.$language.light.2x), the chip «${lookupAppLocalizations(Locale(language)).noReminderTimePassed}» wraps with each line centred on the longest, hugs it with the bell beside it, stays at the page’s left, and a tap still opens the reminder choices',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          await openPassed(tester, language, 2);
+          final action = find.descendant(
+            of: find.byType(ReminderChip),
+            matching: find.byType(ActionChip),
+          );
+          expect(action, findsOneWidget, reason: 'the chip has a tap');
+          final t = chipText(tester, l.noReminderTimePassed);
+          expect(t.lines.length, greaterThanOrEqualTo(2),
+              reason: 'it wraps at 2×, as the render shows (about $lines)');
+          for (final line in t.lines) {
+            expect((line.center.dx - t.box.center.dx).abs(),
+                lessThanOrEqualTo(1),
+                reason: 'the line $line centred on the longest, in ${t.box}');
+          }
+          expectHugs(tester, l.noReminderTimePassed, action);
+          // The chip stays left on the page, in line with the title.
+          final title = tester.getRect(
+            find
+                .descendant(
+                  of: find.byType(TaskDetailScreen),
+                  matching: find.text('Llamar a Marta'),
+                )
+                .first,
+          );
+          expect(tester.getRect(action).left, closeTo(title.left, 1),
+              reason: 'the chip at the page’s left, as the title');
+          expect(tester.takeException(), isNull, reason: 'no overflow');
+          await tester.tap(action);
+          await tester.pumpAndSettle();
+          expect(find.byType(BottomSheet), findsOneWidget,
+              reason: 'a tap opens the reminder choices');
+        },
+      );
+    }
+
+    // The plan expected one line here; at 360 dp the chip's label has
+    // 232 dp (the page's width less 80), so it took two lines before P317
+    // as well (render tasks/detail.alert-passed.es.light.1x). What this
+    // locks is «as before»: the same lines a start-aligned label had.
+    testWidgets(
+      'UX-2635: es 1× on 360×800, the chip «Sin recordatorio: ya ha pasado la hora del aviso» wraps as before, its lines centred, hugging the longest, with the bell beside it',
+      (tester) async {
+        await openPassed(tester, 'es', 1);
+        final t = chipText(tester, es.noReminderTimePassed);
+        final paragraph = labelParagraph(
+          tester,
+          find.byType(ReminderChip),
+          es.noReminderTimePassed,
+        );
+        final before = TextPainter(
+          text: paragraph.text,
+          textDirection: TextDirection.ltr,
+          textScaler: paragraph.textScaler,
+          maxLines: 10,
+        )..layout(maxWidth: paragraph.constraints.maxWidth);
+        addTearDown(before.dispose);
+        expect(t.lines, hasLength(before.computeLineMetrics().length),
+            reason: 'the same lines as a start-aligned label in its room');
+        expect(t.lines.length, lessThanOrEqualTo(2));
+        for (final line in t.lines) {
+          expect((line.center.dx - t.box.center.dx).abs(),
+              lessThanOrEqualTo(1),
+              reason: 'the line $line centred on the longest, in ${t.box}');
+        }
+        expectHugs(
+          tester,
+          es.noReminderTimePassed,
+          find.descendant(
+            of: find.byType(ReminderChip),
+            matching: find.byType(ActionChip),
+          ),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2635: a reminder line with no tap (onChanged null, nothing blocking) at es 2× keeps its lines start-aligned and hugs its longest line',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final container = designContainer(
+          overrides: [
+            ...reminders,
+            calendarClockProvider.overrideWithValue(() => at),
+          ],
+        );
+        addTearDown(container.dispose);
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              locale: const Locale('es'),
+              supportedLocales: AppLocalizations.supportedLocales,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              theme: AppTheme.light,
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: const TextScaler.linear(2)),
+                child: child!,
+              ),
+              home: Scaffold(
+                body: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child: ReminderChip(task: marta()),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final plain = find.descendant(
+          of: find.byType(ReminderChip),
+          matching: find.byType(Chip),
+        );
+        expect(plain, findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(ReminderChip),
+            matching: find.byType(ActionChip),
+          ),
+          findsNothing,
+          reason: 'a line with no tap is no control',
+        );
+        final t = chipText(tester, es.noReminderTimePassed);
+        expect(t.lines.length, greaterThanOrEqualTo(2), reason: 'it wraps');
+        for (final line in t.lines) {
+          expect((line.left - t.box.left).abs(), lessThanOrEqualTo(1),
+              reason: 'the line $line starts at the label’s start, ${t.box}');
+        }
+        expect(
+          t.lines.any((line) => t.longest - line.width > 4),
+          isTrue,
+          reason: 'a shorter line shows the alignment: ${t.lines}',
+        );
+        expectHugs(tester, es.noReminderTimePassed, plain);
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }
 

@@ -130,6 +130,12 @@ class NewTaskRoute extends MaterialPageRoute<void> {
   /// build on; until then it is empty.
   bool empty = true;
 
+  /// Nothing in its form changed since it opened, and Más detalles is
+  /// closed. Only such a blank form closes for an entry it doesn't take
+  /// (UX-2643). The form keeps this from its first build on; until then it
+  /// is.
+  bool untouched = true;
+
   @override
   void install() {
     super.install();
@@ -159,6 +165,26 @@ bool? emptyEntryFormOnTop(NavigatorState navigator) {
     return arguments.blank ? arguments.askedToSpeak : null;
   }
   return null;
+}
+
+/// Whether the route on top of [navigator] is a new task's form opened
+/// [NewTaskArguments.blank], still as it opened: nothing typed, picked or
+/// chosen, and Más detalles closed. An entry closes only such a form, since
+/// whatever was chosen in it would go unasked (UX-2643).
+bool untouchedEntryFormOnTop(NavigatorState navigator) {
+  for (final route in NewTaskRoute._open) {
+    if (route.navigator != navigator ||
+        !route.isCurrent ||
+        !route.empty ||
+        !route.untouched) {
+      continue;
+    }
+    final arguments =
+        route.settings.arguments as NewTaskArguments? ??
+        const NewTaskArguments();
+    return arguments.blank;
+  }
+  return false;
 }
 
 /// The task form in create mode, for accounts without Pro: free text makes

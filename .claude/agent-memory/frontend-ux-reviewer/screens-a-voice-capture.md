@@ -110,6 +110,6 @@ The base map above predates the free tier (b7) and this run; trust this section 
 - **Launcher shortcut icons:** adaptive icons (`drawable-anydpi-v26/capture_shortcut_{voice,text}.xml`, bg `#E3F1EE`, 108 dp foregrounds); launcher not yet seen on the emulator.
 - **«Guardar como tarea»** → one-task result card with «Añadir al calendario» (nothing saved until then).
 - **Capture sheet:** ring only while starting/listening/understanding; «Escribir» also on the online path; while understanding is slow «Guardar como tarea» is a TextButton, filled only after a failure; error banners show whole, only the words scroll.
-- **Open:** UX-2643, UX-2644 (entry rules).
+- **Entry rules completed 2026-11-01 (P314):** an entry closes only an untouched blank form, otherwise opens over it (Cancelar/Back shows the form intact); after its one pop it re-checks the top, so VOICE→TEXT→VOICE leaves the one paused sheet. Code + widget tests; device checks owed.
 
 Related: [[ui-patterns]], [[screens-b-calendar-tasks]].

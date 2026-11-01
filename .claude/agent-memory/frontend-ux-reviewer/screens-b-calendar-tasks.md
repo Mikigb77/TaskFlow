@@ -101,6 +101,8 @@ Current as of 2026-10-13 (whole-app run, slice B). Paths are under `App/lib/`.
 - **Steps (checklist):** checkbox + title merged for TalkBack (`MergeSemantics`, off while renaming); ⋮ stays separate.
 - **Edit form** saves on `paused`; Deshacer returns to `_opened`.
 - **Completadas:** newest completion first (see [[ui-patterns]] › Completion times).
-- **Remove file:** ES «Quitar archivo» / «¿Quitar este archivo de la tarea?» (help line still «Se eliminará…»).
+- **Remove file:** ES «Quitar archivo» / «¿Quitar este archivo de la tarea?»; help line «Se quitará de la tarea y, si lo has subido, de tus otros dispositivos al sincronizar. Tu archivo original no se elimina.» (2026-11-01; EN/CA already said remove). Render `tasks/detail.remove-file.*`.
+- **Completar on a page opened from Completadas** keeps the row's time and place (2026-11-01, see [[ui-patterns]] › Completion times).
+- **Reminder chip** (`ReminderChip`, `reminder_control.dart` ~:764): hugs its longest line; centred only when tappable. At ES 1× on 360 dp the passed-alert line wraps (80 dp cap; UX-2648 open).
 
 Related: [[ui-patterns]], [[screens-a-voice-capture]].

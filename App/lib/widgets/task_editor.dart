@@ -314,12 +314,15 @@ class _TaskEditorState extends ConsumerState<TaskEditor>
       _kept = _words;
       _title.addListener(_keepWords);
       _notes.addListener(_keepWords);
-      _title.addListener(_markEmpty);
+      // Typing changes no state of the form's own, so nothing rebuilds it.
+      _title.addListener(_markRoute);
+      _notes.addListener(_markRoute);
     }
   }
 
   // The new task's route, told whether this form is still empty, so a
-  // second tap on the widget or a shortcut opens no second form (UX-2110).
+  // second tap on the widget or a shortcut opens no second form (UX-2110),
+  // and whether it is as it opened, so only then may one close it (UX-2643).
   NewTaskRoute? _route;
 
   @override
@@ -328,12 +331,24 @@ class _TaskEditorState extends ConsumerState<TaskEditor>
     final route = ModalRoute.of(context);
     if (_creating && route is NewTaskRoute && route != _route) {
       _route = route;
-      _markEmpty();
+      _markRoute();
     }
   }
 
-  /// The empty form D12's Back just closes: no title.
-  void _markEmpty() => _route?.empty = _title.text.trim().isEmpty;
+  /// Tells the route whether this is the empty form D12's Back just closes
+  /// (no title), and whether it is untouched: nothing changed since it
+  /// opened, with Más detalles closed and no file being picked. A step typed
+  /// without Enter and a file being picked aren't in [_edited] yet; in a new
+  /// task's form both are reached only with Más detalles open.
+  void _markRoute() {
+    final route = _route;
+    if (route == null) return;
+    route.empty = _title.text.trim().isEmpty;
+    route.untouched =
+        !_detailsExpanded &&
+        !_pickingFile &&
+        const DeepCollectionEquality().equals(_edited().toMap(), _unchanged);
+  }
 
   @override
   void dispose() {
@@ -858,6 +873,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor>
 
   @override
   Widget build(BuildContext context) {
+    // Every change in the form rebuilds it: its route learns of each.
+    _markRoute();
     final colors = Theme.of(context).colorScheme;
     return PopScope(
       canPop: false,
@@ -1246,6 +1263,10 @@ class _TaskEditorState extends ConsumerState<TaskEditor>
                       : _dueDate != null
                       ? context.l10n.captureAddToCalendar
                       : context.l10n.captureAddTask,
+                  // A label that wraps at large text stays centred beside
+                  // its ✓, as the other buttons' labels do.
+                  textAlign: TextAlign.center,
+                  textWidthBasis: TextWidthBasis.longestLine,
                 ),
               ),
             ),

@@ -4148,68 +4148,71 @@ void main() {
 
   // ---- UX loop 2026-10-28-app, round 3 · P313 (UX-2641): an entry from
   // outside the app never closes a sheet that keeps a recording ----
+  // The P313 group's helpers, shared with P314's: a Pro sheet listening
+  // online, the person speaking, and the app left and resumed.
+  /// Every capture sheet built, on top or under another.
+  Finder sheets() => find.byType(VoiceTaskScreen, skipOffstage: false);
+
+  /// A VOICE entry while the phone's own recognizer can't start: the sheet
+  /// listens online, with the app's recorder.
+  Future<_App> openOnline(WidgetTester tester) async {
+    final app = await _App.open(
+      tester,
+      pro: true,
+      size: const Size(360, 800),
+      record: true,
+      speechStartError: PlatformException(code: 'recognizer-busy'),
+      entries: [_entry('voice')],
+    );
+    expect(sheets(), findsOneWidget);
+    expect(app.speech.starts, 1, reason: 'the phone’s recognizer was tried');
+    expect(app.recorders, hasLength(1));
+    expect(app.recorders.single.starts, 1, reason: 'listening online');
+    expect(
+      find.text(es.captureListeningOnline),
+      findsOneWidget,
+      reason: 'online, no words show while speaking',
+    );
+    return app;
+  }
+
+  /// The person speaks: the recorder measures audio, and the capture
+  /// keeps it. No words show online.
+  Future<CaptureSession> speak(WidgetTester tester, _App app) async {
+    app.recorders.single.hear();
+    await tester.pump(const Duration(milliseconds: 120));
+    await tester.pump();
+    final kept = [
+      for (final session in app.store.sessions.values)
+        if (session.audioPath != null) session,
+    ];
+    expect(kept, hasLength(1), reason: 'the recording is kept');
+    expect(words(), findsNothing, reason: 'no words show online');
+    return kept.single;
+  }
+
+  Future<void> leaveAndComeBack(WidgetTester tester) async {
+    for (final state in [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+    await tester.pumpAndSettle();
+    for (final state in [
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+    await tester.pumpAndSettle();
+  }
+
   group('P313 · an entry never closes what holds something', () {
-    /// Every capture sheet built, on top or under another.
-    Finder sheets() => find.byType(VoiceTaskScreen, skipOffstage: false);
     Finder cancel() =>
         inSheet(find.widgetWithText(TextButton, es.cancel)).hitTestable();
-
-    /// A VOICE entry while the phone's own recognizer can't start: the sheet
-    /// listens online, with the app's recorder.
-    Future<_App> openOnline(WidgetTester tester) async {
-      final app = await _App.open(
-        tester,
-        pro: true,
-        size: const Size(360, 800),
-        record: true,
-        speechStartError: PlatformException(code: 'recognizer-busy'),
-        entries: [_entry('voice')],
-      );
-      expect(sheets(), findsOneWidget);
-      expect(app.speech.starts, 1, reason: 'the phone’s recognizer was tried');
-      expect(app.recorders, hasLength(1));
-      expect(app.recorders.single.starts, 1, reason: 'listening online');
-      expect(
-        find.text(es.captureListeningOnline),
-        findsOneWidget,
-        reason: 'online, no words show while speaking',
-      );
-      return app;
-    }
-
-    /// The person speaks: the recorder measures audio, and the capture
-    /// keeps it. No words show online.
-    Future<CaptureSession> speak(WidgetTester tester, _App app) async {
-      app.recorders.single.hear();
-      await tester.pump(const Duration(milliseconds: 120));
-      await tester.pump();
-      final kept = [
-        for (final session in app.store.sessions.values)
-          if (session.audioPath != null) session,
-      ];
-      expect(kept, hasLength(1), reason: 'the recording is kept');
-      expect(words(), findsNothing, reason: 'no words show online');
-      return kept.single;
-    }
-
-    Future<void> leaveAndComeBack(WidgetTester tester) async {
-      for (final state in [
-        AppLifecycleState.inactive,
-        AppLifecycleState.hidden,
-        AppLifecycleState.paused,
-      ]) {
-        tester.binding.handleAppLifecycleStateChanged(state);
-      }
-      await tester.pumpAndSettle();
-      for (final state in [
-        AppLifecycleState.hidden,
-        AppLifecycleState.inactive,
-        AppLifecycleState.resumed,
-      ]) {
-        tester.binding.handleAppLifecycleStateChanged(state);
-      }
-      await tester.pumpAndSettle();
-    }
 
     testWidgets(
       'UX-2641: Pro, ES 1× on 360×800, online listening: a recording paused when the app was left, no words shown; a TEXT entry opens a typing sheet over it, with no question skipped; Cancelar on it shows the paused voice sheet, and the capture is kept, not discarded',
@@ -4314,6 +4317,75 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(TaskEditor, skipOffstage: false), findsOneWidget);
         expect(titleText(tester), 'Comprar pilas', reason: 'its words kept');
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- UX loop 2026-11-01-screens, round 1 · P314 (UX-2644): what a close
+  // uncovers may take the entry ----
+  group('P314 · an entry closes only what is as it opened', () {
+    testWidgets(
+      'UX-2644: Pro, ES 1× on 360×800, online listening: a recording paused when the app was left; a TEXT entry opens a typing sheet over it; a VOICE entry then leaves exactly one capture sheet, the paused voice sheet, with one recorder started once, all three entries acknowledged and the capture kept',
+      (tester) async {
+        final app = await openOnline(tester);
+        final capture = await speak(tester, app);
+
+        await leaveAndComeBack(tester);
+        expect(sheets(), findsOneWidget);
+        expect(find.text(es.recordingKept), findsOneWidget, reason: 'paused');
+
+        app.entries.queue.add(_entry('text'));
+        app.entries.changed();
+        await tester.pumpAndSettle();
+        expect(
+          sheets(),
+          findsNWidgets(2),
+          reason: 'the typing sheet opens over the paused one',
+        );
+        expect(words(), findsOneWidget, reason: 'the top sheet types');
+        // The typing sheet builds its own recorder, never started.
+        final built = app.recorders.length;
+
+        app.entries.queue.add(_entry('voice'));
+        app.entries.changed();
+        await tester.pumpAndSettle();
+        expect(
+          sheets(),
+          findsOneWidget,
+          reason: 'exactly one capture sheet: no second voice sheet',
+        );
+        expect(find.byType(BottomSheet), findsOneWidget);
+        expect(words(), findsNothing, reason: 'the typing sheet closed');
+        expect(
+          find.text(es.recordingKept).hitTestable(),
+          findsOneWidget,
+          reason: 'the paused voice sheet shows',
+        );
+        expect(app.entries.acknowledged, hasLength(3));
+        expect(app.entries.queue, isEmpty);
+        expect(
+          app.recorders,
+          hasLength(built),
+          reason: 'no sheet was built for the VOICE entry',
+        );
+        expect(
+          [for (final recorder in app.recorders) recorder.starts],
+          [1, for (var i = 1; i < built; i++) 0],
+          reason: 'one recorder, started once: no second recording',
+        );
+        expect(app.recorders.first.stops, 1, reason: 'still paused');
+        expect(app.speech.starts, 1, reason: 'no second listening');
+        expect(
+          find.text(es.captureKeepQuestion),
+          findsNothing,
+          reason: 'no keep-or-discard question',
+        );
+        final kept = app.store.sessions[capture.id]!;
+        expect(kept.status, isNot('discarded'));
+        expect(kept.terminal, isFalse);
+        expect(kept.audioPath, capture.audioPath);
+        expect(find.byType(CalendarScreen).hitTestable(), findsNothing);
         expect(tester.takeException(), isNull);
       },
     );

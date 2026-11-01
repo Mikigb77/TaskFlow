@@ -848,4 +848,448 @@ void main() {
       },
     );
   });
+
+
+  // ---- UX loop 2026-11-01-screens, round 1 · P316 (UX-2647): «¿Quién es
+  // responsable?» and «Novedades del proyecto» open with a heading ----
+  group('P316 · picker headings', () {
+    Finder sheet() => find.byType(BottomSheet);
+    Finder inSheet(Finder finder) =>
+        find.descendant(of: sheet(), matching: finder);
+    Finder row(String text) => find.ancestor(
+      of: inSheet(find.textContaining(text)),
+      matching: find.byType(ListTile),
+    );
+    Finder list() => inSheet(find.byType(Scrollable));
+
+    bool contains(Rect outer, Rect inner) =>
+        inner.top >= outer.top - 0.5 &&
+        inner.bottom <= outer.bottom + 0.5 &&
+        inner.left >= outer.left - 0.5 &&
+        inner.right <= outer.right + 0.5;
+
+    /// [title] is a heading: its own semantics node with the header flag,
+    /// in titleMedium, 24 dp from the sheet's left edge, not a ListTile row.
+    void expectHeading(WidgetTester tester, String title) {
+      final heading = inSheet(find.text(title));
+      expect(heading, findsOneWidget, reason: '«$title» in the sheet');
+      expect(
+        find.ancestor(of: heading, matching: find.byType(ListTile)),
+        findsNothing,
+        reason: '«$title» isn\'t drawn as a plain row',
+      );
+      final node = tester.getSemantics(heading);
+      expect(node.flagsCollection.isHeader, isTrue, reason: '«$title»');
+      expect(
+        tester.widget<Text>(heading).style,
+        Theme.of(tester.element(heading)).textTheme.titleMedium,
+        reason: '«$title» in titleMedium',
+      );
+      expect(
+        tester.getTopLeft(heading).dx - tester.getTopLeft(sheet()).dx,
+        closeTo(24, 0.5),
+        reason: '«$title» starts 24 dp from the sheet\'s left edge',
+      );
+    }
+
+    /// The heading's text is laid out whole: inside the sheet and the
+    /// screen, with no line cut off.
+    void expectWhole(WidgetTester tester, Finder finder, Size screen) {
+      final rect = tester.getRect(finder);
+      expect(
+        contains(tester.getRect(sheet()), rect),
+        isTrue,
+        reason: '$rect inside the sheet ${tester.getRect(sheet())}',
+      );
+      expect(contains(Offset.zero & screen, rect), isTrue, reason: '$rect');
+      final paragraph = tester.renderObject<RenderParagraph>(finder);
+      expect(paragraph.didExceedMaxLines, isFalse);
+    }
+
+    /// TalkBack meets [labels] in this order.
+    void expectReadingOrder(WidgetTester tester, List<String> labels) {
+      final order = [
+        for (final node in tester.semantics.simulatedAccessibilityTraversal())
+          node.label,
+      ];
+      var last = -1;
+      for (final label in labels) {
+        final at = order.indexWhere((read) => read.contains(label));
+        expect(at, greaterThan(last), reason: '«$label» after the last in $order');
+        last = at;
+      }
+    }
+
+    Future<void> setUpScreen(
+      WidgetTester tester,
+      Size size,
+    ) async {
+      await loadManrope();
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+    }
+
+    Widget app(
+      String language,
+      double textScale,
+      List<Override> overrides,
+      Widget home,
+    ) => ProviderScope(
+      overrides: overrides,
+      child: MaterialApp(
+        theme: AppTheme.light,
+        locale: Locale(language),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
+        home: Scaffold(body: SafeArea(child: home)),
+      ),
+    );
+
+    // «¿Quién es responsable?», from a task in a shared project.
+    TaskListInfo shared(List<ProjectMember> people) => TaskListInfo(
+      id: 'mates',
+      name: 'Matemáticas',
+      shared: true,
+      role: 'owner',
+      ownerId: 1,
+      people: people,
+    );
+
+    Future<void> openResponsible(
+      WidgetTester tester, {
+      required String language,
+      required Size size,
+      double textScale = 1,
+      required TaskListInfo project,
+      required Task task,
+    }) async {
+      await setUpScreen(tester, size);
+      final api = OfflineApiClient();
+      addTearDown(api.close);
+      await tester.pumpWidget(
+        app(language, textScale, [
+          apiClientProvider.overrideWithValue(api),
+          authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
+          taskListsProvider.overrideWith((ref) async => [project]),
+          groupsProvider.overrideWith((ref) async => []),
+          taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+        ], TaskAssignmentPicker(task: task, lockShared: true, onChanged: (_) {})),
+      );
+      await tester.pumpAndSettle();
+      final chip = find.descendant(
+        of: find.byType(TaskAssignmentPicker),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is ActionChip &&
+              ((widget.avatar as Icon?)?.icon == Icons.groups_outlined ||
+                  (widget.avatar as Icon?)?.icon == Icons.person_outline),
+        ),
+      );
+      expect(chip, findsOneWidget);
+      await tester.tap(chip);
+      await tester.pumpAndSettle();
+      expect(sheet(), findsOneWidget);
+    }
+
+    // «Novedades del proyecto», for a project.
+    Future<void> openUpdates(
+      WidgetTester tester, {
+      required String language,
+      required Size size,
+      double textScale = 1,
+      required TaskListInfo project,
+    }) async {
+      await setUpScreen(tester, size);
+      await tester.pumpWidget(
+        app(language, textScale, [
+          taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+        ], Consumer(
+          builder: (context, ref, _) => Center(
+            child: TextButton(
+              onPressed: () => showProjectPreferences(context, ref, project),
+              child: const Text('open'),
+            ),
+          ),
+        )),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(sheet(), findsOneWidget);
+    }
+
+    testWidgets(
+      'UX-2647: «¿Quién es responsable?» (ES 1× on 360×800, two editors) opens with a titleMedium heading 24 dp in, then «Todos» and each person, the ✓ only on Ana, read in that order',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final es = lookupAppLocalizations(const Locale('es'));
+        await openResponsible(
+          tester,
+          language: 'es',
+          size: const Size(360, 800),
+          project: shared(const [
+            ProjectMember(id: 1, name: 'Miki', role: 'owner'),
+            ProjectMember(id: 2, name: 'Ana', role: 'editor'),
+          ]),
+          task: Task(
+            id: 1,
+            title: 'Terminar la presentación',
+            priority: 1,
+            listId: 'mates',
+            assignment: 'member',
+            assigneeId: 2,
+            assigneeName: 'Ana',
+          ),
+        );
+        expect(es.assignmentChoose, '¿Quién es responsable?');
+        expectHeading(tester, es.assignmentChoose);
+        final heading = inSheet(find.text(es.assignmentChoose));
+        final everyone = row(es.assignedToGroup);
+        final miki = row('Miki');
+        final ana = row('Ana');
+        for (final finder in [everyone, miki, ana]) {
+          expect(finder, findsOneWidget);
+        }
+        // On screen: the heading, «Todos», then each person.
+        expect(
+          tester.getTopLeft(heading).dy,
+          lessThan(tester.getTopLeft(everyone).dy),
+        );
+        expect(
+          tester.getTopLeft(everyone).dy,
+          lessThan(tester.getTopLeft(miki).dy),
+        );
+        expect(
+          tester.getTopLeft(miki).dy,
+          lessThan(tester.getTopLeft(ana).dy),
+        );
+        // Only the chosen row has a ✓ (UX-2514).
+        final checks = inSheet(find.byIcon(Icons.check_rounded));
+        expect(checks, findsOneWidget);
+        expect(
+          find.descendant(of: ana, matching: find.byIcon(Icons.check_rounded)),
+          findsOneWidget,
+        );
+        expect(tester.widget<ListTile>(ana).selected, isTrue);
+        // TalkBack: the heading, then the choices.
+        expectReadingOrder(tester, [
+          es.assignmentChoose,
+          es.assignedToGroup,
+          'Miki',
+          'Ana',
+        ]);
+        semantics.dispose();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    Future<void> openCasa(WidgetTester tester, String notifications) =>
+        openUpdates(
+          tester,
+          language: 'es',
+          size: const Size(360, 800),
+          project: TaskListInfo(
+            id: 'casa',
+            name: 'Casa',
+            shared: true,
+            notifications: notifications,
+          ),
+        );
+
+    for (final notifications in ['all', 'muted']) {
+      testWidgets(
+        'UX-2647: «Novedades del proyecto» for «Casa» (ES 1× on 360×800, set to $notifications): a titleMedium heading 24 dp in, «Casa» as a plain line under it, then the three choices, the ✓ on the chosen one',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          final es = lookupAppLocalizations(const Locale('es'));
+          await openCasa(tester, notifications);
+          expect(es.projectNotifications, 'Novedades del proyecto');
+          expectHeading(tester, es.projectNotifications);
+          final heading = inSheet(find.text(es.projectNotifications));
+          final name = inSheet(find.text('Casa'));
+          expect(name, findsOneWidget);
+          expect(
+            find.ancestor(of: name, matching: find.byType(ListTile)),
+            findsNothing,
+            reason: '«Casa» is a plain line, not a row',
+          );
+          expect(
+            tester.getTopLeft(name).dy,
+            greaterThan(tester.getBottomLeft(heading).dy - 0.5),
+            reason: '«Casa» under the heading',
+          );
+          final choices = [es.updatesAll, es.updatesAssigned, es.updatesMuted];
+          var above = tester.getBottomLeft(name).dy;
+          for (final choice in choices) {
+            final tile = row(choice);
+            expect(tile, findsOneWidget, reason: '«$choice»');
+            expect(tester.getTopLeft(tile).dy, greaterThan(above - 0.5));
+            above = tester.getTopLeft(tile).dy;
+          }
+          final label = notifications == 'all'
+              ? es.updatesAll
+              : es.updatesMuted;
+          expect(inSheet(find.byIcon(Icons.check_rounded)), findsOneWidget);
+          expect(
+            find.descendant(
+              of: row(label),
+              matching: find.byIcon(Icons.check_rounded),
+            ),
+            findsOneWidget,
+            reason: 'the ✓ on «$label»',
+          );
+          expect(tester.widget<ListTile>(row(label)).selected, isTrue);
+          semantics.dispose();
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2647: «Novedades del proyecto» for «Casa» (ES 1×): TalkBack reads the heading alone, then «Casa» outside the heading\'s node, then the three choices',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final es = lookupAppLocalizations(const Locale('es'));
+        await openCasa(tester, 'assigned');
+        final heading = inSheet(find.text(es.projectNotifications));
+        final name = inSheet(find.text('Casa'));
+        final headingNode = tester.getSemantics(heading);
+        expect(headingNode.flagsCollection.isHeader, isTrue);
+        expect(
+          headingNode.label,
+          es.projectNotifications,
+          reason: 'the heading reads only «${es.projectNotifications}»',
+        );
+        final nameNode = tester.getSemantics(name);
+        expect(
+          nameNode.id,
+          isNot(headingNode.id),
+          reason: '«Casa» sits outside the heading\'s node',
+        );
+        expect(nameNode.flagsCollection.isHeader, isFalse);
+        expectReadingOrder(tester, [
+          es.projectNotifications,
+          'Casa',
+          es.updatesAll,
+          es.updatesAssigned,
+          es.updatesMuted,
+        ]);
+        semantics.dispose();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final language in ['es', 'ca']) {
+      testWidgets(
+        'UX-2647: «Novedades del proyecto» at ${language.toUpperCase()} 2× on 360×740: the heading and the last choice show whole inside the sheet, with no scrolling',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          final l10n = lookupAppLocalizations(Locale(language));
+          const screen = Size(360, 740);
+          await openUpdates(
+            tester,
+            language: language,
+            size: screen,
+            textScale: 2,
+            project: TaskListInfo(
+              id: 'casa',
+              name: 'Casa',
+              shared: true,
+              notifications: 'assigned',
+            ),
+          );
+          expectHeading(tester, l10n.projectNotifications);
+          final heading = inSheet(find.text(l10n.projectNotifications));
+          expectWhole(tester, heading, screen);
+          final last = row(l10n.updatesMuted);
+          expect(last, findsOneWidget);
+          final rect = tester.getRect(last);
+          expect(
+            contains(tester.getRect(list()), rect),
+            isTrue,
+            reason: '«${l10n.updatesMuted}» $rect whole in the list ${tester.getRect(list())}',
+          );
+          expect(
+            rect.bottom,
+            lessThanOrEqualTo(tester.getRect(sheet()).bottom + 0.5),
+            reason: 'above the sheet\'s bottom edge',
+          );
+          expect(rect.bottom, lessThanOrEqualTo(screen.height + 0.5));
+          expect(
+            tester.state<ScrollableState>(list()).position.pixels,
+            0,
+            reason: 'seen without scrolling',
+          );
+          semantics.dispose();
+          expect(tester.takeException(), isNull);
+        },
+      );
+
+      testWidgets(
+        'UX-2647: «¿Quién es responsable?» at ${language.toUpperCase()} 2× on 360×740 with seven editors: the heading shows whole and the last person scrolls into view',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          final l10n = lookupAppLocalizations(Locale(language));
+          const screen = Size(360, 740);
+          const names = [
+            'Miki',
+            'Ana',
+            'Bea',
+            'Carles',
+            'Dolors',
+            'Eva',
+            'Ferran',
+          ];
+          await openResponsible(
+            tester,
+            language: language,
+            size: screen,
+            textScale: 2,
+            project: shared([
+              for (var i = 0; i < names.length; i++)
+                ProjectMember(
+                  id: i + 1,
+                  name: names[i],
+                  role: i == 0 ? 'owner' : 'editor',
+                ),
+            ]),
+            task: Task(
+              id: 1,
+              title: 'Terminar la presentación',
+              priority: 1,
+              listId: 'mates',
+              assignment: 'group',
+            ),
+          );
+          expectHeading(tester, l10n.assignmentChoose);
+          expectWhole(tester, inSheet(find.text(l10n.assignmentChoose)), screen);
+          final viewport = tester.getRect(list());
+          expect(
+            viewport.height,
+            lessThanOrEqualTo(screen.height * .7 + 0.5),
+            reason: 'capped at 70% of the screen: $viewport',
+          );
+          await tester.scrollUntilVisible(
+            inSheet(find.text('Ferran')),
+            200,
+            scrollable: list(),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            contains(tester.getRect(list()), tester.getRect(row('Ferran'))),
+            isTrue,
+            reason: 'the last person whole in view once scrolled',
+          );
+          semantics.dispose();
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  });
 }

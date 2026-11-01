@@ -1,6 +1,6 @@
 ---
 name: recurring-problems
-description: Forty-four problem types the 2026-10-13 whole-app review found in several areas of TaskFlow (no landing, state last, undo bars that never leave, hidden actions, developer text, duplicates, lost input, large text, help copy outliving its state...), as a checklist to run first on any screen
+description: Forty-six problem types the 2026-10-13 whole-app review found in several areas of TaskFlow (no landing, state last, undo bars that never leave, hidden actions, developer text, duplicates, lost input, large text, help copy outliving its state...), as a checklist to run first on any screen
 metadata:
   type: project
 ---
@@ -187,5 +187,13 @@ Problem types the 2026-10-13 whole-app run (slices A–D) found in more than one
 43. **One-tap rows replacing a compact control push the primary below the fold at 2×** (repeat sheet, R1B1-2), and a pinned primary then hides that content continues (R2B-1). See 36.
 
 44. **Sync gates comparing the phone's row with the server's "now" fail when the other side changed first** (D9 reader reminders). Look for a persisted intent marker (`own_reminders_pending`).
+
+45. **A wrapping label stretches to the full width, leaving its icon at the edge.**
+    - Four times so far: UX-2608, UX-2630, the form's «Añadir al / calendario» (UX-2634), the CA reminder chip (UX-2635). Fix is always `textWidthBasis: longestLine` + centre (only if tappable).
+    - Check every `.icon` button and icon chip whose label can wrap at 2× in ES/CA.
+
+46. **A page opened from a list loses the list's context.**
+    - The task page opened from Completadas stamped a new completion time, so the row jumped (UX-2646). Same family as 39.
+    - When a list holds per-row state (a remembered time, a scope), check that the row's page and its actions receive it.
 
 Related: [[ui-patterns]], [[review-techniques]].

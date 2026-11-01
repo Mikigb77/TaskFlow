@@ -18,8 +18,9 @@ class TaskList extends StatelessWidget {
 
   /// Completadas' order, by when each row was completed, from this: rows
   /// with a time first, the last one done on top; then those without one,
-  /// latest planned day first, undated last. Null orders by schedule. An
-  /// open row ticked again is done at its time from this, not now.
+  /// latest planned day first, undated last. Null orders by schedule. A row
+  /// ticked again, on the list or on its page, is done at its time from
+  /// this, not now.
   final DateTime? Function(Task)? completedTime;
 
   /// Just-saved tasks, highlighted while [lit]. The first one's row carries
@@ -85,7 +86,7 @@ class TaskList extends StatelessWidget {
                 project: project,
                 showUndated: showUndated,
                 markOverdue: true,
-                doneAt: task.isCompleted ? null : timeOf?.call(task),
+                doneAt: timeOf?.call(task),
               );
       },
     );

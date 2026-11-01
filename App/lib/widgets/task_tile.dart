@@ -48,8 +48,8 @@ class TaskTile extends ConsumerWidget {
   /// clear rather than «Tarea completada».
   final bool lastOpen;
 
-  /// The time an open row on Completadas was done at, given back when it is
-  /// ticked again.
+  /// The time a row on Completadas was done at, given back when it is
+  /// ticked again, on the row or on its page.
   final DateTime? doneAt;
 
   /// The row's date line, or null when it has nothing to say.
@@ -205,6 +205,7 @@ class TaskTile extends ConsumerWidget {
           taskId: task.id!,
           occurrenceDate: task.occurrenceDate,
           occurrenceKey: task.occurrenceId,
+          doneAt: doneAt,
         ),
       ),
     );

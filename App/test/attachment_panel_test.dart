@@ -934,6 +934,100 @@ void main() {
       );
     }
   });
+
+  // ---- UX loop 2026-11-01-screens, round 1 · P315 (UX-2645): the
+  // remove-file help says «Se quitará» ----
+  group('P315 · the task page', () {
+    const es =
+        'Se quitará de la tarea y, si lo has subido, de tus otros dispositivos al sincronizar. Tu archivo original no se elimina.';
+    const en =
+        'This removes it from the task and, if uploaded, your other devices when they sync. Your original file is not deleted.';
+    const ca =
+        'Es traurà de la tasca i, si s’ha pujat, dels altres dispositius quan se sincronitzin. El fitxer original no se suprimirà.';
+
+    testWidgets(
+      'UX-2645: in ES the remove-file dialog reads «¿Quitar este archivo de la tarea?», the file’s name, then «Se quitará de la tarea…», with «Quitar archivo»; nothing in it says «Se eliminará»',
+      (tester) async {
+        final l = lookupAppLocalizations(const Locale('es'));
+        expect(l.fileRemoveHelp, es);
+        await pumpPanel(tester, language: 'es');
+        final remove = find.widgetWithText(TextButton, l.fileRemove);
+        await tester.ensureVisible(remove);
+        await tester.pumpAndSettle();
+        await tester.tap(remove);
+        await tester.pumpAndSettle();
+        final dialog = find.byType(AlertDialog);
+        expect(dialog, findsOneWidget);
+
+        final question = find.descendant(
+          of: dialog,
+          matching: find.text(l.fileRemoveQuestion),
+        );
+        final body = find.descendant(
+          of: dialog,
+          matching: find.text('Local notes.txt\n\n$es'),
+        );
+        final button = find.descendant(
+          of: dialog,
+          matching: find.widgetWithText(FilledButton, l.fileRemove),
+        );
+        expect(question, findsOneWidget);
+        expect(body, findsOneWidget, reason: 'the name, then the help');
+        expect(button, findsOneWidget);
+        // Read top to bottom: the question, the name and help, the button.
+        expect(
+          tester.getTopLeft(question).dy,
+          lessThan(tester.getTopLeft(body).dy),
+        );
+        expect(
+          tester.getBottomLeft(body).dy,
+          lessThanOrEqualTo(tester.getTopLeft(button).dy),
+        );
+
+        final words = tester
+            .widgetList<Text>(
+              find.descendant(of: dialog, matching: find.byType(Text)),
+            )
+            .map((text) => text.data ?? text.textSpan?.toPlainText() ?? '')
+            .join(' | ');
+        expect(words, isNot(contains('Se eliminará')), reason: words);
+        expect(words, isNot(contains('eliminará')), reason: words);
+
+        await tester.tap(find.widgetWithText(TextButton, l.cancel));
+        await tester.pumpAndSettle();
+        expect(dialog, findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+
+    for (final (language, help) in [('en', en), ('ca', ca)]) {
+      testWidgets(
+        'UX-2645: the $language help line under the remove-file question is unchanged',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          expect(l.fileRemoveHelp, help);
+          await pumpPanel(tester, language: language);
+          final remove = find.widgetWithText(TextButton, l.fileRemove);
+          await tester.ensureVisible(remove);
+          await tester.pumpAndSettle();
+          await tester.tap(remove);
+          await tester.pumpAndSettle();
+          expect(
+            find.descendant(
+              of: find.byType(AlertDialog),
+              matching: find.text('Local notes.txt\n\n$help'),
+            ),
+            findsOneWidget,
+          );
+          await tester.tap(find.widgetWithText(TextButton, l.cancel));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        },
+      );
+    }
+  });
 }
 
 /// Nobody is signed in: files stay on this phone.

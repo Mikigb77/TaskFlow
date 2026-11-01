@@ -404,7 +404,7 @@
   "fileRemove": "Quitar archivo",
   "removeFileNamed": "Quitar {file}",
   "fileRemoveQuestion": "¿Quitar este archivo de la tarea?",
-  "fileRemoveHelp": "Se eliminará de la tarea y, si lo has subido, de tus otros dispositivos al sincronizar. Tu archivo original no se elimina.",
+  "fileRemoveHelp": "Se quitará de la tarea y, si lo has subido, de tus otros dispositivos al sincronizar. Tu archivo original no se elimina.",
   "yourAccount": "Tu cuenta",
   "accountSaved": "Guardado en tu cuenta",
   "syncNow": "Sincronizar ahora",

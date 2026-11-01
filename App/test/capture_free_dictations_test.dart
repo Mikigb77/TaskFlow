@@ -4251,6 +4251,209 @@ void main() {
       },
     );
   });
+
+  group('P314 · an entry closes only what is as it opened', () {
+    /// Every task form on the navigator, on top or under another.
+    Finder forms() => find.byType(TaskEditor, skipOffstage: false);
+    Finder listening() => find.byType(VoiceTaskScreen);
+
+    /// The top form's day chip [key] is chosen. Only the top form is on
+    /// stage.
+    bool chosen(WidgetTester tester, String key) =>
+        tester.widget<ChoiceChip>(find.byKey(ValueKey(key))).selected;
+
+    Future<void> tap(WidgetTester tester, Finder finder) async {
+      await tester.ensureVisible(finder);
+      await tester.pumpAndSettle();
+      await tester.tap(finder);
+      await tester.pumpAndSettle();
+    }
+
+    /// «Mañana» on the top form, with no title typed.
+    Future<void> pickTomorrow(WidgetTester tester) async {
+      await tap(tester, find.byKey(const ValueKey('new-task-tomorrow')));
+      expect(chosen(tester, 'new-task-tomorrow'), isTrue);
+      expect(formTitle(tester), isEmpty, reason: 'no title typed');
+    }
+
+    /// Cancelar on the listening sheet, with nothing said.
+    Future<void> cancelListening(WidgetTester tester) async {
+      await tester.tap(
+        find
+            .descendant(
+              of: listening(),
+              matching: find.widgetWithText(TextButton, es.cancel),
+            )
+            .hitTestable(),
+      );
+      await tester.pumpAndSettle();
+      expect(listening(), findsNothing);
+    }
+
+    testWidgets(
+      'UX-2643: a free account with 5 dictations left, ES 1× on 360×800: a TEXT entry’s form with «Mañana» picked and no title; a VOICE entry opens the listening sheet over it, the form still under it; Cancelar shows the form with «Mañana» chosen and its title empty; nothing saved',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(5),
+          size: const Size(360, 800),
+        );
+        await app.deliver(tester, entry('text'));
+        expect(forms(), findsOneWidget);
+        await pickTomorrow(tester);
+
+        await app.deliver(tester, entry('voice'));
+        expect(listening(), findsOneWidget, reason: 'the entry’s own sheet');
+        expect(app.speech.starts, 1, reason: 'the sheet listens');
+        expect(
+          forms(),
+          findsOneWidget,
+          reason: 'the form with a day chosen is not closed',
+        );
+        expect(app.queue, isEmpty, reason: 'both entries taken');
+
+        await cancelListening(tester);
+        expect(forms(), findsOneWidget);
+        expect(form().hitTestable(), findsOneWidget, reason: 'the form shows');
+        expect(chosen(tester, 'new-task-tomorrow'), isTrue, reason: 'kept');
+        expect(formTitle(tester), isEmpty);
+        expect(app.tasks.titles(), isEmpty, reason: 'nothing saved');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2643: a free account with 0 dictations left, the used-up notice seen: a TEXT entry’s form with «Mañana» picked and no title; a VOICE entry opens a second form on top, with the used-up line and no day chosen; Back on it shows the first form with «Mañana» chosen',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(0),
+          noticeSeen: true,
+          size: const Size(360, 800),
+        );
+        await app.deliver(tester, entry('text'));
+        expect(forms(), findsOneWidget);
+        expect(usedUp(), findsNothing, reason: 'a TEXT entry’s form');
+        await pickTomorrow(tester);
+
+        await app.deliver(tester, entry('voice'));
+        expect(
+          forms(),
+          findsNWidgets(2),
+          reason: 'the entry’s own form over the one with a day',
+        );
+        expect(usedUp(), findsOneWidget, reason: 'says why the mic is missing');
+        expect(usedUp().hitTestable(), findsOneWidget);
+        for (final key in [
+          'new-task-today',
+          'new-task-tomorrow',
+          'new-task-pick-day',
+        ]) {
+          expect(chosen(tester, key), isFalse, reason: '$key: no day chosen');
+        }
+        expect(formTitle(tester), isEmpty);
+        expect(app.speech.starts, 0);
+        expect(app.queue, isEmpty, reason: 'both entries taken');
+
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(forms(), findsOneWidget, reason: 'the first form shows');
+        expect(usedUp(), findsNothing);
+        expect(chosen(tester, 'new-task-tomorrow'), isTrue, reason: 'kept');
+        expect(formTitle(tester), isEmpty);
+        expect(app.tasks.titles(), isEmpty, reason: 'nothing saved');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2643: a free account with 5 dictations left: a TEXT entry’s form, no title, Más detalles opened, a step «Comprar pan» added with Enter, Más detalles closed again (the step still shows); a VOICE entry opens the listening sheet over it; Cancelar shows the form with its step',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(5),
+          size: const Size(360, 800),
+        );
+        await app.deliver(tester, entry('text'));
+        expect(forms(), findsOneWidget);
+
+        await tap(tester, find.byKey(const ValueKey('task-more-details')));
+        expect(find.text(es.fewerDetails), findsOneWidget);
+        final step = find.byKey(const ValueKey('add-checklist-item'));
+        await tester.ensureVisible(step);
+        await tester.pumpAndSettle();
+        await tester.enterText(step, 'Comprar pan');
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        await tap(tester, find.byKey(const ValueKey('task-more-details')));
+        expect(find.text(es.moreDetails), findsOneWidget, reason: 'closed');
+        expect(
+          find.text('Comprar pan'),
+          findsOneWidget,
+          reason: 'the step still shows',
+        );
+        expect(formTitle(tester), isEmpty);
+
+        await app.deliver(tester, entry('voice'));
+        expect(listening(), findsOneWidget);
+        expect(forms(), findsOneWidget, reason: 'the form with a step stays');
+        expect(app.queue, isEmpty);
+
+        await cancelListening(tester);
+        expect(form().hitTestable(), findsOneWidget);
+        expect(find.text('Comprar pan'), findsOneWidget, reason: 'its step');
+        expect(formTitle(tester), isEmpty);
+        expect(app.tasks.titles(), isEmpty, reason: 'nothing saved');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2643: a free account with 5 dictations left: a TEXT entry’s form with only Más detalles opened, nothing typed or picked; a VOICE entry opens the listening sheet over it (an open Más detalles counts as started); Cancelar shows the form',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(5),
+          size: const Size(360, 800),
+        );
+        await app.deliver(tester, entry('text'));
+        await tap(tester, find.byKey(const ValueKey('task-more-details')));
+        expect(find.text(es.fewerDetails), findsOneWidget);
+
+        await app.deliver(tester, entry('voice'));
+        expect(listening(), findsOneWidget);
+        expect(forms(), findsOneWidget, reason: 'the started form stays');
+        expect(app.queue, isEmpty);
+
+        await cancelListening(tester);
+        expect(form().hitTestable(), findsOneWidget, reason: 'the form shows');
+        expect(formTitle(tester), isEmpty);
+        expect(app.tasks.titles(), isEmpty, reason: 'nothing saved');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2643, absorbing unchanged: a free account with 0 dictations left: a TEXT entry’s form with «Mañana» picked and no title; a second TEXT entry is taken by it: still exactly one form, with «Mañana» chosen',
+      (tester) async {
+        final app = await _FreeApp.open(
+          tester,
+          freeVoice: freeVoice(0),
+          noticeSeen: true,
+          size: const Size(360, 800),
+        );
+        await app.deliver(tester, entry('text'));
+        await pickTomorrow(tester);
+
+        await app.deliver(tester, entry('text'));
+        expect(forms(), findsOneWidget, reason: 'absorbed: still one form');
+        expect(chosen(tester, 'new-task-tomorrow'), isTrue, reason: 'kept');
+        expect(formTitle(tester), isEmpty);
+        expect(app.queue, isEmpty, reason: 'both entries taken');
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }
 
 /// A phone whose database can't be read or written.

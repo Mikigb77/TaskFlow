@@ -191,33 +191,44 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         // waits on top, empty, opens nothing more: a second tap stacks no
         // second sheet or form (UX-2110). A form or used-up notice counts
         // only if an entry opened it, and a tap that asks to speak only one
-        // that says why the mic is missing (UX-2642). Otherwise what holds
-        // nothing closes first, so one sheet or form shows, in the mode asked
+        // that says why the mic is missing (UX-2642). Otherwise what is as it
+        // opened closes first, so one sheet or form shows, in the mode asked
         // for: an empty sheet of the other mode, so the mic never lands on
         // the keyboard (UX-2637), unless it keeps a recording (UX-2641); an
-        // entry's empty form, which Back would just close. Anything else
-        // stays, and the entry opens over it: a sheet with words or a
-        // recording, a form with a day, project, person or words. Shared
-        // words always open their own.
+        // entry's form with nothing typed, picked or chosen and Más detalles
+        // closed (UX-2643). What that close uncovers may take the entry in
+        // turn, and then nothing more opens (UX-2644). Anything else stays,
+        // and the entry opens over it: a sheet with words or a recording, a
+        // form with a day, project, person, words or anything chosen in it.
+        // Shared words always open their own.
         if (!shared) {
           final navigator = _navigator.currentState!;
+          final asked = voice ? CaptureMode.voice : CaptureMode.typing;
+          bool takes() =>
+              (_entrySheets > 0 ? emptyCaptureSheetOnTop(navigator) : null) ==
+                  asked ||
+              (captureOpensForm(
+                    ProviderScope.containerOf(context, listen: false),
+                    typing: !voice,
+                  ) &&
+                  emptyTaskFormOnTop(navigator, askedToSpeak: voice));
+          if (takes()) {
+            await entries.acknowledge(entry.id);
+            continue;
+          }
           final sheet = _entrySheets > 0
               ? emptyCaptureSheetOnTop(navigator)
               : null;
           final recorded =
               sheet != null && emptyCaptureSheetOnTopRecorded(navigator);
-          final form = emptyEntryFormOnTop(navigator);
-          final asked = voice ? CaptureMode.voice : CaptureMode.typing;
-          if (sheet == asked ||
-              (captureOpensForm(
-                    ProviderScope.containerOf(context, listen: false),
-                    typing: !voice,
-                  ) &&
-                  emptyTaskFormOnTop(navigator, askedToSpeak: voice))) {
-            await entries.acknowledge(entry.id);
-            continue;
+          if ((sheet != null && !recorded) ||
+              untouchedEntryFormOnTop(navigator)) {
+            navigator.pop();
+            if (takes()) {
+              await entries.acknowledge(entry.id);
+              continue;
+            }
           }
-          if ((sheet != null && !recorded) || form != null) navigator.pop();
         }
         CaptureSession? session;
         if (shared) {

@@ -1469,7 +1469,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get fileRemoveHelp =>
-      'Se eliminará de la tarea y, si lo has subido, de tus otros dispositivos al sincronizar. Tu archivo original no se elimina.';
+      'Se quitará de la tarea y, si lo has subido, de tus otros dispositivos al sincronizar. Tu archivo original no se elimina.';
 
   @override
   String get yourAccount => 'Tu cuenta';

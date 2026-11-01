@@ -8189,13 +8189,18 @@ void main() {
         );
         expect(paragraph.text.toPlainText(), words);
         expect(paragraph.didExceedMaxLines, isFalse);
-        // Whole: every character is laid out inside the paragraph's box.
-        for (final box in paragraph.getBoxesForSelection(
-          TextSelection(baseOffset: 0, extentOffset: words.length),
-        )) {
-          expect(box.left, greaterThanOrEqualTo(-0.5));
-          expect(box.right, lessThanOrEqualTo(paragraph.size.width + 0.5));
-          expect(box.bottom, lessThanOrEqualTo(paragraph.size.height + 0.5));
+        // Whole: every visible character is laid out inside the paragraph's
+        // box. The label hugs its longest line (P317), so the space a line
+        // wraps at may hang past it, unseen.
+        for (var i = 0; i < words.length; i++) {
+          if (words[i].trim().isEmpty) continue;
+          for (final box in paragraph.getBoxesForSelection(
+            TextSelection(baseOffset: i, extentOffset: i + 1),
+          )) {
+            expect(box.left, greaterThanOrEqualTo(-0.5));
+            expect(box.right, lessThanOrEqualTo(paragraph.size.width + 0.5));
+            expect(box.bottom, lessThanOrEqualTo(paragraph.size.height + 0.5));
+          }
         }
         final text = tester.getRect(chipText(words));
         final chip = tester.getRect(find.byType(ReminderChip));

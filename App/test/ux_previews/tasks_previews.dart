@@ -575,6 +575,25 @@ void tasksPreviews() {
 
     preview(
       detail,
+      'responsible-sheet',
+      'The same task, its person chip «Ana» tapped: «¿Quién es responsable?» '
+          'opens with its heading, then «Todos» and each person who can edit '
+          '(María, yours, «· Yo»; Ana, chosen, with its ✓; Paul).',
+      [es1, ca2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), ...sharedProjectTasks()],
+          projects: allProjects,
+        );
+        await app.push('/taskDetails', arguments: 31);
+        await app.tap('Ana');
+        await p.shoot();
+      },
+    );
+
+    preview(
+      detail,
       'full',
       'A task with a day and time, repeat, reminder, notes and steps.',
       [es1, esDark],

@@ -48,9 +48,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 
+import 'support/button_label.dart';
 import 'support/capture_fixtures.dart'
     show ListeningSpeech, MemoryCaptures, QuietSpeech, SilentRecorder;
 import 'support/design_fixtures.dart';
+import 'support/icon_button_label.dart';
 import 'support/reminder_fixtures.dart';
 
 final en = lookupAppLocalizations(const Locale('en'));
@@ -2837,6 +2839,131 @@ void main() {
         },
       );
     }
+  });
+
+  // ---- UX loop 2026-11-01-screens, round 1 · P317 (UX-2634) ----
+  group('P317 · wrapped labels centre beside their icon', () {
+    setUpAll(() async {
+      await loadManrope();
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    });
+
+    /// The form's button reads [label] in [lines] lines, each centred on the
+    /// longest, which the label's box hugs; its ✓ sits beside the text, and
+    /// the two together are centred in the button, to within [tolerance] dp.
+    /// Flutter pads a button with an icon less on the icon's side (16 and
+    /// 24 dp at 1×, 8 and 12 at 2×), so the pair sits 4 dp (1×) or 2 dp (2×)
+    /// towards the ✓ by design, as P304's buttons do (UX-2630).
+    void expectCentredWithTick(
+      WidgetTester tester,
+      String label, {
+      required int lines,
+      double tolerance = 2.5,
+    }) {
+      expect(buttonLabel(tester), label);
+      final paragraph = labelParagraph(tester, save(), label);
+      expect(paragraph.didExceedMaxLines, isFalse, reason: '«$label» whole');
+      final box = paragraph.localToGlobal(Offset.zero) & paragraph.size;
+      final drawn = labelLines(tester, save(), label);
+      expect(drawn, hasLength(lines),
+          reason: '«$label» in $lines line(s): $drawn');
+      final longest = drawn
+          .map((line) => line.width)
+          .reduce((a, b) => a > b ? a : b);
+      expect(box.width - longest, lessThanOrEqualTo(1),
+          reason: '«$label»: the label $box hugs its longest line ($longest)');
+      for (final line in drawn) {
+        expect((line.center.dx - box.center.dx).abs(), lessThanOrEqualTo(1),
+            reason: '«$label»: the line $line centred on the longest, in $box');
+      }
+      expectIconBesideCentredLabel(
+        tester,
+        save(),
+        label,
+        tolerance: tolerance,
+      );
+    }
+
+    for (final language in ['es', 'ca']) {
+      testWidgets(
+        'UX-2634: $language 2× on 360×740 with a 300 dp keyboard up and a title typed (form/new-task.keyboard), «${strings(language).captureAddToCalendar}» wraps to two lines centred on each other, its ✓ beside the longer line and the two centred in the button; the title field and the button still show above the keyboard',
+        (tester) async {
+          tester.platformDispatcher.textScaleFactorTestValue = 2;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          const size = Size(360, 740);
+          final l = strings(language);
+          await _App.open(tester, language: language, size: size);
+          await openForm(tester, l);
+          await typeTitle(tester, 'Recoger las gafas en la óptica');
+          await tester.ensureVisible(chip('new-task-today'));
+          await tester.pumpAndSettle();
+          await tester.tap(chip('new-task-today'));
+          await tester.pumpAndSettle();
+          await tester.tap(title());
+          await tester.pumpAndSettle();
+          tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+          addTearDown(tester.view.resetViewInsets);
+          await tester.pumpAndSettle();
+          expect(tester.testTextInput.isVisible, isTrue, reason: 'keyboard up');
+
+          expectCentredWithTick(tester, l.captureAddToCalendar, lines: 2);
+
+          const keyboardTop = 740.0 - 300;
+          final field = tester.getRect(
+            find.descendant(of: title(), matching: find.byType(EditableText)),
+          );
+          expect(field.top, greaterThanOrEqualTo(0), reason: 'title $field');
+          expect(field.bottom, lessThanOrEqualTo(keyboardTop + 0.5),
+              reason: 'title $field above the keyboard');
+          final add = tester.getRect(save());
+          expect(add.top, greaterThanOrEqualTo(field.bottom - 0.5),
+              reason: 'the button doesn’t cover the title');
+          expect(add.bottom, lessThanOrEqualTo(keyboardTop + 0.5),
+              reason: 'button $add above the keyboard');
+          expect(save().hitTestable(), findsOneWidget);
+          expect(tester.takeException(), isNull, reason: 'no overflow');
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2634: es 1× on 360×800, «Añadir tarea» and then, once a day is chosen, «Añadir al calendario» each stay on one line, centred with their ✓, in a 60 dp button',
+      (tester) async {
+        await _App.open(tester, size: const Size(360, 800));
+        await openForm(tester);
+        expectCentredWithTick(tester, es.captureAddTask, lines: 1, tolerance: 4.5);
+        expect(tester.getRect(visibleButton(save())).height, closeTo(60, 0.5));
+        await typeTitle(tester, 'Llamar al médico');
+        await tester.tap(chip('new-task-tomorrow'));
+        await tester.pumpAndSettle();
+        expectCentredWithTick(tester, es.captureAddToCalendar, lines: 1, tolerance: 4.5);
+        expect(tester.getRect(visibleButton(save())).height, closeTo(60, 0.5));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2634: es 1× on 360×800, the edit form’s «Guardar cambios» stays on one line, centred with its ✓, in a 60 dp button',
+      (tester) async {
+        await _App.open(
+          tester,
+          size: const Size(360, 800),
+          tasks: [Task(id: 1, title: 'Médico', priority: 1, dueDate: tomorrow)],
+        );
+        unawaited(
+          Navigator.of(
+            tester.element(find.byType(CalendarScreen)),
+          ).pushNamed('/editTask', arguments: 1),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(TaskEditor), findsOneWidget);
+        expectCentredWithTick(tester, es.saveChangesSentence, lines: 1, tolerance: 4.5);
+        expect(tester.getRect(visibleButton(save())).height, closeTo(60, 0.5));
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }
 

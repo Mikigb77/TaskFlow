@@ -759,7 +759,15 @@ class ReminderChip extends ConsumerWidget {
                         80)
                     .clamp(0, double.infinity),
           ),
-          child: Text(line.text, softWrap: true, maxLines: 10),
+          // A wrapped reading hugs its longest line, so the bell sits beside
+          // it; on the chip with a tap, a control, the lines centre too.
+          child: Text(
+            line.text,
+            softWrap: true,
+            maxLines: 10,
+            textAlign: line.onTap == null ? null : TextAlign.center,
+            textWidthBasis: TextWidthBasis.longestLine,
+          ),
         );
         // A line with no tap is information: drawn with no outline and at
         // full contrast, rather than as a control or a switched-off one. The

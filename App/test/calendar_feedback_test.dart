@@ -5427,6 +5427,279 @@ void main() {
       },
     );
   });
+
+  // ---- UX loop 2026-11-01-screens, round 1 · P315 (UX-2646): Completar on
+  // the page of a row opened from Completadas keeps the row's time ----
+  group('P315 · the task page', () {
+    final now = DateTime.now();
+    DateTime daysAgo(int days, [int hour = 10]) =>
+        DateTime(now.year, now.month, now.day - days, hour);
+    DateTime todayAt(int hour, [int minute = 0]) =>
+        DateTime(now.year, now.month, now.day, hour, minute);
+    final es = lookupAppLocalizations(const Locale('es'));
+
+    Finder done(String title) => find.descendant(
+      of: find.byType(CompletedTasksScreen),
+      matching: find.widgetWithText(TaskTile, title),
+    );
+
+    /// The rows of Completadas, top to bottom, as (title, repetition date).
+    List<(String, String?)> rows(WidgetTester tester) {
+      final tiles = find.descendant(
+        of: find.byType(CompletedTasksScreen),
+        matching: find.byType(TaskTile),
+      );
+      final list = tester.widgetList<TaskTile>(tiles).toList()
+        ..sort(
+          (a, b) => tester
+              .getTopLeft(find.byWidget(a))
+              .dy
+              .compareTo(tester.getTopLeft(find.byWidget(b)).dy),
+        );
+      return [for (final tile in list) (tile.task.title, tile.task.occurrenceId)];
+    }
+
+    Future<void> openCompleted(WidgetTester tester) async {
+      unawaited(
+        tester
+            .state<NavigatorState>(find.byType(Navigator))
+            .pushNamed('/completedTasks'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(CompletedTasksScreen), findsOneWidget);
+    }
+
+    Future<void> leaveAndReturn(WidgetTester tester) async {
+      tester.state<NavigatorState>(find.byType(Navigator)).pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(CompletedTasksScreen), findsNothing);
+      await openCompleted(tester);
+    }
+
+    Future<void> tapCircle(WidgetTester tester, Finder row) async {
+      final circle = find.descendant(of: row, matching: find.byType(Checkbox));
+      await tester.ensureVisible(circle);
+      await tester.pumpAndSettle();
+      await tester.tap(circle);
+      await tester.pumpAndSettle();
+    }
+
+    /// Taps [row]'s title, as a person opens a task, and waits for its page.
+    Future<void> openPage(WidgetTester tester, Finder row, String title) async {
+      final name = find.descendant(of: row, matching: find.text(title));
+      await tester.ensureVisible(name.first);
+      await tester.pumpAndSettle();
+      await tester.tap(name.first);
+      await tester.pumpAndSettle();
+      expect(find.byType(TaskDetailScreen), findsOneWidget);
+    }
+
+    Finder pageButton(String label) => find.descendant(
+      of: find.byType(TaskDetailScreen),
+      matching: find.text(label),
+    );
+
+    Future<void> tapOnPage(WidgetTester tester, String label) async {
+      final button = pageButton(label);
+      expect(button, findsOneWidget, reason: '«$label» on the page');
+      await tester.ensureVisible(button);
+      await tester.pumpAndSettle();
+      await tester.tap(button);
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+    }
+
+    /// Ends the snackbar's time, so leaving isn't held by it.
+    Future<void> settleMessages(WidgetTester tester) async {
+      await tester.pump(const Duration(seconds: 12));
+      await tester.pumpAndSettle();
+    }
+
+    /// The app in Spanish on 360×800, its tasks stored with the database's
+    /// rule for completion times, with [clock] as now.
+    Future<_StampingTasks> open(
+      WidgetTester tester,
+      List<Task> tasks,
+      DateTime Function() clock,
+    ) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final repository = _StampingTasks(tasks, clock);
+      final container = designContainer(
+        regionalStore: MemoryRegionalStore(
+          const RegionalPreferences(language: 'es'),
+        ),
+        tasks: () => TaskNotifier(repository),
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const MyApp()),
+      );
+      await tester.pumpAndSettle();
+      return repository;
+    }
+
+    List<Task> threeTicks() => [
+      Task(id: 1, title: 'Pagar la luz', priority: 1, dueDate: daysAgo(1), hasTime: false, isCompleted: true, completedAt: todayAt(9)),
+      Task(id: 2, title: 'Renovar el DNI', priority: 1, dueDate: daysAgo(20), hasTime: false, isCompleted: true, completedAt: todayAt(10)),
+      Task(id: 3, title: 'Reservar el hotel', priority: 1, dueDate: daysAgo(2), hasTime: false, isCompleted: true, completedAt: todayAt(11)),
+    ];
+    const order = ['Reservar el hotel', 'Renovar el DNI', 'Pagar la luz'];
+
+    void expectStoredAt(Task task, DateTime at) => expect(
+      task.completedAt != null && task.completedAt!.isAtSameMomentAs(at),
+      isTrue,
+      reason: '«${task.title}» stored ${task.completedAt}, expected $at',
+    );
+
+    testWidgets(
+      'UX-2646: Completadas, ES 1× on 360×800, ticked at 09:00, 10:00 and 11:00: the 10:00 row reopened with its circle, opened, and given «Completar» at 12:00 on its page: the page closes, it keeps 10:00, and the list reads 11:00, 10:00, 09:00 on this visit and the next',
+      (tester) async {
+        var clock = todayAt(11, 30);
+        final repository = await open(tester, threeTicks(), () => clock);
+        await openCompleted(tester);
+        expect(rows(tester).map((row) => row.$1), order);
+
+        await tapCircle(tester, done('Renovar el DNI'));
+        expect(repository.task(2).isCompleted, isFalse, reason: 'reopened');
+        await settleMessages(tester);
+        expect(rows(tester).map((row) => row.$1), order);
+
+        await openPage(tester, done('Renovar el DNI'), 'Renovar el DNI');
+        clock = todayAt(12);
+        await tapOnPage(tester, es.complete);
+        expect(find.byType(TaskDetailScreen), findsNothing,
+            reason: 'Completar closes the page');
+        expect(find.byType(CompletedTasksScreen), findsOneWidget);
+        expect(repository.task(2).isCompleted, isTrue);
+        expectStoredAt(repository.task(2), todayAt(10));
+        expect(rows(tester).map((row) => row.$1), order, reason: 'this visit');
+
+        await settleMessages(tester);
+        await leaveAndReturn(tester);
+        expect(rows(tester).map((row) => row.$1), order, reason: 'next visit');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2646: the 10:00 row’s page opened while it is done: «Reabrir» keeps the page, then «Completar» at 12:00 stores 10:00, and the next visit reads 11:00, 10:00, 09:00',
+      (tester) async {
+        var clock = todayAt(11, 30);
+        final repository = await open(tester, threeTicks(), () => clock);
+        await openCompleted(tester);
+        expect(rows(tester).map((row) => row.$1), order);
+
+        await openPage(tester, done('Renovar el DNI'), 'Renovar el DNI');
+        await tapOnPage(tester, es.reopen);
+        expect(find.byType(TaskDetailScreen), findsOneWidget,
+            reason: 'Reabrir keeps the page');
+        expect(repository.task(2).isCompleted, isFalse, reason: 'reopened');
+        expect(pageButton(es.complete), findsOneWidget);
+        await settleMessages(tester);
+
+        clock = todayAt(12);
+        await tapOnPage(tester, es.complete);
+        expect(find.byType(TaskDetailScreen), findsNothing);
+        expect(repository.task(2).isCompleted, isTrue);
+        expectStoredAt(repository.task(2), todayAt(10));
+
+        await settleMessages(tester);
+        await leaveAndReturn(tester);
+        expect(rows(tester).map((row) => row.$1), order, reason: 'next visit');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2646: a repeating task’s repetition done at 10:00, between rows done at 09:00 and 11:00, reopened on Completadas and given «Completar» on its page at 12:00: its time for that date stays 10:00 and it keeps its place on the next visit',
+      (tester) async {
+        final key = Task.dateKey(daysAgo(1));
+        var clock = todayAt(11, 30);
+        final repository = await open(tester, [
+          Task(
+            id: 1,
+            title: 'Regar las plantas',
+            priority: 1,
+            dueDate: daysAgo(3, 9),
+            recurrence: 'daily',
+            completedDates: [key],
+            completedTimes: {key: todayAt(10)},
+          ),
+          Task(id: 2, title: 'Llamar a Ana', priority: 1, dueDate: daysAgo(5), isCompleted: true, completedAt: todayAt(9)),
+          Task(id: 3, title: 'Pedir cita', priority: 1, dueDate: daysAgo(6), isCompleted: true, completedAt: todayAt(11)),
+        ], () => clock);
+        await openCompleted(tester);
+        final repetitionOrder = [
+          ('Pedir cita', null),
+          ('Regar las plantas', key),
+          ('Llamar a Ana', null),
+        ];
+        expect(rows(tester), repetitionOrder);
+
+        await tapCircle(tester, done('Regar las plantas'));
+        expect(repository.task(1).completedDates, isNot(contains(key)));
+        await settleMessages(tester);
+
+        await openPage(tester, done('Regar las plantas'), 'Regar las plantas');
+        clock = todayAt(12);
+        await tapOnPage(tester, es.complete);
+        expect(find.byType(TaskDetailScreen), findsNothing);
+        expect(repository.task(1).completedDates, contains(key));
+        final time = repository.task(1).completedTimes[key];
+        expect(
+          time != null && time.isAtSameMomentAs(todayAt(10)),
+          isTrue,
+          reason: 'stored $time for $key, not the page’s 12:00',
+        );
+
+        await settleMessages(tester);
+        await leaveAndReturn(tester);
+        expect(rows(tester), repetitionOrder);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2646: a task’s page opened from Calendar, or from Tareas: «Completar» at 12:00 still stores 12:00',
+      (tester) async {
+        final repository = await open(tester, [
+          Task(id: 1, title: 'Llamar a Ana', priority: 1, dueDate: todayAt(0), hasTime: false),
+          Task(id: 2, title: 'Comprar pan', priority: 1, dueDate: todayAt(0), hasTime: false),
+        ], () => todayAt(12));
+
+        final calendarRow = find.descendant(
+          of: find.byType(CalendarScreen),
+          matching: find.widgetWithText(TaskTile, 'Llamar a Ana'),
+        );
+        await openPage(tester, calendarRow, 'Llamar a Ana');
+        await tapOnPage(tester, es.complete);
+        expect(find.byType(TaskDetailScreen), findsNothing);
+        expect(repository.task(1).isCompleted, isTrue);
+        expectStoredAt(repository.task(1), todayAt(12));
+        await settleMessages(tester);
+
+        await tester.tap(
+          find.descendant(
+            of: find.byType(NavigationBar),
+            matching: find.text(es.tasks),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final tasksRow = find.descendant(
+          of: find.byType(HomeScreen),
+          matching: find.widgetWithText(TaskTile, 'Comprar pan'),
+        );
+        await openPage(tester, tasksRow, 'Comprar pan');
+        await tapOnPage(tester, es.complete);
+        expect(find.byType(TaskDetailScreen), findsNothing);
+        expect(repository.task(2).isCompleted, isTrue);
+        expectStoredAt(repository.task(2), todayAt(12));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }
 
 /// Tasks whose first read fails, as when the phone's database can't be read.

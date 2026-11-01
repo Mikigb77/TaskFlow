@@ -192,6 +192,28 @@ void sharingPreviews() {
 
     preview(
       sharing,
+      'updates-sheet',
+      'Your shared project\'s «Novedades del proyecto» tapped: the sheet opens '
+          'with its heading, «Matemáticas» under it, then its three choices, '
+          'the chosen one with its ✓.',
+      [es1, ca2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), ...sharedProjectTasks()],
+          projects: allProjects,
+          overrides: [
+            listSharingProvider.overrideWith((ref, id) async => _sharingData()),
+          ],
+        );
+        await app.pushPage(const ListSharingScreen(listId: 'matematicas'));
+        await app.tap(p.l.projectNotifications);
+        await p.shoot();
+      },
+    );
+
+    preview(
+      sharing,
       'invite',
       'Invitar a una persona: the email to invite, typed.',
       everywhere,
