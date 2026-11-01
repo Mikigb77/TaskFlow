@@ -81,6 +81,56 @@ bool _alertPassed(WidgetRef ref, Task? task) {
   return !ReminderEngine.alertAhead(task, settings, now);
 }
 
+/// The alerts this phone keeps for a task ([ReminderAccess.alertsOf]), read
+/// again each time reminders are planned again or a notice's action is taken.
+final _alertsProvider = FutureProvider.autoDispose
+    .family<List<Map<String, Object?>>, int>((ref, taskId) {
+      final changes = TaskReminders.changes.stream.listen(
+        (_) => ref.invalidateSelf(),
+      );
+      ref.onDispose(changes.cancel);
+      return ref.watch(reminderAccessProvider).alertsOf(taskId);
+    });
+
+/// When [task]'s reminder rang here, or rings again after a snooze
+/// ([ReminderEngine.lastAlert]): null when it never did, as when it was
+/// saved too late to ring (D1), and while the alerts are read.
+({DateTime when, bool snoozed})? _lastAlert(WidgetRef ref, Task? task) {
+  final id = task?.id;
+  final settings = ref.watch(reminderPreferencesProvider).valueOrNull;
+  if (id == null || settings == null) return null;
+  final alerts = ref.watch(_alertsProvider(id)).valueOrNull;
+  if (alerts == null || alerts.isEmpty) return null;
+  return ReminderEngine.lastAlert(
+    task!,
+    alerts,
+    settings,
+    ref.watch(calendarClockProvider)(),
+  );
+}
+
+/// A reminder that has rung, as its line says it: «Recordatorio enviado:
+/// hoy, 09:40», or «Recordatorio pospuesto: hoy, 09:52» while a snooze is to
+/// come. A [plan]'s line, once its last notice has rung, ends «· último: hoy,
+/// 16:50». The day as the plan lines write it.
+String _rangText(
+  BuildContext context,
+  WidgetRef ref,
+  ({DateTime when, bool snoozed}) alert, {
+  String? plan,
+}) {
+  final l = context.l10n;
+  final now = ref.watch(calendarClockProvider)();
+  final when = planWhen(alert.when, now);
+  final date = planDay(alert.when, now, context.localeName);
+  final time = context.clockTime(alert.when);
+  return alert.snoozed
+      ? l.reminderSnoozed(when, date, time)
+      : plan != null
+      ? l.reminderPlanLast(plan, when, date, time)
+      : l.reminderSent(when, date, time);
+}
+
 /// A plan as its task shows it: «Recordatorios: cada 3 días, y a diario la
 /// última semana · próximo: sáb 24, 9:00», or a strength's «Recordatorios
 /// normales hasta el jue 12 · …». [bare], after a person's name, leaves the
@@ -500,9 +550,11 @@ Future<int?> _pickFrom(
 );
 
 /// [task]'s reminder line as this phone reads it: its icon, its words and
-/// what a tap does. The plan's line, «Recordatorio: 1 hora antes», «Sin
-/// recordatorio · Activar» when this phone won't ring (the tap turns
-/// reminders on), or «Sin recordatorio: ya ha pasado la hora del aviso»;
+/// what a tap does. The plan's line, «Recordatorio: 1 hora antes» («… ·
+/// fecha límite» when it counts from the deadline), «Sin recordatorio ·
+/// Activar» when this phone won't ring (the tap turns reminders on),
+/// «Recordatorio enviado: hoy, 09:40» once it has rung, or «Sin
+/// recordatorio: ya ha pasado la hora del aviso» when it never could;
 /// otherwise a tap opens the reminder choices and gives [onChanged] the task
 /// with the one chosen. The task's chip and a collapsed row on the capture's
 /// card both read it, so they can't drift. For a task with a reminder date
@@ -535,10 +587,10 @@ Future<int?> _pickFrom(
         planned: plan != null,
       );
   // Last: a tap still opens the choices, where a later time can be set.
-  final passed =
-      reason == null &&
-      !blocked &&
-      _alertPassed(ref, ringsHere ? task : task.copyWith(reminderPlan: null));
+  final checked = ringsHere ? task : task.copyWith(reminderPlan: null);
+  final passed = reason == null && !blocked && _alertPassed(ref, checked);
+  // Its time came and it rang, or a snooze is to come: not D1's case.
+  final rang = passed ? _lastAlert(ref, checked) : null;
   final minute = task.reminderTime ?? preferences.dateOnlyTime;
   final label = task.reminderMinutes == -1
       ? context.l10n.off
@@ -549,9 +601,11 @@ Future<int?> _pickFrom(
       : _clock(context, minute);
   final value = plan != null
       ? reminderPlanText(context, ref, task)
-      : '${task.deadline == null ? '' : '${task.reminderAnchor == 'deadline' ? context.l10n.deadline : context.l10n.plannedFor} · '}$label';
+      : task.deadline != null && task.reminderAnchor == 'deadline'
+      ? context.l10n.reminderBeforeDeadline(label)
+      : label;
   return (
-    icon: blocked || passed || reason?.silent == true
+    icon: blocked || (passed && rang == null) || reason?.silent == true
         ? Icons.notifications_off_outlined
         : plan != null
         ? Icons.notifications_active_outlined
@@ -560,6 +614,8 @@ Future<int?> _pickFrom(
         ? reason.text(context)
         : blocked
         ? context.l10n.noReminderTurnOn
+        : rang != null
+        ? _rangText(context, ref, rang, plan: plan == null ? null : value)
         : passed
         ? context.l10n.noReminderTimePassed
         : plan != null
@@ -724,20 +780,18 @@ class ReminderControl extends ConsumerWidget {
           time: time,
           planned: active != null,
         );
-    final passed =
-        dated &&
-        reason == null &&
-        !blocked &&
-        _alertPassed(
-          ref,
-          planned ??
-              schedule?.copyWith(
-                reminderMinutes: minutes,
-                reminderTime: time,
-                // A plan that can't ring here doesn't count.
-                reminderPlan: ringsHere ? schedule!.reminderPlan : null,
-              ),
+    final checked =
+        planned ??
+        schedule?.copyWith(
+          reminderMinutes: minutes,
+          reminderTime: time,
+          // A plan that can't ring here doesn't count.
+          reminderPlan: ringsHere ? schedule!.reminderPlan : null,
         );
+    final passed =
+        dated && reason == null && !blocked && _alertPassed(ref, checked);
+    // Its time came and it rang, or a snooze is to come: not D1's case.
+    final rang = passed ? _lastAlert(ref, checked) : null;
     final minute = time ?? settings.dateOnlyTime;
     final value = active != null
         ? reminderPlanText(context, ref, planned!)
@@ -770,27 +824,33 @@ class ReminderControl extends ConsumerWidget {
               if (chosenTime != time) onTime(chosenTime);
             },
           );
+    final line =
+        reason?.text(context) ??
+        (!dated
+            ? context.l10n.dateForReminder
+            : rang != null
+            ? _rangText(context, ref, rang, plan: active == null ? null : value)
+            : passed
+            ? context.l10n.noReminderTimePassed
+            : value);
+    // A line that names itself (a plan's, a reason's, one that says the
+    // reminder has passed or rung) is the row's only text: no «Recordatorio»
+    // over it.
+    final named = reason != null || (dated && (passed || active != null));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(
-            passed
+            passed && rang == null
                 ? Icons.notifications_off_outlined
                 : active != null
                 ? Icons.notifications_active_outlined
                 : Icons.notifications_outlined,
           ),
-          title: Text(context.l10n.reminder),
-          subtitle: Text(
-            reason?.text(context) ??
-                (!dated
-                    ? context.l10n.dateForReminder
-                    : passed
-                    ? context.l10n.noReminderTimePassed
-                    : value),
-          ),
+          title: Text(named ? line : context.l10n.reminder),
+          subtitle: named ? null : Text(line),
           trailing: onTap == null
               ? null
               : const Icon(Icons.chevron_right_rounded),

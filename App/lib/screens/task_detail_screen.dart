@@ -163,6 +163,13 @@ class TaskDetailScreen extends ConsumerWidget {
                 (task.reminderDate != null ||
                     ReminderPlans.active(task) != null) &&
                 reminderShows(ref, task);
+            // A reader chooses their own reminders on the tasks that ring
+            // for them, and nothing else (D9).
+            final ownReminders =
+                !canEdit &&
+                !task.isNote &&
+                project?.role == 'viewer' &&
+                reminderRingsHere(ref, task);
             void edit() =>
                 Navigator.pushNamed(context, '/editTask', arguments: taskId);
             void reschedule() =>
@@ -221,6 +228,8 @@ class TaskDetailScreen extends ConsumerWidget {
                       MessageBanner(
                         task.isNote
                             ? context.l10n.viewOnlyNote
+                            : ownReminders
+                            ? context.l10n.viewOnlyTaskReminders
                             : context.l10n.viewOnlyTask,
                         icon: Icons.visibility_outlined,
                       ),
@@ -376,20 +385,28 @@ class TaskDetailScreen extends ConsumerWidget {
                         alignment: Alignment.centerLeft,
                         child: ReminderChip(
                           task: task,
-                          onChanged: !canEdit
+                          onChanged: !canEdit && !ownReminders
                               ? null
                               : (updated) async {
+                                  final tasks = ref.read(taskProvider.notifier);
                                   try {
-                                    await ref
-                                        .read(taskProvider.notifier)
-                                        .updateTask(
-                                          series!.copyWith(
-                                            reminderMinutes:
-                                                updated.reminderMinutes,
-                                            reminderTime: updated.reminderTime,
-                                            reminderPlan: updated.reminderPlan,
-                                          ),
-                                        );
+                                    if (canEdit) {
+                                      await tasks.updateTask(
+                                        series!.copyWith(
+                                          reminderMinutes:
+                                              updated.reminderMinutes,
+                                          reminderTime: updated.reminderTime,
+                                          reminderPlan: updated.reminderPlan,
+                                        ),
+                                      );
+                                    } else {
+                                      await tasks.setOwnReminders(
+                                        series!.id!,
+                                        minutes: updated.reminderMinutes,
+                                        time: updated.reminderTime,
+                                        plan: updated.reminderPlan,
+                                      );
+                                    }
                                   } catch (_) {
                                     if (context.mounted) {
                                       showFeedback(

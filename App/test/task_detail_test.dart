@@ -24,7 +24,17 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'dart:io';
+
+import 'package:agenda/repositories/cloud_task_repository.dart';
+import 'package:agenda/services/api_client.dart';
+import 'package:agenda/services/reminder_preferences.dart';
+import 'package:path/path.dart' as p;
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
 import 'support/design_fixtures.dart';
+import 'support/never_syncing_tasks.dart';
+import 'support/reminder_fixtures.dart';
 
 final es = lookupAppLocalizations(const Locale('es'));
 
@@ -928,6 +938,316 @@ void main() {
       },
     );
   }
+  // ---- 2026-10-28-app · P268 (UX-2301): a step's tick never waits on the
+  // server; the sync runs behind ----
+
+  group('P268 · steps show at once', () {
+    testWidgets(
+      'UX-2301: on a task’s page with a sync that never completes, a ticked step checks at once, and a second step ticked 300 ms later checks too',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final cloud = NeverSyncingTasks([
+          plain().copyWith(
+            checklist: [
+              ChecklistItem(id: 'card', title: 'Llevar la tarjeta sanitaria'),
+              ChecklistItem(id: 'note', title: 'Pedir el justificante'),
+            ],
+          ),
+        ]);
+        final container = designContainer(
+          regionalStore: MemoryRegionalStore(
+            const RegionalPreferences(language: 'es'),
+          ),
+          tasks: () => TaskNotifier(cloud),
+        );
+        addTearDown(container.dispose);
+        await tester.pumpWidget(
+          UncontrolledProviderScope(container: container, child: const MyApp()),
+        );
+        await tester.pumpAndSettle();
+        expect(cloud.syncs, greaterThan(0), reason: 'a sync is under way');
+        expect(cloud.finished, 0, reason: 'and it never finishes');
+        await _App.detail(tester, 1);
+
+        Finder step(String id) => find.byKey(ValueKey('check-step-$id'));
+        bool? done(String id) =>
+            tester.widget<CheckboxListTile>(step(id)).value;
+        await tester.ensureVisible(step('note'));
+        await tester.pumpAndSettle();
+        expect(step('card').hitTestable(), findsOneWidget);
+        expect(done('card'), isFalse);
+        expect(done('note'), isFalse);
+
+        await tester.tap(step('card'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(done('card'), isTrue, reason: 'the first step checks at once');
+        expect(done('note'), isFalse);
+
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.tap(step('note'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(done('card'), isTrue);
+        expect(done('note'), isTrue, reason: 'the second checks at once too');
+        expect(
+          cloud.byId(1)!.checklist.map((item) => item.completed),
+          [true, true],
+          reason: 'both are written on the phone',
+        );
+        expect(cloud.finished, 0);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- 2026-10-28-app · P271 (UX-2032, D9): a reader chooses their own
+  // reminders, and nothing else opens ----
+
+  group('P271 · a reader’s own reminders', () {
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    final en = lookupAppLocalizations(const Locale('en'));
+    final rehearsal = DateTime(friday.year, friday.month, friday.day, 19);
+
+    /// «Ensayo del coro», a timed task in «Coro», where this account is
+    /// «lector»: for «Todos» by default, or given to Marta.
+    Map<String, dynamic> choirTask({bool forMarta = false}) => {
+      ...Task(
+        title: 'Ensayo del coro',
+        priority: 1,
+        dueDate: rehearsal,
+        hasTime: true,
+        reminderMinutes: 10,
+        listId: _choir,
+        assignment: forMarta ? 'member' : 'group',
+        assigneeId: forMarta ? 2 : null,
+        assigneeName: forMarta ? 'Marta' : null,
+        checklist: [
+          ChecklistItem(id: 'partitura', title: 'Llevar la partitura'),
+        ],
+      ).toApi(),
+      'id': _choirTaskId,
+      'version': 3,
+      // As the server sends it: the name of whoever it's given to.
+      'assignee_name': forMarta ? 'Marta' : null,
+    };
+
+    Finder actionChip() => find.descendant(
+      of: find.byType(ReminderChip),
+      matching: find.byType(ActionChip),
+    );
+    Finder chipReads(String text) => find.descendant(
+      of: find.byType(ReminderChip),
+      matching: find.text(text),
+    );
+
+    testWidgets(
+      'UX-2032: on a «Todos» task in «Coro» (lector), ES 1× at 360×800, the banner says «… y elegir tus recordatorios», the chip is an enabled button that opens «solo para ti», and «1 hora antes» shows at once',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final phone = await _ReaderPhone.open(tester, choirTask());
+        await phone.detail();
+        expect(find.text(es.viewOnlyTaskReminders), findsOneWidget);
+        expect(find.text(es.viewOnlyTask), findsNothing);
+
+        final chip = actionChip();
+        expect(chip, findsOneWidget, reason: 'the reminder line is a chip');
+        await tester.ensureVisible(chip);
+        await tester.pumpAndSettle();
+        expect(
+          tester.getSemantics(chip),
+          isSemantics(
+            isButton: true,
+            hasEnabledState: true,
+            isEnabled: true,
+            hasTapAction: true,
+          ),
+        );
+        expect(
+          chipReads(es.reminderValue(es.minutesBefore(10))),
+          findsOneWidget,
+        );
+
+        await tester.tap(chip);
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        expect(sheet, findsOneWidget);
+        final justYou = find.byKey(const ValueKey('reminder-plan-just-you'));
+        expect(find.descendant(of: sheet, matching: justYou), findsOneWidget);
+        expect(tester.widget<Text>(justYou).data, es.reminderPlanJustYou);
+        final title = find.descendant(
+          of: sheet,
+          matching: find.text(es.reminder),
+        );
+        expect(title, findsOneWidget);
+        expect(
+          tester.getRect(justYou).top,
+          greaterThanOrEqualTo(tester.getRect(title).bottom - 0.5),
+          reason: 'under the sheet’s title',
+        );
+
+        final hour = find.descendant(
+          of: sheet,
+          matching: find.text(es.hourBefore),
+        );
+        await tester.ensureVisible(hour.first);
+        await tester.pumpAndSettle();
+        await tester.tap(hour.first);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(
+          chipReads(es.reminderValue(es.hourBefore)),
+          findsOneWidget,
+          reason: 'the choice shows in the chip at once',
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsNothing, reason: 'it closes');
+        expect(find.text(es.updateReminderError), findsNothing);
+
+        // Only the reminders changed, kept on the phone to send.
+        final row = await phone.row();
+        expect(row['reminderMinutes'], 60);
+        expect(row['title'], 'Ensayo del coro');
+        expect(row['isCompleted'], 0);
+        expect(row['sync_pending'], 1);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+
+    for (final (l, language) in [(en, 'en'), (ca, 'ca')]) {
+      testWidgets('UX-2032: the reader’s banner in $language', (tester) async {
+        final phone = await _ReaderPhone.open(
+          tester,
+          choirTask(),
+          language: language,
+        );
+        await phone.detail();
+        expect(find.text(l.viewOnlyTaskReminders), findsOneWidget);
+        expect(find.text(l.viewOnlyTask), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    test('UX-2032: the reader’s banner in the three catalogs', () {
+      expect(
+        es.viewOnlyTaskReminders,
+        'Solo puedes ver esta tarea y elegir tus recordatorios.',
+      );
+      expect(
+        en.viewOnlyTaskReminders,
+        'You can only view this task and choose your reminders.',
+      );
+      expect(
+        ca.viewOnlyTaskReminders,
+        'Només pots veure aquesta tasca i triar els teus recordatoris.',
+      );
+      expect(es.viewOnlyTask, 'Solo puedes ver esta tarea.');
+    });
+
+    testWidgets(
+      'UX-2032: on the reader’s «Todos» task there is no ✏, no 🗑, no bottom bar and no circle, and the title and its step open nothing',
+      (tester) async {
+        final phone = await _ReaderPhone.open(tester, choirTask());
+        await phone.detail();
+        expect(find.byTooltip(es.editTask), findsNothing);
+        expect(find.byIcon(Icons.edit_outlined), findsNothing);
+        expect(find.byTooltip(es.deleteTask), findsNothing);
+        expect(find.byIcon(Icons.delete_outline_rounded), findsNothing);
+        expect(find.text(es.complete), findsNothing);
+        expect(find.text(es.reschedule), findsNothing);
+        expect(
+          find.bySemanticsLabel(es.completeNamedTask('Ensayo del coro')),
+          findsNothing,
+        );
+        final scaffold = tester.widget<Scaffold>(
+          find
+              .descendant(
+                of: find.byType(TaskDetailScreen),
+                matching: find.byType(Scaffold),
+              )
+              .first,
+        );
+        expect(scaffold.bottomNavigationBar, isNull);
+
+        await tester.tap(find.text('Ensayo del coro'), warnIfMissed: false);
+        await tester.pumpAndSettle();
+        expect(find.byType(TaskEditor), findsNothing);
+        expect(find.byType(TaskDetailScreen), findsOneWidget);
+
+        final step = find.byKey(const ValueKey('check-step-partitura'));
+        await tester.ensureVisible(step);
+        await tester.pumpAndSettle();
+        expect(tester.widget<CheckboxListTile>(step).onChanged, isNull);
+        await tester.tap(step, warnIfMissed: false);
+        await tester.pumpAndSettle();
+        expect(tester.widget<CheckboxListTile>(step).value, isFalse);
+        expect(find.byType(TaskEditor), findsNothing);
+        expect(find.byType(BottomSheet), findsNothing);
+
+        expect((await phone.row())['sync_pending'], 0, reason: 'no write');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2032: a reader on a «Coro» task given to Marta sees «Recordatorio para Marta» with no tap, and «Solo puedes ver esta tarea.»',
+      (tester) async {
+        final phone = await _ReaderPhone.open(
+          tester,
+          choirTask(forMarta: true),
+        );
+        await phone.detail();
+        expect(find.text(es.viewOnlyTask), findsOneWidget);
+        expect(find.text(es.viewOnlyTaskReminders), findsNothing);
+        final line = chipReads(es.reminderForPersonOnly('Marta'));
+        expect(line, findsOneWidget);
+        expect(actionChip(), findsNothing, reason: 'information, no control');
+        await tester.ensureVisible(line);
+        await tester.pumpAndSettle();
+        await tester.tap(line, warnIfMissed: false);
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsNothing);
+        expect((await phone.row())['sync_pending'], 0);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2032: after the choice, a new app on the same database shows «Recordatorio: 1 hora antes» before any sync',
+      (tester) async {
+        final phone = await _ReaderPhone.open(tester, choirTask());
+        await phone.detail();
+        await tester.ensureVisible(actionChip());
+        await tester.pumpAndSettle();
+        await tester.tap(actionChip());
+        await tester.pumpAndSettle();
+        final hour = find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text(es.hourBefore),
+        );
+        await tester.ensureVisible(hour.first);
+        await tester.pumpAndSettle();
+        await tester.tap(hour.first);
+        await tester.pumpAndSettle();
+
+        // The app closes; another starts on the same file, still offline.
+        final again = await phone.restart();
+        await again.detail();
+        expect(chipReads(es.reminderValue(es.hourBefore)), findsOneWidget);
+        expect(
+          phone.api.requests.followedBy(again.api.requests),
+          everyElement(isNot(startsWith('PUT'))),
+          reason: 'nothing reached a server',
+        );
+        expect((await again.row())['reminderMinutes'], 60);
+        expect((await again.row())['sync_pending'], 1, reason: 'still to send');
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }
 
 /// The app in Spanish, signed in, on Calendar, with the real task list over
@@ -1013,5 +1333,129 @@ class _Repository extends TaskRepository {
   Future<int> restoreTask(Task task) async {
     rows[task.id!] = task.toMap();
     return task.id!;
+  }
+}
+// ---- P271: a reader's phone over a real database ----
+
+const _choir = '91111111-1111-4111-8111-111111111111';
+const _choirTaskId = '92222222-2222-4222-8222-222222222222';
+
+/// A server this phone can't reach: every request fails as offline.
+class _Unreachable extends OfflineApiClient {
+  final requests = <String>[];
+  @override
+  Future<dynamic> request(
+    String method,
+    String path, {
+    Map<String, dynamic>? data,
+    String? audioPath,
+    bool authenticated = true,
+    int? accountId,
+  }) async {
+    requests.add('$method $path');
+    throw ApiException(0, 'Offline');
+  }
+}
+
+/// The app at 360×800, signed in as account 1, over a real task database in
+/// a file, where «Coro» is a project this account can only view.
+class _ReaderPhone {
+  _ReaderPhone(this.tester, this.path, this.sql, this.repository, this.api);
+  final WidgetTester tester;
+  final String path;
+  final Database sql;
+  final CloudTaskRepository repository;
+  final _Unreachable api;
+  late int id;
+
+  static Future<_ReaderPhone> open(
+    WidgetTester tester,
+    Map<String, dynamic> task, {
+    String language = 'es',
+  }) async {
+    final directory = Directory.systemTemp.createTempSync('taskflow-reader-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final path = p.join(directory.path, 'data.db');
+    // The file is made with real I/O; the app then reads it in the test's time.
+    final (sql, repository, api) = (await tester.runAsync(() async {
+      final sql = await databaseFactoryFfiNoIsolate.openDatabase(path);
+      await sql.execute(
+        'CREATE TABLE tasks(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, dueDate TEXT, priority INTEGER, isCompleted INTEGER, notes TEXT, filePaths TEXT, imagePaths TEXT)',
+      );
+      await TaskDatabase.upgrade(sql, 3, TaskDatabase.schemaVersion);
+      final database = TaskDatabase.forTesting(sql);
+      final api = _Unreachable();
+      final repository = CloudTaskRepository(database, api, 1);
+      await sql.insert('task_lists', {
+        'id': _choir,
+        'name': 'Coro',
+        'owner_key': repository.ownerKey,
+        'role': 'viewer',
+        'shared': 1,
+      });
+      await database.mergeRemote(repository.ownerKey, task);
+      return (sql, repository, api);
+    }))!;
+    addTearDown(() => tester.runAsync(sql.close));
+    final phone = _ReaderPhone(tester, path, sql, repository, api);
+    await phone._start(language);
+    return phone;
+  }
+
+  Future<void> _start(String language) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final container = designContainer(
+      regionalStore: MemoryRegionalStore(
+        RegionalPreferences(language: language),
+      ),
+      projects: [
+        TaskListInfo(id: _choir, name: 'Coro', role: 'viewer', shared: true),
+      ],
+      tasks: () => TaskNotifier(repository),
+      overrides: reminderOverrides(
+        MemoryReminderStore(
+          const ReminderPreferences(
+            enabled: true,
+            dateOnlyTime: 540,
+            asked: true,
+          ),
+        ),
+        FakeReminderAccess(allowed: true),
+      ),
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const MyApp()),
+    );
+    await tester.pumpAndSettle();
+    id = (await sql.query('tasks', columns: ['id'])).single['id'] as int;
+  }
+
+  /// This task's row on the phone.
+  Future<Map<String, Object?>> row() async =>
+      (await sql.query('tasks', where: 'id = ?', whereArgs: [id])).single;
+
+  Future<void> detail() => _App.detail(tester, id);
+
+  /// Closes this app and its database, then opens a new app on the same file.
+  Future<_ReaderPhone> restart() async {
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+    final reopened = (await tester.runAsync(() async {
+      await sql.close();
+      return databaseFactoryFfiNoIsolate.openDatabase(path);
+    }))!;
+    addTearDown(() => tester.runAsync(reopened.close));
+    final api = _Unreachable();
+    final repository = CloudTaskRepository(
+      TaskDatabase.forTesting(reopened),
+      api,
+      1,
+    );
+    final phone = _ReaderPhone(tester, path, reopened, repository, api);
+    await phone._start('es');
+    return phone;
   }
 }

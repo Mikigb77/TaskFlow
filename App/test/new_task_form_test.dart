@@ -2428,6 +2428,89 @@ void main() {
       expect(app.tasks.state.requireValue, hasLength(2));
     },
   );
+
+  group('P276 · a dated save from Sin fecha lands on Calendar', () {
+    testWidgets(
+      'UX-2307: from Calendar’s «Sin fecha · 1», the form saved with Mañana on the Sin fecha page lands on Calendar on tomorrow with the row lit and «Añadida al …» with Deshacer; Deshacer removes it',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          tasks: [Task(id: 1, title: 'Ordenar el trastero', priority: 1)],
+        );
+        final count = find.byKey(const ValueKey('calendar-inbox'));
+        await tester.ensureVisible(count);
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(of: count, matching: find.text(es.inboxCount(1))),
+          findsOneWidget,
+        );
+        await tester.tap(count);
+        await tester.pumpAndSettle();
+        final sinFecha = find.byWidgetPredicate(
+          (widget) => widget is HomeScreen && !widget.isRoot,
+        );
+        expect(sinFecha, findsOneWidget);
+
+        await openForm(tester);
+        await typeTitle(tester, 'Comprar pilas');
+        await tester.tap(chip('new-task-tomorrow'));
+        await tester.pumpAndSettle();
+        expect(selected(tester, 'new-task-tomorrow'), isTrue);
+        await tapSave(tester);
+
+        expect(find.byType(TaskEditor), findsNothing);
+        expect(sinFecha, findsNothing, reason: 'the Sin fecha page closed');
+        expect(
+          tester
+              .widget<NavigationBar>(find.byType(NavigationBar))
+              .selectedIndex,
+          0,
+        );
+        final saved = app.tasks.state.requireValue.singleWhere(
+          (task) => task.title == 'Comprar pilas',
+        );
+        expect(Task.day(saved.dueDate!), tomorrow);
+        expect(
+          find.text(DateFormat.MMMMEEEEd('es').format(tomorrow)),
+          findsOneWidget,
+          reason: 'Calendar shows Mañana',
+        );
+        final lightRow = find.descendant(
+          of: find.byType(CalendarScreen),
+          matching: row('Comprar pilas'),
+        );
+        expect(lightRow.hitTestable(), findsOneWidget);
+        expect(tester.widget<TaskTile>(lightRow).color, lit(tester));
+        expect(
+          tester.getRect(lightRow).bottom,
+          lessThanOrEqualTo(tester.getRect(find.byType(SnackBar)).top),
+        );
+        final calendar = tester.element(find.byType(CalendarScreen));
+        final message = es.taskAddedOn(calendar.weekdayDate(tomorrow));
+        expect(message, startsWith('Añadida al '));
+        expect(
+          find.descendant(
+            of: find.byType(SnackBar),
+            matching: find.text(message),
+          ),
+          findsOneWidget,
+        );
+        final undo = find.descendant(
+          of: find.byType(SnackBar),
+          matching: find.text(es.undo),
+        );
+        expect(undo, findsOneWidget);
+
+        await tester.tap(undo);
+        await tester.pumpAndSettle();
+        expect(app.tasks.state.requireValue.map((task) => task.title), [
+          'Ordenar el trastero',
+        ]);
+        expect(lightRow, findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }
 
 /// The app in Spanish (or [language]) on Calendar, signed in. Without

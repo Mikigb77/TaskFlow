@@ -495,7 +495,8 @@ void main() {
       expect(find.text(es.captureUnderstanding), findsOneWidget);
       await tester.pump(const Duration(seconds: 7));
       await tester.pump(const Duration(milliseconds: 1200));
-      final save = button(es.captureSaveAsWritten);
+      // A text button while the assistant still works (UX-2103).
+      final save = find.widgetWithText(TextButton, es.captureSaveAsWritten);
       expect(save, findsOneWidget);
       final first = app.api.drafts.single['capture_id'];
       expect(isUuid(first), isTrue);
@@ -565,12 +566,15 @@ void main() {
   );
 
   testWidgets(
-    'UX-499: closing the sheet while a dictation is understood sends no cancel, and the result waits in the pending list',
+    'UX-499 / UX-2102: closing the sheet with Conservar while a dictation is understood sends no cancel, and the result waits in the pending list',
     (tester) async {
       final app = await _FreeApp.open(tester, freeVoice: freeVoice(5));
       app.api.hold = Completer<void>();
       await dictate(tester, app, 'Comprar pan', settle: false);
       await tester.tap(inSheet(find.widgetWithText(TextButton, es.cancel)));
+      await frames(tester);
+      expect(find.text(es.captureKeepQuestion), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, es.keep));
       await frames(tester);
       expect(find.byType(BottomSheet), findsNothing);
       app.api.hold!.complete();
@@ -3533,6 +3537,283 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- UX loop 2026-10-28-app, round 1 · P273 (UX-2102, UX-2104): Cancelar
+  // during Entendiendo… asks; the offline line for a recording ----
+
+  group('P273 · understanding and failing', () {
+    /// A first dictation of [said], held while it is understood; with
+    /// [slow], 8 s pass, into the slow state.
+    Future<_FreeApp> understanding(
+      WidgetTester tester, {
+      bool slow = false,
+      String said = 'Comprar pan',
+    }) async {
+      final app = await _FreeApp.open(tester, freeVoice: freeVoice(5));
+      app.api
+        ..hold = Completer<void>()
+        // Had the answer been taken, one dictation would be used.
+        ..answerFreeVoice = freeVoice(4);
+      await dictate(tester, app, said, settle: false);
+      expect(find.text(es.captureUnderstanding), findsOneWidget);
+      if (slow) {
+        await tester.pump(const Duration(seconds: 7));
+        await tester.pump(const Duration(milliseconds: 1200));
+        expect(find.text(es.captureSlow), findsOneWidget);
+      }
+      return app;
+    }
+
+    Future<void> close(WidgetTester tester, String how) async {
+      switch (how) {
+        case 'Cancelar':
+          await tester.tap(inSheet(find.widgetWithText(TextButton, es.cancel)));
+        case 'Back':
+          await tester.binding.handlePopRoute();
+        default:
+          await tester.drag(
+            inSheet(find.text(es.captureUnderstanding)),
+            const Offset(0, 300),
+          );
+      }
+      await frames(tester);
+    }
+
+    Finder question() => find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.text(es.captureKeepQuestion),
+    );
+
+    int? left(_FreeApp app) =>
+        app.container.read(authProvider).account!.freeVoice?.left;
+
+    Future<List<String>> pendingIds(_FreeApp app) async {
+      app.container.invalidate(pendingCapturesProvider);
+      return [
+        for (final s in await app.container.read(
+          pendingCapturesProvider.future,
+        ))
+          s.id,
+      ];
+    }
+
+    for (final slow in [false, true]) {
+      final state = slow ? 'the 8 s slow state' : 'Entendiendo…';
+      for (final how in ['Cancelar', 'Back', 'swipe down']) {
+        testWidgets(
+          'UX-2102: a first capture, ES 1×: during $state, $how asks ¿Conservar lo que has dicho para más tarde? and the sheet stays',
+          (tester) async {
+            final app = await understanding(tester, slow: slow);
+            await close(tester, how);
+            expect(es.captureKeepQuestion, isNotEmpty);
+            expect(question(), findsOneWidget);
+            expect(find.byType(BottomSheet), findsOneWidget);
+            expect(app.api.deletes, isEmpty);
+            await tester.tap(find.widgetWithText(FilledButton, es.keep));
+            await frames(tester);
+            app.api.hold!.complete();
+            await tester.pumpAndSettle();
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+
+    testWidgets(
+      'UX-2102: Descartar during Entendiendo… sends the cancel for the capture, leaves nothing pending, and uses no free dictation',
+      (tester) async {
+        final app = await understanding(tester);
+        final id = app.api.drafts.single['capture_id'];
+        expect(left(app), 5);
+        await close(tester, 'Cancelar');
+        await tester.tap(find.widgetWithText(TextButton, es.discard));
+        await frames(tester);
+        expect(app.api.deletes, ['ai/drafts/$id/']);
+        expect(find.byType(BottomSheet), findsNothing);
+
+        app.api.hold!.complete();
+        await tester.pumpAndSettle();
+        expect(await pendingIds(app), isEmpty);
+        await tester.pumpAndSettle();
+        expect(find.text(es.pendingCaptureCount(1)), findsNothing);
+        expect(find.byType(CaptureResult), findsNothing);
+        expect(left(app), 5, reason: 'a cancelled dictation does not count');
+        expect(find.byType(MessageBanner), findsNothing);
+        expect(app.api.deletes, hasLength(1));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2102: Descartar in the 8 s slow state sends the cancel and leaves nothing pending',
+      (tester) async {
+        final app = await understanding(tester, slow: true);
+        final id = app.api.drafts.single['capture_id'];
+        await close(tester, 'Back');
+        await tester.tap(find.widgetWithText(TextButton, es.discard));
+        await frames(tester);
+        expect(app.api.deletes, ['ai/drafts/$id/']);
+        app.api.hold!.complete();
+        await tester.pumpAndSettle();
+        expect(await pendingIds(app), isEmpty);
+        expect(left(app), 5);
+        expect(app.tasks.titles(), isEmpty, reason: 'nothing saved');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2102: Conservar during Entendiendo… closes the sheet, and once understood Calendar shows «Sin guardar · 1»',
+      (tester) async {
+        final app = await understanding(tester);
+        await close(tester, 'Cancelar');
+        await tester.tap(find.widgetWithText(FilledButton, es.keep));
+        await frames(tester);
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(app.api.deletes, isEmpty);
+
+        app.api.hold!.complete();
+        await tester.pumpAndSettle();
+        expect(es.pendingCaptureCount(1), 'Sin guardar · 1');
+        expect(find.text(es.pendingCaptureCount(1)), findsOneWidget);
+        final ids = await pendingIds(app);
+        expect(ids, hasLength(1));
+        expect(app.store.sessions[ids.single]!.drafts, isNotEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2102: dismissing the question during Entendiendo… keeps the sheet waiting, and the result shows there once understood',
+      (tester) async {
+        final app = await understanding(tester);
+        await close(tester, 'Cancelar');
+        expect(question(), findsOneWidget);
+        // Dismissed: a tap outside the dialog.
+        await tester.tapAt(const Offset(8, 8));
+        await frames(tester);
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(find.byType(BottomSheet), findsOneWidget);
+        expect(find.text(es.captureUnderstanding), findsOneWidget);
+        expect(app.api.deletes, isEmpty);
+
+        app.api.hold!.complete();
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsOneWidget);
+        expect(find.byType(CaptureResult), findsOneWidget);
+        expect(find.text('Comprar pan'), findsWidgets);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2102: an answer that arrives while the question is open follows Descartar, chosen after: nothing is pending and no result shows',
+      (tester) async {
+        final app = await understanding(tester);
+        await close(tester, 'Cancelar');
+        expect(question(), findsOneWidget);
+        app.api.hold!.complete();
+        await tester.pumpAndSettle();
+        expect(question(), findsOneWidget, reason: 'the question stays');
+
+        await tester.tap(find.widgetWithText(TextButton, es.discard));
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(find.byType(CaptureResult), findsNothing);
+        expect(await pendingIds(app), isEmpty);
+        await tester.pumpAndSettle();
+        expect(find.text(es.pendingCaptureCount(1)), findsNothing);
+        expect(app.tasks.titles(), isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2102: an answer that arrives while the question is open follows Conservar, chosen after: the sheet closes and «Sin guardar · 1» shows',
+      (tester) async {
+        final app = await understanding(tester);
+        await close(tester, 'Cancelar');
+        app.api.hold!.complete();
+        await tester.pumpAndSettle();
+        expect(question(), findsOneWidget);
+
+        await tester.tap(find.widgetWithText(FilledButton, es.keep));
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(find.text(es.pendingCaptureCount(1)), findsOneWidget);
+        final ids = await pendingIds(app);
+        expect(ids, hasLength(1));
+        expect(app.store.sessions[ids.single]!.drafts, isNotEmpty);
+        expect(app.api.deletes, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    // UX-2104: offline, a recording with no words.
+    for (final language in ['es', 'en', 'ca']) {
+      testWidgets(
+        'UX-2104 ($language): offline, a recording with no words says the recording is kept and names no «Guardar como tarea»',
+        (tester) async {
+          final l = strings(language);
+          final app = await _FreeApp.open(
+            tester,
+            freeVoice: freeVoice(5),
+            language: language,
+            size: const Size(360, 800),
+          );
+          keepRecording(app, id: 'offline-wav');
+          app.api.failure = ApiException(0, 'Offline. Retry when connected.');
+          unawaited(
+            showCaptureSheet(
+              tester.element(find.byType(Scaffold).first),
+              captureId: 'offline-wav',
+              startListening: false,
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(button(l.done));
+          await answered(tester, app, 1);
+          final banner = inSheet(find.byType(MessageBanner));
+          expect(banner, findsOneWidget);
+          expect(
+            find.descendant(
+              of: banner,
+              matching: find.text(l.captureOfflineRecording),
+            ),
+            findsOneWidget,
+          );
+          expect(find.text(l.captureOffline), findsNothing);
+          expect(
+            l.captureOfflineRecording,
+            isNot(contains(l.captureSaveAsWritten)),
+          );
+          expect(
+            find.descendant(
+              of: banner,
+              matching: find.textContaining(l.captureSaveAsWritten),
+            ),
+            findsNothing,
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    test('UX-2104: the offline line for a recording reads as written', () {
+      expect(
+        es.captureOfflineRecording,
+        'Sin conexión. La grabación se conserva; reinténtalo cuando tengas internet.',
+      );
+      expect(
+        en.captureOfflineRecording,
+        'No internet. Your recording is kept; try again when you’re online.',
+      );
+      expect(
+        ca.captureOfflineRecording,
+        'Sense connexió. La gravació es conserva; torna-ho a provar quan tinguis internet.',
+      );
+    });
+  });
 }
 
 /// A phone whose database can't be read or written.

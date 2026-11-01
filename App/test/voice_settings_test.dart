@@ -364,7 +364,7 @@ void main() {
     (tester) async {
       expect(
         es.capturePrivacyLine,
-        'Tus palabras van por internet. Más en Ajustes.',
+        'Tus palabras van a la IA de Google. Más en Otros ajustes › Voz.',
       );
       tester.platformDispatcher.textScaleFactorTestValue = 2;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
@@ -1075,31 +1075,38 @@ void main() {
     }
 
     testWidgets(
-      'UX-491: on the first capture in Spanish at 2× text on 360×740 the privacy line reads Tus palabras van por internet. Más en Ajustes. and is laid out whole',
+      'UX-491: on the first capture in Spanish at 2× text on 360×740 the privacy line reads Tus palabras van a la IA de Google. Más en Otros ajustes › Voz. and is laid out whole',
       (tester) async {
         expect(
           es.capturePrivacyLine,
-          'Tus palabras van por internet. Más en Ajustes.',
+          'Tus palabras van a la IA de Google. Más en Otros ajustes › Voz.',
         );
         final paragraph = await privacyLine(tester, es, 'es');
         expect(paragraph.text.toPlainText(), es.capturePrivacyLine);
         expect(paragraph.didExceedMaxLines, isFalse);
-        // The line's pointer to the details names Settings as the app does.
-        expect(es.capturePrivacyLine, endsWith('${es.settings}.'));
+        // The line's pointer to the details names the screens as the app
+        // does (UX-2111).
+        expect(
+          es.capturePrivacyLine,
+          endsWith('${es.otherSettings} › ${es.voiceSettings}.'),
+        );
       },
     );
 
     testWidgets(
-      'UX-491: on the first capture in Catalan at 2× text on 360×740 the privacy line reads Les paraules van per internet. Més a Configuració. and is laid out whole',
+      'UX-491: on the first capture in Catalan at 2× text on 360×740 the privacy line reads Les paraules van a la IA de Google. Més a Altres opcions › Veu. and is laid out whole',
       (tester) async {
         expect(
           ca.capturePrivacyLine,
-          'Les paraules van per internet. Més a Configuració.',
+          'Les paraules van a la IA de Google. Més a Altres opcions › Veu.',
         );
         final paragraph = await privacyLine(tester, ca, 'ca');
         expect(paragraph.text.toPlainText(), ca.capturePrivacyLine);
         expect(paragraph.didExceedMaxLines, isFalse);
-        expect(ca.capturePrivacyLine, endsWith('${ca.settings}.'));
+        expect(
+          ca.capturePrivacyLine,
+          endsWith('${ca.otherSettings} › ${ca.voiceSettings}.'),
+        );
       },
     );
   });

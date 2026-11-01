@@ -9,8 +9,10 @@ import 'package:agenda/widgets/schedule_editor.dart';
 
 /// Shared by Calendar, Tasks and details, including keyboard/accessible buttons.
 class TaskInteractions {
-  static Future<void> toggle(
-      BuildContext context, WidgetRef ref, Task task) async {
+  /// Ticks or reopens [task]. A tick says [doneMessage], if given, rather
+  /// than «Tarea completada».
+  static Future<void> toggle(BuildContext context, WidgetRef ref, Task task,
+      {String? doneMessage}) async {
     final container = ProviderScope.containerOf(context, listen: false);
     final notifier = ref.read(taskProvider.notifier);
     final messenger = ScaffoldMessenger.of(context);
@@ -23,7 +25,9 @@ class TaskInteractions {
       }
       HapticFeedback.selectionClick();
       await showFeedback(messenger,
-          task.isCompleted ? strings.taskReopened : strings.taskCompleted,
+          task.isCompleted
+              ? strings.taskReopened
+              : doneMessage ?? strings.taskCompleted,
           actionLabel: strings.undo, onAction: () async {
         if (!messenger.mounted ||
             !identical(container.read(taskProvider.notifier), notifier)) {

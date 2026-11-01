@@ -746,7 +746,12 @@ void main() {
       await tester.pump(const Duration(milliseconds: 1200));
       expect(es.captureSlow, 'Está tardando más de lo normal.');
       expect(find.text(es.captureSlow), findsOneWidget);
-      final save = find.widgetWithText(FilledButton, es.captureSaveAsWritten);
+      // UX-2103: nothing is ready to confirm, so no filled button.
+      expect(
+        find.widgetWithText(FilledButton, es.captureSaveAsWritten),
+        findsNothing,
+      );
+      final save = find.widgetWithText(TextButton, es.captureSaveAsWritten);
       expect(save, findsOneWidget);
       expect(es.captureSaveAsWritten, 'Guardar como tarea');
 
@@ -1003,7 +1008,7 @@ void main() {
       );
       expect(
         en.captureFailed,
-        'That didn’t work. Your words are saved here — try again.',
+        'That didn’t work. Your words are still here — try again.',
       );
     });
 
@@ -1016,28 +1021,28 @@ void main() {
       for (final error in [unreachable, timeout, ApiException(502, 'x')]) {
         expect(
           text(es, error),
-          'No he podido contactar con el asistente; tus palabras se conservan.',
+          'Ahora no puedo convertir tus palabras en tareas; se conservan.',
         );
         expect(
           text(ca, error),
-          'No he pogut contactar amb l’assistent; les teves paraules es conserven.',
+          'Ara no puc convertir les teves paraules en tasques; es conserven.',
         );
         expect(
           text(en, error),
-          'Couldn’t reach the assistant — your words are kept.',
+          'I can’t turn your words into tasks right now; they’re kept.',
         );
       }
       expect(
         text(es, offline),
-        'Sin conexión. Tus palabras están guardadas; inténtalo cuando tengas internet.',
+        'Sin conexión. Toca Guardar como tarea o reinténtalo cuando tengas internet.',
       );
       expect(
         text(ca, offline),
-        'Sense connexió. Les teves paraules estan desades; torna-ho a provar quan tinguis internet.',
+        'Sense connexió. Toca Desa-ho com a tasca o torna-ho a provar quan tinguis internet.',
       );
       expect(
         text(en, offline),
-        'No internet. Your words are saved — try again when you’re online.',
+        'No internet. Tap Save as a task, or try again when you’re online.',
       );
       final short = ApiException(422, 'Audio too short');
       expect(
@@ -2090,7 +2095,7 @@ void main() {
 
   for (final language in ['es', 'en', 'ca']) {
     testWidgets(
-      'UX-919 ($language): after 8 s of waiting the filled button reads «${saveAsATask[language]}», and after a failure the same label shows below Reintentar',
+      'UX-919 ($language): after 8 s of waiting the text button reads «${saveAsATask[language]}» (UX-2103), and after a failure the same label shows below Reintentar',
       (tester) async {
         final l = lang(language);
         expect(l.captureSaveAsWritten, saveAsATask[language]);
@@ -2101,7 +2106,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 8200));
         expect(find.text(l.captureSlow), findsOneWidget);
         expect(
-          find.widgetWithText(FilledButton, l.captureSaveAsWritten),
+          find.widgetWithText(TextButton, l.captureSaveAsWritten),
           findsOneWidget,
         );
         hold.complete();
@@ -2718,7 +2723,8 @@ void main() {
         );
         await frames(tester);
         await tester.pump(const Duration(milliseconds: 8200));
-        final save = find.widgetWithText(FilledButton, l.captureSaveAsWritten);
+        // A text button while the assistant still works (UX-2103).
+        final save = find.widgetWithText(TextButton, l.captureSaveAsWritten);
         expect(save, findsOneWidget);
         await tester.ensureVisible(save);
         await tester.pump(const Duration(milliseconds: 400));
@@ -2787,8 +2793,9 @@ void main() {
       await frames(tester);
       await tester.pump(const Duration(milliseconds: 8200));
       expect(find.text(es.captureSlow), findsOneWidget);
+      // A text button while the assistant still works (UX-2103).
       final save = inSheet(
-        find.widgetWithText(FilledButton, es.captureSaveAsWritten),
+        find.widgetWithText(TextButton, es.captureSaveAsWritten),
       );
       expect(save, findsOneWidget);
       final label = find.descendant(
@@ -2858,6 +2865,317 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // ---- UX loop 2026-10-28-app, round 1 · P273 (UX-2103, UX-2104, UX-2109),
+  // with Manrope (loaded above) ----
+
+  group('P273 · understanding and failing', () {
+    Future<void> manrope() async => (FontLoader(
+      'Manrope',
+    )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+
+    void at2x(WidgetTester tester) {
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    }
+
+    /// The sheet's one problem banner, showing [text], whole: every line
+    /// laid out, inside the screen and inside every scroll view around it;
+    /// with [still], none of those scroll views can scroll.
+    Rect expectWholeBanner(
+      WidgetTester tester,
+      String text, {
+      Size screen = const Size(360, 800),
+      bool still = false,
+    }) {
+      final banner = inSheet(find.byType(MessageBanner));
+      expect(banner, findsOneWidget);
+      final label = find.descendant(of: banner, matching: find.text(text));
+      expect(label, findsOneWidget);
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: label, matching: find.byType(RichText)),
+      );
+      expect(paragraph.didExceedMaxLines, isFalse);
+      final rect = tester.getRect(banner);
+      expect(rect.top, greaterThanOrEqualTo(-0.5));
+      expect(rect.bottom, lessThanOrEqualTo(screen.height + 0.5));
+      expect(
+        rect.bottom,
+        lessThanOrEqualTo(tester.getRect(find.byType(BottomSheet)).bottom),
+      );
+      final scrollables = find.ancestor(
+        of: banner,
+        matching: find.byType(Scrollable),
+      );
+      for (final element in scrollables.evaluate()) {
+        final viewport = tester.getRect(find.byWidget(element.widget));
+        expect(
+          rect.top,
+          greaterThanOrEqualTo(viewport.top - 0.5),
+          reason: 'the banner’s top edge is in its scroll view',
+        );
+        expect(
+          rect.bottom,
+          lessThanOrEqualTo(viewport.bottom + 0.5),
+          reason:
+              'the banner’s last line and bottom edge are in its scroll '
+              'view (banner $rect, view $viewport)',
+        );
+        if (still) {
+          final position =
+              (element as StatefulElement).state as ScrollableState;
+          expect(
+            position.position.maxScrollExtent,
+            0,
+            reason: 'only the words scroll',
+          );
+        }
+      }
+      return rect;
+    }
+
+    /// The typed-words field's top border shows under [banner]: in view and
+    /// what a tap just inside it reaches.
+    void expectFieldTopVisible(WidgetTester tester, Rect banner) {
+      final decorator = find.descendant(
+        of: words(),
+        matching: find.byType(InputDecorator),
+      );
+      expect(decorator, findsOneWidget);
+      final field = tester.getRect(decorator);
+      expect(
+        field.top,
+        greaterThanOrEqualTo(banner.bottom - 0.5),
+        reason: 'the field starts below the banner',
+      );
+      expect(field.top, lessThan(800));
+      final inside = <RenderObject>{
+        for (final element
+            in find
+                .descendant(
+                  of: words(),
+                  matching: find.byWidgetPredicate((_) => true),
+                )
+                .evaluate())
+          if (element.renderObject != null) element.renderObject!,
+      };
+      final hit = tester.hitTestOnBinding(
+        Offset(field.center.dx, field.top + 2),
+      );
+      expect(
+        hit.path.any((entry) => inside.contains(entry.target)),
+        isTrue,
+        reason: 'the field’s top border is in view at ${field.top}',
+      );
+    }
+
+    // UX-2103: at 8 s, nothing is ready to confirm.
+    for (final scale in [1, 2]) {
+      testWidgets(
+        'UX-2103: ES $scale× on 360×800, after 8 s of understanding no filled button shows, and «Guardar como tarea» is a text button at least 48 dp tall under «Está tardando más de lo normal.»',
+        (tester) async {
+          await manrope();
+          if (scale == 2) at2x(tester);
+          final hold = Completer<void>();
+          await typeAndSend(
+            tester,
+            'es',
+            'Mañana, llamar al dentista y comprar pan',
+            size: const Size(360, 800),
+            hold: hold,
+          );
+          await frames(tester);
+          await tester.pump(const Duration(milliseconds: 8200));
+          final slow = inSheet(find.text(es.captureSlow));
+          expect(slow, findsOneWidget);
+          expect(
+            find.widgetWithText(FilledButton, es.captureSaveAsWritten),
+            findsNothing,
+          );
+          expect(inSheet(find.byType(FilledButton)), findsNothing);
+          final save = inSheet(
+            find.widgetWithText(TextButton, es.captureSaveAsWritten),
+          );
+          expect(save, findsOneWidget);
+          await tester.ensureVisible(save);
+          await tester.pump(const Duration(milliseconds: 400));
+          final button = tester.getRect(save);
+          expect(button.height, greaterThanOrEqualTo(48));
+          expect(
+            button.top,
+            greaterThanOrEqualTo(tester.getRect(slow).bottom - 0.5),
+            reason: 'under the slow line',
+          );
+          expect(button.bottom, lessThanOrEqualTo(800.5));
+          expect(save.hitTestable(), findsOneWidget);
+          expect(tester.takeException(), isNull);
+          hold.complete();
+          await tester.pumpAndSettle();
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2103: ES 1× on 360×800, after a 503 «Guardar como tarea» is a filled button again, under «Reintentar»',
+      (tester) async {
+        await manrope();
+        await typeAndSend(
+          tester,
+          'es',
+          'Mañana, llamar al dentista y comprar pan',
+          size: const Size(360, 800),
+          failure: ApiException(503, 'Service unavailable'),
+        );
+        await tester.pumpAndSettle();
+        final retry = inSheet(find.widgetWithText(FilledButton, es.tryAgain));
+        final save = inSheet(
+          find.widgetWithText(FilledButton, es.captureSaveAsWritten),
+        );
+        expect(retry, findsOneWidget);
+        expect(save, findsOneWidget);
+        expect(
+          tester.getRect(retry).bottom,
+          lessThanOrEqualTo(tester.getRect(save).top),
+          reason: 'under Reintentar',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    // UX-2104 and UX-2109: offline with typed words, at 2×.
+    for (final language in ['es', 'ca']) {
+      testWidgets(
+        'UX-2104 / UX-2109 ($language 2× on 360×800): offline with typed words, the banner says to tap «Guardar como tarea», whole, with the field’s top border in view',
+        (tester) async {
+          await manrope();
+          at2x(tester);
+          final l = lang(language);
+          await typeAndSend(
+            tester,
+            language,
+            'Llamar al médico el viernes a las diez',
+            size: const Size(360, 800),
+            failure: ApiException(0, 'Offline. Retry when connected.'),
+          );
+          await tester.pumpAndSettle();
+          expect(l.captureOffline, contains(l.captureSaveAsWritten));
+          final banner = expectWholeBanner(tester, l.captureOffline);
+          expectFieldTopVisible(tester, banner);
+          expect(
+            inSheet(find.widgetWithText(FilledButton, l.captureSaveAsWritten)),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull, reason: 'no overflow');
+        },
+      );
+    }
+
+    test('UX-2104: the offline line names the button and says what to tap', () {
+      expect(
+        es.captureOffline,
+        'Sin conexión. Toca Guardar como tarea o reinténtalo cuando tengas internet.',
+      );
+      expect(
+        ca.captureOffline,
+        'Sense connexió. Toca Desa-ho com a tasca o torna-ho a provar quan tinguis internet.',
+      );
+      expect(
+        en.captureOffline,
+        'No internet. Tap Save as a task, or try again when you’re online.',
+      );
+      for (final l in [es, en, ca]) {
+        expect(l.captureOffline, contains(l.captureSaveAsWritten));
+      }
+    });
+
+    // UX-2104: the server that understands the words can't be reached.
+    for (final language in ['es', 'en', 'ca']) {
+      testWidgets(
+        'UX-2104 ($language): unreachable (503), the banner says the words can’t become tasks now and are kept',
+        (tester) async {
+          final l = lang(language);
+          await typeAndSend(
+            tester,
+            language,
+            'llamar al médico',
+            size: const Size(360, 800),
+            failure: ApiException(503, 'Service unavailable'),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.descendant(
+              of: inSheet(find.byType(MessageBanner)),
+              matching: find.text(l.captureUnavailable),
+            ),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    test('UX-2104: the unreachable line reads as written', () {
+      expect(
+        es.captureUnavailable,
+        'Ahora no puedo convertir tus palabras en tareas; se conservan.',
+      );
+      expect(
+        en.captureUnavailable,
+        'I can’t turn your words into tasks right now; they’re kept.',
+      );
+      expect(
+        ca.captureUnavailable,
+        'Ara no puc convertir les teves paraules en tasques; es conserven.',
+      );
+    });
+
+    // UX-2109: today's limit with many typed words, at CA 2×.
+    testWidgets(
+      'UX-2109 (ca 2× on 360×800): typed words refused by today’s limit, the banner shows whole and only the words scroll',
+      (tester) async {
+        await manrope();
+        at2x(tester);
+        await typeAndSend(
+          tester,
+          'ca',
+          [
+            'Trucar al metge divendres a les deu',
+            'Comprar pa i llet a la botiga del costat',
+            'Recollir el paquet de correus abans de dinar',
+            'Enviar la factura a la gestoria',
+            'Portar el cotxe al taller dimarts',
+            'Regar les plantes del balcó',
+          ].join('\n'),
+          size: const Size(360, 800),
+          failure: ApiException(
+            429,
+            'Daily limit reached.',
+            null,
+            const Duration(seconds: 3600),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final banner = expectWholeBanner(
+          tester,
+          ca.captureAllowance,
+          still: true,
+        );
+        expectFieldTopVisible(tester, banner);
+        // The words are what scrolls: they don't all fit.
+        final wordsScroll = find.descendant(
+          of: words(),
+          matching: find.byType(Scrollable),
+        );
+        expect(wordsScroll, findsOneWidget);
+        expect(
+          tester.state<ScrollableState>(wordsScroll).position.maxScrollExtent,
+          greaterThan(0),
+          reason: 'the words run out of room and scroll',
+        );
+        expect(tester.takeException(), isNull, reason: 'no overflow');
+      },
+    );
+  });
 }
 
 Map<String, dynamic> _found(String title) => {

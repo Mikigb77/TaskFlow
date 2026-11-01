@@ -322,6 +322,32 @@ void calendarPreviews() {
 
     preview(
       agenda,
+      'all-clear',
+      'Today\'s last open task just ticked: «Todo listo. Respira.» with Deshacer.',
+      [es1, es2, ca2],
+      (p) async {
+        // Today: the walk, already done, and the call to the doctor.
+        await PreviewApp.open(
+          p,
+          tasks: [
+            for (final task in normalDay())
+              if (task.id! < 3 || task.id! > 5) task,
+          ],
+        );
+        final checkbox = find.descendant(
+          of: find.widgetWithText(TaskTile, 'Llamar al médico para pedir cita'),
+          matching: find.byType(Checkbox),
+        );
+        await p.tester.ensureVisible(checkbox);
+        await p.tester.pumpAndSettle();
+        await p.tester.tap(checkbox);
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      agenda,
       'phone-events',
       'The phone\'s own calendar shown too: its events line after the day\'s tasks, scrolled into view.',
       [es1],

@@ -713,7 +713,7 @@ void main() {
     }
 
     testWidgets(
-      'UX-448: ticking the just-saved task keeps Tarea completada and Deshacer free of the sheet; the next dated save asks',
+      'UX-448: ticking the just-saved task keeps its completion message and Deshacer free of the sheet; the next dated save asks',
       (tester) async {
         final store = MemoryReminderStore();
         final access = FakeReminderAccess();
@@ -736,7 +736,8 @@ void main() {
               .isCompleted,
           isTrue,
         );
-        expect(find.text(l.taskCompleted).hitTestable(), findsOneWidget);
+        // The day's only task: its tick says the day is clear (WD34).
+        expect(find.text(l.dayAllClear).hitTestable(), findsOneWidget);
         expect(find.text(l.undo).hitTestable(), findsOneWidget);
         expect(sheet(), findsNothing);
         expect(question(l), findsNothing);

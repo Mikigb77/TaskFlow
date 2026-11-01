@@ -131,6 +131,7 @@ void main() {
   _p235DeadlineOnly();
   _p239OverdueLanding();
   _p240DeadlineRow();
+  _p267CommandCards();
 }
 
 // ---------------------------------------------------------------- parsing
@@ -4542,8 +4543,8 @@ void _plan2Round1() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('UX-1702: all five done: Calendar on today with no '
-        '«Atrasadas», today’s rows ticked and lit, «5 tareas completadas»; '
+    testWidgets('UX-1702: all five done: Calendar on today, its overdue rows '
+        'ticked under «Atrasadas», today’s rows ticked and lit, «5 tareas completadas»; '
         'Deshacer opens all five again', (tester) async {
       final app = await _App.open(
         tester,
@@ -4558,7 +4559,9 @@ void _plan2Round1() {
       await _confirm(tester);
       expect(find.byType(CaptureResult), findsNothing);
       expect(find.text(es.todayAgenda), findsOneWidget);
-      expect(find.textContaining('Atrasada'), findsNothing);
+      // P269 (UX-2304): ticked while Today was shown, the two overdue rows
+      // stay under «Atrasadas · 2», after today's own, until Calendar is left.
+      expect(find.text(es.overdueCount(2)), findsOneWidget);
       for (final title in ['Comprar pan', 'Ir al médico', 'Llamar a mamá']) {
         expect(_calendarRow(title), findsOneWidget, reason: title);
         final tile = tester.widget<TaskTile>(_calendarRow(title));
@@ -5949,7 +5952,11 @@ void _p235DeadlineOnly() {
       expect(find.textContaining('¿Qué día'), findsNothing);
       final yesterday = _weekdayDate(tester, day(-1));
       expect(
-        _inResult(find.text('$yesterday → $yesterday · 18:00')),
+        _inResult(
+          find.text(
+            es.commandChangeLine(es.deadline, yesterday, '$yesterday · 18:00'),
+          ),
+        ),
         findsOneWidget,
       );
       expect(_inResult(find.textContaining('${es.noDate} →')), findsNothing);
@@ -6419,6 +6426,458 @@ void _p240DeadlineRow() {
         expect(rect.bottom, lessThanOrEqualTo(rowRect.bottom + 0.5));
         expect(tester.takeException(), isNull);
       });
+    }
+  });
+}
+
+// ------------------------------------------- P267 of run 2026-10-28-app
+//
+// UX-2201: a set's tasks are all in the sheet's own scroll, with no scroll
+// inside the card, and the confirming button stays pinned. UX-2209: the
+// deadline's change line names its field before its chip. UX-2210: a set
+// with nothing to do, or that can't act, shows the search icon; a set that
+// will act keeps its action's.
+
+/// Two tasks Today lists under «Atrasadas» and four open today
+/// (commands/cards.bulk-today-overdue): six for «Marcar 6 tareas como
+/// hechas».
+List<Task> _p267TodaySix() => [
+  ..._todayWithOverdue(),
+  Task(
+    id: 6,
+    title: 'Recoger a los niños del colegio',
+    priority: 1,
+    dueDate: day(0, 17),
+  ),
+];
+
+/// Six open tasks tomorrow, for «Borra todo lo de mañana».
+List<Task> _p267TomorrowSix() => [
+  for (final (index, title) in [
+    'Llevar el coche al taller',
+    'Recoger a los niños del colegio',
+    'Comprar el regalo de cumpleaños',
+    'Llamar a la gestoría por la renta',
+    'Clase de yoga',
+    'Preparar la cena para los abuelos',
+  ].indexed)
+    Task(id: 60 + index, title: title, priority: 1, dueDate: day(1, 9 + index)),
+];
+
+CaptureCommand _p267DeleteTomorrow() =>
+    command({'kind': 'delete', 'target': setTarget(from: day(1))});
+
+/// The command card around [finder]: the result's 22 dp-cornered frame.
+Finder _p267Card(Finder finder) => find
+    .ancestor(
+      of: finder,
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is Material &&
+            widget.shape is RoundedRectangleBorder &&
+            (widget.shape! as RoundedRectangleBorder).borderRadius ==
+                BorderRadius.circular(22),
+      ),
+    )
+    .first;
+
+/// The set's card.
+Finder get _p267SetCard =>
+    _p267Card(_inResult(find.byKey(const ValueKey('command-headline'))).first);
+
+/// The sheet's own Scrollable: the one around the result's cards.
+Finder get _p267SheetScroll => find
+    .descendant(
+      of: _inResult(find.byType(SingleChildScrollView)).first,
+      matching: find.byType(Scrollable),
+    )
+    .first;
+
+Finder get _p267Button => find.byKey(const ValueKey('save-drafts'));
+
+/// No scroll and no scrollbar inside the set's card; every row's nearest
+/// Scrollable is the sheet's own; the button is outside it.
+void _p267ExpectOneScroll(WidgetTester tester, {required int rows}) {
+  final card = _p267SetCard;
+  expect(
+    find.descendant(of: card, matching: find.byType(Scrollable)),
+    findsNothing,
+    reason: 'no Scrollable nested in the card',
+  );
+  expect(
+    find.descendant(
+      of: card,
+      matching: find.byWidgetPredicate(
+        (widget) => widget is Scrollbar || widget is RawScrollbar,
+      ),
+    ),
+    findsNothing,
+    reason: 'no scrollbar inside the card',
+  );
+  final sheet = tester.element(_p267SheetScroll);
+  expect(
+    tester.widget<Scrollable>(_p267SheetScroll).axisDirection,
+    AxisDirection.down,
+  );
+  // The card itself sits in the sheet's scroll.
+  expect(
+    find.ancestor(of: card, matching: find.byType(Scrollable)).evaluate().first,
+    sheet,
+  );
+  final boxes = _inResult(find.byType(CheckboxListTile));
+  expect(boxes, findsNWidgets(rows));
+  for (final row in tester.elementList(boxes)) {
+    final scrollable = find
+        .ancestor(
+          of: find.byElementPredicate((e) => e == row),
+          matching: find.byType(Scrollable),
+        )
+        .evaluate()
+        .first;
+    expect(scrollable, sheet, reason: 'each row in the sheet’s own scroll');
+    expect(
+      find.descendant(
+        of: find.byElementPredicate((e) => e == row),
+        matching: find.byType(Checkbox),
+      ),
+      findsOneWidget,
+    );
+  }
+  expect(
+    find.descendant(of: _p267SheetScroll, matching: _p267Button),
+    findsNothing,
+    reason: 'the button is pinned outside the scroll',
+  );
+}
+
+/// Scrolling the sheet brings each of [titles] whole into its view, above
+/// the button, which stays where it was.
+Future<void> _p267ExpectEveryRowReached(
+  WidgetTester tester,
+  List<String> titles,
+) async {
+  final button = tester.getRect(_p267Button);
+  for (final title in titles) {
+    final row = _setRow(title);
+    expect(row, findsOneWidget, reason: title);
+    await tester.scrollUntilVisible(row, 60, scrollable: _p267SheetScroll);
+    await tester.pumpAndSettle();
+    final view = tester.getRect(_p267SheetScroll);
+    final rect = tester.getRect(row);
+    if (rect.bottom > view.bottom + 0.5 ||
+        rect.bottom > button.top + 0.5 ||
+        rect.top < view.top - 0.5) {
+      // Only partly in: one more nudge of the sheet itself.
+      await tester.drag(
+        _p267SheetScroll,
+        Offset(0, rect.top < view.top ? 60 : -60),
+      );
+      await tester.pumpAndSettle();
+    }
+    final shown = tester.getRect(row);
+    _expectInside(view, shown, '«$title»');
+    expect(
+      shown.bottom,
+      lessThanOrEqualTo(button.top + 0.5),
+      reason: '«$title» $shown above the button $button',
+    );
+    expect(tester.getRect(_p267Button), button, reason: 'the button stays');
+  }
+}
+
+/// The icon on the set card's first line.
+IconData? _p267HeaderIcon(WidgetTester tester) => tester
+    .widget<Icon>(
+      find.descendant(
+        of: find
+            .ancestor(
+              of: _inResult(
+                find.byKey(const ValueKey('command-headline')),
+              ).first,
+              matching: find.byType(Row),
+            )
+            .first,
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Icon && widget.size == 22,
+        ),
+      ),
+    )
+    .icon;
+
+void _p267CommandCards() {
+  group('P267 · command cards', () {
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+    });
+
+    // ------------------------------------------------------------ UX-2201
+    for (final scale in [1.0, 1.3]) {
+      testWidgets(
+        'UX-2201: es ${scale}x on 360×800 (cards.bulk-today-overdue): '
+        '«Marcar 6 tareas como hechas» lists its six in the sheet’s own '
+        'scroll, no scrollbar inside the card; scrolling the sheet reaches '
+        'every row; the button stays pinned',
+        (tester) async {
+          final app = await _App.open(
+            tester,
+            tasks: _p267TodaySix(),
+            textScale: scale,
+            size: const Size(360, 800),
+          );
+          await app.showResult(tester, [
+            _completeToday(),
+          ], transcript: 'Marca como hechas todas las de hoy');
+          expect(_buttonLabel(tester), es.commandBulkComplete(6));
+          _p267ExpectOneScroll(tester, rows: 6);
+          await _p267ExpectEveryRowReached(tester, [
+            'Devolver el libro a la biblioteca',
+            'Pagar la factura del gas',
+            'Comprar pan',
+            'Ir al médico',
+            'Llamar a mamá',
+            'Recoger a los niños del colegio',
+          ]);
+          expect(tester.takeException(), isNull);
+        },
+      );
+
+      testWidgets(
+        'UX-2201: es ${scale}x on 360×800 (cards.bulk-move): «Pasa todas las '
+        'tareas de ayer a mañana» lists its four in the sheet’s own scroll, '
+        'no scrollbar inside the card; scrolling the sheet reaches every '
+        'row; the button stays pinned',
+        (tester) async {
+          final app = await _App.open(
+            tester,
+            tasks: _fourYesterday(),
+            projects: [_casa],
+            textScale: scale,
+            size: const Size(360, 800),
+          );
+          await app.showResult(tester, [
+            _moveYesterdayToTomorrow(),
+          ], transcript: 'Pasa todas las tareas de ayer a mañana');
+          expect(_buttonLabel(tester), es.commandBulkMove(4));
+          _p267ExpectOneScroll(tester, rows: 4);
+          await _p267ExpectEveryRowReached(tester, [
+            'Llamar al fontanero',
+            'Pintar la valla',
+            'Comprar el regalo',
+            'Pagar la factura del gas',
+          ]);
+          expect(tester.takeException(), isNull);
+        },
+      );
+
+      testWidgets(
+        'UX-2201: es ${scale}x on 360×800, «Borra todo lo de mañana» over six '
+        'tasks: every row’s checkbox in the sheet’s own Scrollable, none '
+        'nested in the card; it opens at «Eliminar 6 tareas» with its ✕ in '
+        'view (UX-1704)',
+        (tester) async {
+          final app = await _App.open(
+            tester,
+            tasks: _p267TomorrowSix(),
+            textScale: scale,
+            size: const Size(360, 800),
+          );
+          await app.showResult(tester, [
+            _p267DeleteTomorrow(),
+          ], transcript: 'Borra todo lo de mañana');
+          expect(_headline(tester), es.commandBulkDelete(6));
+          expect(es.commandBulkDelete(6), 'Eliminar 6 tareas');
+          final view = _resultView(tester);
+          _expectInside(
+            view,
+            tester.getRect(
+              _inResult(find.byKey(const ValueKey('command-headline'))).first,
+            ),
+            'the heading',
+          );
+          _expectInside(
+            view,
+            tester.getRect(_inResult(find.byTooltip(es.commandDontDeleteAny))),
+            'the ✕',
+          );
+          _p267ExpectOneScroll(tester, rows: 6);
+          await _p267ExpectEveryRowReached(tester, [
+            for (final task in _p267TomorrowSix()) task.title,
+          ]);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    // ------------------------------------------------------------ UX-2209
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'UX-2209: es ${scale}x on 360×800 (cards.change-deadline-only): '
+        '«Fecha límite: <ayer> →», whole, then the chip «Mañana»; TalkBack '
+        'still hears «Fecha límite: de <ayer> a Mañana»',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          final app = await _App.open(
+            tester,
+            tasks: [_gasBill()],
+            textScale: scale,
+            size: const Size(360, 800),
+          );
+          await app.showResult(tester, [
+            _changeGasBill({'date': key(day(1))}),
+          ], transcript: 'Pasa la factura del gas a mañana');
+          expect(
+            es.commandChangeLineFrom('Fecha límite', 'mar, 27 de oct'),
+            'Fecha límite: mar, 27 de oct →',
+          );
+          final yesterday = _weekdayDate(tester, day(-1));
+          final line = _inResult(
+            find.text(es.commandChangeLineFrom(es.deadline, yesterday)),
+          );
+          expect(line, findsOneWidget);
+          final card = _p267Card(line);
+          final frame = tester.getRect(card);
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(of: line, matching: find.byType(RichText)).first,
+          );
+          expect(paragraph.didExceedMaxLines, isFalse, reason: 'not cut');
+          final text = tester.getRect(line);
+          expect(text.left, greaterThanOrEqualTo(frame.left - 0.5));
+          expect(text.right, lessThanOrEqualTo(frame.right + 0.5));
+          // The chip follows: beside the line, or under it.
+          expect(_moveChip, findsOneWidget);
+          expect(_chipLabel(tester), es.tomorrow);
+          final chip = tester.getRect(_moveChip);
+          final beside =
+              chip.left >= text.right - 0.5 &&
+              chip.top < text.bottom &&
+              chip.bottom > text.top;
+          final under = chip.top >= text.bottom - 0.5;
+          expect(beside || under, isTrue, reason: 'chip $chip after $text');
+          expect(chip.left, greaterThanOrEqualTo(frame.left - 0.5));
+          expect(chip.right, lessThanOrEqualTo(frame.right + 0.5));
+          expect(chip.bottom, lessThanOrEqualTo(frame.bottom + 0.5));
+          expect(
+            find.bySemanticsLabel(
+              es.commandChangeSemantics(es.deadline, yesterday, es.tomorrow),
+            ),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+          semantics.dispose();
+        },
+      );
+    }
+
+    // ------------------------------------------------------------ UX-2210
+    testWidgets(
+      'UX-2210: es 1x (cards.bulk-none): a set that matched nothing shows '
+      'the search icon, not the pencil',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          tasks: [
+            Task(id: 1, title: 'Comprar pan', priority: 1, dueDate: day(0, 9)),
+          ],
+          size: const Size(360, 800),
+        );
+        await app.showResult(tester, [
+          _moveYesterdayToTomorrow(),
+        ], transcript: 'Pasa todas las tareas de ayer a mañana');
+        expect(
+          _headline(tester),
+          es.commandBulkNone('open', es.commandBulkPeriod('yesterday', '', '')),
+        );
+        expect(_p267HeaderIcon(tester), Icons.search_rounded);
+        expect(_inResult(find.byIcon(Icons.edit_outlined)), findsNothing);
+        expect(_p267Button, findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2210: es 1x (cards.bulk-view-only): a set whose only matches are '
+      'in a project the person can only view shows the search icon',
+      (tester) async {
+        final viewOnly = TaskListInfo(
+          id: 'maths',
+          name: 'Matemáticas',
+          shared: true,
+          role: 'viewer',
+          version: 2,
+          people: const [
+            ProjectMember(id: 1, name: 'Yo', role: 'viewer'),
+            ProjectMember(id: 4, name: 'Ana', role: 'owner'),
+          ],
+        );
+        final app = await _App.open(
+          tester,
+          tasks: [
+            Task(
+              id: 1,
+              title: 'Preparar el examen del tema 6',
+              priority: 2,
+              dueDate: day(0, 17),
+              listId: 'maths',
+            ),
+          ],
+          projects: [viewOnly],
+          size: const Size(360, 800),
+        );
+        await app.showResult(tester, [
+          command({
+            'kind': 'update',
+            'target': setTarget(from: day(0), listId: 'maths'),
+            'changes': {'date': key(day(1))},
+          }),
+        ], transcript: 'Pasa las de Matemáticas de hoy a mañana');
+        expect(_headline(tester), es.commandBulkViewOnly('Matemáticas'));
+        expect(_p267HeaderIcon(tester), Icons.search_rounded);
+        expect(_inResult(find.byIcon(Icons.edit_outlined)), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final (name, tasks, said, kind, icon) in [
+      (
+        'a move',
+        _fourYesterday,
+        _moveYesterdayToTomorrow,
+        'Pasa todas las tareas de ayer a mañana',
+        Icons.edit_outlined,
+      ),
+      (
+        'a completion',
+        _p267TodaySix,
+        _completeToday,
+        'Marca como hechas todas las de hoy',
+        Icons.task_alt_rounded,
+      ),
+      (
+        'a deletion',
+        _p267TomorrowSix,
+        _p267DeleteTomorrow,
+        'Borra todo lo de mañana',
+        Icons.delete_outline_rounded,
+      ),
+    ]) {
+      testWidgets(
+        'UX-2210: es 1x: $name set that will act keeps its action’s icon',
+        (tester) async {
+          final app = await _App.open(
+            tester,
+            tasks: tasks(),
+            projects: [_casa],
+            size: const Size(360, 800),
+          );
+          await app.showResult(tester, [said()], transcript: kind);
+          expect(_p267Button, findsOneWidget);
+          expect(_p267HeaderIcon(tester), icon);
+          expect(_inResult(find.byIcon(Icons.search_rounded)), findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+      );
     }
   });
 }

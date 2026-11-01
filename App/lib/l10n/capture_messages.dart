@@ -16,16 +16,19 @@ String freeVoiceUsedUpText(
 }
 
 /// [freeVoiceResets]: when free dictations come back, for a refusal of
-/// spoken words.
+/// spoken words. [recording]: a capture that is only a recording, with no
+/// words to save as written.
 String captureProblemText(
   AppLocalizations l,
   String value, {
   DateTime? freeVoiceResets,
+  bool recording = false,
 }) => switch (CaptureProblem.from(value)) {
   CaptureProblem.gone => l.captureGone,
   CaptureProblem.noteLength => l.captureNoteLength,
   CaptureProblem.noTasks => l.captureNoTasks,
-  CaptureProblem.offline => l.captureOffline,
+  CaptureProblem.offline =>
+    recording ? l.captureOfflineRecording : l.captureOffline,
   CaptureProblem.timeout || CaptureProblem.unavailable => l.captureUnavailable,
   CaptureProblem.tooFast => l.captureTooFast,
   CaptureProblem.allowance => l.captureAllowance,

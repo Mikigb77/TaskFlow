@@ -683,7 +683,10 @@ void main() {
         );
         expect(find.text('Informe → Informe final'), findsOneWidget);
         expect(find.text('${es.assignedToGroup} → Paul'), findsOneWidget);
-        expect(find.text('${es.medium} → ${es.high}'), findsOneWidget);
+        expect(
+          find.text(es.commandChangeLine(es.priority, es.medium, es.high)),
+          findsOneWidget,
+        );
         expect(find.text(es.commandNotesAdd('Con IVA')), findsOneWidget);
         expect(
           find.text(es.commandMemberNotIn('Pol', 'Equipo')),
@@ -1876,6 +1879,9 @@ void main() {
       },
     );
   });
+
+  // UX loop 2026-10-28-app, round 1 · P267 (UX-2204, UX-2209, UX-2210).
+  _p267CommandCards();
 }
 
 /// The phone's recognizer, shared by the tests: it listens until stopped,
@@ -4743,7 +4749,9 @@ void _commandsRound2() {
             }),
           ],
         );
-        final line = find.text('${es.medium} → ${es.high}');
+        final line = find.text(
+          es.commandChangeLine(es.priority, es.medium, es.high),
+        );
         expect(line, findsOneWidget);
         final row = find.ancestor(of: line, matching: find.byType(Row)).first;
         expect(
@@ -6957,5 +6965,409 @@ void _round20261021() {
         },
       );
     }
+  });
+}
+
+// ------------------------------------------- P267 of run 2026-10-28-app
+//
+// UX-2204: «¿Cuál quieres cambiar?» answers are the question's outlined
+// choices. UX-2209: the priority's change line names its field. UX-2210: a
+// card that found nothing shows the search icon; a card that will act keeps
+// its action's.
+
+/// The two tasks «llamar Ana» matches (commands/cards.change-which).
+List<Task> _p267Ana() => [
+  Task(id: 43, title: 'Llamar a Ana', priority: 1, dueDate: day(2, 9)),
+  Task(
+    id: 44,
+    title: 'Llamar a Ana por el viaje',
+    priority: 1,
+    dueDate: day(4, 9),
+  ),
+];
+
+CaptureCommand _p267ChangeAna() => command({
+  'kind': 'update',
+  'target': {
+    'words': ['llamar', 'ana'],
+  },
+  'changes': {'time': '18:00'},
+});
+
+/// [finder] in the result's sheet.
+Finder _p267InResult(Finder finder) =>
+    find.descendant(of: find.byType(CaptureResult), matching: finder);
+
+/// The «¿Cuál…?» choices, in the order shown (not «Ver N más»).
+Finder get _p267Choices => _p267InResult(
+  find.byWidgetPredicate((widget) {
+    final key = widget.key;
+    return widget is InkWell &&
+        key is ValueKey<String> &&
+        key.value.startsWith('choose-') &&
+        !key.value.startsWith('choose-more-');
+  }),
+);
+
+/// The command card around [finder]: the result's 22 dp-cornered frame.
+Finder _p267Card(Finder finder) => find
+    .ancestor(
+      of: finder,
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is Material &&
+            widget.shape is RoundedRectangleBorder &&
+            (widget.shape! as RoundedRectangleBorder).borderRadius ==
+                BorderRadius.circular(22),
+      ),
+    )
+    .first;
+
+/// The question box's tinted panel around [finder]: surfaceContainerHigh,
+/// 16 dp corners, as every QuestionBox draws it.
+Finder _p267Panel(WidgetTester tester, Finder finder) {
+  final colors = Theme.of(tester.element(finder)).colorScheme;
+  return find
+      .ancestor(
+        of: finder,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is DecoratedBox &&
+              widget.decoration is BoxDecoration &&
+              (widget.decoration as BoxDecoration).color ==
+                  colors.surfaceContainerHigh &&
+              (widget.decoration as BoxDecoration).borderRadius ==
+                  BorderRadius.circular(16),
+        ),
+      )
+      .first;
+}
+
+/// The icon on the first line of each card in the result, in order.
+List<IconData?> _p267HeaderIcons(WidgetTester tester) => [
+  for (final headline in tester.elementList(
+    _p267InResult(find.byKey(const ValueKey('command-headline'))),
+  ))
+    tester
+        .widget<Icon>(
+          find.descendant(
+            of: find
+                .ancestor(
+                  of: find.byElementPredicate((e) => e == headline),
+                  matching: find.byType(Row),
+                )
+                .first,
+            matching: find.byWidgetPredicate(
+              (widget) => widget is Icon && widget.size == 22,
+            ),
+          ),
+        )
+        .icon,
+];
+
+/// [text] lies whole inside [card]: not cut, on as many lines as it needs.
+void _p267ExpectWhole(WidgetTester tester, Finder text, Finder card) {
+  expect(text, findsOneWidget);
+  final paragraph = tester.renderObject<RenderParagraph>(
+    find.descendant(of: text, matching: find.byType(RichText)).first,
+  );
+  expect(paragraph.didExceedMaxLines, isFalse, reason: 'not cut');
+  final rect = tester.getRect(text);
+  final frame = tester.getRect(card);
+  expect(rect.left, greaterThanOrEqualTo(frame.left - 0.5), reason: '$rect');
+  expect(rect.right, lessThanOrEqualTo(frame.right + 0.5), reason: '$rect');
+  expect(rect.bottom, lessThanOrEqualTo(frame.bottom + 0.5), reason: '$rect');
+}
+
+void _p267CommandCards() {
+  group('P267 · command cards', () {
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+    });
+
+    // ------------------------------------------------------------ UX-2204
+    for (final (language, scale) in [('es', 1.0), ('es', 2.0), ('ca', 2.0)]) {
+      testWidgets(
+        'UX-2204: $language ${scale}x on 360×800 (cards.change-which): the '
+        'matches sit in a question box under «¿Cuál quieres cambiar?», each '
+        'an outlined full-width choice at least 48 dp tall, 8 dp apart; one '
+        'tap picks it and enables the main button',
+        (tester) async {
+          final l = language == 'ca' ? ca : es;
+          final app = await _App.open(
+            tester,
+            tasks: _p267Ana(),
+            language: language,
+            textScale: scale,
+            size: const Size(360, 800),
+          );
+          await app.showResult(tester, commands: [_p267ChangeAna()]);
+          final question = _p267InResult(find.text(l.commandWhichToChange));
+          expect(question, findsOneWidget);
+          expect(_p267Choices, findsNWidgets(2));
+          final cardRect = tester.getRect(_p267Card(question));
+          final questionRect = tester.getRect(question);
+          final colors = Theme.of(tester.element(question)).colorScheme;
+          Rect? previous;
+          Rect? panelRect;
+          for (final choice in tester.elementList(_p267Choices)) {
+            final finder = find.byElementPredicate((e) => e == choice);
+            // In the question's tinted box, under the question, inside the
+            // same card.
+            final box = tester.getRect(_p267Panel(tester, finder));
+            panelRect ??= box;
+            expect(box, panelRect, reason: 'one box holds every match');
+            expect(box.top, greaterThanOrEqualTo(questionRect.bottom - 0.5));
+            expect(box.left, greaterThanOrEqualTo(cardRect.left - 0.5));
+            expect(box.right, lessThanOrEqualTo(cardRect.right + 0.5));
+            // Outlined, in the theme's outline colour.
+            final material = find
+                .ancestor(of: finder, matching: find.byType(Material))
+                .first;
+            final shape = tester.widget<Material>(material).shape;
+            expect(shape, isA<OutlinedBorder>());
+            final side = (shape! as OutlinedBorder).side;
+            expect(side.color, colors.outline);
+            expect(side.style, BorderStyle.solid);
+            expect(side.width, greaterThan(0));
+            // The box's full width, and as tall as a tap needs.
+            final rect = tester.getRect(material);
+            expect(
+              rect.left - box.left,
+              lessThanOrEqualTo(14.5),
+              reason: '$rect in $box',
+            );
+            expect(
+              box.right - rect.right,
+              lessThanOrEqualTo(14.5),
+              reason: '$rect in $box',
+            );
+            expect(rect.height, greaterThanOrEqualTo(48), reason: '$rect');
+            if (previous != null) {
+              expect(
+                rect.top - previous.bottom,
+                greaterThanOrEqualTo(8 - 0.01),
+                reason: 'gap between $previous and $rect',
+              );
+            }
+            previous = rect;
+            // Each match's title and day show whole.
+            for (final text in tester.elementList(
+              find.descendant(of: finder, matching: find.byType(Text)),
+            )) {
+              _p267ExpectWhole(
+                tester,
+                find.byElementPredicate((e) => e == text),
+                material,
+              );
+            }
+          }
+          expect(saveButton(tester).onPressed, isNull);
+          final ana = _p267InResult(
+            find.byWidgetPredicate(
+              (widget) =>
+                  widget is InkWell &&
+                  widget.key is ValueKey<String> &&
+                  (widget.key! as ValueKey<String>).value.startsWith(
+                    'choose-',
+                  ) &&
+                  (widget.key! as ValueKey<String>).value.endsWith('-43'),
+            ),
+          );
+          expect(ana, findsOneWidget);
+          await tester.ensureVisible(ana);
+          await tester.pumpAndSettle();
+          await tester.tap(ana);
+          await tester.pumpAndSettle();
+          expect(find.text(l.commandWhichToChange), findsNothing);
+          expect(saveButton(tester).onPressed, isNotNull);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    // ------------------------------------------------------------ UX-2209
+    for (final (language, scale) in [('es', 1.0), ('ca', 2.0)]) {
+      testWidgets(
+        'UX-2209: $language ${scale}x on 360×800 (cards.change-details): the '
+        'priority line names its field, «Prioridad: Media → Alta» / '
+        '«Prioritat: Mitjana → Alta», whole; TalkBack still hears «Prioridad: '
+        'de Media a Alta»; the title line keeps only its icon',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          final l = language == 'ca' ? ca : es;
+          final app = await _App.open(
+            tester,
+            projects: [team],
+            language: language,
+            textScale: scale,
+            size: const Size(360, 800),
+            tasks: [
+              Task(
+                id: 1,
+                title: 'Informe',
+                priority: 1,
+                listId: 'team',
+                assignment: 'group',
+              ),
+              Task(
+                id: 2,
+                title: 'Presupuesto',
+                priority: 2,
+                listId: 'team',
+                assignment: 'group',
+              ),
+            ],
+          );
+          await app.showResult(
+            tester,
+            commands: [
+              command({
+                'kind': 'update',
+                'target': {
+                  'words': ['informe'],
+                },
+                'changes': {'title': 'Informe final'},
+              }),
+              command({
+                'kind': 'update',
+                'target': {
+                  'words': ['presupuesto'],
+                },
+                'changes': {'priority': 3},
+              }),
+            ],
+          );
+          expect(
+            es.commandChangeLine(es.priority, es.medium, es.high),
+            'Prioridad: Media → Alta',
+          );
+          expect(
+            ca.commandChangeLine(ca.priority, ca.medium, ca.high),
+            'Prioritat: Mitjana → Alta',
+          );
+          final line = _p267InResult(
+            find.text(l.commandChangeLine(l.priority, l.medium, l.high)),
+          );
+          _p267ExpectWhole(tester, line, _p267Card(line));
+          // TalkBack hears the field, as before.
+          expect(
+            es.commandChangeSemantics(es.priority, es.medium, es.high),
+            'Prioridad: de Media a Alta',
+          );
+          expect(
+            find.bySemanticsLabel(
+              l.commandChangeSemantics(l.priority, l.medium, l.high),
+            ),
+            findsOneWidget,
+          );
+          // The title's line still has only its icon.
+          expect(
+            _p267InResult(find.text('Informe → Informe final')),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+          semantics.dispose();
+        },
+      );
+    }
+
+    // ------------------------------------------------------------ UX-2210
+    testWidgets(
+      'UX-2210: es 1x (cards.not-found): a change and a deletion that found '
+      'nothing show the search icon, not the pencil or the bin',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          tasks: [Task(id: 1, title: 'Ir al médico', priority: 1)],
+          size: const Size(360, 800),
+        );
+        await app.showResult(
+          tester,
+          commands: [
+            command({
+              'kind': 'update',
+              'target': {
+                'words': ['dentista'],
+              },
+              'changes': {'date': key(day(3))},
+            }),
+            command({
+              'kind': 'delete',
+              'target': {
+                'words': ['gimnasio'],
+              },
+            }),
+          ],
+        );
+        expect(
+          _p267InResult(find.text(es.commandTaskNotFound('dentista'))),
+          findsOneWidget,
+        );
+        expect(
+          _p267InResult(find.text(es.commandTaskNotFound('gimnasio'))),
+          findsOneWidget,
+        );
+        expect(_p267HeaderIcons(tester), [
+          Icons.search_rounded,
+          Icons.search_rounded,
+        ]);
+        expect(_p267InResult(find.byIcon(Icons.edit_outlined)), findsNothing);
+        expect(
+          _p267InResult(find.byIcon(Icons.delete_outline_rounded)),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2210: es 1x: cards that will act keep their action’s icon: the '
+      'pencil on a change that found its task and on «¿Cuál quieres '
+      'cambiar?», the bin on a deletion that found its task',
+      (tester) async {
+        final app = await _App.open(
+          tester,
+          tasks: [
+            ..._p267Ana(),
+            Task(id: 49, title: 'Dentista', priority: 1, dueDate: day(5, 9)),
+            Task(id: 50, title: 'Peluquería', priority: 1, dueDate: day(3, 10)),
+          ],
+          size: const Size(360, 800),
+        );
+        await app.showResult(
+          tester,
+          commands: [
+            command({
+              'kind': 'update',
+              'target': {
+                'words': ['peluquería'],
+              },
+              'changes': {'priority': 3},
+            }),
+            _p267ChangeAna(),
+            command({
+              'kind': 'delete',
+              'target': {
+                'words': ['dentista'],
+              },
+            }),
+          ],
+        );
+        expect(
+          _p267InResult(find.text(es.commandWhichToChange)),
+          findsOneWidget,
+        );
+        expect(_p267HeaderIcons(tester), [
+          Icons.edit_outlined,
+          Icons.edit_outlined,
+          Icons.delete_outline_rounded,
+        ]);
+        expect(_p267InResult(find.byIcon(Icons.search_rounded)), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }

@@ -975,7 +975,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get reset => 'Restablecer';
 
   @override
-  String get recordingKept => 'Grabación guardada en este teléfono';
+  String get recordingKept => 'Grabación conservada en este teléfono';
 
   @override
   String get onDeviceTranscript => 'En el teléfono, mientras hablas';
@@ -1024,7 +1024,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get capturePrivacyLine =>
-      'Tus palabras van por internet. Más en Ajustes.';
+      'Tus palabras van a la IA de Google. Más en Otros ajustes › Voz.';
 
   @override
   String get lookRight => '¿Está bien así?';
@@ -1197,6 +1197,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get taskCompleted => 'Tarea completada';
+
+  @override
+  String get dayAllClear => 'Todo listo. Respira.';
 
   @override
   String get undoError => 'No se pudo deshacer el cambio. Inténtalo de nuevo.';
@@ -1373,6 +1376,11 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String reminderBeforeDeadline(String lead) {
+    return '$lead · fecha límite';
+  }
+
+  @override
   String reminderForPersonOnly(String name) {
     return 'Recordatorio para $name';
   }
@@ -1387,6 +1395,36 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get noReminderTimePassed =>
       'Sin recordatorio: ya ha pasado la hora del aviso';
+
+  @override
+  String reminderSent(String when, String date, String time) {
+    String _temp0 = intl.Intl.selectLogic(when, {
+      'today': 'hoy',
+      'tomorrow': 'mañana',
+      'other': '$date',
+    });
+    return 'Recordatorio enviado: $_temp0, $time';
+  }
+
+  @override
+  String reminderSnoozed(String when, String date, String time) {
+    String _temp0 = intl.Intl.selectLogic(when, {
+      'today': 'hoy',
+      'tomorrow': 'mañana',
+      'other': '$date',
+    });
+    return 'Recordatorio pospuesto: $_temp0, $time';
+  }
+
+  @override
+  String reminderPlanLast(String plan, String when, String date, String time) {
+    String _temp0 = intl.Intl.selectLogic(when, {
+      'today': 'hoy',
+      'tomorrow': 'mañana',
+      'other': '$date',
+    });
+    return '$plan · último: $_temp0, $time';
+  }
 
   @override
   String get fileLocal => 'Solo en este dispositivo';
@@ -2742,11 +2780,15 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get captureOffline =>
-      'Sin conexión. Tus palabras están guardadas; inténtalo cuando tengas internet.';
+      'Sin conexión. Toca Guardar como tarea o reinténtalo cuando tengas internet.';
+
+  @override
+  String get captureOfflineRecording =>
+      'Sin conexión. La grabación se conserva; reinténtalo cuando tengas internet.';
 
   @override
   String get captureUnavailable =>
-      'No he podido contactar con el asistente; tus palabras se conservan.';
+      'Ahora no puedo convertir tus palabras en tareas; se conservan.';
 
   @override
   String get captureTooFast =>
@@ -2819,7 +2861,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get captureListeningOnline =>
-      'Te escucho. Verás tus palabras al tocar Listo.';
+      'Te escucho. Al tocar Listo verás lo que he entendido.';
 
   @override
   String captureTimeLeft(int seconds) {
@@ -2907,7 +2949,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get capturesEmptyHelp =>
-      'Aquí se guardan las grabaciones y las tareas que dejes a medias.';
+      'Aquí se conservan las grabaciones y las tareas que dejes a medias.';
 
   @override
   String captureDraftSummary(int count) {
@@ -3096,6 +3138,13 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get viewOnlyTask => 'Solo puedes ver esta tarea.';
+
+  @override
+  String get viewOnlyTaskReminders =>
+      'Solo puedes ver esta tarea y elegir tus recordatorios.';
+
+  @override
+  String get syncCopySuffix => '(copia local)';
 
   @override
   String get stepUpdateError =>
@@ -4297,6 +4346,16 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String commandChangeSemantics(String label, String before, String after) {
     return '$label: de $before a $after';
+  }
+
+  @override
+  String commandChangeLine(String label, String before, String after) {
+    return '$label: $before → $after';
+  }
+
+  @override
+  String commandChangeLineFrom(String label, String before) {
+    return '$label: $before →';
   }
 
   @override

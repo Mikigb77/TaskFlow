@@ -448,7 +448,7 @@ void remindersPreviews() {
     preview(
       planCard,
       'plan',
-      'Said: «Presentar el proyecto de empresa en tres semanas, recuérdamelo cada 3 días las dos primeras semanas y luego cada día». The plan shows in one «Recordatorio» row under the date, above «Más opciones», which has no subtitle; tapping it opens the reminder sheet.',
+      'Said: «Presentar el proyecto de empresa en tres semanas, recuérdamelo cada 3 días las dos primeras semanas y luego cada día». The plan shows in one row under the date, above «Más opciones», which has no subtitle: its line alone beside the bell, with no «Recordatorio» over it, read once by TalkBack; tapping it opens the reminder sheet.',
       [es1, es2, ca2],
       (p) async {
         await _planCapture(p);
@@ -492,7 +492,7 @@ void remindersPreviews() {
     preview(
       planCard,
       'plan-reminders-off',
-      'The same dictation with reminders off on this phone: the «Recordatorio» row keeps the plan\'s line, and «Activar recordatorios» shows under it.',
+      'The same dictation with reminders off on this phone: the reminder row keeps the plan\'s line, alone beside the bell, and «Activar recordatorios» shows under it.',
       [es2],
       (p) async {
         await _planCapture(

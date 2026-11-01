@@ -236,8 +236,8 @@ void main() {
         [en.capturesEmptyHelp, es.capturesEmptyHelp, ca.capturesEmptyHelp],
         [
           'Recordings and tasks you leave unfinished are kept here.',
-          'Aquí se guardan las grabaciones y las tareas que dejes a medias.',
-          'Aquí es guarden les gravacions i les tasques que deixis a mig fer.',
+          'Aquí se conservan las grabaciones y las tareas que dejes a medias.',
+          'Aquí es conserven les gravacions i les tasques que deixis a mig fer.',
         ],
       );
       expect(
@@ -1159,9 +1159,9 @@ void main() {
         ca.captureListeningOnline,
       ],
       [
-        'I’m listening. You’ll see your words when you tap Done.',
-        'Te escucho. Verás tus palabras al tocar Listo.',
-        'T’escolto. Veuràs les paraules quan toquis Fet.',
+        'I’m listening. Tap Done to see what I understood.',
+        'Te escucho. Al tocar Listo verás lo que he entendido.',
+        'T’escolto. En tocar Fet veuràs el que he entès.',
       ],
     );
     expect(
@@ -1835,5 +1835,91 @@ void main() {
       'Google’s AI, saved audio, and what stays on the phone. '
       'capturePrivacyLine is its short form in the capture sheet.',
     );
+  });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P273 (UX-2104, UX-2105) ----
+
+  group('P273 · understanding and failing', () {
+    Map<String, dynamic> catalog(String language) =>
+        jsonDecode(
+              File('${directory.path}/app_$language.arb').readAsStringSync(),
+            )
+            as Map<String, dynamic>;
+
+    test(
+      'UX-2104: no capture string names an assistant («asistente», “assistant”, «assistent»)',
+      () {
+        const assistant = {
+          'es': 'asistente',
+          'en': 'assistant',
+          'ca': 'assistent',
+        };
+        for (final MapEntry(key: language, value: word) in assistant.entries) {
+          final messages = catalog(language);
+          final capture = [
+            for (final key in keys)
+              if (key.startsWith('capture') || key == 'recordingKept') key,
+          ];
+          expect(capture, isNotEmpty);
+          for (final key in capture) {
+            expect(
+              (messages[key] as String).toLowerCase(),
+              isNot(contains(word)),
+              reason: '$language: $key',
+            );
+          }
+        }
+      },
+    );
+
+    test(
+      'UX-2105: words and recordings waiting in «Sin guardar» are kept, never saved, in recordingKept, capturesEmptyHelp, captureFailed and captureOffline',
+      () {
+        const banned = [
+          'guardad',
+          'se guardan',
+          'es guarden',
+          'desad',
+          'saved',
+        ];
+        for (final language in ['en', 'es', 'ca']) {
+          final messages = catalog(language);
+          for (final key in [
+            'recordingKept',
+            'capturesEmptyHelp',
+            'captureFailed',
+            'captureOffline',
+          ]) {
+            final value = (messages[key] as String).toLowerCase();
+            for (final word in banned) {
+              expect(
+                value,
+                isNot(contains(word)),
+                reason: '$language: $key: $value',
+              );
+            }
+          }
+        }
+      },
+    );
+
+    test('UX-2105: the reviewer’s copy for the kept words', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final es = lookupAppLocalizations(const Locale('es'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(
+        en.captureFailed,
+        'That didn’t work. Your words are still here — try again.',
+      );
+      expect(es.recordingKept, 'Grabación conservada en este teléfono');
+      expect(
+        es.capturesEmptyHelp,
+        'Aquí se conservan las grabaciones y las tareas que dejes a medias.',
+      );
+      expect(
+        ca.capturesEmptyHelp,
+        'Aquí es conserven les gravacions i les tasques que deixis a mig fer.',
+      );
+    });
   });
 }

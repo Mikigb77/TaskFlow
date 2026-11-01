@@ -180,6 +180,10 @@ class Task {
   bool get isRecurring => recurrence != 'none' && dueDate != null;
   DateTime? get displayDate => occurrenceDate ?? dueDate;
 
+  /// «Sin fecha»: neither a day nor a deadline. A deadline-only task shows on
+  /// its deadline's day, so it isn't undated.
+  bool get undated => dueDate == null && deadline == null;
+
   /// Repeating deadlines retain their civil-day offset from the ORIGINAL
   /// occurrence. Moving a single planned slot must not move its deadline.
   DateTime? get displayDeadline {

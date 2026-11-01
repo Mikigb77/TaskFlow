@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/models/capture_command.dart';
 import 'package:agenda/models/task.dart';
@@ -567,6 +568,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   bool _typedStarted = false;
   // The recorder's file before any audio arrived: no capture holds it yet.
   String? _audioId;
+  // This sheet's recording has measured only silence so far: `Escribir`
+  // drops it without asking.
+  bool _onlySilence = false;
   bool _movedToReview = false;
   bool _discarded = false;
   // `Escribir` without Pro handed the capture to the task form.
@@ -823,6 +827,10 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     }
   }
 
+  /// The recorder's level, in dBFS, above which something may have been
+  /// said: a quiet room measures below it.
+  static const _silenceLevel = -45.0;
+
   static final _audioFormat = Platform.isAndroid
       ? CaptureSession.androidPcmWav
       : null;
@@ -891,6 +899,11 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     if (_busy || _recording) return;
     _starting = _startRecording();
   }
+
+  /// TalkBack is on: what it says while the microphone is open would end up
+  /// in the words, so nothing is announced while listening.
+  bool get _screenReader =>
+      mounted && MediaQuery.accessibleNavigationOf(context);
 
   void _announce(String message) {
     if (!mounted) return;
@@ -983,7 +996,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     if (!mounted || !_recording || _phase != _CapturePhase.starting) return;
     setState(() => _phase = _CapturePhase.listening);
     _armTimer();
-    _announce(context.l10n.captureListening);
+    // With TalkBack, `Escuchando` was said before the microphone opened.
+    if (!_screenReader) _announce(context.l10n.captureListening);
     _sweepOnce();
   }
 
@@ -996,8 +1010,15 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         return;
       }
       setState(() => _seconds = timer.tick);
-      // The countdown shows each second; TalkBack hears it once.
-      if (timer.tick == 50) _announce(context.l10n.captureTimeLeft(10));
+      // The countdown shows each second. Without TalkBack it is read out
+      // once; with it, a pulse, so nothing is said into the microphone.
+      if (timer.tick == 50) {
+        if (_screenReader) {
+          unawaited(HapticFeedback.vibrate());
+        } else {
+          _announce(context.l10n.captureTimeLeft(10));
+        }
+      }
       // The time cap acts as if the user had stopped.
       if (timer.tick >= 60) unawaited(_timeUp());
     });
@@ -1022,7 +1043,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       state == AppLifecycleState.paused ||
       state == AppLifecycleState.detached;
 
-  Future<void> _startRecording() async {
+  /// Opens the microphone. [again] when the phone's own recognizer failed
+  /// and listening moves online: TalkBack already said `Escuchando`.
+  Future<void> _startRecording({bool again = false}) async {
     setState(() {
       _phase = _CapturePhase.starting;
       _error = null;
@@ -1090,6 +1113,19 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           'Retry this recording or discard it before recording another.',
         );
       }
+      // With TalkBack, `Escuchando` is said first and the microphone opens
+      // a second later, so the screen reader's voice isn't in the words.
+      // Once is enough when listening moves online.
+      if (_screenReader && !again) {
+        _announce(context.l10n.captureListening);
+        await Future<void>.delayed(const Duration(seconds: 1));
+        if (!mounted ||
+            _typing ||
+            _asking ||
+            _leaving(WidgetsBinding.instance.lifecycleState)) {
+          return;
+        }
+      }
       if (_usingNative) {
         // The capture is kept from the first words, not from listening.
         _nativePrefix = _words.text.trim();
@@ -1143,7 +1179,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           _goOnline();
           await _endNativeRun();
           if (!mounted) return;
-          return await _startRecording();
+          return await _startRecording(again: true);
         }
         if (!mounted || _leaving(WidgetsBinding.instance.lifecycleState)) {
           await _finishRecording(submit: false, interrupted: true);
@@ -1200,10 +1236,12 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         return;
       }
       _listening();
+      _onlySilence = true;
       _amplitude = recorder
           .onAmplitudeChanged(const Duration(milliseconds: 120))
           .listen((value) {
             _keepAudio();
+            if (value.current > _silenceLevel) _onlySilence = false;
             if (mounted && _phase == _CapturePhase.listening) {
               setState(() => _level = ((value.current + 60) / 60).clamp(0, 1));
             }
@@ -1289,7 +1327,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     await _endNativeRun();
     await _starting;
     if (!mounted || _recording) return;
-    _starting = _startRecording();
+    _starting = _startRecording(again: true);
   }
 
   /// Ends listening. Only the user stopping, or the time cap, [submit]s;
@@ -1339,6 +1377,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     _recording = false;
     _listeningWatch?.stop();
     _timer?.cancel();
+    // With TalkBack, it is said once the microphone is closed.
+    String? said;
     if (mounted) {
       setState(() {
         _phase = submit ? _CapturePhase.processing : _restingPhase(interrupted);
@@ -1347,9 +1387,13 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       // Say what happened: `Done` when sending, `Paused` when listening was
       // cut off without the person asking.
       if (submit) {
-        _announce(context.l10n.done);
+        said = context.l10n.done;
       } else if (!quiet && _phase == _CapturePhase.paused) {
-        _announce(context.l10n.capturePaused);
+        said = context.l10n.capturePaused;
+      }
+      if (said != null && !_screenReader) {
+        _announce(said);
+        said = null;
       }
     }
     await _amplitude?.cancel();
@@ -1375,6 +1419,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         await _recorder!.stop();
         await _dropUnheardAudio();
       }
+      if (said != null) _announce(said);
       if (_session != null) {
         _session = _session!.copyWith(status: 'editing');
         await _store.update(_session!);
@@ -1482,6 +1527,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         await _dropSaidAgain(attempt, replacing!);
         return;
       }
+      // Discarded, or saved as written, before the words went out: they
+      // aren't sent.
+      if (superseded()) return;
       inputKept = true;
       // Typed words go to the assistant only with Pro; spoken ones go with
       // free dictations too.
@@ -1906,6 +1954,64 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     );
   }
 
+  /// `Escribir` under the controls. Online, a recording can't become words to
+  /// edit: listening stops, a recording of only silence goes, and any other
+  /// is kept or discarded as on Cancelar. Then typing ([byHand]: the form)
+  /// starts empty; the recording never goes to the form. Dismissing the
+  /// question leaves the sheet as it is.
+  Future<void> _typeFromControls({required bool byHand}) async {
+    if (_asking) return;
+    final online =
+        _initialized &&
+        !_usingNative &&
+        (_recording || _phase == _CapturePhase.starting);
+    if (!online && _session?.audioPath == null) {
+      return byHand ? _fillByHand() : _typeInstead();
+    }
+    _asking = true;
+    // The phone's own recognizer listened after all: its words are typed.
+    var heardWords = false;
+    try {
+      await _starting;
+      await _finishRecording(submit: false, interrupted: true, quiet: true);
+      await _writes;
+      final session = _session;
+      if (session == null) {
+        // The recorder stopped before any audio arrived: nothing was kept.
+      } else if (session.audioPath == null) {
+        heardWords = true;
+      } else if (_onlySilence && !_hasWords) {
+        await _dropSilent(session);
+      } else {
+        if (!mounted) return;
+        final keep = await _askToKeep(context, spoken: true);
+        if (!mounted || keep == null) return;
+        // Kept, it waits in Sin guardar.
+        if (!keep) await _store.discard(session.id, _owner);
+      }
+    } catch (_) {
+      /* The recording stays in the pending list. */
+    } finally {
+      _asking = false;
+    }
+    if (!mounted) return;
+    if (heardWords) return byHand ? _fillByHand() : _typeInstead();
+    ref.invalidate(pendingCapturesProvider);
+    _words.clear();
+    _nativePrefix = '';
+    _typedStarted = false;
+    _audioId = null;
+    _onlySilence = false;
+    setState(() {
+      _session = null;
+      _error = null;
+      _failed = false;
+      _phase = _CapturePhase.idle;
+    });
+    if (byHand) return _fillByHand();
+    return _typeInstead();
+  }
+
   /// `Escribir`: stop listening, keep the words and edit them.
   Future<void> _typeInstead() async {
     setState(() => _typing = true);
@@ -1915,8 +2021,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   }
 
   /// Cancel, Back and a swipe down: close at once when nothing was said;
-  /// otherwise ask once whether to keep it. After `Volver a decirlo`, the
-  /// result comes back instead.
+  /// otherwise ask once whether to keep it, while the words are understood
+  /// too. After `Volver a decirlo`, the result comes back instead.
   Future<void> _cancel() async {
     if (_asking || !mounted) return;
     final previous = _previousResult;
@@ -1924,12 +2030,9 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       await _backToResult(previous);
       return;
     }
-    if (_phase == _CapturePhase.processing) {
-      Navigator.pop(context);
-      return;
-    }
+    final understanding = _phase == _CapturePhase.processing;
     // Nothing to ask: a recording that waits is already kept.
-    if (!_hasInput || _recordingWaits()) {
+    if (!understanding && (!_hasInput || _recordingWaits())) {
       Navigator.pop(context);
       return;
     }
@@ -1948,13 +2051,25 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
           _session?.audioPath != null,
     );
     _asking = false;
+    // Dismissed: the sheet stays, still understanding if it was. An answer
+    // that came meanwhile follows the choice.
     if (!mounted || keep == null) return;
     if (keep) {
-      // The capture stays in the pending list.
+      // The capture stays in the pending list, understood there if it still
+      // is.
       Navigator.pop(context);
-    } else {
-      await _discard();
+      return;
     }
+    if (understanding) {
+      // The running step is over for this sheet, and the assistant is told
+      // at once, so the dropped words use no free dictation.
+      _attempts++;
+      final attempt = _session;
+      if (attempt != null) {
+        CaptureProcessor(_store, ref.read(apiClientProvider)).cancel(attempt);
+      }
+    }
+    await _discard();
   }
 
   /// Stop listening, drop the words said again, and show the result they
@@ -2250,7 +2365,12 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
             onPressed: () => unawaited(_saveAsWritten()),
             child: Text(l10n.captureSaveAsWritten),
           ),
-      ] else if (saveAsWritten) ...[
+      ]
+      // Still understanding: nothing is ready to confirm, so no filled
+      // button; `Guardar como tarea` sits under the slow line.
+      else if (saveAsWritten && processing)
+        ...const <Widget>[]
+      else if (saveAsWritten) ...[
         if (failed)
           FilledButton.tonal(
             onPressed: _busy ? null : _done,
@@ -2288,7 +2408,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     ];
     final wordsStyle = theme.textTheme.headlineSmall;
     // A recording that waits has no words to type.
-    final Widget? words = _typing && !recordingWaits
+    final field = _typing && !recordingWaits;
+    final Widget? words = field
         // Named once typed into, when the example no longer shows.
         ? Semantics(
             label: l10n.captureYourWords,
@@ -2380,7 +2501,12 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         : MessageBanner(
             limitWaits
                 ? l10n.captureAllowanceRecording
-                : captureProblemText(l10n, _error!),
+                : captureProblemText(
+                    l10n,
+                    _error!,
+                    // Only a recording: there is nothing to save as written.
+                    recording: recorded && !_hasWords,
+                  ),
             isError: _error != CaptureProblem.setupRequested && !microphone,
             icon: microphone ? Icons.mic_off_outlined : null,
             liveRegion: microphone ? true : null,
@@ -2401,28 +2527,56 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
             children: [
               if (status != null)
                 Text(status, style: theme.textTheme.titleMedium),
-              if (error != null)
+              if (error != null || banners.isNotEmpty || words != null)
                 Flexible(
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.only(top: status == null ? 0 : 8),
-                    child: error,
-                  ),
-                ),
-              if (banners.isNotEmpty || words != null)
-                Flexible(
-                  // Reversed, so the newest words stay in view as they grow.
-                  child: SingleChildScrollView(
-                    reverse: true,
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Column(
+                  // The problem and the notes show whole, and only the words
+                  // under them scroll, in the room they leave. They scroll
+                  // themselves only where they alone don't fit.
+                  child: LayoutBuilder(
+                    builder: (context, constraints) => Column(
+                      mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        for (final banner in banners)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: banner,
+                        if (error != null || banners.isNotEmpty)
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxHeight: constraints.maxHeight,
+                            ),
+                            child: SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  if (error != null)
+                                    Padding(
+                                      padding: EdgeInsets.only(
+                                        top: status == null ? 0 : 8,
+                                      ),
+                                      child: error,
+                                    ),
+                                  for (final banner in banners)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 8),
+                                      child: banner,
+                                    ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ?words,
+                        if (words != null)
+                          Flexible(
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              // The field scrolls inside its own border; the
+                              // words heard scroll reversed, so the newest
+                              // stay in view as they grow.
+                              child: field
+                                  ? words
+                                  : SingleChildScrollView(
+                                      reverse: true,
+                                      child: words,
+                                    ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -2457,7 +2611,17 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
                     ),
                   ),
                 ),
-              if (!_typing) ...[
+              if (saveAsWritten && processing)
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton(
+                    onPressed: () => unawaited(_saveAsWritten()),
+                    child: Text(l10n.captureSaveAsWritten),
+                  ),
+                ),
+              // The microphone shows only while it opens, listens or the words
+              // are understood; nothing takes its place otherwise.
+              if (!_typing && !resting) ...[
                 const SizedBox(height: 16),
                 Center(child: _ring(colors, phase)),
               ],
@@ -2469,14 +2633,13 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
                 // stacked; Settings and the reason take the whole width.
                 stack: (failed && saveAsWritten) || settingsFirst || _askingMic,
                 showCancel: !recordingWaits,
-                // `Escribir` filled above needs no second one under it.
-                showType: !_typing && !recorded && !typeFirst,
+                // `Escribir` filled above needs no second one under it; a
+                // recording that waits has nothing to type.
+                showType: !_typing && !recordingWaits && !typeFirst,
                 byHand: byHand,
                 onType: working
                     ? null
-                    : byHand
-                    ? () => unawaited(_fillByHand())
-                    : () => unawaited(_typeInstead()),
+                    : () => unawaited(_typeFromControls(byHand: byHand)),
               ),
             ],
           ),

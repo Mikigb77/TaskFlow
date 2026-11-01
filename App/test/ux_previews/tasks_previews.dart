@@ -11,6 +11,7 @@ import 'package:agenda/services/attachment_store.dart';
 import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
+import 'package:agenda/widgets/reminder_control.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -157,6 +158,53 @@ final _fileUsage = {
 Future<void> _openProject(PreviewApp app, String id) async {
   await app.tab(app.p.l.tasks);
   await app.pushPage(HomeScreen(isRoot: false, listId: id));
+}
+
+/// «Pagar la luz», today at 09:50 with «10 minutos antes», opened at 09:41:
+/// its alert rang at 09:40, or, [snoozed] then, rings again at 09:51.
+Future<void> _rangAlert(Preview p, {bool snoozed = false}) async {
+  final due = day(0, 9, 50);
+  final rang = day(0, 9, 40);
+  final again = day(0, 9, 51);
+  final app = await PreviewApp.open(
+    p,
+    tasks: [
+      ...normalDay(),
+      Task(
+        id: 78,
+        title: 'Pagar la luz',
+        dueDate: due,
+        hasTime: true,
+        priority: 1,
+        reminderMinutes: 10,
+      ),
+    ],
+    projects: allProjects,
+    reminders: const ReminderPreferences(enabled: true, asked: true),
+    // As the reminder engine keeps it: a snooze sets the alert again at its
+    // own time.
+    phoneAlerts: [
+      {
+        'identity': 'owner/task/78/once',
+        'task_id': 78,
+        'occurrence': null,
+        'due_at': due.toIso8601String(),
+        'fire_at': (snoozed ? again : rang).toUtc().toIso8601String(),
+        'status': snoozed ? 'scheduled' : 'elapsed',
+        'error': null,
+        'snooze_at': snoozed ? again.toUtc().toIso8601String() : null,
+      },
+    ],
+  );
+  await app.push('/taskDetails', arguments: 78);
+  // The chip in view, below the date at large text.
+  await p.tester.scrollUntilVisible(
+    find.byType(ReminderChip),
+    200,
+    scrollable: app.mainScroll(),
+  );
+  await p.tester.pumpAndSettle();
+  await p.shoot();
 }
 
 /// Tasks for the many-people project, given to several of them.
@@ -630,6 +678,66 @@ void tasksPreviews() {
         );
         await p.tester.pumpAndSettle();
         await p.shoot();
+      },
+    );
+
+    preview(
+      detail,
+      'alert-rang',
+      'Opened from its notice at 09:41: «Pagar la luz», today at 09:50 with «10 minutos antes», rang at 09:40. The chip, with the usual bell, reads «Recordatorio enviado: hoy, 09:40»; a tap opens the reminder choices.',
+      [es1, ca2],
+      (p) async {
+        await _rangAlert(p);
+      },
+    );
+
+    preview(
+      detail,
+      'alert-snoozed',
+      'The same task after «Posponer 10 min» at 09:41: the chip, with the usual bell, reads «Recordatorio pospuesto: hoy, 09:51» until the snoozed notice rings.',
+      [es1, ca2],
+      (p) async {
+        await _rangAlert(p, snoozed: true);
+      },
+    );
+
+    preview(
+      detail,
+      'reader',
+      'A «Todos» task in Ana’s «Coro», where this account is «lector», as it opens: «Solo puedes ver esta tarea y elegir tus recordatorios.», no ✏, 🗑 or bottom bar, and (in view at 1×) the chip «Recordatorio: 10 minutos antes», which opens this account’s own reminder choices.',
+      [es1, ca2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [
+            ...normalDay(),
+            Task(
+              id: 79,
+              title: 'Ensayo del coro',
+              dueDate: day(1, 19),
+              priority: 1,
+              listId: 'coro',
+              assignment: 'group',
+              reminderMinutes: 10,
+            ),
+          ],
+          projects: [...allProjects, _choirToView],
+          reminders: const ReminderPreferences(enabled: true, asked: true),
+        );
+        await app.push('/taskDetails', arguments: 79);
+        await p.shoot();
+        // The chip in view, below the date at large text.
+        await p.tester.scrollUntilVisible(
+          find.byType(ReminderChip),
+          200,
+          scrollable: app.mainScroll(),
+        );
+        await p.tester.pumpAndSettle();
+        await p.shoot('reader-chip');
+      },
+      then: {
+        'reader-chip':
+            'The same page scrolled to its reminder chip, «Recordatorio: 10 minutos antes», drawn as a button with its outline.',
       },
     );
 

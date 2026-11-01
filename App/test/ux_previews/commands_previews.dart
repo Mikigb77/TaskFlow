@@ -400,7 +400,7 @@ void commandPreviews() {
     preview(
       cards,
       'change-deadline-only',
-      '«Pasa la factura del gas a mañana» for a task with only yesterday\'s deadline: one change line, the deadline\'s, yesterday → the chip «Mañana ▾», no «Fecha y hora» line, and Cambiar fecha.',
+      '«Pasa la factura del gas a mañana» for a task with only yesterday\'s deadline: one change line that names its field, «Fecha límite: <yesterday> →», then the chip «Mañana ▾», no «Fecha y hora» line, and Cambiar fecha.',
       [es1, es2],
       (p) async {
         final app = await PreviewApp.open(
@@ -452,8 +452,8 @@ void commandPreviews() {
     preview(
       cards,
       'change-which',
-      'A change that matches two tasks: tap the one to change; nothing waits on a guess.',
-      [es2],
+      'A change that matches two tasks: «¿Cuál quieres cambiar?» with its ✕, then the two in a question box, each an outlined full-width choice with its day, 8 dp apart; tap the one to change; nothing waits on a guess.',
+      [es1, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(
           p,
@@ -522,7 +522,7 @@ void commandPreviews() {
     preview(
       cards,
       'change-details',
-      'Changes besides the day: title, person, priority and notes before → after; a person not in the project is said, and left as it was.',
+      'Changes besides the day: title, person, priority and notes before → after, the priority\'s line naming its field, «Prioridad: Media → Alta»; a person not in the project is said, and left as it was.',
       [es1, ca2],
       (p) async {
         final app = await PreviewApp.open(
@@ -831,8 +831,8 @@ void commandPreviews() {
     preview(
       cards,
       'bulk-move',
-      '«Pasa todas las tareas de ayer a mañana»: «Mover 4 tareas a», then the day as a chip with ▾, «mañana, <tomorrow>», the weekday and its number kept on one line, that opens «Elegir día»; yesterday\'s open tasks with their day and, when they have one, their project, all ticked, and «Mover 4 tareas»; the one already done stays.',
-      [es1, es2, ca2],
+      '«Pasa todas las tareas de ayer a mañana»: «Mover 4 tareas a», then the day as a chip with ▾, «mañana, <tomorrow>», the weekday and its number kept on one line, that opens «Elegir día»; yesterday\'s open tasks with their day and, when they have one, their project, all ticked, in the sheet\'s own scroll with no scroll inside the card, and «Mover 4 tareas»; the one already done stays.',
+      [es1, es13, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(
           p,
@@ -1020,8 +1020,8 @@ void commandPreviews() {
     preview(
       cards,
       'bulk-today-overdue',
-      '«Marca como hechas todas las de hoy» with two tasks Today lists under «Atrasadas»: «Marcar 6 tareas como hechas», those two first, «… · Atrasada» (one dated two days ago, one with only yesterday\'s deadline, «Vence …»), all ticked, then today\'s open tasks.',
-      [es1, es2, ca2],
+      '«Marca como hechas todas las de hoy» with two tasks Today lists under «Atrasadas»: «Marcar 6 tareas como hechas», those two first, «… · Atrasada» (one dated two days ago, one with only yesterday\'s deadline, «Vence …»), all ticked, then today\'s open tasks, every row in the sheet\'s own scroll with no scroll inside the card, the button pinned below.',
+      [es1, es13, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(
           p,
@@ -1132,7 +1132,7 @@ void commandPreviews() {
     preview(
       cards,
       'bulk-none',
-      'A set that matched nothing: «No hay tareas pendientes de ayer», and only Cerrar.',
+      'A set that matched nothing: the search icon and «No hay tareas pendientes de ayer», and only Cerrar.',
       [es1],
       (p) async {
         final app = await PreviewApp.open(
@@ -1153,7 +1153,7 @@ void commandPreviews() {
     preview(
       cards,
       'bulk-view-only',
-      '«Pasa las de Matemáticas de hoy a mañana» when Ana shares Matemáticas with the person only to view: the set\'s only matches are there, so the card names the project, «Solo puedes ver «Matemáticas»: sus tareas no cambian.», then Cerrar and Volver a decirlo, with nothing to apply.',
+      '«Pasa las de Matemáticas de hoy a mañana» when Ana shares Matemáticas with the person only to view: the set\'s only matches are there, so the card has the search icon and names the project, «Solo puedes ver «Matemáticas»: sus tareas no cambian.», then Cerrar and Volver a decirlo, with nothing to apply.',
       [es1],
       (p) async {
         final app = await PreviewApp.open(
@@ -1272,7 +1272,7 @@ void commandPreviews() {
     preview(
       cards,
       'not-found',
-      'A change that found no task: it says so, and offers Guardar como tarea to keep the words as a task.',
+      'A change that found no task: it says so, by the search icon, and offers Guardar como tarea to keep the words as a task.',
       everywhere,
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay(), projects: allProjects);

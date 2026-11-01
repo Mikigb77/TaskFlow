@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:agenda/models/reminder_plan.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_schedule_change.dart';
 import 'package:agenda/models/occurrence_change.dart';
@@ -98,6 +99,16 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
     unawaited(loadTasks());
   }
 
+  /// Sets only this account's own reminders on task [id], as a project's
+  /// «lector» may (D9), and shows them at once, syncing behind.
+  Future<void> setOwnReminders(int id,
+          {int? minutes, int? time, ReminderPlan? plan}) =>
+      _mutate(() async {
+        await _repository.updateOwnReminders(id,
+            minutes: minutes, time: time, plan: plan);
+        if (mounted) await showLocal();
+      });
+
   Future<void> addTasks(List<Task> tasks) async {
     await _repository.addTasks(tasks);
     if (mounted) unawaited(loadTasks());
@@ -110,7 +121,7 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
             .firstOrNull;
         if (task == null) throw StateError('This task no longer exists.');
         await _repository.updateTask(task.copyWith(listId: listId));
-        if (mounted) await loadTasks();
+        if (mounted) await showLocal();
       });
 
   Future<T> _mutate<T>(Future<T> Function() action) {
@@ -129,7 +140,7 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
         if (task == null) throw StateError('Task no longer exists.');
         final after = TaskScheduleChange.apply(task, date, hasTime);
         await _repository.updateTask(after);
-        if (mounted) await loadTasks();
+        if (mounted) await showLocal();
         return TaskScheduleChange(task, after);
       });
 
@@ -181,7 +192,7 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
           ...task.exceptions.where((change) => change.originalDate != key),
           if (after != null) after,
         ]));
-        if (mounted) await loadTasks();
+        if (mounted) await showLocal();
         return OccurrenceChange(task, key, before, after);
       });
 
@@ -218,7 +229,7 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
       } else {
         await _repository.updateTask(task.copyWith(isCompleted: completed));
       }
-      if (mounted) await loadTasks();
+      if (mounted) await showLocal();
     });
   }
 
@@ -243,7 +254,7 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
                     ? item.setDone(completed, occurrence: key)
                     : item)
                 .toList()));
-        if (mounted) await loadTasks();
+        if (mounted) await showLocal();
       });
 
   /// With [sync] false the deletion stays on this phone until the next sync,
@@ -265,7 +276,7 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
   /// Undoes [deleteTask] with the task as it was.
   Future<void> restoreTask(Task task) => _mutate(() async {
         await _repository.restoreTask(task);
-        if (mounted) await loadTasks();
+        if (mounted) await showLocal();
       });
 
   /// Undoes several [deleteTask]s at once, each task as it was, then shows

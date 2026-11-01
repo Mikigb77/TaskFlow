@@ -1008,7 +1008,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Live transcription uses on-device speech where available; no audio is retained in that mode. To add, find or change tasks, your words go over the internet to Google’s AI. Saved audio is transcribed online. Anything not saved yet stays on this phone until you save or discard it.';
 
   @override
-  String get capturePrivacyLine => 'Your words go online. More in Settings.';
+  String get capturePrivacyLine =>
+      'Your words go to Google’s AI. More in Other settings › Voice.';
 
   @override
   String get lookRight => 'Look right?';
@@ -1161,6 +1162,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get taskCompleted => 'Task completed';
+
+  @override
+  String get dayAllClear => 'All clear. Take a breath.';
 
   @override
   String get undoError => 'Could not undo. Please try again.';
@@ -1330,6 +1334,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String reminderBeforeDeadline(String lead) {
+    return '$lead · deadline';
+  }
+
+  @override
   String reminderForPersonOnly(String name) {
     return 'Reminder for $name';
   }
@@ -1342,6 +1351,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noReminderTimePassed => 'No reminder: the alert time has passed';
+
+  @override
+  String reminderSent(String when, String date, String time) {
+    String _temp0 = intl.Intl.selectLogic(when, {
+      'today': 'today',
+      'tomorrow': 'tomorrow',
+      'other': '$date',
+    });
+    return 'Reminder sent: $_temp0, $time';
+  }
+
+  @override
+  String reminderSnoozed(String when, String date, String time) {
+    String _temp0 = intl.Intl.selectLogic(when, {
+      'today': 'today',
+      'tomorrow': 'tomorrow',
+      'other': '$date',
+    });
+    return 'Reminder snoozed: $_temp0, $time';
+  }
+
+  @override
+  String reminderPlanLast(String plan, String when, String date, String time) {
+    String _temp0 = intl.Intl.selectLogic(when, {
+      'today': 'today',
+      'tomorrow': 'tomorrow',
+      'other': '$date',
+    });
+    return '$plan · last: $_temp0, $time';
+  }
 
   @override
   String get fileLocal => 'Only on this device';
@@ -2657,11 +2696,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get captureOffline =>
-      'No internet. Your words are saved — try again when you’re online.';
+      'No internet. Tap Save as a task, or try again when you’re online.';
+
+  @override
+  String get captureOfflineRecording =>
+      'No internet. Your recording is kept; try again when you’re online.';
 
   @override
   String get captureUnavailable =>
-      'Couldn’t reach the assistant — your words are kept.';
+      'I can’t turn your words into tasks right now; they’re kept.';
 
   @override
   String get captureTooFast =>
@@ -2733,7 +2776,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get captureListeningOnline =>
-      'I’m listening. You’ll see your words when you tap Done.';
+      'I’m listening. Tap Done to see what I understood.';
 
   @override
   String captureTimeLeft(int seconds) {
@@ -2902,7 +2945,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get captureFailed =>
-      'That didn’t work. Your words are saved here — try again.';
+      'That didn’t work. Your words are still here — try again.';
 
   @override
   String get captureSlow => 'Taking longer than usual.';
@@ -3007,6 +3050,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get viewOnlyTask => 'You can only view this task.';
+
+  @override
+  String get viewOnlyTaskReminders =>
+      'You can only view this task and choose your reminders.';
+
+  @override
+  String get syncCopySuffix => '(offline copy)';
 
   @override
   String get stepUpdateError => 'Could not update this step. Please retry.';
@@ -4193,6 +4243,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String commandChangeSemantics(String label, String before, String after) {
     return '$label: from $before to $after';
+  }
+
+  @override
+  String commandChangeLine(String label, String before, String after) {
+    return '$label: $before → $after';
+  }
+
+  @override
+  String commandChangeLineFrom(String label, String before) {
+    return '$label: $before →';
   }
 
   @override

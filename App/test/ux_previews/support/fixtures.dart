@@ -147,7 +147,6 @@ List<Task> normalDay() => [
     title: 'Comer con Ana',
     dueDate: day(0, 13, 30),
     priority: 1,
-    listId: 'casa',
   ),
   Task(
     id: 4,

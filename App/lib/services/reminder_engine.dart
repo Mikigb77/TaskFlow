@@ -25,6 +25,10 @@ class PlannedReminder {
   final String body;
   final String languageCode;
   final bool daily;
+
+  /// For a task in a project where this account is «lector»: its notice
+  /// offers no «Completar», which a reader can't do (D9).
+  final bool readOnly;
   const PlannedReminder({
     required this.identity,
     this.taskId,
@@ -35,6 +39,7 @@ class PlannedReminder {
     required this.body,
     this.languageCode = 'en',
     this.daily = false,
+    this.readOnly = false,
   });
   String signature(bool exact) => jsonEncode([
     when.toUtc().toIso8601String(),
@@ -44,6 +49,8 @@ class PlannedReminder {
     daily,
     exact,
     due?.toUtc().toIso8601String(),
+    // A notice whose buttons change is set again.
+    if (readOnly) 'read-only',
   ]);
   Map<String, Object?> row(String owner, DateTime now) => {
     'owner_key': owner,
@@ -189,8 +196,9 @@ class ReminderEngine {
     ReminderPlan plan,
     ReminderPreferences preferences,
     DateTime now,
-    ReminderCopy copy,
-  ) {
+    ReminderCopy copy, {
+    bool readOnly = false,
+  }) {
     final anchor = ReminderPlans.anchor(task)!;
     final lead = ReminderPlans.dayLead(task, preferences.leadMinutes);
     final alerts = ReminderPlans.alerts(
@@ -218,6 +226,7 @@ class ReminderEngine {
             body: lead != null && alert.daysBefore == 0
                 ? copy.planDayBody(task, alert.when, lead)
                 : copy.planBody(task, alert.daysBefore),
+            readOnly: readOnly,
           ),
     ];
   }
@@ -307,17 +316,93 @@ class ReminderEngine {
     });
   }
 
+  /// The alerts this phone keeps for task [taskId], for the active account:
+  /// its `reminder_state` rows, each with `snooze_at`, its snooze's time,
+  /// when one was asked for. [lastAlert] reads them.
+  Future<List<Map<String, Object?>>> alertsOf(int taskId) async {
+    final owner = await activeOwner();
+    if (owner == null) return const [];
+    return (await database.database).rawQuery(
+      '''SELECT r.*, s.fire_at AS snooze_at
+      FROM reminder_state r LEFT JOIN reminder_snoozes s
+        ON s.identity = r.identity AND s.owner_key = r.owner_key
+      WHERE r.owner_key = ? AND r.task_id = ?''',
+      [owner, taskId],
+    );
+  }
+
+  /// When [task]'s reminder last rang, by [alerts] ([alertsOf]), or when it
+  /// rings again after a snooze still to come ([snoozed]); null when it was
+  /// never set to ring by now: blocked, cancelled before its time, or saved
+  /// after it (D1). A single reminder counts only while its alert is still
+  /// the task's: the same day and time, and the same lead; a plan's, while
+  /// it counts from the same day. Unlike [alertAhead], it's about what rang.
+  static ({DateTime when, bool snoozed})? lastAlert(
+    Task task,
+    List<Map<String, Object?>> alerts,
+    ReminderPreferences preferences,
+    DateTime now,
+  ) {
+    final planned = ReminderPlans.active(task) != null;
+    final anchor = planned ? ReminderPlans.anchor(task) : task.reminderDate;
+    if (anchor == null || (!planned && task.reminderMinutes == -1)) {
+      return null;
+    }
+    final firing = planned ? null : _firing(task, preferences);
+    if (!planned && firing == null) return null;
+    DateTime? last;
+    DateTime? snooze;
+    for (final row in alerts) {
+      final fired = DateTime.tryParse(row['fire_at'] as String? ?? '');
+      final snoozedAt = DateTime.tryParse(row['snooze_at'] as String? ?? '');
+      if (fired == null ||
+          isPlanAlert(row['identity']) != planned ||
+          row['due_at'] != anchor.toIso8601String() ||
+          row['error'] != null ||
+          !const {
+            'scheduled',
+            'approximate',
+            'elapsed',
+          }.contains(row['status'])) {
+        continue;
+      }
+      // A snooze sets the alert again at its own time.
+      if (!planned &&
+          !fired.isAtSameMomentAs(firing!.when) &&
+          (snoozedAt == null || !fired.isAtSameMomentAs(snoozedAt))) {
+        continue;
+      }
+      if (!planned && row['occurrence'] != task.occurrenceId) continue;
+      if (snoozedAt != null && snoozedAt.isAfter(now)) {
+        if (snooze == null || snoozedAt.isAfter(snooze)) snooze = snoozedAt;
+      }
+      for (final moment in [fired, if (snoozedAt != null) snoozedAt]) {
+        if (!moment.isAfter(now) && (last == null || moment.isAfter(last))) {
+          last = moment;
+        }
+      }
+    }
+    if (snooze != null) return (when: snooze.toLocal(), snoozed: true);
+    if (last != null) return (when: last.toLocal(), snoozed: false);
+    return null;
+  }
+
+  /// The reminders to set for [tasks]. Those in [readOnly], the projects where
+  /// this account is «lector» ([TaskDatabase.readOnlyProjects]), are planned
+  /// without «Completar».
   static List<PlannedReminder> plan(
     String owner,
     List<Task> tasks,
     ReminderPreferences preferences,
     DateTime now, {
     ReminderCopy? copy,
+    Set<String> readOnly = const {},
   }) {
     if (!preferences.enabled) return [];
     final c = copy ?? ReminderCopy.fallback();
     final l = c.strings;
     final result = <PlannedReminder>[];
+    bool reader(Task task) => readOnly.contains(task.listId);
     // A plan replaces its task's single reminder while it's set: on a timed
     // anchor's own day, its notice rings at that reminder's moment instead.
     final single = <Task>[];
@@ -326,7 +411,17 @@ class ReminderEngine {
       if (plan == null) {
         single.add(task);
       } else if (task.id != null && !task.isCompleted) {
-        result.addAll(planReminders(owner, task, plan, preferences, now, c));
+        result.addAll(
+          planReminders(
+            owner,
+            task,
+            plan,
+            preferences,
+            now,
+            c,
+            readOnly: reader(task),
+          ),
+        );
       }
     }
     for (final task in upcoming(single, now)) {
@@ -343,6 +438,7 @@ class ReminderEngine {
           title: task.title,
           languageCode: c.languageCode,
           body: c.body(task, firing.when, firing.lead),
+          readOnly: reader(task),
         ),
       );
     }
@@ -429,11 +525,22 @@ class ReminderEngine {
         owner,
         await database.getTasks(ownerKey: owner),
       );
+      final readOnly = await TaskDatabase.readOnlyProjects(
+        await database.database,
+        owner,
+      );
       final preferences = await ReminderPreferenceStore(database).read(owner);
       final copy = await readCopy();
       final capabilities = await driver.capability();
       final pending = await driver.pendingIds();
-      final planned = plan(owner, tasks, preferences, now, copy: copy);
+      final planned = plan(
+        owner,
+        tasks,
+        preferences,
+        now,
+        copy: copy,
+        readOnly: readOnly,
+      );
       final db = await database.database;
       // A snooze is a separate durable choice. Unrelated edits must not reset it.
       final snoozes = await db.rawQuery(
@@ -468,6 +575,7 @@ class ReminderEngine {
                 : isPlanDayAlert(row['identity'])
                 ? copy.planDayBody(task, when.toLocal(), 0)
                 : copy.planBody(task, _planDaysBefore(row, task)),
+            readOnly: readOnly.contains(task.listId),
           ),
         );
       }
@@ -712,7 +820,8 @@ class ReminderEngine {
   }
 
   /// `complete`, `snooze`, or `undo`, which reopens what `complete` closed
-  /// and shows the alert again.
+  /// and shows the alert again. False when it did nothing, as for `complete`
+  /// on a task in a project where this account is «lector».
   Future<bool> action(int id, String action, {String? token}) async {
     if (!const {'complete', 'snooze', 'undo'}.contains(action)) return false;
     final db = await database.database;
@@ -747,6 +856,14 @@ class ReminderEngine {
       );
       if (task == null) return null;
       if (action == 'complete' || action == 'undo') {
+        // A reader can't complete a task (D9): a notice still in the shade
+        // from before writes nothing, so nothing becomes a copy at sync.
+        if ((await TaskDatabase.readOnlyProjects(
+          tx,
+          owner,
+        )).contains(task.listId)) {
+          return null;
+        }
         final done = action == 'complete';
         final occurrence = task.occurrenceId;
         final dates = {...task.completedDates};

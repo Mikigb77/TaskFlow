@@ -3,8 +3,12 @@ import 'dart:convert';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
+import 'dart:ui' show Locale;
+import 'package:agenda/l10n/generated/app_localizations.dart';
+import 'package:agenda/models/reminder_plan.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/services/android_database_factory.dart';
+import 'package:agenda/services/reminder_copy.dart';
 
 /// Why this phone gives no reminder for a task ([TaskDatabase.reminderBlock]).
 enum ReminderBlock { archived, muted, notForAccount }
@@ -401,6 +405,22 @@ class TaskDatabase {
     }).toList();
   }
 
+  /// The projects where account [owner] is «lector»: their tasks' reminders
+  /// ring for a reader, who can't complete them (D9), so their notices offer
+  /// no «Completar».
+  static Future<Set<String>> readOnlyProjects(
+    DatabaseExecutor db,
+    String owner,
+  ) async => {
+    for (final row in await db.query(
+      'task_lists',
+      columns: ['id'],
+      where: "owner_key = ? AND role = 'viewer'",
+      whereArgs: [owner],
+    ))
+      row['id'] as String,
+  };
+
   /// Why this phone won't remind about [task], or null when it will: its
   /// project, or the project's group, is [archived]; the project is [muted];
   /// or the task isn't for account [accountId], whose [role] in the project
@@ -554,6 +574,38 @@ class TaskDatabase {
     });
   }
 
+  /// Sets only this account's own reminders on task [taskId]: the single
+  /// reminder's [minutes] and [time], and the [plan]. The one write a
+  /// «lector» project takes from a reader (D9), so it skips [validateList]'s
+  /// read-only refusal; nothing else of the task changes. The row goes
+  /// pending, and the sync sends it as a change to these reminders alone.
+  Future<int> updateOwnReminders(
+    int taskId, {
+    String ownerKey = 'local',
+    int? minutes,
+    int? time,
+    ReminderPlan? plan,
+  }) async {
+    final count = await (await database).rawUpdate(
+      '''UPDATE tasks SET reminderMinutes = ?, reminderTime = ?, reminderPlan = ?,
+      sync_pending = ?, revision = revision + 1
+      WHERE id = ? AND owner_key = ? AND is_deleted = 0
+        AND (kind IS NULL OR kind != 'note')''',
+      [
+        minutes,
+        time,
+        plan?.encode(),
+        ownerKey == 'local' ? 0 : 1,
+        taskId,
+        ownerKey,
+      ],
+    );
+    if (count == 0) {
+      throw StateError('This task is no longer in the current account.');
+    }
+    return count;
+  }
+
   Future<int> deleteTask(int id, {String ownerKey = 'local'}) async {
     final db = await database;
     if (ownerKey == 'local') {
@@ -678,6 +730,35 @@ class TaskDatabase {
     );
   }
 
+  /// Takes [remote] as task [sent]'s server copy, keeping the reminders this
+  /// account chose on the phone ([updateOwnReminders]): a reader's were saved
+  /// on the server before it answered that the task had changed meanwhile
+  /// (D9). The anchor is the server's, which a reader never sets. A choice
+  /// made since [sent] went out stays pending.
+  Future<void> acceptKeepingReminders(
+    String ownerKey,
+    Map<String, dynamic> sent,
+    Map<String, dynamic> remote,
+  ) async {
+    await (await database).transaction((tx) async {
+      await tx.update(
+        'tasks',
+        _remoteValues(remote)
+          ..remove('reminderMinutes')
+          ..remove('reminderTime')
+          ..remove('reminderPlan')
+          ..remove('sync_pending'),
+        where: 'id = ? AND owner_key = ?',
+        whereArgs: [sent['id'], ownerKey],
+      );
+      await tx.rawUpdate(
+        '''UPDATE tasks SET sync_pending = CASE WHEN revision = ? THEN 0 ELSE 1 END
+        WHERE id = ? AND owner_key = ?''',
+        [sent['revision'], sent['id'], ownerKey],
+      );
+    });
+  }
+
   Map<String, dynamic> _remoteValues(Map<String, dynamic> remote) => {
     ...(Task.fromApi(remote).toMap()
       ..remove('id')
@@ -737,6 +818,13 @@ class TaskDatabase {
     Map<String, dynamic> sent,
     Map<String, dynamic> remote,
   ) async {
+    // The copy's title says what it is in the app's language: «(copia local)».
+    String suffix;
+    try {
+      suffix = (await readReminderStrings(this)).syncCopySuffix;
+    } catch (_) {
+      suffix = lookupAppLocalizations(const Locale('en')).syncCopySuffix;
+    }
     final db = await database;
     await db.transaction((tx) async {
       final rows = await tx.query(
@@ -767,7 +855,7 @@ class TaskDatabase {
             'createdByName': null,
           });
         }
-        final title = '${local['title']} (offline copy)';
+        final title = '${local['title']} $suffix';
         local.remove('id');
         await tx.insert('tasks', {
           ...local,

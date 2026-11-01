@@ -1714,7 +1714,7 @@ abstract class AppLocalizations {
   /// **'Reset'**
   String get reset;
 
-  /// No description provided for @recordingKept.
+  /// Capture sheet status line for a recording that waits on the phone, in Unfinished captures, to be understood. Words and recordings waiting there are “kept”, never “saved”: saving means adding them as a task.
   ///
   /// In en, this message translates to:
   /// **'Recording kept on this phone'**
@@ -1804,10 +1804,10 @@ abstract class AppLocalizations {
   /// **'Live transcription uses on-device speech where available; no audio is retained in that mode. To add, find or change tasks, your words go over the internet to Google’s AI. Saved audio is transcribed online. Anything not saved yet stays on this phone until you save or discard it.'**
   String get capturePrivacy;
 
-  /// One short line under the words in the capture sheet, shown only the first time the microphone is used on this device. The full note is on the Voice screen in Settings.
+  /// One short line under the words in the capture sheet, shown only the first time the microphone is used on this phone: says the words go to Google’s AI and names where the full note is (Other settings › Voice, as otherSettings and voiceSettings read; keep them identical).
   ///
   /// In en, this message translates to:
-  /// **'Your words go online. More in Settings.'**
+  /// **'Your words go to Google’s AI. More in Other settings › Voice.'**
   String get capturePrivacyLine;
 
   /// No description provided for @lookRight.
@@ -1983,6 +1983,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Task completed'**
   String get taskCompleted;
+
+  /// On Calendar, the message after a row's tick leaves the shown day with no open task (overdue tasks on today included), with Undo. The website demo's line; keep it short and calm.
+  ///
+  /// In en, this message translates to:
+  /// **'All clear. Take a breath.'**
+  String get dayAllClear;
 
   /// No description provided for @undoError.
   ///
@@ -2284,6 +2290,12 @@ abstract class AppLocalizations {
   /// **'Reminder: {value}'**
   String reminderValue(String value);
 
+  /// The value of a task's reminder chip (inside reminderValue: “Reminder: 1 hour before · deadline”) when the reminder counts from the task's deadline rather than its day. {lead} is how long before (1 hour before), or the time on the day for a deadline without a time (9:00).
+  ///
+  /// In en, this message translates to:
+  /// **'{lead} · deadline'**
+  String reminderBeforeDeadline(String lead);
+
   /// The reminder line on a task given to someone else. Their reminders are their own and never reach this phone, so none of this account's reminder values is shown. {name} is the person's name.
   ///
   /// In en, this message translates to:
@@ -2307,6 +2319,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No reminder: the alert time has passed'**
   String get noReminderTimePassed;
+
+  /// Reminder chip and form row once the task's reminder has rung on this phone (not a reminder saved too late to ring, which reads noReminderTimePassed). {when} is today, tomorrow or other: the day it rang; {date} that day as the plan lines write it (sat 24); {time} the clock time it rang, as the app writes it. Tapping it opens the reminder choices.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder sent: {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}'**
+  String reminderSent(String when, String date, String time);
+
+  /// Reminder chip and form row after “Snooze 10 min” on the task's reminder, while the snoozed reminder is still to ring. {when} is today, tomorrow or other: the day it rings again; {date} that day as the plan lines write it (sat 24); {time} the clock time it rings again, as the app writes it. Tapping it opens the reminder choices.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder snoozed: {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}'**
+  String reminderSnoozed(String when, String date, String time);
+
+  /// On a task with a plan whose reminders have all gone by, once its last one has rung on this phone: the plan in words (reminderPlanStrengthLine or reminderPlanOwnLine), then when that last reminder rang. {when} is today, tomorrow or other; {date} the day (sat 24); {time} the clock time, as the app writes it.
+  ///
+  /// In en, this message translates to:
+  /// **'{plan} · last: {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}'**
+  String reminderPlanLast(String plan, String when, String date, String time);
 
   /// No description provided for @fileLocal.
   ///
@@ -4312,16 +4342,22 @@ abstract class AppLocalizations {
   /// **'I didn’t find a task. Say what and when, for example: “Tomorrow, call the dentist.”'**
   String get captureNoTasks;
 
-  /// No description provided for @captureOffline.
+  /// Capture sheet banner when there is no internet and there are words to save. Names the Save as a task button under it, which works offline: keep that name identical to captureSaveAsWritten. Words waiting in Unfinished captures are “kept”, never “saved”.
   ///
   /// In en, this message translates to:
-  /// **'No internet. Your words are saved — try again when you’re online.'**
+  /// **'No internet. Tap Save as a task, or try again when you’re online.'**
   String get captureOffline;
 
-  /// No description provided for @captureUnavailable.
+  /// Capture sheet banner when there is no internet and the capture is only a recording, with no words yet, so there is no Save as a task button. The recording waits in Unfinished captures: it is “kept”, never “saved”.
   ///
   /// In en, this message translates to:
-  /// **'Couldn’t reach the assistant — your words are kept.'**
+  /// **'No internet. Your recording is kept; try again when you’re online.'**
+  String get captureOfflineRecording;
+
+  /// Capture sheet banner when the server that understands the words can’t be reached or took too long. Names no assistant, which the app never introduces. The words wait in Unfinished captures: “kept”, never “saved”.
+  ///
+  /// In en, this message translates to:
+  /// **'I can’t turn your words into tasks right now; they’re kept.'**
   String get captureUnavailable;
 
   /// Shown in the dictation sheet when many dictations came in a row and the per-minute limit refused this one. Names the Try again button under it; waiting a minute is enough.
@@ -4438,10 +4474,10 @@ abstract class AppLocalizations {
   /// **'Nothing heard yet. Speak when you’re ready, or tap Type instead.'**
   String get captureNothingHeardYet;
 
-  /// Shown under the microphone from the start of listening when the words are understood online: no words appear while speaking. Names the Done button (done).
+  /// Shown under the microphone from the start of listening when the words are understood online: no words appear while speaking. Names the Done button (done); after Done the sheet shows the result, what was understood, and the words themselves only behind See what I said (reviewOriginal).
   ///
   /// In en, this message translates to:
-  /// **'I’m listening. You’ll see your words when you tap Done.'**
+  /// **'I’m listening. Tap Done to see what I understood.'**
   String get captureListeningOnline;
 
   /// Shown under the microphone in the last 10 seconds of the 60-second listening limit, counting down each second; read out once, at 10 seconds left.
@@ -4564,7 +4600,7 @@ abstract class AppLocalizations {
   /// **'All caught up'**
   String get capturesCaughtUp;
 
-  /// No description provided for @capturesEmptyHelp.
+  /// Empty state of Unfinished captures. What waits there is “kept”, never “saved”: saving means adding it as a task.
   ///
   /// In en, this message translates to:
   /// **'Recordings and tasks you leave unfinished are kept here.'**
@@ -4654,10 +4690,10 @@ abstract class AppLocalizations {
   /// **'Understanding…'**
   String get captureUnderstanding;
 
-  /// No description provided for @captureFailed.
+  /// Capture sheet banner for a rare failure with nothing else to explain it. The words stay in the sheet and in Unfinished captures: “kept” or “still here”, never “saved”.
   ///
   /// In en, this message translates to:
-  /// **'That didn’t work. Your words are saved here — try again.'**
+  /// **'That didn’t work. Your words are still here — try again.'**
   String get captureFailed;
 
   /// No description provided for @captureSlow.
@@ -4666,7 +4702,7 @@ abstract class AppLocalizations {
   /// **'Taking longer than usual.'**
   String get captureSlow;
 
-  /// Button on the capture sheet: the fallback that saves the words as one task, read on the phone (its day and time from the words). It shows after 8 s of waiting for the assistant, after a failure (below Try again), and on a command result that found nothing.
+  /// Button on the capture sheet: the fallback that saves the words as one task, read on the phone (its day and time from the words). It shows after 8 s of waiting for the assistant (a text button, as nothing is ready to confirm yet), after a failure (below Try again), and on a command result that found nothing. captureOffline names it: keep the two identical.
   ///
   /// In en, this message translates to:
   /// **'Save as a task'**
@@ -4785,6 +4821,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You can only view this task.'**
   String get viewOnlyTask;
+
+  /// Banner on a task in a project the person can only view, when the task rings for them: its reminder chip still opens, for their own reminders only.
+  ///
+  /// In en, this message translates to:
+  /// **'You can only view this task and choose your reminders.'**
+  String get viewOnlyTaskReminders;
+
+  /// Added after a task title, with a space, to the personal copy a sync keeps of an unsent edit that conflicted with the shared task. The same copy syncProblem names.
+  ///
+  /// In en, this message translates to:
+  /// **'(offline copy)'**
+  String get syncCopySuffix;
 
   /// No description provided for @stepUpdateError.
   ///
@@ -6273,6 +6321,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{label}: from {before} to {after}'**
   String commandChangeSemantics(String label, String before, String after);
+
+  /// One line of a dictation's change card, as shown, for the priority and the deadline: the field, then its value before and after the change. {label} is the field's name (Priority, Deadline); {before} and {after} are its values (Medium, High; a day).
+  ///
+  /// In en, this message translates to:
+  /// **'{label}: {before} → {after}'**
+  String commandChangeLine(String label, String before, String after);
+
+  /// A dictation's change card, the deadline line when the new deadline is a chip that follows this text: the field, then its value before the change and the arrow. {label} is the field's name (Deadline); {before} is its value before (a day).
+  ///
+  /// In en, this message translates to:
+  /// **'{label}: {before} →'**
+  String commandChangeLineFrom(String label, String before);
 
   /// On a dictation's change card: text the confirming tap adds at the end of the task's notes. {text} is that text.
   ///

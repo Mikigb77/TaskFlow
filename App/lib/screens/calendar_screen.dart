@@ -51,6 +51,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   // Tasks seen open on the selected day. Completing one keeps its place
   // until the day changes or Calendar is covered.
   final _openOnDay = <String>{};
+  // Today's overdue tasks seen open while today was shown. One ticked keeps
+  // its place under «Atrasadas», struck through, by the same rule.
+  final _overdueSeen = <String>{};
   // Just-saved tasks: waiting to appear, then shown and highlighted. Saved
   // without a date, the no-date row is highlighted instead, or as well.
   Set<int> _landingIds = {};
@@ -98,6 +101,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   void _select(DateTime day, [DateTime? focused]) {
     if (!isSameDay(day, _selectedDay)) {
       _openOnDay.clear();
+      _overdueSeen.clear();
       _landingIds = {};
       _landedIds = {};
       _landingInbox = false;
@@ -435,7 +439,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   });
 
   /// The open tasks overdue on [now]'s day that aren't among its own
-  /// occurrences, oldest first: what today's agenda lists above its tasks.
+  /// occurrences, oldest first: what today's agenda lists under its tasks.
   List<Task> _overdueOn(List<Task> tasks, DateTime now) {
     String key(Task task) => '${task.id}:${task.occurrenceId}';
     final listed = {
@@ -454,6 +458,45 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
           b.displayDate ?? b.displayDeadline!,
         ),
       );
+  }
+
+  /// Today's [open] overdue tasks, with those ticked since they were seen
+  /// open, struck through where they were. [listed] are today's own rows.
+  List<Task> _withTicked(
+    List<Task> tasks,
+    List<Task> open,
+    Set<String> listed,
+    DateTime now,
+  ) {
+    String key(Task task) => '${task.id}:${task.occurrenceId}';
+    DateTime when(Task task) => task.displayDate ?? task.displayDeadline!;
+    final first = Task.day(now);
+    final ticked = [
+      for (final task in tasks)
+        ...(task.isRecurring
+                ? task.completedDates
+                      .map(task.completedOccurrence)
+                      .whereType<Task>()
+                : [if (task.isCompleted) task])
+            .where(
+              (done) =>
+                  _overdueSeen.contains(key(done)) &&
+                  !listed.contains(key(done)) &&
+                  (done.displayDate ?? done.displayDeadline) != null &&
+                  Task.day(when(done)).isBefore(first),
+            ),
+    ];
+    // Oldest first; rows of the same day keep the tasks' order, so a ticked
+    // row stays where it was.
+    final at = {for (final (i, task) in tasks.indexed) task.id: i};
+    final rows = [...open, ...ticked].indexed.toList()
+      ..sort((a, b) {
+        final date = when(a.$2).compareTo(when(b.$2));
+        if (date != 0) return date;
+        final order = at[a.$2.id]!.compareTo(at[b.$2.id]!);
+        return order != 0 ? order : a.$1.compareTo(b.$1);
+      });
+    return [for (final (_, task) in rows) task];
   }
 
   /// The week or the month. At any text size each day is at least 48 dp
@@ -626,6 +669,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     final shown = TickerMode.valuesOf(context).enabled;
     if (!shown) {
       _openOnDay.clear();
+      _overdueSeen.clear();
       // Leaving Calendar ends a landing's room for the save message.
       _end = 20;
     }
@@ -652,9 +696,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
       return Task.compareBySchedule(a, b);
     });
     final inbox = tasks
-        .where(
-          (task) => !task.isNote && task.dueDate == null && !task.isCompleted,
-        )
+        .where((task) => !task.isNote && task.undated && !task.isCompleted)
         .length;
     if (_landingIds.isNotEmpty &&
         shown &&
@@ -677,9 +719,17 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     final now = _now();
     final today = isSameDay(_selectedDay, now);
     final overdueToday = _overdueOn(tasks, now);
-    final overdue = today ? overdueToday : <Task>[];
-    final completed = events.where((task) => task.isCompleted).length;
+    if (today) _overdueSeen.addAll(overdueToday.map(key));
+    final overdue = today
+        ? _withTicked(tasks, overdueToday, events.map(key).toSet(), now)
+        : <Task>[];
+    final completed = [
+      ...events,
+      ...overdue,
+    ].where((task) => task.isCompleted).length;
     final total = events.length + overdue.length;
+    // The day's last open row says so when it's ticked (WD34).
+    final lastOpen = total - completed == 1;
     final hasAny = (tasksState.valueOrNull ?? const []).isNotEmpty;
     // The state in which the empty state shows the instruction, or is still
     // deciding whether to. Its header and empty state drop their decorations
@@ -952,6 +1002,43 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                 ),
               )
             else ...[
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverList.builder(
+                  itemCount: events.length,
+                  itemBuilder: (context, index) {
+                    final task = events[index];
+                    final showDate =
+                        task.displayDate != null &&
+                        Task.dateKey(task.displayDate!) !=
+                            Task.dateKey(_selectedDay);
+                    final landed = _landedIds.contains(task.id);
+                    return Padding(
+                      key: landed
+                          ? _litRows.putIfAbsent(key(task), GlobalKey.new)
+                          : null,
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: landed
+                          ? LandedTaskTile(
+                              task: task,
+                              showDate: showDate,
+                              lit: _lit(key(task)),
+                              lastOpen: lastOpen && !task.isCompleted,
+                            )
+                          : TaskTile(
+                              task: task,
+                              showDate: showDate,
+                              lastOpen: lastOpen && !task.isCompleted,
+                            ),
+                    );
+                  },
+                ),
+              ),
+              if (overdue.isNotEmpty && events.isNotEmpty)
+                const SliverPadding(
+                  padding: EdgeInsets.fromLTRB(24, 0, 24, 10),
+                  sliver: SliverToBoxAdapter(child: Divider()),
+                ),
               if (overdue.isNotEmpty)
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -975,42 +1062,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                             child: TaskTile(
                               task: overdue[index - 1],
                               showDate: true,
+                              lastOpen:
+                                  lastOpen && !overdue[index - 1].isCompleted,
                             ),
                           ),
                   ),
                 ),
-              if (overdue.isNotEmpty && events.isNotEmpty)
-                const SliverPadding(
-                  padding: EdgeInsets.fromLTRB(24, 0, 24, 10),
-                  sliver: SliverToBoxAdapter(child: Divider()),
-                ),
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                sliver: SliverList.builder(
-                  itemCount: events.length,
-                  itemBuilder: (context, index) {
-                    final task = events[index];
-                    final showDate =
-                        task.displayDate != null &&
-                        Task.dateKey(task.displayDate!) !=
-                            Task.dateKey(_selectedDay);
-                    final landed = _landedIds.contains(task.id);
-                    return Padding(
-                      key: landed
-                          ? _litRows.putIfAbsent(key(task), GlobalKey.new)
-                          : null,
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: landed
-                          ? LandedTaskTile(
-                              task: task,
-                              showDate: showDate,
-                              lit: _lit(key(task)),
-                            )
-                          : TaskTile(task: task, showDate: showDate),
-                    );
-                  },
-                ),
-              ),
             ],
             SliverToBoxAdapter(child: DeviceCalendarEvents(day: _selectedDay)),
             if (inbox > 0)

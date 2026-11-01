@@ -148,7 +148,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   (task.assignment == 'member' && task.assigneeId == person)) &&
               (label == null || task.labels.contains(label)) &&
               (filter == 0 ||
-                  (filter == 3 && task.dueDate == null) ||
+                  (filter == 3 && task.undated) ||
                   (filter == 2 && task.priority == 3) ||
                   (filter == 1 &&
                       (overdue.contains(task) ||
@@ -218,7 +218,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// Capture, or the form, opened here saved [focus]'s tasks. If the search
   /// or a filter would hide them, clear it, so they are on screen every
   /// time: on a project page, `Para mí` and a person too, when need be;
-  /// elsewhere the app-wide `Para mí`, then the project filter.
+  /// elsewhere the app-wide `Para mí`, then the project filter. A page that
+  /// can't list them even so (Sin fecha, for a task given a day; a project,
+  /// for a task put in another one) sends them to Calendar, as the Día view
+  /// does.
   void _land(CalendarFocus focus) {
     final all = ref.read(taskProvider).valueOrNull ?? [];
     bool lists(List<Task> tasks) =>
@@ -232,20 +235,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ref.read(authProvider).account?.id,
             ref.read(taskListsProvider).valueOrNull ?? [],
           );
-    var scope = global;
-    setState(() {
-      if (!lists(
-        _visible(all, filter: _filter, query: _query, label: _label),
-      )) {
-        for (final (clear, everyone, widen) in [
+    // The first of these that lists them: as it is, then each wider step.
+    final step =
+        [
+          (false, false, false),
           (true, false, false),
           if (widget.listId != null) (true, true, false),
           if (!identical(wider, global)) ...[
             (false, false, true),
             (true, false, true),
           ],
-        ]) {
-          if (!lists(
+        ].where((step) {
+          final (clear, everyone, widen) = step;
+          return lists(
             _visible(
               all,
               filter: clear && widget.isRoot ? 0 : _filter,
@@ -254,38 +256,63 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               everyone: everyone,
               global: widen ? wider : global,
             ),
-          )) {
-            continue;
-          }
-          if (clear) {
-            _search.clear();
-            _query = '';
-            _label = null;
-            if (widget.isRoot) _filter = 0;
-            _openHere.clear();
-          }
-          if (everyone) {
-            _team = true;
-            _person = null;
-            _openHere.clear();
-          }
-          if (widen) scope = wider;
-          break;
-        }
+          );
+        }).firstOrNull;
+    if (step == null) {
+      _landOnCalendar(focus);
+      return;
+    }
+    final (clear, everyone, widen) = step;
+    setState(() {
+      if (clear) {
+        _search.clear();
+        _query = '';
+        _label = null;
+        if (widget.isRoot) _filter = 0;
+        _openHere.clear();
+      }
+      if (everyone) {
+        _team = true;
+        _person = null;
+        _openHere.clear();
       }
       _landingIds = focus.taskIds;
       _landedIds = {};
       _highlight = false;
       _highlightTimer?.cancel();
     });
-    if (!identical(scope, global)) {
-      ref.read(projectScopeProvider.notifier).state = scope;
+    if (widen) {
+      ref.read(projectScopeProvider.notifier).state = wider;
       ref.read(scopeWideningProvider.notifier).state = ScopeWidening(
         focus,
         global,
-        scope,
+        wider,
       );
     }
+  }
+
+  /// Shows [focus]'s tasks on Calendar instead, lit on their day (or its
+  /// no-date row), as the Día view does.
+  void _landOnCalendar(CalendarFocus focus) {
+    final calendarFocus = ref.read(calendarFocusProvider.notifier);
+    final widening = ref.read(scopeWideningProvider.notifier);
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    // Once this focus has reached every listener.
+    scheduleMicrotask(() {
+      final there = CalendarFocus(
+        focus.day,
+        focus.taskIds,
+        showCalendar: true,
+        undated: focus.undated,
+      );
+      calendarFocus.state = there;
+      // A filter Calendar widened for them: the save's Deshacer, which knows
+      // only [focus], narrows it again.
+      final widened = widening.state;
+      if (widened != null && identical(widened.landing, there)) {
+        widening.state = ScopeWidening(focus, widened.before, widened.after);
+      }
+    });
   }
 
   /// Brings the first new row into view, clear of the save message, then

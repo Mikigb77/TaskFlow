@@ -47,13 +47,16 @@ void reminderWorker() {
 /// through when its «Reminders» exception is allowed. A plan's notice offers
 /// only «Completar»: a snooze would bring the same notice back. Its notice on
 /// a timed day, at the task's usual reminder, is that reminder, with its
-/// «Posponer 10 min».
+/// «Posponer 10 min». A reader's reminder ([PlannedReminder.readOnly]) has
+/// no «Completar»: the single reminder keeps only its snooze, and a plan's
+/// notice has no button; a tap still opens the task.
 @visibleForTesting
 NotificationDetails reminderNotificationDetails(PlannedReminder reminder,
     {bool silent = false}) {
   final l = lookupAppLocalizations(Locale(reminder.languageCode));
   final ofPlan = ReminderEngine.isPlanAlert(reminder.identity) &&
       !ReminderEngine.isPlanDayAlert(reminder.identity);
+  final buttons = reminder.taskId != null && !(ofPlan && reminder.readOnly);
   return NotificationDetails(
       android: AndroidNotificationDetails(
           'taskflow_reminders', l.notificationChannel,
@@ -62,18 +65,21 @@ NotificationDetails reminderNotificationDetails(PlannedReminder reminder,
           icon: 'app_notifications_icon',
           silent: silent,
           category: AndroidNotificationCategory.reminder,
-          actions: reminder.taskId == null
+          actions: !buttons
               ? null
               : [
-                  AndroidNotificationAction('complete', l.notificationComplete),
+                  if (!reminder.readOnly)
+                    AndroidNotificationAction(
+                        'complete', l.notificationComplete),
                   if (!ofPlan)
                     AndroidNotificationAction('snooze', l.notificationSnooze),
                 ]),
       iOS: DarwinNotificationDetails(
           presentSound: silent ? false : null,
-          categoryIdentifier: reminder.taskId == null
+          categoryIdentifier: !buttons
               ? null
-              : '${ofPlan ? 'plan' : 'task'}_${reminder.languageCode}'));
+              : '${ofPlan ? 'plan' : reminder.readOnly ? 'snooze' : 'task'}'
+                  '_${reminder.languageCode}'));
 }
 
 /// The silent «Completed» line with Undo: not a reminder, so no reminder
@@ -237,6 +243,10 @@ class TaskReminders {
                     _category('plan_${locale.languageCode}',
                         lookupAppLocalizations(locale),
                         snooze: false),
+                    // A reader's single reminder: they can't complete it.
+                    _category('snooze_${locale.languageCode}',
+                        lookupAppLocalizations(locale),
+                        complete: false),
                     DarwinNotificationCategory('undo_${locale.languageCode}',
                         actions: [
                           DarwinNotificationAction.plain(
@@ -298,9 +308,10 @@ class TaskReminders {
   }
 
   static DarwinNotificationCategory _category(String id, AppLocalizations l,
-          {bool snooze = true}) =>
+          {bool snooze = true, bool complete = true}) =>
       DarwinNotificationCategory(id, actions: [
-        DarwinNotificationAction.plain('complete', l.notificationComplete),
+        if (complete)
+          DarwinNotificationAction.plain('complete', l.notificationComplete),
         if (snooze)
           DarwinNotificationAction.plain('snooze', l.notificationSnooze),
       ]);
@@ -465,6 +476,13 @@ class ReminderAccess {
         await openAppSettings();
       } catch (_) {/* Nothing more to open on this phone. */}
     }
+  }
+
+  /// The alerts this phone keeps for task [taskId]
+  /// ([ReminderEngine.alertsOf]), so its line can say one has rung.
+  Future<List<Map<String, Object?>>> alertsOf(int taskId) async {
+    if (!supported) return const [];
+    return TaskReminders.engine.alertsOf(taskId);
   }
 
   static const _appSettings = MethodChannel('taskflow/app-settings');

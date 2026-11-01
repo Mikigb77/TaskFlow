@@ -23,6 +23,7 @@ class TaskTile extends ConsumerWidget {
     this.project,
     this.showUndated = true,
     this.markOverdue = false,
+    this.lastOpen = false,
   });
   final Task task;
 
@@ -41,6 +42,10 @@ class TaskTile extends ConsumerWidget {
 
   /// In task lists, an open task whose day has passed says «Atrasada».
   final bool markOverdue;
+
+  /// The open task left on Calendar's shown day: ticking it says the day is
+  /// clear rather than «Tarea completada».
+  final bool lastOpen;
 
   /// The row's date line, or null when it has nothing to say.
   String? _dateLine(BuildContext context, WidgetRef ref) {
@@ -207,6 +212,12 @@ class TaskTile extends ConsumerWidget {
       ),
     );
     void reschedule() => TaskInteractions.reschedule(context, ref, task);
+    Future<void> toggle() => TaskInteractions.toggle(
+      context,
+      ref,
+      task,
+      doneMessage: lastOpen ? context.l10n.dayAllClear : null,
+    );
     return Semantics(
       container: true,
       // A row that can't be changed is one button that opens the task. An
@@ -231,7 +242,7 @@ class TaskTile extends ConsumerWidget {
         key: ValueKey('gesture:${task.id}:${task.occurrenceId}'),
         confirmDismiss: (direction) async {
           if (direction == DismissDirection.startToEnd) {
-            await TaskInteractions.toggle(context, ref, task);
+            await toggle();
           } else {
             await TaskInteractions.reschedule(context, ref, task);
           }
@@ -283,7 +294,7 @@ class TaskTile extends ConsumerWidget {
                         value: task.isCompleted,
                         shape: const CircleBorder(),
                         onChanged: editable
-                            ? (_) => TaskInteractions.toggle(context, ref, task)
+                            ? (_) => toggle()
                             : null,
                       ),
                     ),
@@ -370,6 +381,7 @@ class LandedTaskTile extends StatelessWidget {
     this.project,
     this.showUndated = true,
     this.markOverdue = false,
+    this.lastOpen = false,
   });
   final Task task;
   final bool lit;
@@ -377,6 +389,7 @@ class LandedTaskTile extends StatelessWidget {
   final String? project;
   final bool showUndated;
   final bool markOverdue;
+  final bool lastOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -393,6 +406,7 @@ class LandedTaskTile extends StatelessWidget {
         project: project,
         showUndated: showUndated,
         markOverdue: markOverdue,
+        lastOpen: lastOpen,
       ),
     );
   }

@@ -11,7 +11,7 @@ import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/task_list.dart';
 import 'package:agenda/models/task.dart';
 
-class CompletedTasksScreen extends ConsumerWidget {
+class CompletedTasksScreen extends ConsumerStatefulWidget {
   const CompletedTasksScreen({
     super.key,
     this.listId,
@@ -27,7 +27,41 @@ class CompletedTasksScreen extends ConsumerWidget {
   final int? person;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CompletedTasksScreen> createState() =>
+      _CompletedTasksScreenState();
+}
+
+class _CompletedTasksScreenState extends ConsumerState<CompletedTasksScreen> {
+  // Rows seen done on this page, by task occurrence. One reopened here keeps
+  // its place, unticked, until the person leaves the page: Tareas' rule.
+  final _doneHere = <String>{};
+
+  static String _row(Task task) => '${task.id}:${task.occurrenceId}';
+
+  /// [task]'s done rows, and those reopened here since they were seen done.
+  List<Task> _rowsOf(Task task) {
+    if (!task.isRecurring) {
+      return task.isCompleted || _doneHere.contains(_row(task))
+          ? [task]
+          : const [];
+    }
+    final prefix = '${task.id}:';
+    return [
+      ...task.completedDates.map(task.completedOccurrence).whereType<Task>(),
+      for (final row in _doneHere)
+        if (row.startsWith(prefix) &&
+            !task.completedDates.contains(row.substring(prefix.length)))
+          ?task.occurrenceByKey(row.substring(prefix.length)),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final listId = widget.listId;
+    final team = widget.team;
+    final person = widget.person;
+    // The page is covered by another screen: the person has left it.
+    if (!TickerMode.valuesOf(context).enabled) _doneHere.clear();
     final projects = ref.watch(taskListsProvider).valueOrNull ?? [];
     final accountId = ref.watch(authProvider).account?.id;
     final project = projects.where((p) => p.id == listId).firstOrNull;
@@ -61,16 +95,9 @@ class CompletedTasksScreen extends ConsumerWidget {
         appBar: CustomAppBar(title: context.l10n.completedTasks),
         body: ref.watch(taskProvider).when(
               data: (tasks) {
-                final completed = tasks
-                    .where(shown)
-                    .expand((task) => task.isRecurring
-                        ? task.completedDates
-                            .map(task.completedOccurrence)
-                            .whereType<Task>()
-                        : task.isCompleted
-                            ? [task]
-                            : <Task>[])
-                    .toList();
+                final completed = tasks.where(shown).expand(_rowsOf).toList();
+                final done = completed.where((task) => task.isCompleted);
+                _doneHere.addAll(done.map(_row));
                 if (completed.isEmpty) {
                   return SingleChildScrollView(
                       child: Column(
@@ -97,10 +124,12 @@ class CompletedTasksScreen extends ConsumerWidget {
                               children: [
                                 if (name != null) ...[
                                   name,
-                                  const SizedBox(height: 8),
+                                  if (done.isNotEmpty) const SizedBox(height: 8),
                                 ],
-                                Text(context.l10n
-                                    .completedTaskSummary(completed.length)),
+                                // Every row reopened here: no count to give.
+                                if (done.isNotEmpty)
+                                  Text(context.l10n
+                                      .completedTaskSummary(done.length)),
                               ])),
                       Expanded(
                           child: TaskList(

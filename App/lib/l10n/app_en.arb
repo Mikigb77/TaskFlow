@@ -499,6 +499,9 @@
   "resetOccurrence": "Reset this occurrence",
   "reset": "Reset",
   "recordingKept": "Recording kept on this phone",
+  "@recordingKept": {
+    "description": "Capture sheet status line for a recording that waits on the phone, in Unfinished captures, to be understood. Words and recordings waiting there are “kept”, never “saved”: saving means adding them as a task."
+  },
   "onDeviceTranscript": "On this phone, as you speak",
   "onlineAudio": "Online, after you finish",
   "speechMethod": "How speech becomes text",
@@ -528,9 +531,9 @@
   "@capturePrivacy": {
     "description": "The full voice privacy note at the end of the Voice screen in Settings: on-device or online transcription, why the words go to Google’s AI, saved audio, and what stays on the phone. capturePrivacyLine is its short form in the capture sheet."
   },
-  "capturePrivacyLine": "Your words go online. More in Settings.",
+  "capturePrivacyLine": "Your words go to Google’s AI. More in Other settings › Voice.",
   "@capturePrivacyLine": {
-    "description": "One short line under the words in the capture sheet, shown only the first time the microphone is used on this device. The full note is on the Voice screen in Settings."
+    "description": "One short line under the words in the capture sheet, shown only the first time the microphone is used on this phone: says the words go to Google’s AI and names where the full note is (Other settings › Voice, as otherSettings and voiceSettings read; keep them identical)."
   },
   "lookRight": "Look right?",
   "finalSay": "Tap a detail to change it. You have the final say.",
@@ -653,6 +656,10 @@
   "sharedProject": "Shared",
   "taskReopened": "Task reopened",
   "taskCompleted": "Task completed",
+  "dayAllClear": "All clear. Take a breath.",
+  "@dayAllClear": {
+    "description": "On Calendar, the message after a row's tick leaves the shown day with no open task (overdue tasks on today included), with Undo. The website demo's line; keep it short and calm."
+  },
   "undoError": "Could not undo. Please try again.",
   "taskUpdateError": "Could not update this task. Please try again.",
   "occurrenceSkippedNotice": "Occurrence skipped",
@@ -761,6 +768,15 @@
     }
   },
   "reminderValue": "Reminder: {value}",
+  "reminderBeforeDeadline": "{lead} · deadline",
+  "@reminderBeforeDeadline": {
+    "description": "The value of a task's reminder chip (inside reminderValue: “Reminder: 1 hour before · deadline”) when the reminder counts from the task's deadline rather than its day. {lead} is how long before (1 hour before), or the time on the day for a deadline without a time (9:00).",
+    "placeholders": {
+      "lead": {
+        "type": "String"
+      }
+    }
+  },
   "reminderForPersonOnly": "Reminder for {name}",
   "@reminderForPersonOnly": {
     "description": "The reminder line on a task given to someone else. Their reminders are their own and never reach this phone, so none of this account's reminder values is shown. {name} is the person's name.",
@@ -781,6 +797,54 @@
   "noReminderTimePassed": "No reminder: the alert time has passed",
   "@noReminderTimePassed": {
     "description": "Reminder chip and form row when reminders are on but the task's alert time (its own or the default, such as 9:00 for a task without a time) has already gone by, so nothing will ring. Tapping it opens the reminder choices, where a later time can be picked."
+  },
+  "reminderSent": "Reminder sent: {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}",
+  "@reminderSent": {
+    "description": "Reminder chip and form row once the task's reminder has rung on this phone (not a reminder saved too late to ring, which reads noReminderTimePassed). {when} is today, tomorrow or other: the day it rang; {date} that day as the plan lines write it (sat 24); {time} the clock time it rang, as the app writes it. Tapping it opens the reminder choices.",
+    "placeholders": {
+      "when": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderSnoozed": "Reminder snoozed: {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}",
+  "@reminderSnoozed": {
+    "description": "Reminder chip and form row after “Snooze 10 min” on the task's reminder, while the snoozed reminder is still to ring. {when} is today, tomorrow or other: the day it rings again; {date} that day as the plan lines write it (sat 24); {time} the clock time it rings again, as the app writes it. Tapping it opens the reminder choices.",
+    "placeholders": {
+      "when": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPlanLast": "{plan} · last: {when, select, today{today} tomorrow{tomorrow} other{{date}}}, {time}",
+  "@reminderPlanLast": {
+    "description": "On a task with a plan whose reminders have all gone by, once its last one has rung on this phone: the plan in words (reminderPlanStrengthLine or reminderPlanOwnLine), then when that last reminder rang. {when} is today, tomorrow or other; {date} the day (sat 24); {time} the clock time, as the app writes it.",
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "when": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
   },
   "fileLocal": "Only on this device",
   "fileQueued": "Upload queued",
@@ -1668,8 +1732,18 @@
   "@captureNoTasks": {
     "description": "Capture sheet banner, read out once, when the assistant found no task and no command in the words. Gives an example of what to say next; Say again (captureSayAgain) is the button under it."
   },
-  "captureOffline": "No internet. Your words are saved — try again when you’re online.",
-  "captureUnavailable": "Couldn’t reach the assistant — your words are kept.",
+  "captureOffline": "No internet. Tap Save as a task, or try again when you’re online.",
+  "@captureOffline": {
+    "description": "Capture sheet banner when there is no internet and there are words to save. Names the Save as a task button under it, which works offline: keep that name identical to captureSaveAsWritten. Words waiting in Unfinished captures are “kept”, never “saved”."
+  },
+  "captureOfflineRecording": "No internet. Your recording is kept; try again when you’re online.",
+  "@captureOfflineRecording": {
+    "description": "Capture sheet banner when there is no internet and the capture is only a recording, with no words yet, so there is no Save as a task button. The recording waits in Unfinished captures: it is “kept”, never “saved”."
+  },
+  "captureUnavailable": "I can’t turn your words into tasks right now; they’re kept.",
+  "@captureUnavailable": {
+    "description": "Capture sheet banner when the server that understands the words can’t be reached or took too long. Names no assistant, which the app never introduces. The words wait in Unfinished captures: “kept”, never “saved”."
+  },
   "captureTooFast": "You’ve dictated a lot in a row. Wait a minute, then tap Try again.",
   "@captureTooFast": {
     "description": "Shown in the dictation sheet when many dictations came in a row and the per-minute limit refused this one. Names the Try again button under it; waiting a minute is enough."
@@ -1731,9 +1805,9 @@
   "@captureNothingHeardYet": {
     "description": "Shown under the microphone after about 5 seconds of listening with no words heard yet, on the phone’s own speech recognition. Names the Type instead button (captureTypeInstead)."
   },
-  "captureListeningOnline": "I’m listening. You’ll see your words when you tap Done.",
+  "captureListeningOnline": "I’m listening. Tap Done to see what I understood.",
   "@captureListeningOnline": {
-    "description": "Shown under the microphone from the start of listening when the words are understood online: no words appear while speaking. Names the Done button (done)."
+    "description": "Shown under the microphone from the start of listening when the words are understood online: no words appear while speaking. Names the Done button (done); after Done the sheet shows the result, what was understood, and the words themselves only behind See what I said (reviewOriginal)."
   },
   "captureTimeLeft": "{seconds, plural, =1{1 second left} other{{seconds} seconds left}}",
   "@captureTimeLeft": {
@@ -1779,6 +1853,9 @@
   "voiceRecording": "Voice recording",
   "capturesCaughtUp": "All caught up",
   "capturesEmptyHelp": "Recordings and tasks you leave unfinished are kept here.",
+  "@capturesEmptyHelp": {
+    "description": "Empty state of Unfinished captures. What waits there is “kept”, never “saved”: saving means adding it as a task."
+  },
   "captureDraftSummary": "{count, plural, one{1 not added yet} other{{count} not added yet}}",
   "@captureDraftSummary": {
     "description": "In Unfinished captures, under a capture's first task: how many of its tasks are not added yet.",
@@ -1848,11 +1925,14 @@
   },
   "captureCheckDetails": "Check the details above",
   "captureUnderstanding": "Understanding…",
-  "captureFailed": "That didn’t work. Your words are saved here — try again.",
+  "captureFailed": "That didn’t work. Your words are still here — try again.",
+  "@captureFailed": {
+    "description": "Capture sheet banner for a rare failure with nothing else to explain it. The words stay in the sheet and in Unfinished captures: “kept” or “still here”, never “saved”."
+  },
   "captureSlow": "Taking longer than usual.",
   "captureSaveAsWritten": "Save as a task",
   "@captureSaveAsWritten": {
-    "description": "Button on the capture sheet: the fallback that saves the words as one task, read on the phone (its day and time from the words). It shows after 8 s of waiting for the assistant, after a failure (below Try again), and on a command result that found nothing."
+    "description": "Button on the capture sheet: the fallback that saves the words as one task, read on the phone (its day and time from the words). It shows after 8 s of waiting for the assistant (a text button, as nothing is ready to confirm yet), after a failure (below Try again), and on a command result that found nothing. captureOffline names it: keep the two identical."
   },
   "captureThingsToAdd": "{count, plural, one{1 thing to add} other{{count} things to add}}",
   "@captureThingsToAdd": {
@@ -1911,6 +1991,14 @@
   "loadTaskError": "Couldn’t load this task",
   "deleteSeriesHelp": "“{title}” and all its occurrences will be removed.",
   "viewOnlyTask": "You can only view this task.",
+  "viewOnlyTaskReminders": "You can only view this task and choose your reminders.",
+  "@viewOnlyTaskReminders": {
+    "description": "Banner on a task in a project the person can only view, when the task rings for them: its reminder chip still opens, for their own reminders only."
+  },
+  "syncCopySuffix": "(offline copy)",
+  "@syncCopySuffix": {
+    "description": "Added after a task title, with a space, to the personal copy a sync keeps of an unsent edit that conflicted with the shared task. The same copy syncProblem names."
+  },
   "stepUpdateError": "Could not update this step. Please retry.",
   "diagnosticsPrivacy": "Local counts and timing from the last 1,000 events. No task titles, words, recordings or account identifiers are included. Nothing here is uploaded.",
   "diagnosticsPercentiles": "Median is the middle observation. P95 is the time that 95% of observations finish within. Failed requests are counted separately.",
@@ -3074,6 +3162,33 @@
         "type": "String"
       },
       "after": {
+        "type": "String"
+      }
+    }
+  },
+  "commandChangeLine": "{label}: {before} → {after}",
+  "@commandChangeLine": {
+    "description": "One line of a dictation's change card, as shown, for the priority and the deadline: the field, then its value before and after the change. {label} is the field's name (Priority, Deadline); {before} and {after} are its values (Medium, High; a day).",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "before": {
+        "type": "String"
+      },
+      "after": {
+        "type": "String"
+      }
+    }
+  },
+  "commandChangeLineFrom": "{label}: {before} →",
+  "@commandChangeLineFrom": {
+    "description": "A dictation's change card, the deadline line when the new deadline is a chip that follows this text: the field, then its value before the change and the arrow. {label} is the field's name (Deadline); {before} is its value before (a day).",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "before": {
         "type": "String"
       }
     }

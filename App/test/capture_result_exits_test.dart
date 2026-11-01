@@ -359,7 +359,7 @@ void main() {
   );
 
   testWidgets(
-    'UX-461: a first capture’s Cancelar during Entendiendo… still closes the sheet, and the capture is pending once understood',
+    'UX-2102: a first capture’s Cancelar during Entendiendo… asks, and Conservar closes the sheet with the capture pending once understood',
     (tester) async {
       final app = await _App.open(tester);
       app.api.found = [_found('Comprar pan')];
@@ -374,6 +374,9 @@ void main() {
       expect(find.text(es.captureUnderstanding), findsOneWidget);
 
       await tester.tap(find.widgetWithText(TextButton, es.cancel));
+      await frames(tester);
+      expect(find.text(es.captureKeepQuestion), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, es.keep));
       await tester.pumpAndSettle();
       expect(find.text(es.captureUnderstanding), findsNothing);
       expect(find.byType(AlertDialog), findsNothing);
@@ -469,7 +472,9 @@ void main() {
 
       await tester.tap(start);
       await frames(tester);
-      expect(app.speech.starts, 3, reason: 'Empezar a hablar listens at once');
+      // With TalkBack the microphone opens a second after `Escuchando`.
+      await tester.pump(const Duration(seconds: 1));
+      expect(app.speech.starts, 3, reason: 'Empezar a hablar listens');
       app.speech.send('ready');
       await frames(tester);
       expect(find.text(es.listeningSeconds('00:00')), findsOneWidget);

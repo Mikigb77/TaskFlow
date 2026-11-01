@@ -1297,6 +1297,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     plan: _reminderPlan,
     task: _responsibility,
     schedule: _repeatTask.copyWith(
+      // A saved task's alerts are known by its id: the row says one has rung.
+      id: widget.task.id,
       exceptions: _exceptions,
       completedDates: widget.task.completedDates,
       isCompleted: widget.task.isCompleted,

@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/checklist_item.dart';
+import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/repositories/cloud_task_repository.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/task_database.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -462,6 +466,198 @@ void main() {
       expect((await repository.getAllTasks()).single.title, task.title);
     },
   );
+
+  // ---- 2026-10-28-app · P268 (UX-2301): ticks, moves and steps show at
+  // once; the server sync runs behind and loses nothing ----
+
+  group('P268 · changes show at once; the sync runs behind', () {
+    test(
+      'UX-2301: with a sync that takes 5 s and then succeeds, a tick, a move and a step show at once, and afterwards the list matches the server’s, each change sent once',
+      () async {
+        final slow = _SlowApi();
+        addTearDown(slow.close);
+        final cloud = CloudTaskRepository(database, slow, 1);
+        await cloud.addTasks([
+          Task(
+            title: 'Comprar pan',
+            priority: 1,
+            dueDate: DateTime(2026, 10, 20, 9),
+          ),
+          Task(
+            title: 'Llamar a Ana',
+            priority: 1,
+            dueDate: DateTime(2026, 10, 20, 11),
+          ),
+          Task(
+            title: 'Preparar la maleta',
+            priority: 1,
+            dueDate: DateTime(2026, 10, 20, 18),
+            checklist: [
+              ChecklistItem(id: 'charger', title: 'Cargador'),
+              ChecklistItem(id: 'passport', title: 'Pasaporte'),
+            ],
+          ),
+          Task(
+            title: 'Pagar la luz',
+            priority: 1,
+            dueDate: DateTime(2026, 10, 22),
+            hasTime: false,
+          ),
+        ]);
+        await cloud.sync();
+        expect(cloud.syncError, isNull);
+        expect(await database.pending(cloud.ownerKey), isEmpty);
+        expect(slow.remote, hasLength(4));
+        // Meanwhile another device renames one on the server.
+        final bill = slow.remote.indexWhere(
+          (t) => t['title'] == 'Pagar la luz',
+        );
+        slow.remote[bill] = {
+          ...slow.remote[bill],
+          'title': 'Pagar la luz y el agua',
+          'version': (slow.remote[bill]['version'] as int) + 1,
+        };
+        slow.puts.clear();
+        slow.holdNextPull = const Duration(seconds: 5);
+
+        // The app opens: its first load starts the slow sync.
+        final notifier = TaskNotifier(cloud);
+        addTearDown(notifier.dispose);
+        var shown = <Task>[];
+        notifier.addListener((state) => shown = state.valueOrNull ?? shown);
+        await slow.pullHeld.future.timeout(const Duration(seconds: 5));
+        Task named(String title) => shown.firstWhere((t) => t.title == title);
+        expect(shown, hasLength(4));
+
+        final watch = Stopwatch()..start();
+        await notifier.setCompleted(named('Comprar pan'), true);
+        await notifier.rescheduleTask(
+          named('Llamar a Ana').id!,
+          DateTime(2026, 10, 21, 11),
+          true,
+        );
+        await notifier.setChecklistCompleted(
+          named('Preparar la maleta'),
+          'charger',
+          true,
+        );
+        watch.stop();
+        expect(slow.released, isFalse, reason: 'the slow sync still runs');
+        expect(watch.elapsed, lessThan(const Duration(seconds: 2)));
+        expect(named('Comprar pan').isCompleted, isTrue);
+        expect(named('Llamar a Ana').dueDate, DateTime(2026, 10, 21, 11));
+        expect(
+          named('Preparar la maleta').checklist.map((item) => item.completed),
+          [true, false],
+        );
+
+        // The slow sync ends, then the one the changes asked for runs.
+        await notifier.loadTasks();
+        expect(slow.released, isTrue);
+        expect(cloud.syncError, isNull);
+        expect(await database.pending(cloud.ownerKey), isEmpty);
+        final remote = {for (final t in slow.remote) t['title'] as String: t};
+        expect(
+          remote.keys,
+          unorderedEquals([
+            'Comprar pan',
+            'Llamar a Ana',
+            'Preparar la maleta',
+            'Pagar la luz y el agua',
+          ]),
+        );
+        // Each change reached the server once, and only the changed tasks.
+        expect(slow.puts.length, 3, reason: '${slow.puts}');
+        expect(slow.puts.values, everyElement(1), reason: '${slow.puts}');
+        for (final title in [
+          'Comprar pan',
+          'Llamar a Ana',
+          'Preparar la maleta',
+        ]) {
+          expect(remote[title]!['version'], 2, reason: title);
+        }
+        expect(remote['Pagar la luz y el agua']!['version'], 2);
+        expect(remote['Comprar pan']!['is_completed'], isTrue);
+        expect(remote['Llamar a Ana']!['is_completed'], isFalse);
+
+        // What the server holds, read into an empty cache, is what the list
+        // shows now.
+        List<String> describe(List<Task> tasks) => [
+          for (final t in [
+            ...tasks,
+          ]..sort((a, b) => a.title.compareTo(b.title)))
+            [
+              t.title,
+              t.isCompleted,
+              t.dueDate?.toUtc(),
+              t.hasTime,
+              for (final item in t.checklist) '${item.title}:${item.completed}',
+            ].join('|'),
+        ];
+        final onScreen = describe(shown);
+        expect(onScreen, hasLength(4));
+        expect(
+          onScreen.where((t) => t.startsWith('Pagar la luz y el agua|')),
+          hasLength(1),
+          reason: 'the other device’s change shows too',
+        );
+        final sql = await database.database;
+        await sql.delete(
+          'tasks',
+          where: 'owner_key = ?',
+          whereArgs: [cloud.ownerKey],
+        );
+        await cloud.sync();
+        expect(describe(await cloud.getAllTasks()), onScreen);
+      },
+      timeout: const Timeout(Duration(seconds: 60)),
+    );
+  });
+}
+
+/// [_Api] whose next pull of the task pages waits [holdNextPull]: a sync
+/// that takes that long, then succeeds. Counts the task uploads per task.
+class _SlowApi extends _Api {
+  Duration? holdNextPull;
+
+  /// Completes when the held pull starts.
+  final pullHeld = Completer<void>();
+
+  /// Whether the held pull has answered.
+  bool released = false;
+
+  /// Uploads per task id.
+  final puts = <String, int>{};
+
+  @override
+  Future<dynamic> request(
+    String method,
+    String path, {
+    Map<String, dynamic>? data,
+    String? audioPath,
+    bool authenticated = true,
+    int? accountId,
+  }) async {
+    final hold = holdNextPull;
+    if (method == 'GET' && path.startsWith('tasks/?') && hold != null) {
+      holdNextPull = null;
+      if (!pullHeld.isCompleted) pullHeld.complete();
+      await Future<void>.delayed(hold);
+      released = true;
+    }
+    if (method == 'PUT' && path.startsWith('tasks/')) {
+      final id = path.split('/')[1];
+      puts[id] = (puts[id] ?? 0) + 1;
+    }
+    return super.request(
+      method,
+      path,
+      data: data,
+      audioPath: audioPath,
+      authenticated: authenticated,
+      accountId: accountId,
+    );
+  }
 }
 
 class _Api extends ApiClient {

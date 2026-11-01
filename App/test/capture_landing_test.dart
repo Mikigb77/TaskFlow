@@ -10,6 +10,7 @@ import 'package:agenda/l10n/region.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
@@ -1531,11 +1532,9 @@ void main() {
           (away) => clock = clock.add(away),
         );
         expect(Task.day(clock), Task.day(inDays(1)));
-        // The new day: yesterday's open tasks are now overdue, at its top.
-        expect(
-          find.textContaining(es.overdueCount(2).split(' · ').first),
-          findsOneWidget,
-        );
+        // The new day: its own rows lead; yesterday's open tasks, now
+        // overdue, follow them (P269, UX-2302).
+        expect(rows(tester).first, 'Tarea de las 8');
         expect(agendaScroll(tester).maxScrollExtent, greaterThan(0));
         expectTodayAtTop(tester);
         expect(tester.takeException(), isNull);
@@ -1556,6 +1555,154 @@ void main() {
         expect(rows(tester), isNot(contains('Comer con Ana')));
         expect(find.text(es.todayAgenda), findsNothing);
         expect(agendaScroll(tester).pixels, moreOrLessEquals(offset, epsilon: 0.5));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  group('P276 · a save the page can’t list lands on Calendar', () {
+    Finder taskPage() => find.byWidgetPredicate(
+      (widget) => widget is HomeScreen && !widget.isRoot,
+    );
+
+    /// Calendar's «Sin fecha · 1», tapped: the Sin fecha page.
+    Future<void> openSinFecha(WidgetTester tester) async {
+      final count = find.byKey(const ValueKey('calendar-inbox'));
+      await tester.ensureVisible(count);
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(of: count, matching: find.text(es.inboxCount(1))),
+        findsOneWidget,
+      );
+      await tester.tap(count);
+      await tester.pumpAndSettle();
+      expect(taskPage(), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.descendant(of: taskPage(), matching: find.byType(AppBar)),
+          matching: find.text(es.inbox),
+        ),
+        findsOneWidget,
+      );
+    }
+
+    /// Calendar in front on [day], [title]'s row lit and in view, clear of
+    /// the save message.
+    void expectLandedOn(WidgetTester tester, DateTime day, String title) {
+      expect(taskPage(), findsNothing, reason: 'the page was closed');
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(
+        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+        0,
+      );
+      expect(find.text(DateFormat.MMMMEEEEd('es').format(day)), findsOneWidget);
+      final saved = find.descendant(
+        of: find.byType(CalendarScreen),
+        matching: row(title),
+      );
+      expect(saved.hitTestable(), findsOneWidget);
+      expect(tester.widget<TaskTile>(saved).color, lit(tester));
+      expect(
+        tester.getRect(saved).bottom,
+        lessThanOrEqualTo(tester.getRect(find.byType(SnackBar)).top),
+      );
+    }
+
+    testWidgets(
+      'UX-2307: from Calendar’s «Sin fecha · 1», a capture saved for tomorrow on the Sin fecha page lands on Calendar on tomorrow with the row lit and «Añadida al …» with Deshacer; Deshacer removes it',
+      (tester) async {
+        final tomorrow = inDays(1);
+        final app = await _App.open(tester, [
+          Task(id: 1, title: 'Ordenar el trastero', priority: 1),
+        ]);
+        await openSinFecha(tester);
+        app.api.found = [found('Comprar pilas', on: tomorrow)];
+        await app.say(tester, 'Mañana comprar pilas');
+        expect(find.byType(CaptureResult), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('save-drafts')));
+        await tester.pumpAndSettle();
+
+        expectLandedOn(tester, tomorrow, 'Comprar pilas');
+        final calendar = tester.element(find.byType(CalendarScreen));
+        final message = es.taskAddedOn(calendar.weekdayDate(tomorrow));
+        expect(message, startsWith('Añadida al '));
+        expect(
+          find.descendant(
+            of: find.byType(SnackBar),
+            matching: find.text(message),
+          ),
+          findsOneWidget,
+        );
+        final undo = find.descendant(
+          of: find.byType(SnackBar),
+          matching: find.text(es.undo),
+        );
+        expect(undo, findsOneWidget);
+
+        await tester.tap(undo);
+        await tester.pumpAndSettle();
+        expect(app.tasks.titles(), isNot(contains('Comprar pilas')));
+        expect(app.tasks.titles(), contains('Ordenar el trastero'));
+        expect(app.store.undos, 1);
+        expect(
+          find.descendant(
+            of: find.byType(CalendarScreen),
+            matching: row('Comprar pilas'),
+          ),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2307: on a project page, a dictation that puts its task in another project lands on Calendar on the task’s day, with the row lit',
+      (tester) async {
+        final day = inDays(3);
+        final app = await _App.open(
+          tester,
+          [],
+          projects: [
+            TaskListInfo(id: 'casa', name: 'Casa'),
+            TaskListInfo(id: 'trabajo', name: 'Trabajo'),
+          ],
+        );
+        await tester.tap(
+          find.descendant(
+            of: find.byType(NavigationBar),
+            matching: find.text(es.tasks),
+          ),
+        );
+        await tester.pumpAndSettle();
+        unawaited(
+          Navigator.of(tester.element(find.byType(HomeScreen))).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const HomeScreen(isRoot: false, listId: 'casa'),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(taskPage(), findsOneWidget);
+        app.api.found = [
+          {...found('Preparar la reunión', on: day), 'list_id': 'trabajo'},
+        ];
+        await app.say(tester, 'Preparar la reunión de trabajo');
+        expect(find.byType(CaptureResult), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('save-drafts')));
+        await tester.pumpAndSettle();
+
+        final saved = app.tasks.state.requireValue.singleWhere(
+          (task) => task.title == 'Preparar la reunión',
+        );
+        expect(saved.listId, 'trabajo');
+        expectLandedOn(tester, day, 'Preparar la reunión');
+        expect(
+          find.descendant(
+            of: find.byType(SnackBar),
+            matching: find.text(es.undo),
+          ),
+          findsOneWidget,
+        );
         expect(tester.takeException(), isNull);
       },
     );
@@ -1582,6 +1729,8 @@ class _App {
     // The app's clock (calendarClockProvider), read each time it is asked.
     DateTime Function()? clock,
     double textScale = 1,
+    // The account's projects, for project pages.
+    List<TaskListInfo> projects = const [],
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -1611,7 +1760,7 @@ class _App {
             ),
           ),
         ),
-        taskListsProvider.overrideWith((ref) async => []),
+        taskListsProvider.overrideWith((ref) async => projects),
         apiClientProvider.overrideWithValue(api),
         taskRepositoryProvider.overrideWithValue(cloud ?? MemoryTasks()),
         taskProvider.overrideWith(
