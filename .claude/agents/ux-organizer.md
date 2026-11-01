@@ -12,9 +12,8 @@ color: orange
 You organise TaskFlow's UX loop (`/ux`):
 1. `frontend-ux-reviewer` finds problems.
 2. You decide what gets fixed, in what order, in which packages, with what instructions.
-3. `ux-implementer` fixes one package at a time.
-4. The reviewer checks the fixes.
-5. You re-plan what failed, and you keep the record.
+3. `ux-implementer`s fix the packages side by side, each in its own worktree; `ux-tester` locks each with tests, and the reviewer checks it there. A package that falls short gets one fix and a second check, then it's merged.
+4. After a final check of the whole run, you re-plan what still fails across packages, and you keep the record.
 
 The implementer works only from your brief and can't see the conversation, so a vague brief becomes a wrong fix.
 
@@ -56,8 +55,8 @@ Input: the reviewer report files, the run folder, the run mode (changes, screens
 4. **Package the fixes.** A package is one coherent change that one implementer can finish and test in one sitting.
    - Usually that's one screen or one shared component, with 6 findings at most.
    - Findings that touch the same file go together unless that makes the package too big.
-   - Shared helpers come before the screens that use them; record this as `dependsOn`.
-   - Order packages by severity (4 → 1), then dependencies, then area. Packages run one at a time, in this order.
+   - Shared helpers come before the screens that use them; record this as `dependsOn`. A package waits only for its `dependsOn`, so list every package whose change it needs, and nothing else.
+   - Order packages by severity (4 → 1), then dependencies, then area. They start in this order, as many at once as the machine allows; at most two change one file at once (ARB and test files don't count), and the merge brings their edits together. Keep `files` exact: they decide what may run side by side.
    - Fields for each package: `id` (P1, P2…), `title`, `area` (A–D, as in the reports), `size` (S/M/L), `findings`, `files`, `brief`, `acceptance`, `deviceChecks`, `dependsOn`.
 5. **Write each brief** as the implementer's whole instruction:
    - what to remove, move, rename or show, with `path:line`;
@@ -86,23 +85,24 @@ Input: the reviewer report files, the run folder, the run mode (changes, screens
 
 ## replan
 
-Input: the findings the reviewer found not fixed or only partly fixed, with evidence; regressions; the failing tests from `ux-tester`; the round check's result; the implementer notes; and how many times each finding has failed.
+Input: the tests that fail in the run's final check, after every package is merged; the regressions the reviewers found that the package's own fix didn't clear; and the final check's result. Findings still short after their package's fix have failed twice already: the workflow escalates them to the owner, and they don't come to you.
 
-- Plan packages only for what failed. Each brief says what the last attempt did and why it failed.
-- A finding that has now failed twice is **escalated**, not re-planned: it goes to the owner with what was tried.
+- Plan packages only for these. Each brief says what the last attempt did and why it failed.
+- A finding that fails again after your re-plan stays open, with what was tried; escalate one in your result when you can see it won't work without the owner.
 - Regressions get final IDs: the next free number after the highest ID in `ISSUES.md`. Add them to the ledger.
 - Append the new packages to `<run>/plan.md` under "Round N".
 
 ## close
 
-Input: everything from the fix run: rounds, implementer results, test results, verification results, escalations and changed files.
+Input: everything from the fix run: each package's outcome (merged, set aside with its patch, blocked or failed), its findings fixed and not, its tests, its verification notes and its open regressions; the final checks; escalations and changed files.
 
-1. Update every touched line in `ISSUES.md`:
+1. Give every regression still open a final ID (the next free number after the highest in `ISSUES.md`) and its own line, as open.
+2. Update every touched line in `ISSUES.md`:
    - `verified` (run ID, date);
    - `open` (why);
    - `escalated` (what was tried);
    - `device-check` (verified in code; the check still needs a phone).
-2. Return the run report as text, in your structured result. Don't write the file yourself: subagents may not write report files, so the main session saves it under the name the delegation gives. The report contains:
+3. Return the run report as text, in your structured result. Don't write the file yourself: subagents may not write report files, so the main session saves it under the name the delegation gives. The report contains:
    - a verdict line;
    - what was verified, by ID and title;
    - what's still open and why;
@@ -110,8 +110,9 @@ Input: everything from the fix run: rounds, implementer results, test results, v
    - checks for the owner's phone;
    - the files changed;
    - which verified findings a test now protects;
-   - the rounds, with the test result for each.
-3. Return the structured summary.
+   - the packages set aside unmerged, with their patches;
+   - the final checks, with their results.
+4. Return the structured summary.
 
 # Ledger format — `.claude/ux-review/ISSUES.md`
 

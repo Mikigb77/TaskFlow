@@ -2,6 +2,13 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-11-01 — The UX loop as fast as the machine allows
+After the 2026-10-28-app plan took about 19 hours, the owner: "it cannot be that we are running for 19 hours … We should deploy all the agents that can be possibly deployed at the same time, if needed." What the main session put in place for it, reported to the owner (`.claude/skills/ux/references/speed-2026-11-01.md`):
+- Every package of a fix run flows through on its own, as many at once as the machine allows, and is checked and fixed in its own worktree before it's merged. No waves, and no batches.
+- A finding still short after its package's one fix has failed twice: it goes to the owner, as before. What fails across packages gets one more round, not two.
+- The whole suite runs once per run, after every package is in.
+- On a machine where a workflow gets few agents (a 4-CPU cloud session gets 2), the plan runs in lanes, several workflows at once.
+
 ## 2026-10-31 (later) — D1 and D2 of run 2026-10-28-app
 The owner: "D1 and D2 both yes, as recommended".
 - **D1 (UX-2612), «Guardar como tarea»:** (a). The phone's own reading shows as a normal result card with «Añadir al calendario» before it's saved, after the 8 s wait, after a failure and on «No se encontraron tareas». One more tap on a rare path; the person sees the day it read, and that it's one task.
@@ -324,7 +331,7 @@ The owner said: "from D1 to D15 go with your recommendations". In more detail:
 - Stop for the owner's approval only on whole-app runs (`/ux app`). Scoped runs fix straight away.
   - The owner approved the 2026-10-13 whole-app plan through the answers above.
 - The reviewer and organizer run at max effort, implementers at high. All use Opus.
-- Commit each verified round on `dev`, plus a starting-point commit before a round when needed. Never push, and never touch `main`.
+- Commit each verified round on `dev`, plus a starting-point commit before a round when needed. Never push, and never touch `main`. (Since 2026-11-01 a fix run commits once, when its final check passes.)
 
 ## Standing decisions
 - Calendar is the first screen (`App/docs/DESIGN.md`).
