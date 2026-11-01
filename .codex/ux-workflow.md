@@ -84,8 +84,11 @@ and web loops sequentially, with only one source writer or test runner active.
    Supply the package, relevant findings/rules, acceptance criteria and allowed
    paths. Do not broaden an app/web UX fix into backend or infrastructure work.
 5. **Test.** A separate tester receives the plan's acceptance criteria and changed
-   paths. It may edit tests, not product code. Run focused meaningful checks per
-   package, and the domain's whole suite once per run, after the last package. Preserve true exit codes: for WSL
+   paths. It may edit tests, not product code. Every step of a package runs the
+   domain's package check (`.claude/skills/ux/scripts/check.py`), which runs only the checks and
+   tests its change touches (`--list` shows what and why); the domain's whole
+   suite runs once per run, after the last package, and what fails there is
+   repaired once and re-checked with the package check. Preserve true exit codes: for WSL
    pipelines use `set -o pipefail`; truncating output must not hide a failed test.
    Update affected previews after edits. Do not repeat green suites without a
    new change or unresolved concern.
@@ -95,7 +98,8 @@ and web loops sequentially, with only one source writer or test runner active.
    failure leaves the affected check pending/blocked, never passed.
 7. **Retry.** Fix a package that falls short once, right after its check, and
    check it again. A finding still short after that has failed twice: escalate
-   it. Re-plan only what fails across packages in the run's final check, in at
+   it. Re-plan only what the run's final check finds and its repair can't clear,
+   re-checked afterwards with the package check, in at
    most one follow-up round (2026-11-01: the owner asked for runs as fast as the
    machine allows). Stop retrying unavailable infrastructure; report what would
    unblock it.

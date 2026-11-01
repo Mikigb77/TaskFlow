@@ -140,7 +140,7 @@ When it returns:
 
 ## 6. Fix and verify — workflow `ux-fix`
 
-Every package flows through on its own, in its own git worktree: ux-implementer, then ux-tester (tests, and renders of its screens), then frontend-ux-reviewer; if it falls short, one fix and a second check; then it's merged into the main checkout. A package starts as soon as its `dependsOn` are merged and an agent is free; it never waits for unrelated packages. When every package is in, one final check runs the analyzer, the whole suite and the previews; what still fails is re-planned once. How it works: `.claude/skills/ux/references/loop.md`, step 5.
+Every package flows through on its own, in its own git worktree: ux-implementer, then ux-tester (tests, and renders of its screens), then frontend-ux-reviewer; if it falls short, one fix and a second check; then it's merged into the main checkout. A package starts as soon as its `dependsOn` are merged and an agent is free; it never waits for unrelated packages. Each step of a package tests only what it touched, through the package check (`scripts/check.py`): l10n generation, the analyzer on the files it changed and the files that use them, and only the tests that cover them, chosen from the imports and the ARB keys it changed. When every package is in, one final check runs the analyzer, the whole suite and the previews: the run's only whole-suite run. What it finds goes to one repair in the main checkout, re-checked the same targeted way; what still fails is re-planned once, and that round is re-checked the same way too. How it works: `.claude/skills/ux/references/loop.md`, step 5.
 
 1. **Make the starting point.** If `git status --porcelain` shows uncommitted user-facing changes, commit exactly those files first, so the run's own commit can be reverted on its own. Message: `Changes reviewed by the UX loop (<run id>)`, plus the attribution line.
 2. **Get ready.**
@@ -150,15 +150,14 @@ Every package flows through on its own, in its own git worktree: ux-implementer,
    - While it runs, don't edit, commit, stash or switch branches in the main checkout: every package's worktree is seeded from it, and every merge writes it.
 3. **Run it.** Call the Workflow tool with `scriptPath` set to the absolute path of `.claude/skills/ux/workflows/ux-fix.js`, and args `{ runId, runDir, date, repoRoot, heavySlots, skip, only, notes }`:
    - `repoRoot` is `git rev-parse --show-toplevel`, with forward slashes.
-   - `heavySlots` is 3, or 2 on a machine with 4 CPUs or fewer. Every Flutter command, of every run and lane at once, waits for one of these slots.
+   - `heavySlots` is 3. Every Flutter command, of every run and lane at once, waits for one of these slots. The package checks are short (a few test files each), so 3 fit a 4-CPU cloud session too.
    - For `/ux fix`, the run folder is the newest one under `runs/` that has a `plan.json` but no `report.md`.
    - Leave `maxParallel`, `agents`, `fileLimit`, `fixAttempts` and `maxExtraRounds` at their defaults unless the owner asks.
    - Save the args of every run you start, with its run ID: resuming needs exactly the same args.
 
-   **Lanes, on a machine with fewer than 8 CPUs** (a cloud session has 4): run the plan as several workflows at once, so each brings its own agents.
-   1. Split it: `python -I -X utf8 .claude/skills/ux/scripts/pkg.py <runDir> --lanes 4`, adding `--only …` or `--skip …` as the owner asked. It prints each lane's packages; packages that depend on each other share a lane.
-   2. Start one run per lane, all in the same message: the args above plus `part: "packages"`, `lane: "L1"` (`"L2"`, …) and `only` set to that lane's packages.
-   3. When every lane has returned, start one more run with the same args plus `part: "finish"` and `laneResults` set to the list of the lanes' results, unchanged. It runs the final check, the re-plan and the record. Its result is what step 4 uses.
+   **Lanes.** First split the plan: `python -I -X utf8 .claude/skills/ux/scripts/pkg.py <runDir> --lanes auto`, adding `--only …` or `--skip …` as the owner asked. It prints the lanes for this machine; packages that depend on each other share a lane. With one lane (8 CPUs or more), run the plan as one run, as above. On a smaller machine (a cloud session has 4 CPUs, so 2 agents per workflow) it prints one lane per 5 packages, up to 6, and the plan runs as that many workflows at once, each with its own agents:
+   1. Start one run per lane, all in the same message: the args above plus `part: "packages"`, `lane: "L1"` (`"L2"`, …) and `only` set to that lane's packages.
+   2. When every lane has returned, start one more run with the same args plus `part: "finish"` and `laneResults` set to the list of the lanes' results, unchanged. It runs the final check, the repair, the re-plan and the record. Its result is what step 4 uses.
 4. **When it returns:**
    - **Save the report.** Write `close.report` to `<runDir>/<reportName>`. Subagents may not write report files, so the organizer returns the text.
    - **`testsPassed` is true:** commit the run.
@@ -179,7 +178,7 @@ Run the whole approved plan in one run, or one set of lanes. Don't split it into
 
 ### How long it takes
 
-The 2026-10-28-app plan (32 packages) took about 15 hours in a 4-CPU cloud session on 2026-10-31 and 11-01: three batches of waves, two agents at a time, with up to three rounds each. With packages flowing through on their own, the same plan comes to about 6–7 hours there in one run, 2½–3 hours in 4 lanes, and about 2 hours on a 16-CPU PC. These are estimates from that run's measured step times, not a measured run. Where the time went, and why: `references/speed-2026-11-01.md`.
+The 2026-10-28-app plan (32 packages) took about 15 hours in a 4-CPU cloud session on 2026-10-31 and 11-01: three batches of waves, two agents at a time, with up to three rounds each, and `flutter test` was 37% of all agent time. With packages flowing through on their own, each step testing only what it touched and the whole suite run once, the same plan comes to about 1½–2 hours there in 6 lanes, and about 1½ hours on a 16-CPU PC. These are estimates from that run's measured step times, not a measured run. Where the time went, and why: `references/speed-2026-11-01.md`.
 
 ## 7. Tell the owner
 
@@ -193,7 +192,7 @@ Keep it short; the details live in `report.md`.
 ## Size and cost
 
 - **Each package:** an implementer, a tester and a reviewer; a fix and a second check when it falls short; a share of a merge step (a small model runs it). A conflict at merge adds an integrator.
-- **Each run:** a load step, one final check, the record and the reviewer's memory; a re-plan and its packages if the final check fails.
+- **Each run:** a load step, one final check (the only whole-suite run), the record and the reviewer's memory; a repair if the final check fails, and a re-plan, its packages and a targeted re-check if the repair can't clear it.
 - **Scoped run, one area:** 1 reviewer and 1 organizer, then about 4–6 agents per package. A two-package run is about 12–15 agents.
 - **Whole app:** 6 reviewers and 1 organizer, then the same per package. A large plan takes hours; see "How long it takes" above.
 

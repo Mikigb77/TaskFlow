@@ -299,18 +299,18 @@ def merge_text(base, ours, theirs, marked=False, union=True):
 
 # ---------------------------------------------------------------- gate
 
-def gate(args):
-    """Runs a heavy command (Flutter, a build) once one of the machine's slots is free, so many
-    implementers can think and edit in parallel while only a few compile at a time. A slot is
-    a lock on a file in the main repo's git folder; the OS releases it if the process dies."""
-    command = args.argv
-    if command and command[0] == "--":
-        command = command[1:]
-    if not command:
-        raise SystemExit("gate needs a command after --")
-    slots = max(1, int(args.slots or os.environ.get("UX_GATE_SLOTS") or 3))
+@contextmanager
+def gate_slot(slots=None, pool="app"):
+    """Holds one of the machine's slots for heavy commands (Flutter, a build) while the block
+    runs, so many implementers can think and edit in parallel while only a few compile at a
+    time. A slot is a lock on a file in the main repo's git folder; the OS releases it if the
+    process dies. A process the gate started (UX_GATE_HELD names its pool) holds a slot already."""
+    slots = max(1, int(slots or os.environ.get("UX_GATE_SLOTS") or 3))
     # One pool per loop and repo; the website's loop keeps its own, in its own repo.
-    pool = re.sub(r"[^a-z0-9-]", "", (args.pool or "app").lower()) or "app"
+    pool = re.sub(r"[^a-z0-9-]", "", (pool or "app").lower()) or "app"
+    if os.environ.get("UX_GATE_HELD") == pool:
+        yield 0.0
+        return
     common = git(Path(__file__).resolve().parent, "rev-parse", "--path-format=absolute", "--git-common-dir")
     lock_dir = Path(common) / f"ux-gate-{pool}"  # the main repo's .git, from any of its worktrees
     lock_dir.mkdir(parents=True, exist_ok=True)
@@ -330,13 +330,30 @@ def gate(args):
             waited += 2
     if waited:
         print(f"[gate] waited {waited:.0f} s for a slot", file=sys.stderr, flush=True)
+    previous = os.environ.get("UX_GATE_HELD")
+    os.environ["UX_GATE_HELD"] = pool
     try:
+        yield waited
+    finally:
+        if previous is None:
+            os.environ.pop("UX_GATE_HELD", None)
+        else:
+            os.environ["UX_GATE_HELD"] = previous
+        handle.close()
+
+
+def gate(args):
+    """Runs a heavy command once one of the machine's slots is free (gate_slot)."""
+    command = args.argv
+    if command and command[0] == "--":
+        command = command[1:]
+    if not command:
+        raise SystemExit("gate needs a command after --")
+    with gate_slot(args.slots, args.pool):
         if len(command) == 1:  # one command line, for the shell
             return subprocess.run(command[0], shell=True).returncode
         exe = shutil.which(command[0]) or command[0]
         return subprocess.run([exe, *command[1:]]).returncode
-    finally:
-        handle.close()
 
 
 class NotSeeded(Exception):

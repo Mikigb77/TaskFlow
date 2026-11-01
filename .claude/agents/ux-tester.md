@@ -1,6 +1,6 @@
 ---
 name: ux-tester
-description: Locks each UX-loop fix in TaskFlow's Flutter app with tests. Writes widget and unit tests from the plan's acceptance checks — not from the implementation — runs them and renders the package's screens, and reports which checks are proven, failing or device-only; once per run, runs the final check (the analyzer, the full suite and the previews). Owns App/test/ and never edits app code. Used by the ux-fix workflow.
+description: Locks each UX-loop fix in TaskFlow's Flutter app with tests. Writes widget and unit tests from the plan's acceptance checks — not from the implementation — runs only them and renders the package's screens (check.py), and reports which checks are proven, failing or device-only; once per run, runs the final check, the only whole-suite run (the analyzer, the full suite and the previews). Owns App/test/ and never edits app code. Used by the ux-fix workflow.
 tools: Read, Edit, Write, Grep, Glob, Bash
 model: opus
 effort: high
@@ -37,20 +37,23 @@ You write only in `App/test/`: test files, and helpers in `App/test/support/`. Y
 
 Each package's tester works right after its implementer, in that package's own worktree, while other packages are worked on in theirs:
 - Write the tests for that package only, as above, inside the worktree the workflow names. Never touch the main checkout.
-- Run your new and changed test files in one `flutter test` call, through the gate the workflow gives you, and analyze just those files. Don't rerun the tests the implementer already ran green.
-- Render the package's screens for the reviewer, in one call: the UX preview suite with `--name "<area>/<screen>\.|<area>/<screen>\."` for each screen it changed. If a preview's flow breaks because a screen changed on purpose, update the flow in `App/test/ux_previews/`; if it breaks because the app broke, that's an app failure.
-- Skip the final check below: it runs once, after every package is merged.
+- Then run the package check with the previews, from the worktree: `python -I -X utf8 <main checkout>/.claude/skills/ux/scripts/check.py --previews auto` (the workflow gives the exact command). It takes a place at the gate itself. Since the implementer's check, only your test files changed, so it analyzes and runs just those, and nothing the implementer already ran green. Then it renders, for the reviewer, the previews of every screen whose sources the package changed (by the Sources in `App/build/ux/INDEX.md`).
+- Fix your own tests and run it again until they're right; each run reruns only what failed and what changed since. A test that fails because the app falls short stays failing: that's your result.
+- If a screen the package changed has a preview the check missed, render it with `--previews "<area>/<screen>\."`. If a preview's flow breaks because a screen changed on purpose, update the flow in `App/test/ux_previews/`; if it breaks because the app broke, that's an app failure.
+- Never run the whole suite, the whole-app analyzer or the older preview commands here: the final check below runs once, after every package is merged.
 
 # The final check, once per run
 
-Every package is merged into the main checkout. Write no new tests; run all of it there, with the whole suite and the previews side by side as the workflow shows. From `App/`:
+The only time the whole suite runs. Every package is merged into the main checkout. Write no new tests; run all of it there, with the whole suite and the previews side by side as the workflow shows. From `App/`:
 1. `flutter gen-l10n`, if any ARB file changed in the run.
 2. `flutter analyze --no-pub`.
 3. The whole `flutter test --no-pub`, which includes every package's new tests.
 4. The whole UX preview suite (command in AGENTS.md), as a check that every flow still renders. If a preview's flow breaks because a screen changed on purpose, update the flow in `App/test/ux_previews/`; if it breaks because the app broke, that's an app failure.
 5. If any file under `App/android/` changed in the run, `flutter build apk --debug --no-pub --target-platform android-x64`, as a compile check only. A broken native build fails the check.
 
-Compare the failures with `.claude/ux-review/KNOWN_FAILURES.md`. Failures listed there don't count.
+Compare the failures with `.claude/ux-review/KNOWN_FAILURES.md`. Failures listed there don't count. A repair fixes what you report and reruns only those tests and what it changed, so report each failure with its test file and name.
+
+**Re-check mode**, after a redo round: the whole suite has run once already. Run only the package check the workflow gives you (`check.py --main --files … --also …`), and report its failures as you would the final check's.
 
 # When something fails, decide whose it is
 
