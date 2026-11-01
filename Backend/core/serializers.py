@@ -1,5 +1,6 @@
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from django.contrib.auth.password_validation import validate_password
+from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework import serializers
 from .models import User, Task, TaskList, TaskGroup, ProjectPreference, TaskReminder
@@ -185,6 +186,9 @@ class TaskSerializer(serializers.ModelSerializer):
     repeat_until = serializers.DateField(allow_null=True, required=False, default=None)
     completed_dates = serializers.ListField(child=serializers.DateField(), max_length=10000, required=False, default=list)
     priority = serializers.IntegerField(min_value=1, max_value=3, default=1)
+    # Sent by the app with the moment of the tick; without one the server keeps what it has.
+    completed_at = serializers.DateTimeField(allow_null=True, required=False)
+    completed_times = serializers.DictField(child=serializers.DateTimeField(), required=False)
     reminder_minutes = serializers.IntegerField(min_value=-1, max_value=10080, allow_null=True, required=False, write_only=True)
     reminder_time = serializers.IntegerField(min_value=0, max_value=1439, allow_null=True, required=False, write_only=True)
     reminder_plan = serializers.JSONField(allow_null=True, required=False, write_only=True)
@@ -305,7 +309,7 @@ class TaskSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ["id", "kind", "title", "due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "reminder_anchor", "recurrence", "repeat_until", "repeat_interval", "repeat_weekdays", "exceptions", "completed_dates", "priority", "reminder_minutes", "reminder_time", "reminder_plan", "notes", "checklist", "list_id", "labels", "is_completed", "is_deleted", "version", "created_at", "updated_at", "assignment", "assignee_id", "assignee_name", "created_by", "created_by_name"]
+        fields = ["id", "kind", "title", "due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "reminder_anchor", "recurrence", "repeat_until", "repeat_interval", "repeat_weekdays", "exceptions", "completed_dates", "priority", "reminder_minutes", "reminder_time", "reminder_plan", "notes", "checklist", "list_id", "labels", "is_completed", "completed_at", "completed_times", "is_deleted", "version", "created_at", "updated_at", "assignment", "assignee_id", "assignee_name", "created_by", "created_by_name"]
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate(self, attrs):
@@ -353,7 +357,36 @@ class TaskSerializer(serializers.ModelSerializer):
         if day and attrs.get("repeat_until") and attrs["repeat_until"] < day:
             raise serializers.ValidationError({"repeat_until": "The end date must be on or after the start date."})
         attrs["completed_dates"] = sorted({value.isoformat() for value in attrs.get("completed_dates", [])})
+        self.validate_completion_times(attrs, repeat)
         return attrs
+
+    def validate_completion_times(self, attrs, repeat):
+        """When each completion happened (D2, docs/COMPLETION_TIMES.md). A time the app sends
+        wins, clamped to now; else the one kept; else now for a completion new in this save.
+        Completions from before the server kept times have none."""
+        now, task = timezone.now(), self.instance
+        sent_at, sent = attrs.pop("completed_at", None), attrs.pop("completed_times", None) or {}
+        if repeat == "none":
+            done = attrs.get("is_completed", getattr(task, "is_completed", False))
+            was_done = bool(task and task.is_completed)
+            if not done:
+                at = None
+            elif sent_at:
+                at = min(sent_at, now)
+            else:
+                at = task.completed_at if was_done else now
+            attrs.update(completed_at=at, completed_times={})
+            return
+        kept, before = (task.completed_times, set(task.completed_dates)) if task else ({}, set())
+        times = {}
+        for day in attrs["completed_dates"]:
+            if sent.get(day):
+                times[day] = min(sent[day], now).isoformat()
+            elif day in kept:
+                times[day] = kept[day]
+            elif day not in before:
+                times[day] = now.isoformat()
+        attrs.update(completed_at=None, completed_times=times)
 
 
 class DraftRequestSerializer(serializers.Serializer):

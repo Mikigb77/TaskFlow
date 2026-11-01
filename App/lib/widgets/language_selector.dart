@@ -61,10 +61,12 @@ class _LanguageSheetState extends ConsumerState<_LanguageSheet> {
       await ref
           .read(regionalProvider.notifier)
           .set(ref.read(regionalProvider).withLanguage(language));
-      // The widget, the shortcuts and the share messages follow (Android 13+).
-      unawaited(AppLanguageBridge.apply(language));
-      await TaskReminders.refreshLanguage();
+      // The sheet closes once the language is saved. The widget, the
+      // shortcuts and the share messages (Android 13+) and the reminders
+      // follow afterwards; each records its own errors.
       if (mounted) Navigator.pop(context);
+      unawaited(AppLanguageBridge.apply(language));
+      unawaited(TaskReminders.refreshLanguage());
     } catch (_) {
       if (mounted) {
         showFeedback(

@@ -3,6 +3,8 @@ import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/checklist_editor.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
+import 'dart:ui' show CheckedState;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -196,4 +198,90 @@ void main() {
       },
     );
   }
+
+  // ---- UX loop 2026-10-28-app, round 1 · P293 (UX-2415): each step reads
+  // once ----
+  group('P293 · steps read once', () {
+    /// Every node TalkBack can reach, as (label, is a checkbox, is a button).
+    List<({String label, bool checkbox, bool button})> nodes(
+      WidgetTester tester,
+    ) {
+      final found = <({String label, bool checkbox, bool button})>[];
+      void visit(SemanticsNode node) {
+        final data = node.getSemanticsData();
+        if (data.label.isNotEmpty || data.tooltip.isNotEmpty) {
+          found.add((
+            label: [data.label, data.tooltip]
+                .where((part) => part.isNotEmpty)
+                .join(' '),
+            checkbox: data.flagsCollection.isChecked != CheckedState.none,
+            button: data.flagsCollection.isButton,
+          ));
+        }
+        node.visitChildren((child) {
+          visit(child);
+          return true;
+        });
+      }
+
+      visit(tester
+          .renderObject(find.byType(ChecklistEditor))
+          .owner!
+          .semanticsOwner!
+          .rootSemanticsNode!);
+      return found;
+    }
+
+    for (final language in ['es', 'ca', 'en']) {
+      testWidgets(
+        'UX-2415: in the form ($language), each step is read once, as its checkbox labelled with its title, plus its ⋮; no separate text node for the title',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          final l = lookupAppLocalizations(Locale(language));
+          var items = [
+            ChecklistItem(title: 'Meriendas'),
+            ChecklistItem(title: 'Cuadernos').setDone(true),
+          ];
+          await tester.pumpWidget(MaterialApp(
+              locale: Locale(language),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: Scaffold(
+                  body: StatefulBuilder(
+                      builder: (context, setState) => SingleChildScrollView(
+                          child: ChecklistEditor(
+                              items: items,
+                              onChanged: (next) =>
+                                  setState(() => items = next)))))));
+          await tester.pumpAndSettle();
+          final all = nodes(tester);
+          for (final title in ['Meriendas', 'Cuadernos']) {
+            final reading = all
+                .where((node) => node.label.contains(title))
+                .toList();
+            final checkbox = reading.where((node) => node.checkbox).toList();
+            expect(checkbox, hasLength(1), reason: '$title: $reading');
+            expect(checkbox.single.label, title, reason: '$title: $reading');
+            final menu = reading.where(
+              (node) => node.label == l.editCaptureItem(title),
+            );
+            expect(menu, hasLength(1), reason: '$title’s ⋮: $reading');
+            expect(menu.single.button, isTrue);
+            expect(menu.single.checkbox, isFalse);
+            expect(
+              reading,
+              hasLength(2),
+              reason: 'the checkbox and the ⋮, nothing else: $reading',
+            );
+          }
+          // The merged step still ticks.
+          await tester.tap(find.byType(Checkbox).first);
+          await tester.pumpAndSettle();
+          expect(items.first.completed, isTrue);
+          semantics.dispose();
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  });
 }

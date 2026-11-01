@@ -40,6 +40,16 @@ const editTask = Screen(
   sources: ['lib/screens/edit_task_screen.dart', ..._editorSources],
 );
 
+const repeatSheet = Screen(
+  'form',
+  'repeat-sheet',
+  'The repeat sheet, from the form\'s Repetir under Más detalles',
+  sources: [
+    'lib/widgets/repeat_rule_control.dart',
+    'lib/widgets/task_editor.dart',
+  ],
+);
+
 final _club = TaskListInfo(
   id: 'club',
   name: 'Club de lectura',
@@ -273,6 +283,45 @@ void formPreviews() {
           projects: [...allProjects, _club],
         );
         await app.push('/editTask', arguments: 62);
+        await p.shoot();
+      },
+    );
+
+    // P281 (UX-2407, UX-2413): the five choices as one-tap rows; P301
+    // (UX-2621, UX-2622): the ticked one's details under a line, Listo pinned;
+    // P306 (UX-2632): a thumb and a line above Listo while they scroll.
+    preview(
+      repeatSheet,
+      'open',
+      'Editing a task, Más detalles → Repetir, then «Cada semana» tapped: the five rows with «Cada semana» ticked, a line, then its details: the interval, the weekday chips and the end date, which at 2× go on below, by scrolling; Listo pinned at the foot, always in view. A scrollbar thumb beside the details and a line above Listo show that they go on: at 2× by a few hundred dp, and here at 1× too, where with no weekday chosen the end-date row runs 16 dp under the line; when everything fits, neither shows.',
+      [es1, es2, ca2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: [...normalDay(), _pickup()],
+          projects: allProjects,
+        );
+        await app.push('/editTask', arguments: 60);
+        for (final key in ['task-more-details', 'task-repeat']) {
+          final target = find.byKey(ValueKey(key));
+          await p.tester.ensureVisible(target);
+          await p.tester.pumpAndSettle();
+          await p.tester.tap(target);
+          await p.tester.pumpAndSettle();
+        }
+        final weekly = find.byKey(const ValueKey('repeat-weekly'));
+        await p.tester.ensureVisible(weekly);
+        await p.tester.pumpAndSettle();
+        await p.tester.tap(weekly);
+        await p.tester.pumpAndSettle();
+        // Back to the sheet's top, its title in view.
+        await p.tester.ensureVisible(
+          find.descendant(
+            of: find.byType(BottomSheet),
+            matching: find.text(p.l.repeat),
+          ),
+        );
+        await p.tester.pumpAndSettle();
         await p.shoot();
       },
     );

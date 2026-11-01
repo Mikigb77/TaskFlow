@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The voice shortcut's microphone, teal on the adaptive icon's mint background:
+     the 24 dp glyph of drawable/capture_shortcut_voice.xml at 2x, centred in the
+     108 dp canvas as the launcher icon's tick is. The microphone spans 34-72 dp,
+     about half the 72 dp safe zone, so it reads at about 16 dp in the
+     launcher's circle (UX-2112). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="2"
+        android:scaleY="2"
+        android:translateX="30"
+        android:translateY="30">
+        <path
+            android:fillColor="#167568"
+            android:pathData="M12,14c1.66,0 3,-1.34 3,-3V5c0,-1.66 -1.34,-3 -3,-3S9,3.34 9,5v6c0,1.66 1.34,3 3,3zM17,11c0,2.76 -2.24,5 -5,5s-5,-2.24 -5,-5H5c0,3.53 2.61,6.43 6,6.92V21h2v-3.08c3.39,-0.49 6,-3.39 6,-6.92z" />
+    </group>
+</vector>

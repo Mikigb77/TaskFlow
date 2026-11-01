@@ -6,7 +6,9 @@ import 'package:agenda/models/reminder_plan.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/screens/account_screen.dart';
 import 'package:agenda/screens/other_settings_screen.dart';
+import 'package:agenda/services/capture_entries.dart';
 import 'package:agenda/services/capture_problem.dart';
+import 'package:agenda/services/reminder_preferences.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
@@ -142,15 +144,59 @@ List<CaptureSession> _kept({bool recordingOnly = false}) => [
   ],
 ];
 
+/// A launcher that can't add the widget itself, so Otros ajustes explains how.
+class _NoPinLauncher extends CaptureEntries {
+  _NoPinLauncher()
+    : super(channel: const MethodChannel('taskflow/capture-entries-preview'));
+  @override
+  Future<bool> pinWidget() async => false;
+}
+
 void settingsPreviews() {
   previewArea('settings', 'Ajustes', () {
     preview(
       settingsTab,
       'normal',
-      'Ajustes with reminders on.',
+      'Ajustes with reminders on, and Pro active: the TaskFlow Pro row reads «Pro está activo».',
       [...mainScreen, ca2],
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay());
+        await app.tab(p.l.settings);
+        await p.shoot();
+      },
+    );
+
+    preview(
+      settingsTab,
+      'free',
+      'An account without Pro, 4 free dictations left: the TaskFlow Pro row reads «Te quedan 4 dictados gratis este mes».',
+      [es1, es2, ca2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          pro: false,
+          user: account(freeLeft: 4, storageMb: 42),
+          billing: FakeRevenueCat()..info = billingInfo(),
+        );
+        await app.tab(p.l.settings);
+        await p.shoot();
+      },
+    );
+
+    preview(
+      settingsTab,
+      'free-used-up',
+      'An account without Pro and no free dictation left: the TaskFlow Pro row reads «Ya no te quedan dictados gratis este mes».',
+      [es1, es2, ca2],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          pro: false,
+          user: account(freeLeft: 0, storageMb: 42),
+          billing: FakeRevenueCat()..info = billingInfo(),
+        );
         await app.tab(p.l.settings);
         await p.shoot();
       },
@@ -254,7 +300,7 @@ void settingsPreviews() {
     preview(
       pro,
       'free',
-      'An account without Pro: the price, 4 of 10 free dictations left, 42 of 100 MB used.',
+      'An account without Pro: the plan first («No hay una suscripción Pro activa» and 4 of 10 free dictations left), then what Pro gives, in three lines with 20 dp checks (dictation and file space without limit, typed sentences turned into tasks, reminders in your own words), then 42 of 100 MB used, and the price.',
       [es1, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(
@@ -272,7 +318,7 @@ void settingsPreviews() {
     preview(
       pro,
       'free-used-up',
-      'No free dictations left this month, and the file space nearly full.',
+      'The plan first: no free dictations left this month; then what Pro gives; then the file space nearly full.',
       [es1],
       (p) async {
         final app = await PreviewApp.open(
@@ -290,7 +336,7 @@ void settingsPreviews() {
     preview(
       pro,
       'file-space-full',
-      'The file space full, 100 of 100 MB: «Ver tareas con archivos» under the usage line.',
+      'The file space full, 100 of 100 MB: after what Pro gives, «Ver tareas con archivos» under the usage line.',
       [es1, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(
@@ -314,7 +360,7 @@ void settingsPreviews() {
     preview(
       pro,
       'active',
-      'Pro is active and renews.',
+      'Pro is active and renews: «Pro está activo» and its renewal date first, then what Pro gives.',
       [es1],
       (p) async {
         final app = await PreviewApp.open(
@@ -330,7 +376,7 @@ void settingsPreviews() {
     preview(
       pro,
       'complimentary',
-      'Pro given by TaskFlow, with nothing to pay or manage.',
+      'Pro given by TaskFlow, with nothing to pay or manage: «Pro está activo» first, then the line saying TaskFlow gives it.',
       [es1],
       (p) async {
         final app = await PreviewApp.open(
@@ -407,13 +453,30 @@ void settingsPreviews() {
     preview(
       remindersScreen,
       'blocked',
-      'The phone blocks notifications: one plain line, and Permitir avisos to TaskFlow\'s notifications page.',
+      'Reminders on, but the phone blocks notifications: one plain line, and Permitir avisos to TaskFlow\'s notifications page.',
       [...everywhere, ca2],
       (p) async {
         final app = await PreviewApp.open(
           p,
           tasks: normalDay(),
           notificationsAllowed: false,
+        );
+        await app.push('/notifications');
+        await p.shoot();
+      },
+    );
+
+    preview(
+      remindersScreen,
+      'off-blocked',
+      'Reminders off and the phone blocks notifications: the switch alone, the one way in (it asks the phone, or offers its page).',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          notificationsAllowed: false,
+          reminders: const ReminderPreferences(asked: true),
         );
         await app.push('/notifications');
         await p.shoot();
@@ -514,7 +577,30 @@ void settingsPreviews() {
       everywhere,
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay());
-        await app.pushPage(const OtherSettingsScreen(debug: false, staging: false));
+        await app.pushPage(
+          const OtherSettingsScreen(debug: false, staging: false),
+        );
+        await p.shoot();
+      },
+    );
+
+    preview(
+      otherScreen,
+      'widget-help',
+      'The home-screen button\'s help, where the launcher can\'t add the widget itself: the TaskFlow icon\'s shortcuts, the Dictar una tarea widget, sharing text.',
+      [es1],
+      (p) async {
+        final app = await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          overrides: [
+            captureEntriesProvider.overrideWithValue(_NoPinLauncher()),
+          ],
+        );
+        await app.pushPage(
+          const OtherSettingsScreen(debug: false, staging: false),
+        );
+        await app.tap(p.l.homeCapture);
         await p.shoot();
       },
     );

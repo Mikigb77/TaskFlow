@@ -9,10 +9,13 @@ import 'generated/app_localizations.dart';
 /// Outside sign-in, connection and unknown failures also say the tasks are
 /// still on the phone; [onSignIn] leaves that out where there are none yet,
 /// and says how long to wait when the server refused more tries and said.
+/// [keptNote] false leaves out only that sentence, where the request isn't
+/// about the phone's tasks (sharing, groups, invitations).
 String requestProblemText(
   AppLocalizations strings,
   Object error, {
   bool onSignIn = false,
+  bool keptNote = true,
 }) {
   Object? code;
   if (error is GoogleSignInProblem) code = error.code;
@@ -46,7 +49,8 @@ String requestProblemText(
   final reason = requestProblem(error);
   final wait = onSignIn && reason == 'rateLimit' ? waitMinutesFor(error) : null;
   if (wait != null) return strings.tooManyTriesWait(wait);
-  final kept = !onSignIn && (reason == 'network' || reason == 'other');
+  final kept =
+      keptNote && !onSignIn && (reason == 'network' || reason == 'other');
   return strings.requestError(kept ? '${reason}Kept' : reason);
 }
 

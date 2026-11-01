@@ -2,6 +2,7 @@ import 'package:agenda/l10n/region.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/reminder_plan_words.dart';
 import 'package:agenda/models/reminder_plan.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -79,6 +80,56 @@ bool _alertPassed(WidgetRef ref, Task? task) {
     return false;
   }
   return !ReminderEngine.alertAhead(task, settings, now);
+}
+
+/// The alerts this phone keeps for a task ([ReminderAccess.alertsOf]), read
+/// again each time reminders are planned again or a notice's action is taken.
+final _alertsProvider = FutureProvider.autoDispose
+    .family<List<Map<String, Object?>>, int>((ref, taskId) {
+      final changes = TaskReminders.changes.stream.listen(
+        (_) => ref.invalidateSelf(),
+      );
+      ref.onDispose(changes.cancel);
+      return ref.watch(reminderAccessProvider).alertsOf(taskId);
+    });
+
+/// When [task]'s reminder rang here, or rings again after a snooze
+/// ([ReminderEngine.lastAlert]): null when it never did, as when it was
+/// saved too late to ring (D1), and while the alerts are read.
+({DateTime when, bool snoozed})? _lastAlert(WidgetRef ref, Task? task) {
+  final id = task?.id;
+  final settings = ref.watch(reminderPreferencesProvider).valueOrNull;
+  if (id == null || settings == null) return null;
+  final alerts = ref.watch(_alertsProvider(id)).valueOrNull;
+  if (alerts == null || alerts.isEmpty) return null;
+  return ReminderEngine.lastAlert(
+    task!,
+    alerts,
+    settings,
+    ref.watch(calendarClockProvider)(),
+  );
+}
+
+/// A reminder that has rung, as its line says it: «Recordatorio enviado:
+/// hoy, 09:40», or «Recordatorio pospuesto: hoy, 09:52» while a snooze is to
+/// come. A [plan]'s line, once its last notice has rung, ends «· último: hoy,
+/// 16:50». The day as the plan lines write it.
+String _rangText(
+  BuildContext context,
+  WidgetRef ref,
+  ({DateTime when, bool snoozed}) alert, {
+  String? plan,
+}) {
+  final l = context.l10n;
+  final now = ref.watch(calendarClockProvider)();
+  final when = planWhen(alert.when, now);
+  final date = planDay(alert.when, now, context.localeName);
+  final time = context.clockTime(alert.when);
+  return alert.snoozed
+      ? l.reminderSnoozed(when, date, time)
+      : plan != null
+      ? l.reminderPlanLast(plan, when, date, time)
+      : l.reminderSent(when, date, time);
 }
 
 /// A plan as its task shows it: «Recordatorios: cada 3 días, y a diario la
@@ -229,25 +280,106 @@ String _clock(BuildContext context, int minute) =>
 /// reminders ended up on; false when the phone refused or it failed.
 /// [onScheduling] gets the background setting of the alerts, which completes
 /// once they're set or a failure is recorded, for a screen that lists them.
+/// After a refusal, the message's «Permitir avisos» finishes the job once the
+/// person is back from the phone's settings ([_finishOnReturn]).
 Future<bool> turnOnReminders(
   BuildContext context, {
   void Function(Future<void> scheduling)? onScheduling,
 }) async {
   final container = ProviderScope.containerOf(context, listen: false);
   final messenger = ScaffoldMessenger.of(context);
+  final navigator = Navigator.of(context, rootNavigator: true);
   final strings = context.l10n;
   final access = container.read(reminderAccessProvider);
-  var exact = false;
   try {
     if (!await access.requestPermission()) {
       showFeedback(
         messenger,
         strings.notificationPermissionOff,
         actionLabel: strings.allowNotifications,
-        onAction: access.openNotificationSettings,
+        onAction: () => _finishOnReturn(container, navigator),
       );
+      container.invalidate(reminderCapabilityProvider);
       return false;
     }
+  } catch (_) {
+    showFeedback(messenger, strings.notificationSaveError);
+    container.invalidate(reminderCapabilityProvider);
+    return false;
+  }
+  return _switchOn(
+    container,
+    navigator,
+    messenger,
+    strings,
+    onScheduling: onScheduling,
+  );
+}
+
+/// «Permitir avisos» after the phone refused: opens its notifications page
+/// and remembers that this account asked for reminders. Back in the app,
+/// whatever screen shows, reminders turn on as [turnOnReminders] does if the
+/// phone now allows them; still refused, nothing more is said. Forgotten
+/// either way ([reminderRequestsProvider]).
+Future<void> _finishOnReturn(
+  ProviderContainer container,
+  NavigatorState navigator,
+) async {
+  final access = container.read(reminderAccessProvider);
+  final owner = container.read(taskRepositoryProvider).ownerKey;
+  final requests = container.read(reminderRequestsProvider);
+  if (!requests.containsKey(owner)) {
+    final settled = Completer<void>();
+    requests[owner] = settled.future;
+    late final AppLifecycleListener listener;
+    listener = AppLifecycleListener(
+      onResume: () async {
+        listener.dispose();
+        try {
+          if (container.read(taskRepositoryProvider).ownerKey == owner &&
+              (await access.capability()).allowed &&
+              navigator.mounted) {
+            final messenger = ScaffoldMessenger.maybeOf(navigator.context);
+            if (messenger != null) {
+              Future<void>? scheduling;
+              if (await _switchOn(
+                container,
+                navigator,
+                messenger,
+                navigator.context.l10n,
+                onScheduling: (future) => scheduling = future,
+              )) {
+                // A screen waiting on the request lists the alerts set.
+                await scheduling;
+              }
+            }
+          }
+        } catch (_) {
+          // Not finished: the switch in Ajustes › Recordatorios still is.
+        } finally {
+          requests.remove(owner);
+          settled.complete();
+        }
+      },
+    );
+  }
+  await access.openNotificationSettings();
+}
+
+/// Turns reminders on once the phone allows notifications: the switch, 9:00
+/// for tasks without a time, exact alarms when Android needs them, the alerts
+/// and the confirmation. False when it failed. The sheet about exact alarms
+/// opens on [navigator] while it's still there.
+Future<bool> _switchOn(
+  ProviderContainer container,
+  NavigatorState navigator,
+  ScaffoldMessengerState messenger,
+  AppLocalizations strings, {
+  void Function(Future<void> scheduling)? onScheduling,
+}) async {
+  final access = container.read(reminderAccessProvider);
+  var exact = false;
+  try {
     final owner = container.read(taskRepositoryProvider).ownerKey;
     final store = container.read(reminderPreferenceStoreProvider);
     final settings = await store.read(owner);
@@ -268,9 +400,9 @@ Future<bool> turnOnReminders(
     }
     container.invalidate(reminderPreferencesProvider);
     exact = (await access.capability()).exact;
-    if (!exact && context.mounted) {
+    if (!exact && navigator.mounted) {
       final allow = await showModalBottomSheet<bool>(
-        context: context,
+        context: navigator.context,
         isScrollControlled: true,
         builder: (context) => SafeArea(
           child: SingleChildScrollView(
@@ -285,7 +417,8 @@ Future<bool> turnOnReminders(
                 const SizedBox(height: 16),
                 FilledButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child: Text(context.l10n.allowPreciseAlarms),
+                  child: Text(context.l10n.allowPreciseAlarms,
+                      textAlign: TextAlign.center),
                 ),
                 const SizedBox(height: 8),
                 // Leaves as Back does.
@@ -500,9 +633,11 @@ Future<int?> _pickFrom(
 );
 
 /// [task]'s reminder line as this phone reads it: its icon, its words and
-/// what a tap does. The plan's line, «Recordatorio: 1 hora antes», «Sin
-/// recordatorio · Activar» when this phone won't ring (the tap turns
-/// reminders on), or «Sin recordatorio: ya ha pasado la hora del aviso»;
+/// what a tap does. The plan's line, «Recordatorio: 1 hora antes» («… ·
+/// fecha límite» when it counts from the deadline), «Sin recordatorio ·
+/// Activar» when this phone won't ring (the tap turns reminders on),
+/// «Recordatorio enviado: hoy, 09:40» once it has rung, or «Sin
+/// recordatorio: ya ha pasado la hora del aviso» when it never could;
 /// otherwise a tap opens the reminder choices and gives [onChanged] the task
 /// with the one chosen. The task's chip and a collapsed row on the capture's
 /// card both read it, so they can't drift. For a task with a reminder date
@@ -535,10 +670,10 @@ Future<int?> _pickFrom(
         planned: plan != null,
       );
   // Last: a tap still opens the choices, where a later time can be set.
-  final passed =
-      reason == null &&
-      !blocked &&
-      _alertPassed(ref, ringsHere ? task : task.copyWith(reminderPlan: null));
+  final checked = ringsHere ? task : task.copyWith(reminderPlan: null);
+  final passed = reason == null && !blocked && _alertPassed(ref, checked);
+  // Its time came and it rang, or a snooze is to come: not D1's case.
+  final rang = passed ? _lastAlert(ref, checked) : null;
   final minute = task.reminderTime ?? preferences.dateOnlyTime;
   final label = task.reminderMinutes == -1
       ? context.l10n.off
@@ -549,9 +684,11 @@ Future<int?> _pickFrom(
       : _clock(context, minute);
   final value = plan != null
       ? reminderPlanText(context, ref, task)
-      : '${task.deadline == null ? '' : '${task.reminderAnchor == 'deadline' ? context.l10n.deadline : context.l10n.plannedFor} · '}$label';
+      : task.deadline != null && task.reminderAnchor == 'deadline'
+      ? context.l10n.reminderBeforeDeadline(label)
+      : label;
   return (
-    icon: blocked || passed || reason?.silent == true
+    icon: blocked || (passed && rang == null) || reason?.silent == true
         ? Icons.notifications_off_outlined
         : plan != null
         ? Icons.notifications_active_outlined
@@ -560,6 +697,8 @@ Future<int?> _pickFrom(
         ? reason.text(context)
         : blocked
         ? context.l10n.noReminderTurnOn
+        : rang != null
+        ? _rangText(context, ref, rang, plan: plan == null ? null : value)
         : passed
         ? context.l10n.noReminderTimePassed
         : plan != null
@@ -620,7 +759,15 @@ class ReminderChip extends ConsumerWidget {
                         80)
                     .clamp(0, double.infinity),
           ),
-          child: Text(line.text, softWrap: true, maxLines: 10),
+          // A wrapped reading hugs its longest line, so the bell sits beside
+          // it; on the chip with a tap, a control, the lines centre too.
+          child: Text(
+            line.text,
+            softWrap: true,
+            maxLines: 10,
+            textAlign: line.onTap == null ? null : TextAlign.center,
+            textWidthBasis: TextWidthBasis.longestLine,
+          ),
         );
         // A line with no tap is information: drawn with no outline and at
         // full contrast, rather than as a control or a switched-off one. The
@@ -724,20 +871,18 @@ class ReminderControl extends ConsumerWidget {
           time: time,
           planned: active != null,
         );
-    final passed =
-        dated &&
-        reason == null &&
-        !blocked &&
-        _alertPassed(
-          ref,
-          planned ??
-              schedule?.copyWith(
-                reminderMinutes: minutes,
-                reminderTime: time,
-                // A plan that can't ring here doesn't count.
-                reminderPlan: ringsHere ? schedule!.reminderPlan : null,
-              ),
+    final checked =
+        planned ??
+        schedule?.copyWith(
+          reminderMinutes: minutes,
+          reminderTime: time,
+          // A plan that can't ring here doesn't count.
+          reminderPlan: ringsHere ? schedule!.reminderPlan : null,
         );
+    final passed =
+        dated && reason == null && !blocked && _alertPassed(ref, checked);
+    // Its time came and it rang, or a snooze is to come: not D1's case.
+    final rang = passed ? _lastAlert(ref, checked) : null;
     final minute = time ?? settings.dateOnlyTime;
     final value = active != null
         ? reminderPlanText(context, ref, planned!)
@@ -770,27 +915,33 @@ class ReminderControl extends ConsumerWidget {
               if (chosenTime != time) onTime(chosenTime);
             },
           );
+    final line =
+        reason?.text(context) ??
+        (!dated
+            ? context.l10n.dateForReminder
+            : rang != null
+            ? _rangText(context, ref, rang, plan: active == null ? null : value)
+            : passed
+            ? context.l10n.noReminderTimePassed
+            : value);
+    // A line that names itself (a plan's, a reason's, one that says the
+    // reminder has passed or rung) is the row's only text: no «Recordatorio»
+    // over it.
+    final named = reason != null || (dated && (passed || active != null));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(
-            passed
+            passed && rang == null
                 ? Icons.notifications_off_outlined
                 : active != null
                 ? Icons.notifications_active_outlined
                 : Icons.notifications_outlined,
           ),
-          title: Text(context.l10n.reminder),
-          subtitle: Text(
-            reason?.text(context) ??
-                (!dated
-                    ? context.l10n.dateForReminder
-                    : passed
-                    ? context.l10n.noReminderTimePassed
-                    : value),
-          ),
+          title: Text(named ? line : context.l10n.reminder),
+          subtitle: named ? null : Text(line),
           trailing: onTap == null
               ? null
               : const Icon(Icons.chevron_right_rounded),
@@ -800,11 +951,15 @@ class ReminderControl extends ConsumerWidget {
           Text(context.l10n.reminderDefaultsError),
         if (preferences.isLoading && !person)
           Text(context.l10n.loadingReminders),
+        // 8 dp from the row above and whatever comes next (UX-2205).
         if (blocked)
-          TextButton.icon(
-            onPressed: () => turnOnReminders(context),
-            icon: const Icon(Icons.notifications_off_outlined, size: 18),
-            label: Text(context.l10n.enableReminders),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: TextButton.icon(
+              onPressed: () => turnOnReminders(context),
+              icon: const Icon(Icons.notifications_off_outlined, size: 18),
+              label: Text(context.l10n.enableReminders),
+            ),
           ),
       ],
     );

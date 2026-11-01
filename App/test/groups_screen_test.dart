@@ -1,6 +1,10 @@
 // P15 (UX-301, UX-317, UX-340) on a group's page: archiving says it hides
 // the group for everyone and offers Deshacer; leaving asks in red and says
 // so after the page closes.
+import 'dart:async';
+
+import 'package:agenda/l10n/region.dart';
+import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/l10n/request_locale.dart';
@@ -8,6 +12,7 @@ import 'package:agenda/providers/invitations_provider.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/providers/groups_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
+import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/groups_screen.dart';
 import 'package:agenda/theme/app_theme.dart';
@@ -19,6 +24,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'support/design_fixtures.dart';
 import 'support/hanging_sync.dart';
+import 'support/address_wrap.dart';
+import 'support/no_counter.dart';
 
 final es = lookupAppLocalizations(const Locale('es'));
 
@@ -124,7 +131,7 @@ void main() {
           projectCount: 0,
           language: language,
         );
-        final delete = find.widgetWithText(ListTile, l.delete);
+        final delete = find.widgetWithText(ListTile, l.groupDeleteAction);
         await tester.scrollUntilVisible(
           delete,
           200,
@@ -136,7 +143,7 @@ void main() {
         await tester.tap(
           find.descendant(
             of: find.byType(AlertDialog),
-            matching: find.widgetWithText(FilledButton, l.delete),
+            matching: find.widgetWithText(FilledButton, l.groupDeleteAction),
           ),
         );
         await tester.pumpAndSettle();
@@ -168,7 +175,7 @@ void main() {
         projectCount: 0,
         language: 'ca',
       );
-      final delete = find.widgetWithText(ListTile, ca.delete);
+      final delete = find.widgetWithText(ListTile, ca.groupDeleteAction);
       await tester.scrollUntilVisible(
         delete,
         200,
@@ -180,7 +187,7 @@ void main() {
       await tester.tap(
         find.descendant(
           of: find.byType(AlertDialog),
-          matching: find.widgetWithText(FilledButton, ca.delete),
+          matching: find.widgetWithText(FilledButton, ca.groupDeleteAction),
         ),
       );
       await tester.pumpAndSettle();
@@ -344,7 +351,9 @@ void main() {
       expect(
         find.descendant(
           of: dialog,
-          matching: find.text(requestProblemText(es, failure)),
+          matching: find.text(
+            requestProblemText(es, failure, keptNote: false),
+          ),
         ),
         findsOneWidget,
       );
@@ -366,7 +375,7 @@ void main() {
           ],
         ),
       );
-      final invite = find.widgetWithText(OutlinedButton, es.invitePerson);
+      final invite = find.widgetWithText(FilledButton, es.invitePerson);
       await tester.ensureVisible(invite);
       await tester.tap(invite);
       await tester.pumpAndSettle();
@@ -463,7 +472,10 @@ void main() {
         findsNothing,
       );
       expect(find.text(es.groupInvited), findsOneWidget);
-      final invited = find.widgetWithText(ListTile, 'luis@example.invalid');
+      final invited = find.widgetWithText(
+        ListTile,
+        breakableAddress('luis@example.invalid'),
+      );
       expect(
         find.descendant(of: invited, matching: find.text(es.invitationPending)),
         findsOneWidget,
@@ -591,9 +603,20 @@ void main() {
           );
         }
         // With no error and nothing in progress the heading leads the page,
-        // right under the app bar's padding.
+        // right under the app bar's padding; for the owner, right under
+        // Invitar a una persona, which comes first (P285, UX-2520).
         final appBarBottom = tester.getRect(find.byType(AppBar)).bottom;
-        expect(headingTop - appBarBottom, lessThanOrEqualTo(32));
+        final invite = find.widgetWithText(FilledButton, es.invitePerson);
+        final above = role == 'owner'
+            ? tester.getRect(invite).bottom
+            : appBarBottom;
+        if (role == 'owner') {
+          expect(tester.getRect(invite).top - appBarBottom,
+              lessThanOrEqualTo(32));
+        } else {
+          expect(invite, findsNothing);
+        }
+        expect(headingTop - above, lessThanOrEqualTo(32));
         expect(tester.takeException(), isNull);
       },
     );
@@ -655,7 +678,7 @@ void main() {
   }
 
   Future<void> openInvite(WidgetTester tester) async {
-    final invite = find.widgetWithText(OutlinedButton, es.invitePerson);
+    final invite = find.widgetWithText(FilledButton, es.invitePerson);
     await tester.ensureVisible(invite);
     await tester.pumpAndSettle();
     await tester.tap(invite);
@@ -799,7 +822,10 @@ void main() {
       expect(
         find.ancestor(
           of: menu,
-          matching: find.widgetWithText(ListTile, 'luis@example.invalid'),
+          matching: find.widgetWithText(
+            ListTile,
+            breakableAddress('luis@example.invalid'),
+          ),
         ),
         findsOneWidget,
       );
@@ -1027,7 +1053,7 @@ void main() {
       (tester) async {
         final l = lookupAppLocalizations(Locale(language));
         await openMariasGroup(tester, language: language);
-        final invite = find.widgetWithText(OutlinedButton, l.invitePerson);
+        final invite = find.widgetWithText(FilledButton, l.invitePerson);
         await tester.ensureVisible(invite);
         await tester.pumpAndSettle();
         await tester.tap(invite);
@@ -1064,7 +1090,7 @@ void main() {
     'UX-1645: at 2× on 360×800 in Spanish the group invite help shows whole, with no clipping',
     (tester) async {
       await openMariasGroup(tester, scale: 2);
-      final invite = find.widgetWithText(OutlinedButton, es.invitePerson);
+      final invite = find.widgetWithText(FilledButton, es.invitePerson);
       await tester.ensureVisible(invite);
       await tester.pumpAndSettle();
       await tester.tap(invite);
@@ -1101,6 +1127,1023 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  group('P284 · group page answers where you tapped', () {
+    // Measure wrapping in the app's own font, not the square test font.
+    setUpAll(() async {
+      await (FontLoader(
+        'Manrope',
+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
+    });
+
+    const network =
+        'No hay conexión. Revisa el wifi o los datos móviles e inténtalo de nuevo.';
+    Finder inPage(Finder finder) =>
+        find.descendant(of: find.byType(GroupScreen), matching: finder);
+    Finder bar() => inPage(find.byType(LinearProgressIndicator));
+    Finder scrollable() => inPage(find.byType(Scrollable)).first;
+    Future<void> frames(WidgetTester tester, [int count = 10]) async {
+      for (var i = 0; i < count; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    }
+
+    testWidgets(
+      'UX-2502: (es, 2x, 360x800) offline, «Archivar grupo» keeps the page and its members and says the network message as a floating message, never «No se ha podido cargar»',
+      (tester) async {
+        expect(es.requestError('network'), network);
+        final api = await _openLiveGroup(tester, scale: 2);
+        final archive = find.text(es.groupArchive);
+        await tester.scrollUntilVisible(
+          archive,
+          200,
+          scrollable: scrollable(),
+        );
+        await tester.pumpAndSettle();
+        final before = tester.getRect(archive);
+        api.offline = true;
+        await tester.tap(archive);
+        await tester.pump();
+        await frames(tester);
+        expect(
+          api.calls.where((call) => call[0] == 'GET').length,
+          greaterThanOrEqualTo(2),
+          reason: 'the page asked again after the failure, and that failed',
+        );
+        final snack = find.byType(SnackBar);
+        expect(snack, findsOneWidget);
+        expect(
+          tester.widget<SnackBar>(snack).behavior,
+          SnackBarBehavior.floating,
+        );
+        expect(
+          find.descendant(of: snack, matching: find.text(network)),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('Tus tareas siguen guardadas'),
+          findsNothing,
+        );
+        expect(find.text(es.loadFailed), findsNothing);
+        expect(find.byType(LoadFailed), findsNothing);
+        expect(inPage(find.byType(MessageBanner)), findsNothing);
+        expect(archive, findsOneWidget, reason: 'the page stays');
+        expect(tester.getRect(archive), before, reason: 'where it was');
+        expect(bar(), findsNothing);
+        // The members are still there above.
+        await tester.scrollUntilVisible(
+          find.text(es.personYou('Yo')),
+          -200,
+          scrollable: scrollable(),
+        );
+        expect(find.text(es.personYou('Yo')), findsOneWidget);
+        expect(find.text('Ana'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2502: (es, 2x, 360x800) while «Archivar grupo» runs, scrolled to the bottom, a 2 dp bar sits under the app bar in view and nothing below it moves',
+      (tester) async {
+        final api = await _openLiveGroup(tester, scale: 2);
+        final archive = find.text(es.groupArchive);
+        await tester.drag(scrollable(), const Offset(0, -5000));
+        await tester.pumpAndSettle();
+        expect(archive, findsOneWidget);
+        final before = tester.getRect(archive);
+        expect(before.bottom, lessThanOrEqualTo(800));
+        api.hold = Completer<void>();
+        await tester.tap(archive);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(api.calls.last.take(2), ['PUT', 'groups/familia/']);
+        expect(bar(), findsOneWidget);
+        final appBar = tester.getRect(inPage(find.byType(AppBar)));
+        final rect = tester.getRect(bar());
+        expect(rect.height, moreOrLessEquals(2, epsilon: 0.01));
+        expect(rect.top, moreOrLessEquals(appBar.bottom, epsilon: 0.5));
+        expect(rect.bottom, lessThanOrEqualTo(800));
+        expect(tester.getRect(archive), before, reason: 'nothing moves');
+        api.hold!.complete();
+        await frames(tester);
+        expect(bar(), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2502: with the sync held open, a rename and an archive show on the page as soon as the server answers',
+      (tester) async {
+        final tasks = HangingSyncTasks();
+        final api = await _openLiveGroup(tester, tasks: tasks);
+        Finder titled(String name) => find.descendant(
+          of: inPage(find.byType(AppBar)),
+          matching: find.text(name),
+        );
+        expect(titled('Familia'), findsOneWidget);
+        final rename = find.text(es.groupRename);
+        await tester.scrollUntilVisible(rename, 200, scrollable: scrollable());
+        await tester.pumpAndSettle();
+        await tester.tap(rename);
+        await tester.pumpAndSettle();
+        final dialog = find.byType(AlertDialog);
+        await tester.enterText(
+          find.descendant(of: dialog, matching: find.byType(TextFormField)),
+          'Casa',
+        );
+        await tester.tap(
+          find.descendant(
+            of: dialog,
+            matching: find.widgetWithText(FilledButton, es.save),
+          ),
+        );
+        await tester.pump();
+        await frames(tester);
+        expect(api.name, 'Casa');
+        expect(tasks.syncs, greaterThan(0), reason: 'a sync is under way');
+        expect(tasks.sync.isCompleted, isFalse, reason: 'and still running');
+        expect(dialog, findsNothing);
+        expect(titled('Casa'), findsOneWidget);
+        expect(inPage(find.byType(CircularProgressIndicator)), findsNothing);
+        final archive = find.text(es.groupArchive);
+        await tester.scrollUntilVisible(archive, 200, scrollable: scrollable());
+        await tester.pumpAndSettle();
+        await tester.tap(archive);
+        await tester.pump();
+        await frames(tester);
+        expect(api.archived, isTrue);
+        expect(tasks.sync.isCompleted, isFalse);
+        expect(find.text(es.groupRestore), findsOneWidget);
+        expect(find.text(es.groupArchive), findsNothing);
+        expect(bar(), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final voice in [false, true]) {
+      testWidgets(
+        voice
+            ? 'UX-2502: a failed spoken name keeps its dialog open with the typed name and the network message inside it'
+            : 'UX-2502: a failed group rename keeps its dialog open with the typed name and the network message inside it',
+        (tester) async {
+            final api = await _openLiveGroup(
+            tester,
+            role: voice ? 'editor' : 'owner',
+          );
+          if (voice) {
+            final menu = find.byTooltip(es.manageItem('Yo'));
+            await tester.tap(menu);
+            await tester.pumpAndSettle();
+            await tester.tap(
+              find.descendant(
+                of: find.byType(PopupMenuItem<String>),
+                matching: find.text(es.groupVoiceName),
+              ),
+            );
+          } else {
+            final rename = find.text(es.groupRename);
+            await tester.scrollUntilVisible(
+              rename,
+              200,
+              scrollable: scrollable(),
+            );
+            await tester.pumpAndSettle();
+            await tester.tap(rename);
+          }
+          await tester.pumpAndSettle();
+          final dialog = find.byType(AlertDialog);
+          expect(dialog, findsOneWidget);
+          final field = find.descendant(
+            of: dialog,
+            matching: find.byType(TextFormField),
+          );
+          final typed = voice ? 'Mamá' : 'Casa de verano';
+          await tester.enterText(field, typed);
+          api.offline = true;
+          await tester.tap(
+            find.descendant(
+              of: dialog,
+              matching: find.widgetWithText(FilledButton, es.save),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            api.calls.last.take(2),
+            voice
+                ? ['POST', 'groups/familia/profile/']
+                : ['PUT', 'groups/familia/'],
+          );
+          expect(dialog, findsOneWidget, reason: 'the dialog stays open');
+          expect(
+            tester
+                .widget<EditableText>(
+                  find.descendant(of: field, matching: find.byType(EditableText)),
+                )
+                .controller
+                .text,
+            typed,
+          );
+          expect(
+            find.descendant(of: dialog, matching: find.text(network)),
+            findsOneWidget,
+          );
+          expect(
+            find.textContaining('Tus tareas siguen guardadas'),
+            findsNothing,
+          );
+          expect(find.text(es.loadFailed), findsNothing);
+          // The dialog's buttons work again.
+          final save = tester.widget<FilledButton>(
+            find.descendant(
+              of: dialog,
+              matching: find.widgetWithText(FilledButton, es.save),
+            ),
+          );
+          expect(save.onPressed, isNotNull);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'UX-2513: (es, ${scale}x, 360x800) an invited person’s address wraps only after «@» or «.», and TalkBack reads it whole',
+        (tester) async {
+            final semantics = tester.ensureSemantics();
+          await _openLiveGroup(tester, scale: scale);
+          const address = 'carmen.lopez@example.com';
+          final text = find.text(breakableAddress(address));
+          await tester.scrollUntilVisible(text, 100, scrollable: scrollable());
+          await tester.pumpAndSettle();
+          expect(text, findsOneWidget);
+          expectAddressWrapsWhole(tester, text, address);
+          expect(spokenLabel(tester, text), contains(address));
+          expect(tester.getRect(text).right, lessThanOrEqualTo(360.5));
+          semantics.dispose();
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2518: (es, 2x, 360x800) the group invite dialog’s stacked «Cancelar» and «Enviar invitación» stand 8 dp or more apart',
+      (tester) async {
+        await _openLiveGroup(tester, scale: 2);
+        final invite = find.text(es.invitePerson);
+        await tester.scrollUntilVisible(invite, 200, scrollable: scrollable());
+        await tester.pumpAndSettle();
+        await tester.tap(invite);
+        await tester.pumpAndSettle();
+        final dialog = find.byType(AlertDialog);
+        expect(dialog, findsOneWidget);
+        final cancel = tester.getRect(
+          find.descendant(
+            of: dialog,
+            matching: find.widgetWithText(TextButton, es.cancel),
+          ),
+        );
+        final send = tester.getRect(
+          find.descendant(
+            of: dialog,
+            matching: find.widgetWithText(FilledButton, es.sendInvitation),
+          ),
+        );
+        final (upper, lower) = cancel.top <= send.top
+            ? (cancel, send)
+            : (send, cancel);
+        expect(
+          lower.top,
+          greaterThanOrEqualTo(upper.bottom - 0.5),
+          reason: 'stacked at 2x: $cancel, $send',
+        );
+        expect(
+          lower.top - upper.bottom,
+          greaterThanOrEqualTo(7.99),
+          reason: 'the buttons stand apart',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  group('P285 · group page: delete, transfer, invite first, headings, no counters', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+
+    test('UX-2504: the delete and transfer copy reads as the plan wrote it', () {
+      expect(es.groupDeleteAction, 'Eliminar grupo');
+      expect(en.groupDeleteAction, 'Delete group');
+      expect(ca.groupDeleteAction, 'Suprimeix el grup');
+      expect(
+        es.groupDeleteConfirm('Familia'),
+        '¿Eliminar «Familia»? Sus miembros dejarán de verlo. No se puede deshacer.',
+      );
+      expect(
+        en.groupDeleteConfirm('Familia'),
+        'Delete “Familia”? Its members will lose it. This can’t be undone.',
+      );
+      expect(
+        ca.groupDeleteConfirm('Familia'),
+        'Vols suprimir «Familia»? Els membres el deixaran de veure. No es pot desfer.',
+      );
+      expect(es.groupTransferConfirm('Familia', 'Ana'),
+          '¿Transferir «Familia» a Ana?');
+      expect(en.groupTransferConfirm('Familia', 'Ana'),
+          'Transfer “Familia” to Ana?');
+      expect(ca.groupTransferConfirm('Familia', 'Ana'),
+          'Vols transferir «Familia» a Ana?');
+      expect(es.groupTransferAction('Ana'), 'Transferir a Ana');
+      expect(en.groupTransferAction('Ana'), 'Transfer to Ana');
+      expect(ca.groupTransferAction('Ana'), 'Transfereix a Ana');
+    });
+
+    for (final language in ['es', 'en', 'ca']) {
+      testWidgets(
+        'UX-2504: ($language) an empty group’s row reads Eliminar grupo with no subtitle; its confirmation says what deleting does, with a red Eliminar grupo button',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          final api = await _openP285(tester, language: language, projects: 0);
+          final row = find.widgetWithText(ListTile, l.groupDeleteAction);
+          await tester.scrollUntilVisible(
+            row,
+            200,
+            scrollable: find.byType(Scrollable).last,
+          );
+          await tester.pumpAndSettle();
+          expect(tester.widget<ListTile>(row).subtitle, isNull);
+          expect(find.text(l.groupDeleteHelp), findsNothing);
+          expect(find.widgetWithText(ListTile, l.delete), findsNothing);
+          await tester.tap(row);
+          await tester.pumpAndSettle();
+          final dialog = find.byType(AlertDialog);
+          expect(
+            find.descendant(
+              of: dialog,
+              matching: find.text(l.groupDeleteConfirm('Familia')),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(of: dialog, matching: find.text(l.groupDeleteHelp)),
+            findsNothing,
+          );
+          final confirm = find.descendant(
+            of: dialog,
+            matching: find.widgetWithText(FilledButton, l.groupDeleteAction),
+          );
+          expect(confirm, findsOneWidget);
+          final error = Theme.of(tester.element(confirm)).colorScheme.error;
+          expect(
+            tester
+                .widget<FilledButton>(confirm)
+                .style!
+                .backgroundColor!
+                .resolve({}),
+            error,
+          );
+          // Nothing is sent before the confirmation.
+          expect(api.calls.where((c) => c[0] == 'DELETE'), isEmpty);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2504: a group with projects keeps its delete row off, with Solo puedes eliminar un grupo vacío… as its subtitle',
+      (tester) async {
+        await _openP285(tester, projects: 2);
+        final row = find.widgetWithText(ListTile, es.groupDeleteAction);
+        await tester.scrollUntilVisible(
+          row,
+          200,
+          scrollable: find.byType(Scrollable).last,
+        );
+        await tester.pumpAndSettle();
+        final tile = tester.widget<ListTile>(row);
+        expect(tile.onTap, isNull, reason: 'the row is off');
+        expect(
+          find.descendant(of: row, matching: find.text(es.groupDeleteHelp)),
+          findsOneWidget,
+        );
+        await tester.tap(row, warnIfMissed: false);
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final language in ['es', 'en', 'ca']) {
+      testWidgets(
+        'UX-2504: ($language) transferring to Ana: the sheet’s header is Transferir propiedad alone; the confirmation asks ¿Transferir «Familia» a Ana? with the help and Transferir a Ana',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          final api = await _openP285(tester, language: language);
+          final row = find.widgetWithText(ListTile, l.groupTransfer);
+          await tester.scrollUntilVisible(
+            row,
+            200,
+            scrollable: find.byType(Scrollable).last,
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(row);
+          await tester.pumpAndSettle();
+          final sheet = find.byType(BottomSheet);
+          expect(sheet, findsOneWidget);
+          final header = find.descendant(
+            of: sheet,
+            matching: find.widgetWithText(ListTile, l.groupTransfer),
+          );
+          expect(header, findsOneWidget);
+          expect(tester.widget<ListTile>(header).subtitle, isNull);
+          expect(
+            find.descendant(of: sheet, matching: find.text(l.groupTransferHelp)),
+            findsNothing,
+          );
+          await tester.tap(
+            find.descendant(of: sheet, matching: find.text('Ana')),
+          );
+          await tester.pumpAndSettle();
+          final dialog = find.byType(AlertDialog);
+          final title = tester.widget<AlertDialog>(dialog).title as Text;
+          expect(title.data, l.groupTransferConfirm('Familia', 'Ana'));
+          expect(
+            find.descendant(
+              of: dialog,
+              matching: find.text(l.groupTransferHelp),
+            ),
+            findsOneWidget,
+          );
+          final confirm = find.descendant(
+            of: dialog,
+            matching: find.widgetWithText(
+              FilledButton,
+              l.groupTransferAction('Ana'),
+            ),
+          );
+          expect(confirm, findsOneWidget);
+          // The title isn't repeated as the button, nor the old «X: Ana».
+          expect(
+            find.descendant(
+              of: dialog,
+              matching: find.text(l.groupTransferConfirm('Familia', 'Ana')),
+            ),
+            findsOneWidget,
+          );
+          expect(find.text('${l.groupTransfer}: Ana'), findsNothing);
+          expect(api.calls.where((c) => '${c[1]}'.contains('transfer')),
+              isEmpty);
+          await tester.tap(confirm);
+          await tester.pumpAndSettle();
+          final sent = api.calls.lastWhere(
+            (c) => '${c[1]}'.contains('transfer'),
+          );
+          expect(sent.take(2), ['POST', 'groups/familia/transfer/']);
+          expect((sent[2] as Map)['user_id'], 2);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'UX-2520: at ES ${scale}x on 360x800, for the owner Invitar a una persona is a filled button first, under the app bar and above Miembros, on screen without scrolling',
+        (tester) async {
+          await _openP285(tester, scale: scale, invited: true);
+          final invite = find.widgetWithText(FilledButton, es.invitePerson);
+          expect(invite, findsOneWidget);
+          expect(find.widgetWithText(OutlinedButton, es.invitePerson),
+              findsNothing);
+          final button = tester.getRect(invite);
+          final appBar = tester.getRect(find.byType(AppBar));
+          final members = tester.getRect(find.text(es.groupMembers));
+          expect(button.top, greaterThanOrEqualTo(appBar.bottom));
+          expect(button.top - appBar.bottom, lessThanOrEqualTo(32));
+          expect(button.bottom, lessThanOrEqualTo(members.top));
+          expect(button.bottom, lessThanOrEqualTo(800),
+              reason: 'visible on opening, at ${scale}x');
+          // It leads the page: no list row or section sits above it.
+          for (final above in [
+            es.groupInvited,
+            es.groupProjects,
+            es.personYou('Yo'),
+          ]) {
+            final found = find.text(above);
+            if (found.evaluate().isEmpty) continue;
+            expect(tester.getRect(found.first).top,
+                greaterThan(button.bottom), reason: above);
+          }
+          // Tapping it opens the invite dialog.
+          await tester.tap(invite);
+          await tester.pumpAndSettle();
+          expect(find.text(es.inviteWho('Familia')), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2520: a member who can’t manage the group has no Invitar a una persona',
+      (tester) async {
+        await _openP285(tester, role: 'editor');
+        expect(find.text(es.invitePerson), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2519: on the group page Miembros, Invitados and Proyectos del grupo are headings',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await _openP285(tester, invited: true);
+        for (final title in [
+          es.groupMembers,
+          es.groupInvited,
+          es.groupProjects,
+        ]) {
+          final found = find.text(title);
+          await tester.scrollUntilVisible(
+            found,
+            200,
+            scrollable: find.byType(Scrollable).last,
+          );
+          await tester.pumpAndSettle();
+          final node = tester.getSemantics(found);
+          expect(node.label, title);
+          expect(
+            node.getSemanticsData().flagsCollection.isHeader,
+            isTrue,
+            reason: '«$title» is a heading',
+          );
+        }
+        // A member's row is not.
+        expect(
+          tester
+              .getSemantics(find.text(es.personYou('Yo')))
+              .getSemanticsData()
+              .flagsCollection
+              .isHeader,
+          isFalse,
+        );
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'UX-2519: SectionLabel reads as a heading wherever it is used',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await tester.pumpWidget(
+          MaterialApp(
+            locale: const Locale('es'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(body: SectionLabel(es.pendingInvitations)),
+          ),
+        );
+        final label = find.text(es.pendingInvitations.toUpperCase());
+        expect(label, findsOneWidget);
+        expect(
+          tester.getSemantics(label).getSemanticsData().flagsCollection.isHeader,
+          isTrue,
+        );
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'UX-2505: control: a field left with its default counter is caught as «0/80» and «Quedan 80 caracteres»',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await tester.pumpWidget(
+          const MaterialApp(
+            locale: Locale('es'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: AlertDialog(content: TextField(maxLength: 80)),
+            ),
+          ),
+        );
+        expect(find.textContaining(counterText), findsOneWidget);
+        expect(find.bySemanticsLabel(counterSpeech), findsOneWidget);
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'UX-2505: the new group’s name field shows no 0/80 counter and still stops at 80',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await pumpGroups(tester, const GroupsScreen());
+        await tester.tap(find.text(es.newGroup));
+        await tester.pumpAndSettle();
+        await expectNoCounter(tester, 80);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'UX-2505: the group invite’s email field shows no 0/254 counter and no Quedan 254 caracteres, and still stops at 254',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await _openP285(tester);
+        await tester.tap(find.widgetWithText(FilledButton, es.invitePerson));
+        await tester.pumpAndSettle();
+        await expectNoCounter(tester, 254);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'UX-2505: renaming the group shows no 0/80 counter and still stops at 80',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await _openP285(tester);
+        final rename = find.text(es.groupRename);
+        await tester.scrollUntilVisible(
+          rename,
+          200,
+          scrollable: find.byType(Scrollable).last,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(rename);
+        await tester.pumpAndSettle();
+        await expectNoCounter(tester, 80);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'UX-2505: the spoken name field shows no 0/60 counter and still stops at 60',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await _openP285(tester, role: 'admin');
+        await tester.tap(find.byTooltip(es.manageItem('Yo')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(es.groupVoiceName));
+        await tester.pumpAndSettle();
+        await expectNoCounter(tester, 60);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+  });
+
+  // ---- Run 2026-10-28-app, round 2 · P303 (UX-2627) ----
+
+  group('P303 · an offline refresh on a group page says so', () {
+    const network =
+        'No hay conexión. Revisa el wifi o los datos móviles e inténtalo de nuevo.';
+    Finder inPage(Finder finder) =>
+        find.descendant(of: find.byType(GroupScreen), matching: finder);
+
+    /// Group `Familia` in Spanish at 1× on a 360×800 view, fed by a
+    /// [_LiveGroup] server, with its project «Huerto» on the phone.
+    Future<_LiveGroup> openWithProject(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final api = _LiveGroup('owner');
+      final container = ProviderContainer(
+        overrides: [
+          apiClientProvider.overrideWithValue(api),
+          authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
+          taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+          taskProvider.overrideWith((ref) => DesignTaskNotifier()),
+          taskListsProvider.overrideWith(
+            (ref) async => [
+              TaskListInfo(
+                id: 'huerto',
+                name: 'Huerto',
+                version: 1,
+                groupId: 'familia',
+                groupName: 'Familia',
+                shared: true,
+              ),
+            ],
+          ),
+          groupsProvider.overrideWith((ref) async => []),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(api.close);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            locale: const Locale('es'),
+            theme: AppTheme.light,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.noScaling),
+              child: child!,
+            ),
+            home: const GroupScreen(groupId: 'familia'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return api;
+    }
+
+    Future<void> pullToRefresh(WidgetTester tester) async {
+      // From the very top, where a pull refreshes.
+      final scrollable = inPage(find.byType(Scrollable)).first;
+      tester.state<ScrollableState>(scrollable).position.jumpTo(0);
+      await tester.pumpAndSettle();
+      await tester.fling(
+        scrollable,
+        const Offset(0, 400),
+        1000,
+      );
+      await tester.pump();
+      // The scroll, the indicator's settle and its hide.
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(seconds: 1));
+      }
+    }
+
+    testWidgets(
+      'UX-2627: (es, 1x, 360x800) loaded, then offline, a pull-to-refresh keeps the members and projects on screen and shows the network message as a floating message',
+      (tester) async {
+        expect(es.requestError('network'), network);
+        final api = await openWithProject(tester);
+        expect(find.text(es.personYou('Yo')), findsOneWidget);
+        expect(find.text('Ana'), findsOneWidget);
+        await tester.scrollUntilVisible(
+          find.text('Huerto'),
+          200,
+          scrollable: inPage(find.byType(Scrollable)).first,
+        );
+        expect(find.text('Huerto'), findsOneWidget);
+        await tester.scrollUntilVisible(
+          find.text(es.personYou('Yo')),
+          -200,
+          scrollable: inPage(find.byType(Scrollable)).first,
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(SnackBar), findsNothing);
+
+        api.offline = true;
+        final asked = api.calls.where((call) => call[0] == 'GET').length;
+        await pullToRefresh(tester);
+        expect(
+          api.calls.where((call) => call[0] == 'GET').length,
+          greaterThan(asked),
+          reason: 'the refresh asked the server again, and that failed',
+        );
+
+        final snack = find.byType(SnackBar);
+        expect(snack, findsOneWidget);
+        expect(
+          tester.widget<SnackBar>(snack).behavior,
+          SnackBarBehavior.floating,
+        );
+        expect(
+          find.descendant(of: snack, matching: find.text(network)),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Tus tareas siguen guardadas'), findsNothing);
+        // The page as it was: no load failure, its members and projects.
+        expect(find.text(es.loadFailed), findsNothing);
+        expect(find.byType(LoadFailed), findsNothing);
+        expect(inPage(find.byType(RefreshIndicator)), findsOneWidget);
+        expect(find.text(es.personYou('Yo')), findsOneWidget);
+        expect(find.text('Ana'), findsOneWidget);
+        await tester.scrollUntilVisible(
+          find.text('Huerto'),
+          200,
+          scrollable: inPage(find.byType(Scrollable)).first,
+        );
+        expect(find.text(es.groupProjects), findsOneWidget);
+        expect(find.text('Huerto'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2627: (es, 1x, 360x800) online, a pull-to-refresh shows no message',
+      (tester) async {
+        final api = await openWithProject(tester);
+        final asked = api.calls.where((call) => call[0] == 'GET').length;
+        await pullToRefresh(tester);
+        expect(
+          api.calls.where((call) => call[0] == 'GET').length,
+          greaterThan(asked),
+        );
+        expect(find.byType(SnackBar), findsNothing);
+        expect(find.text(es.personYou('Yo')), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+}
+
+/// P285: group `Familia` in [language] at [scale] on a 360×800 view, with
+/// [projects] projects. This account (Yo) has [role]; Ana is the other
+/// member (the owner when Yo isn't). With [invited], Carmen is invited.
+Future<_Groups> _openP285(
+  WidgetTester tester, {
+  String role = 'owner',
+  String language = 'es',
+  double scale = 1,
+  int projects = 1,
+  bool invited = false,
+}) async {
+  tester.view.physicalSize = const Size(360, 800);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  final api = _Groups();
+  final owner = role == 'owner';
+  final container = ProviderContainer(
+    overrides: [
+      apiClientProvider.overrideWithValue(api),
+      authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
+      taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+      taskProvider.overrideWith((ref) => DesignTaskNotifier()),
+      taskListsProvider.overrideWith((ref) async => []),
+      groupsProvider.overrideWith((ref) async => []),
+      pendingInvitationsProvider.overrideWith((ref) async => []),
+      groupDetailsProvider('familia').overrideWith(
+        (ref) async => {
+          'group': {
+            'id': 'familia',
+            'name': 'Familia',
+            'owner_id': owner ? 1 : 2,
+            'version': 1,
+            'role': role,
+            'archived': false,
+            'project_count': projects,
+            'people': [
+              {'user_id': 1, 'name': 'Yo', 'role': role},
+              {'user_id': 2, 'name': 'Ana', 'role': owner ? 'editor' : 'owner'},
+            ],
+          },
+          'invitations': [
+            if (invited)
+              {
+                'id': 'inv-1',
+                'email': 'carmen@example.invalid',
+                'role': 'editor',
+              },
+          ],
+        },
+      ),
+    ],
+  );
+  addTearDown(container.dispose);
+  addTearDown(api.close);
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        locale: Locale(language),
+        theme: AppTheme.light,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(scale)),
+          child: child!,
+        ),
+        home: const GroupScreen(groupId: 'familia'),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+  return api;
+}
+
+/// P284: group `Familia` in Spanish at [scale] on a 360×800 view, fed by a
+/// [_LiveGroup] server through the app's own provider, where this account
+/// (Yo) has [role]; Carmen is invited. Opened from a page underneath.
+Future<_LiveGroup> _openLiveGroup(
+  WidgetTester tester, {
+  String role = 'owner',
+  double scale = 1,
+  TaskNotifier? tasks,
+}) async {
+  tester.view.physicalSize = const Size(360, 800);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  final api = _LiveGroup(role);
+  final container = ProviderContainer(
+    overrides: [
+      apiClientProvider.overrideWithValue(api),
+      authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
+      taskRepositoryProvider.overrideWithValue(MemoryTasks()),
+      taskProvider.overrideWith((ref) => tasks ?? DesignTaskNotifier()),
+      taskListsProvider.overrideWith((ref) async => []),
+      groupsProvider.overrideWith((ref) async => []),
+    ],
+  );
+  addTearDown(container.dispose);
+  addTearDown(api.close);
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        locale: const Locale('es'),
+        theme: AppTheme.light,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(scale)),
+          child: child!,
+        ),
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: TextButton(
+                key: const ValueKey('open-group'),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => const GroupScreen(groupId: 'familia'),
+                  ),
+                ),
+                child: const Text('Abrir'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.tap(find.byKey(const ValueKey('open-group')));
+  await tester.pumpAndSettle();
+  return api;
+}
+
+/// P284: the server of group `familia`. A change takes effect at once and
+/// the next GET shows it; [hold] keeps a change waiting; [offline] fails
+/// every request as a lost connection.
+class _LiveGroup extends OfflineApiClient {
+  _LiveGroup(this.role);
+  final String role;
+  final calls = <List<Object?>>[];
+  bool offline = false;
+  Completer<void>? hold;
+  String name = 'Familia';
+  bool archived = false;
+  int version = 1;
+  String voiceName = '';
+  @override
+  Future<dynamic> request(
+    String method,
+    String path, {
+    Map<String, dynamic>? data,
+    String? audioPath,
+    bool authenticated = true,
+    int? accountId,
+  }) async {
+    calls.add([method, path, data]);
+    if (offline) throw ApiException(0, 'offline');
+    if (method == 'GET' && path == 'groups/familia/sharing/') {
+      return {
+        'group': {
+          'id': 'familia',
+          'name': name,
+          'owner_id': role == 'owner' ? 1 : 2,
+          'version': version,
+          'role': role,
+          'archived': archived,
+          'project_count': 1,
+          'people': [
+            {'user_id': 1, 'name': 'Yo', 'role': role, 'voice_name': voiceName},
+            if (role == 'owner')
+              {'user_id': 2, 'name': 'Ana', 'role': 'editor'}
+            else
+              {'user_id': 2, 'name': 'Ana', 'role': 'owner'},
+          ],
+        },
+        'invitations': [
+          {'id': 'inv-1', 'email': 'carmen.lopez@example.com', 'role': 'editor'},
+        ],
+      };
+    }
+    if (hold != null) await hold!.future;
+    if (method == 'PUT' && path == 'groups/familia/') {
+      name = data?['name'] as String? ?? name;
+      archived = data?['archived'] == true;
+      version++;
+      return {'version': version};
+    }
+    if (method == 'POST' && path == 'groups/familia/profile/') {
+      voiceName = data?['voice_name'] as String? ?? '';
+      return {};
+    }
+    return {};
+  }
 }
 
 /// Group `Familia` in Spanish, where this account has [role], opened from a

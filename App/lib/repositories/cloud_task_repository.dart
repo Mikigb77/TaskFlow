@@ -105,6 +105,55 @@ class CloudTaskRepository extends TaskRepository {
   bool _sameDates(List<dynamic> a, List<dynamic> b) =>
       a.length == b.length && a.toSet().containsAll(b);
 
+  /// The reminder fields that are each account's own, as [remote] has them.
+  Map<String, dynamic> _reminders(Map<String, dynamic> remote) => {
+    'reminder_minutes': remote['reminder_minutes'],
+    'reminder_time': remote['reminder_time'],
+    'reminder_anchor': remote['reminder_anchor'] ?? 'planned',
+    'reminder_plan': remote['reminder_plan'],
+  };
+
+  /// Sends a reader's own reminders on [row], the one change a «lector» may
+  /// make (D9): the server's task as it is, at its version, with the
+  /// reminders chosen on this phone ([data]). The server saves them for this
+  /// account alone, with no new version, and answers with the task; when the
+  /// task changed meanwhile it saves them all the same, then answers 409 with
+  /// the task as it is now. Either answer becomes the row, with these
+  /// reminders kept, so an owner's change this phone hadn't pulled yet comes
+  /// in too. Never a copy, never a notice.
+  Future<void> _sendReminders(
+    Map<String, dynamic> row,
+    Map<String, dynamic> data,
+    Map<String, dynamic> remote,
+  ) async {
+    try {
+      final saved = await api.request(
+        'PUT',
+        'tasks/${row['sync_id']}/',
+        data: {
+          ...remote,
+          'reminder_minutes': data['reminder_minutes'],
+          'reminder_time': data['reminder_time'],
+          'reminder_plan': data['reminder_plan'],
+          'version': remote['version'],
+        },
+        accountId: accountId,
+      );
+      await database.acceptKeepingReminders(
+        ownerKey,
+        row,
+        Map<String, dynamic>.from(saved as Map),
+      );
+    } on ApiException catch (error) {
+      if (error.status != 409 || error.body?['current'] == null) rethrow;
+      await database.acceptKeepingReminders(
+        ownerKey,
+        row,
+        Map<String, dynamic>.from(error.body!['current'] as Map),
+      );
+    }
+  }
+
   @override
   Future<void> sync() =>
       _syncing ??= _synchronize().whenComplete(() => _syncing = null);
@@ -162,6 +211,19 @@ class CloudTaskRepository extends TaskRepository {
                     accountId: accountId,
                   ),
                 );
+                // Nothing to send, as after an undone change.
+                if (_sameContent(data, remote)) {
+                  await database.acknowledge(ownerKey, row, remote);
+                  continue;
+                }
+                // A reader's own reminders are theirs to choose (D9): sent
+                // when they are the row's only change, even if the owner
+                // changed the task before this phone pulled it.
+                if (row['own_reminders_pending'] == 1 ||
+                    _sameContent({...data, ..._reminders(remote)}, remote)) {
+                  await _sendReminders(row, data, remote);
+                  continue;
+                }
                 await database.preserveConflict(ownerKey, row, remote);
               } else {
                 await database.recoverReadOnlyDraft(ownerKey, row['id'] as int);

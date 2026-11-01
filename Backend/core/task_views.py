@@ -2,13 +2,13 @@ from django.db import IntegrityError, transaction
 from django.db.models import Prefetch
 from rest_framework import mixins, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.response import Response
 from .models import Task, TaskReminder
 from .collaboration import record_event, task_change_details
 from .serializers import PERSONAL_REMINDERS, TaskSerializer
 from .attachment_views import delete_task_attachments, check_list_transfer
-from .list_access import visible_tasks, lock_task, display_name
+from .list_access import visible_tasks, lock_task, display_name, list_role
 
 
 def set_reminders(task, user, values):
@@ -48,7 +48,9 @@ class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
     def update(self, request, pk=None):
         # Client-generated UUIDs make offline creation idempotent.
         with transaction.atomic():
-            task, locked = lock_task(pk, request.user, target_list=request.data.get("list_id"))
+            task, locked = lock_task(pk, request.user, target_list=request.data.get("list_id"), reader_ok=True)
+            # A reader may change only their own reminders (D9); everything else stays refused.
+            reader = bool(task and task.task_list_id and list_role(locked[task.task_list_id], request.user) == "viewer")
             previous = dict(task.__dict__) if task else {}
             serializer = self.get_serializer(task, data=request.data)
             serializer.is_valid(raise_exception=True)
@@ -61,6 +63,8 @@ class TaskViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
             if task and task.task_list_id and locked[task.task_list_id].shared and (destination is None or destination.pk != task.task_list_id):
                 raise ValidationError({"list_id": "Shared tasks stay in their list. Export and import a personal copy if needed."})
             expected = serializer.validated_data.get("version", 0)
+            if reader and (not personal or (expected == task.version and not serializer.leaves_unchanged(task))):
+                raise PermissionDenied("This list is read-only for your account.")
             if task and personal:
                 # Saved even when the version is stale: nobody else can have changed them.
                 set_reminders(task, request.user, personal)

@@ -1,6 +1,6 @@
 ---
 name: recurring-problems
-description: Thirty-six problem types the 2026-10-13 whole-app review found in several areas of TaskFlow (no landing, state last, undo bars that never leave, hidden actions, developer text, duplicates, lost input, large text, help copy outliving its state...), as a checklist to run first on any screen
+description: Forty-six problem types the 2026-10-13 whole-app review found in several areas of TaskFlow (no landing, state last, undo bars that never leave, hidden actions, developer text, duplicates, lost input, large text, help copy outliving its state...), as a checklist to run first on any screen
 metadata:
   type: project
 ---
@@ -159,5 +159,41 @@ Problem types the 2026-10-13 whole-app run (slices A–D) found in more than one
 36. **Pinning a header removes the scroll cue.**
     - Fixing the reminder sheet's title + note above a list that opens scrolled to a plan hid that rows sat above (R1D-1 → UX-2035, fixed with a 1 dp edge).
     - When content moves out of a scroll view into a fixed header, check the "opens mid-list" state at 2×: there must be an edge, and check what sliver of a scrolled row peeks under it (it is still a tap target).
+
+37. **"Empty" judged by one field lets an automatic action discard what the user set.**
+    - Entry absorption counted a sheet empty by live words (missed online recordings, R2A-1 → UX-2641) and a form empty by its title (dropped a picked date/checklist/photo, R3A-1 → UX-2643).
+    - Any rule that closes or reuses a screen without asking must use that screen's own "holds input" test (`_hasInput`, the editor's `_edited()` vs `_unchanged`), not a proxy. Absorbing (loses nothing) can be looser than closing.
+
+38. **A rule checks the stack once, then changes it.**
+    - Close-first popped a sheet, uncovering one the entry should have joined, but opened a second anyway (R3A-2 → UX-2644).
+    - After any pop inside a decision, re-check what is now on top.
+
+39. **Reusing whatever is open ignores why it was opened.**
+    - An empty form opened for a picked day, shared project or person absorbed an outside entry, so the new task inherited that context (R2A-2 → UX-2642).
+    - Reuse only routes whose arguments match what the entry would open itself.
+
+40. **A sheet without `isScrollControlled` is capped at 9/16 of the screen.**
+    - Adding a drag handle + heading pushed the project sheet's last row («Nuevo proyecto») half below the edge (R1C-1 → UX-2639).
+    - Whenever a sheet gains a header row, check its last row in a render; prefer the shared 70%-cap picker shape.
+
+41. **An action that leaves the screen turns a hesitant second tap into a tap on the screen below.**
+    - Completar now closes the task page; a second tap landed on Calendar's «Añadir tarea» (R1B2-1).
+    - Check what sits at the same spot on the screen underneath.
+
+42. **Scaled icons in benefit/feature lists push the status off the fold at 2×.**
+    - The Pro screen's check icons scaled to 40 dp and hid «Dictados gratis» (R1D-1 → UX-2640, fixed: fixed 20 dp icon in a first-line-height box, plan status first).
+    - Keep list icons fixed size; put what the person came for (status, counts) before the pitch.
+
+43. **One-tap rows replacing a compact control push the primary below the fold at 2×** (repeat sheet, R1B1-2), and a pinned primary then hides that content continues (R2B-1). See 36.
+
+44. **Sync gates comparing the phone's row with the server's "now" fail when the other side changed first** (D9 reader reminders). Look for a persisted intent marker (`own_reminders_pending`).
+
+45. **A wrapping label stretches to the full width, leaving its icon at the edge.**
+    - Four times so far: UX-2608, UX-2630, the form's «Añadir al / calendario» (UX-2634), the CA reminder chip (UX-2635). Fix is always `textWidthBasis: longestLine` + centre (only if tappable).
+    - Check every `.icon` button and icon chip whose label can wrap at 2× in ES/CA.
+
+46. **A page opened from a list loses the list's context.**
+    - The task page opened from Completadas stamped a new completion time, so the row jumped (UX-2646). Same family as 39.
+    - When a list holds per-row state (a remembered time, a scope), check that the row's page and its actions receive it.
 
 Related: [[ui-patterns]], [[review-techniques]].

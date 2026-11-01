@@ -117,10 +117,12 @@ Future<PreviewApp> _detail(
   int? hour,
   Task? task,
   DateTime? at,
+  bool reminderPrivacyShown = true,
 }) async {
   final app = await PreviewApp.open(
     p,
     pro: pro,
+    reminderPrivacyShown: reminderPrivacyShown,
     user: pro ? null : account(freeLeft: 4),
     billing: pro ? null : (FakeRevenueCat()..info = billingInfo()),
     tasks: [
@@ -187,7 +189,7 @@ void remindersPreviews() {
     preview(
       planSheet,
       'strength',
-      '«Hasta la fecha límite» tapped: Suave · Normal · Intenso with Normal chosen, the plan in words, the strip of dots from today to the day, the count and the next reminder («13 avisos · próximo: mañana, 09:00»), and Listo.',
+      '«Hasta la fecha límite» tapped: Suave · Normal · Intenso with Normal chosen, the plan in words, the strip of dots from today to the day, the count and the next reminder («13 avisos · próximo: mañana, 09:00»), and Listo. On this personal task «Recordatorio» stays at the top as the sheet opens scrolled to the plan, with a thin line under it and no «solo para ti» line.',
       [es1, es2, esDark, ca2, en2],
       (p) async {
         final app = await _detail(p);
@@ -213,10 +215,10 @@ void remindersPreviews() {
     preview(
       planSheet,
       'your-way',
-      '«A tu manera» with Pro: the words typed, as the assistant read them (the field\'s example, «Por ejemplo: …», gives way to the plan), with what the plan gives and Listo, brought into view by the sheet itself.',
+      '«A tu manera» with Pro, opened for the first time on this phone: the words typed, as the assistant read them (the field\'s example, «Por ejemplo: …», gives way to the plan), and under the field the line «Tus palabras van a la IA de Google. Más en Otros ajustes › Voz.», with what the plan gives and Listo, brought into view by the sheet itself. «Recordatorio» stays at the top, with a thin line under it.',
       [es1, es2, ca2],
       (p) async {
-        final app = await _detail(p);
+        final app = await _detail(p, reminderPrivacyShown: false);
         app.api.handlers['POST ai/reminder-plan/'] = (data) => {
           'reminder_plan': _ownWords(data!['text'] as String),
         };
@@ -293,7 +295,7 @@ void remindersPreviews() {
       },
       then: {
         'pro-screen':
-            'The badge tapped: the Pro screen says first, as a heading, «Con Pro, pide los avisos con tus palabras:», then the example «una semana antes y el día antes a las 8».',
+            'The badge tapped: the Pro screen says first, as a heading, «Con Pro, pide los avisos con tus palabras:», then the example «una semana antes y el día antes a las 8», then the plan («No hay una suscripción Pro activa» and the free dictations left), then what else Pro gives: dictation and file space without limit, and typed sentences turned into tasks.',
       },
     );
 
@@ -448,7 +450,7 @@ void remindersPreviews() {
     preview(
       planCard,
       'plan',
-      'Said: «Presentar el proyecto de empresa en tres semanas, recuérdamelo cada 3 días las dos primeras semanas y luego cada día». The plan shows in one «Recordatorio» row under the date, above «Más opciones», which has no subtitle; tapping it opens the reminder sheet.',
+      'Said: «Presentar el proyecto de empresa en tres semanas, recuérdamelo cada 3 días las dos primeras semanas y luego cada día». The plan shows in one row under the date, above «Más opciones», which has no subtitle: its line alone beside the bell, with no «Recordatorio» over it, read once by TalkBack; tapping it opens the reminder sheet.',
       [es1, es2, ca2],
       (p) async {
         await _planCapture(p);
@@ -492,7 +494,7 @@ void remindersPreviews() {
     preview(
       planCard,
       'plan-reminders-off',
-      'The same dictation with reminders off on this phone: the «Recordatorio» row keeps the plan\'s line, and «Activar recordatorios» shows under it.',
+      'The same dictation with reminders off on this phone: the reminder row keeps the plan\'s line, alone beside the bell, and «Activar recordatorios» shows under it.',
       [es2],
       (p) async {
         await _planCapture(

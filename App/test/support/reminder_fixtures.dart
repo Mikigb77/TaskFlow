@@ -87,6 +87,15 @@ class FakeReminderAccess extends ReminderAccess {
 
   @override
   Future<void> reconcile(String owner) async {}
+
+  /// The alerts the phone keeps, as `reminder_state` rows with `snooze_at`
+  /// ([ReminderEngine.alertsOf]): none has rung unless a test adds one.
+  List<Map<String, Object?>> kept = [];
+  @override
+  Future<List<Map<String, Object?>>> alertsOf(int taskId) async => [
+    for (final row in kept)
+      if (row['task_id'] == taskId) row,
+  ];
 }
 
 List<Override> reminderOverrides(

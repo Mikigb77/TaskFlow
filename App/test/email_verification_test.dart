@@ -1796,7 +1796,7 @@ void main() {
         final again = await coldStart(tester, storage, clock: clock);
         expect(screen(), findsNothing);
         expect(find.byType(LoginScreen), findsOneWidget);
-        expect(find.text(es.signInHeading), findsOneWidget);
+        expect(find.text(es.signInOrUpHeading), findsOneWidget);
         expect(again.server.requests, isEmpty);
         expect(tester.takeException(), isNull);
       },
@@ -2175,14 +2175,14 @@ void main() {
           reason: 'no address waits',
         );
         expect(find.byType(LoginScreen), findsOneWidget);
-        expect(find.text(es.signInHeading), findsOneWidget);
+        expect(find.text(es.signInOrUpHeading), findsOneWidget);
         expect(screen(), findsNothing);
         final again = await coldStart(
           tester,
           await storedWithoutSession(tester),
         );
         expect(screen(), findsNothing);
-        expect(find.text(es.signInHeading), findsOneWidget);
+        expect(find.text(es.signInOrUpHeading), findsOneWidget);
         expect(again.server.requests, isEmpty);
         expect(tester.takeException(), isNull);
       },
@@ -2250,7 +2250,7 @@ void main() {
       expect(mounted, lessThanOrEqualTo(usual + frame * 2));
       await tester.pumpAndSettle();
       expect(find.byType(LoginScreen), findsOneWidget);
-      expect(find.text(es.signInHeading), findsOneWidget);
+      expect(find.text(es.signInOrUpHeading), findsOneWidget);
       expect(again.app.server.requests, isEmpty, reason: 'nothing sent');
       expect(tester.takeException(), isNull);
     },
@@ -2386,13 +2386,20 @@ void main() {
     'UX-1207: the confirm screen’s heading names the screen (namesRoute and header), sign-in’s heading names its screen too, and Confirmar’s spinner is read «Confirmando»',
     (tester) async {
       final app = await _App.open(tester);
+      // P291: the folded first screen reads «Entra o crea tu cuenta».
       final signIn = tester
-          .getSemantics(find.text(es.signInHeading))
+          .getSemantics(find.text(es.signInOrUpHeading))
           .getSemanticsData()
           .flagsCollection;
       expect(signIn.namesRoute, isTrue, reason: 'sign-in');
       expect(signIn.isHeader, isTrue);
       await openEmailForm(tester);
+      final open = tester
+          .getSemantics(find.text(es.signInHeading))
+          .getSemanticsData()
+          .flagsCollection;
+      expect(open.namesRoute, isTrue, reason: 'sign-in form');
+      expect(open.isHeader, isTrue);
       await tapVisible(tester, find.text(es.createAnAccount));
       expect(
         tester
@@ -2509,8 +2516,10 @@ void main() {
           expect(paragraph.textScaler.scale(30), closeTo(36, 0.01));
         }
 
-        await expectWhole(l.signInHeading);
+        // P291: the folded first screen, then the open form.
+        await expectWhole(l.signInOrUpHeading);
         await openEmailForm(tester);
+        await expectWhole(l.signInHeading);
         await tapVisible(tester, find.text(l.forgotPassword).first);
         await expectWhole(l.recoveryHeading);
         await tester.pumpWidget(const SizedBox());

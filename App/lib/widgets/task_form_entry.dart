@@ -38,47 +38,87 @@ Future<void> openTaskForm(
 }) async {
   final container = ProviderScope.containerOf(context, listen: false);
   final free = container.read(authProvider).account?.freeVoice;
+  final arguments = NewTaskArguments(
+    day: day,
+    projectId: projectId,
+    person: person,
+    page: page,
+    showCalendar: showCalendar,
+    words: words,
+    readsDates: readsDates,
+    heardAt: heardAt,
+    captureId: captureId,
+    askedToSpeak: askedToSpeak,
+  );
   if (container.read(freeVoiceUsedUpProvider) && free != null) {
     final resets = container.read(freeVoiceResetsProvider);
-    final notice = await container
-        .read(freeVoiceNoticeProvider.notifier)
-        .claim(resets);
-    if (!context.mounted) return;
-    if (notice) {
-      final create = await showModalBottomSheet<bool>(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        showDragHandle: true,
-        builder: (_) => _UsedUpNotice(limit: free.limit, resets: resets),
-      );
-      if (!context.mounted || create == null) return;
-      if (!create) {
-        // `Ver Pro`, as the capture sheet's opens it.
-        unawaited(Navigator.pushNamed(context, '/subscription'));
-        return;
+    // While it's decided on and while it shows, the notice stands for the
+    // form (UX-2110).
+    final notice = _Notice(fromEntry: arguments.blank);
+    _notices.add(notice);
+    try {
+      final shows = await container
+          .read(freeVoiceNoticeProvider.notifier)
+          .claim(resets);
+      if (!context.mounted) return;
+      if (shows) {
+        final create = await showModalBottomSheet<bool>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          showDragHandle: true,
+          builder: (sheetContext) {
+            notice.route ??= ModalRoute.of(sheetContext);
+            return _UsedUpNotice(limit: free.limit, resets: resets);
+          },
+        );
+        if (!context.mounted || create == null) return;
+        if (!create) {
+          // `Ver Pro`, as the capture sheet's opens it.
+          unawaited(Navigator.pushNamed(context, '/subscription'));
+          return;
+        }
       }
+    } finally {
+      _notices.remove(notice);
     }
   }
   if (!context.mounted) return;
-  unawaited(
-    Navigator.pushNamed(
-      context,
-      '/newTask',
-      arguments: NewTaskArguments(
-        day: day,
-        projectId: projectId,
-        person: person,
-        page: page,
-        showCalendar: showCalendar,
-        words: words,
-        readsDates: readsDates,
-        heardAt: heardAt,
-        captureId: captureId,
-        askedToSpeak: askedToSpeak,
-      ),
-    ),
-  );
+  unawaited(Navigator.pushNamed(context, '/newTask', arguments: arguments));
+}
+
+/// Whether what's on top of [navigator] stands for the form a widget or
+/// shortcut entry would open, still empty, so the entry opens no second
+/// form over it (UX-2110): the month's used-up notice an entry opened, which
+/// says itself that dictations are used up; or an entry's form with no
+/// title, as [emptyEntryFormOnTop] tells. A typing entry ([askedToSpeak]
+/// false) takes either kind; one that asks to speak only a form that says
+/// why the mic is missing (UX-2642). A form or notice opened in the app,
+/// with a day, a project, a person or words, never stands for an entry's.
+bool emptyTaskFormOnTop(
+  NavigatorState navigator, {
+  required bool askedToSpeak,
+}) {
+  final form = emptyEntryFormOnTop(navigator);
+  if (form != null && (form || !askedToSpeak)) return true;
+  return _notices.any((notice) {
+    final route = notice.route;
+    // Still decided on, or pushed and not yet built: it's the next on top.
+    return notice.fromEntry &&
+        (route == null || (route.navigator == navigator && route.isCurrent));
+  });
+}
+
+// The used-up notices on their way or showing.
+final _notices = <_Notice>{};
+
+class _Notice {
+  _Notice({required this.fromEntry});
+
+  /// Opened as an entry opens the form: no day, project, person, words or
+  /// capture (UX-2642).
+  final bool fromEntry;
+  ModalRoute<Object?>? route;
 }
 
 /// Free dictations used up: the form has no limit, and dictations come back

@@ -9,6 +9,7 @@ import 'package:agenda/services/text_search.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/project_scope_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
+import 'package:agenda/widgets/search_clear.dart';
 import 'package:agenda/widgets/task_list_picker.dart';
 
 /// The people a shared project's page can filter by, besides the account
@@ -147,7 +148,7 @@ class ProjectScopeControl extends ConsumerWidget {
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 20,
                                     ),
-                                    child: TextField(
+                                    child: SearchField(
                                       decoration: InputDecoration(
                                         hintText: context.l10n.projectsFind,
                                         prefixIcon: const Icon(Icons.search),
@@ -170,6 +171,9 @@ class ProjectScopeControl extends ConsumerWidget {
                                             Icons.calendar_month_outlined,
                                           ),
                                           title: Text(context.l10n.projectsAll),
+                                          trailing: selectedId == null
+                                              ? const Icon(Icons.check_rounded)
+                                              : null,
                                           selected: selectedId == null,
                                           onTap: () =>
                                               Navigator.pop(context, ''),
@@ -437,6 +441,9 @@ Iterable<Widget> _projectChoices(
         subtitle:
             (project.pinned || query.isNotEmpty) && project.groupName != null
             ? Text(project.groupName!)
+            : null,
+        trailing: project.id == selectedId
+            ? const Icon(Icons.check_rounded)
             : null,
         selected: project.id == selectedId,
         onTap: () => Navigator.pop(context, project.id),

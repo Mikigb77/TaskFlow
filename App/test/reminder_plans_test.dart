@@ -261,10 +261,12 @@ void main() {
         await TaskDatabase.upgrade(old, 3, 18);
         final row = dayTask(day: friday13, minutes: 60).toMap()
           ..remove('id')
-          ..remove('reminderPlan');
+          ..remove('reminderPlan')
+          ..remove('completedAt')
+          ..remove('completedTimes');
         await old.insert('tasks', {...row, 'sync_id': 'kept', 'revision': 4});
         await TaskDatabase.upgrade(old, 18, TaskDatabase.schemaVersion);
-        expect(TaskDatabase.schemaVersion, 19);
+        expect(TaskDatabase.schemaVersion, 21);
         final columns = (await old.rawQuery(
           'PRAGMA table_info(tasks)',
         )).map((row) => row['name']).toSet();

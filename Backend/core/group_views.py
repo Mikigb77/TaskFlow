@@ -310,6 +310,9 @@ class NotificationSerializer(serializers.ModelSerializer):
             assignee_id = details["assignee_id"]
             data["assignee_name"] = self._name(assignee_id) if assignee_id else None
             data["assignee_is_you"] = assignee_id is not None and assignee_id == self.context["request"].user.pk
+        # What an update changed (UX-2508), so the app can say «ha movido» for a moved task.
+        if value.event.action == "updated" and isinstance(details.get("fields"), list):
+            data["fields"] = details["fields"]
         return data
 
     def _name(self, user_id):

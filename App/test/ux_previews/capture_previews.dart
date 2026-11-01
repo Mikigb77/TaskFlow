@@ -11,9 +11,11 @@ import 'package:agenda/services/native_speech.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:record/record.dart';
 import 'package:uuid/uuid.dart';
 
 import 'support/app.dart';
+import 'support/fakes.dart';
 import 'support/fixtures.dart';
 import 'support/preview.dart';
 
@@ -153,6 +155,77 @@ Map<String, dynamic> threeTasks() => {
   'commands': [],
 };
 
+/// The app's own recorder, listening: the online path's microphone.
+class _ListeningRecorder extends Fake implements AudioRecorder {
+  final _states = StreamController<RecordState>.broadcast();
+  final levels = StreamController<Amplitude>.broadcast();
+  var _recording = false;
+  @override
+  Stream<RecordState> onStateChanged() => _states.stream;
+  @override
+  Stream<Amplitude> onAmplitudeChanged(Duration interval) => levels.stream;
+  @override
+  Future<bool> hasPermission({bool request = true}) async => true;
+  @override
+  Future<void> start(RecordConfig config, {required String path}) async =>
+      _recording = true;
+  @override
+  Future<bool> isRecording() async => _recording;
+  @override
+  Future<bool> isPaused() async => false;
+  @override
+  Future<String?> stop() async {
+    _recording = false;
+    return null;
+  }
+
+  @override
+  Future<void> dispose() async {
+    await _states.close();
+    await levels.close();
+  }
+}
+
+/// Captures whose recordings go nowhere: no files in a preview.
+class _RecordingCaptures extends PreviewCaptures {
+  _RecordingCaptures() : super(PreviewTasks(normalDay()));
+  @override
+  Future<String> audioPathForId(String id) async => 'preview-$id.wav';
+  @override
+  Future<void> removeAudioFile(String id) async {}
+  @override
+  Future<CaptureSession> create(
+    String ownerKey,
+    String timezone, {
+    String text = '',
+    DateTime? now,
+    bool audio = false,
+    String kind = 'task',
+    String? projectId,
+    String? source,
+    DateTime? day,
+    String? id,
+    String? language,
+  }) async {
+    final session = await super.create(
+      ownerKey,
+      timezone,
+      text: text,
+      now: now,
+      kind: kind,
+      projectId: projectId,
+      source: source,
+      day: day,
+      id: id,
+      language: language,
+    );
+    if (!audio) return session;
+    return sessions[session.id] = session.copyWith(
+      audioPath: await audioPathForId(session.id),
+    );
+  }
+}
+
 void capturePreviews() {
   previewArea('capture', 'Capture sheet', () {
     // ---------------------------------------------------------- listening
@@ -255,6 +328,32 @@ void capturePreviews() {
         );
         await openSheet(app);
         await hear(app, 'Llamar a la farmacia');
+        await p.shoot();
+      },
+    );
+
+    preview(
+      sheet,
+      'listening-online',
+      'Listening online (the phone has no speech for the language), 7 s in, after speech-level sound: no words show, the hint says what Listo brings, and Escribir is still there.',
+      [es1, ca2],
+      (p) async {
+        final recorder = _ListeningRecorder();
+        await PreviewApp.open(
+          p,
+          tasks: normalDay(),
+          speechInstalled: false,
+          overrides: [
+            captureRecorderFactoryProvider.overrideWithValue(() => recorder),
+            captureStoreProvider.overrideWithValue(_RecordingCaptures()),
+          ],
+        );
+        await p.tester.tap(find.text(p.l.addTask).hitTestable());
+        await p.frames();
+        for (var i = 0; i < 7; i++) {
+          recorder.levels.add(Amplitude(current: -20, max: 0));
+          await p.tester.pump(const Duration(seconds: 1));
+        }
         await p.shoot();
       },
     );
@@ -384,7 +483,7 @@ void capturePreviews() {
     preview(
       sheet,
       'understanding-slow',
-      'The assistant has taken 10 s: the slow line and Guardar como tarea.',
+      'The assistant has taken 10 s: the slow line, with Guardar como tarea as a text button under it and no filled button.',
       [es1, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay());
@@ -403,7 +502,7 @@ void capturePreviews() {
     preview(
       sheet,
       'error-offline',
-      'Typed words sent with no connection: the reason, Reintentar and Guardar como tarea.',
+      'Typed words sent with no connection: the reason, naming Guardar como tarea, whole above the words; Reintentar and Guardar como tarea.',
       [es1, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay());
@@ -416,8 +515,8 @@ void capturePreviews() {
     preview(
       sheet,
       'error-unavailable',
-      'Spoken words, and the assistant\'s server fails (503).',
-      everywhere,
+      'Spoken words, and the server that understands them fails (503): they can\'t become tasks now, and are kept.',
+      [es1, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay());
         app.api.failure = ApiException(503, 'Service unavailable');
@@ -475,6 +574,66 @@ void capturePreviews() {
 
     preview(
       sheet,
+      'error-offline-recording',
+      'A recording with no words (online speech) sent with no connection: the recording is kept, and the reason names no Guardar como tarea.',
+      [es2],
+      (p) async {
+        final app = await PreviewApp.open(p, tasks: normalDay());
+        final session = CaptureSession(
+          id: const Uuid().v4(),
+          ownerKey: app.container.read(captureOwnerProvider),
+          timezone: 'Europe/Madrid',
+          capturedAt: previewNow.toUtc(),
+          audioPath: 'preview-recording.wav',
+          status: 'editing',
+          source: 'speech',
+        );
+        app.captures.sessions[session.id] = session;
+        app.api.failure = ApiException(0, 'Offline. Retry when connected.');
+        unawaited(
+          showCaptureSheet(
+            app.context,
+            captureId: session.id,
+            startListening: false,
+          ),
+        );
+        await p.tester.pumpAndSettle();
+        await sendWords(app);
+        // Sending a recording reads its file: real time passes for it.
+        for (var i = 0; i < 10 && app.api.asked.isEmpty; i++) {
+          await p.tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
+          );
+          await p.tester.pump();
+        }
+        await p.tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      sheet,
+      'error-limit-typed',
+      'Typed words refused by today\'s dictation limit (429, Retry-After 3600): the reason, naming Guardar como tarea, whole above the words, which scroll alone; Reintentar and Guardar como tarea.',
+      [ca2],
+      (p) async {
+        final app = await PreviewApp.open(p, tasks: normalDay());
+        app.api.failure = ApiException(
+          429,
+          'Daily limit reached.',
+          null,
+          const Duration(seconds: 3600),
+        );
+        await typeAndSend(app, 'Llamar al médico el viernes a las diez');
+        await p.shoot();
+      },
+    );
+
+    preview(
+      sheet,
       'error-nothing-understood',
       'The assistant found no task in the spoken words: the example, Volver a decirlo filled, Guardar como tarea under it, no Reintentar.',
       [es1, es2, ca2],
@@ -504,6 +663,29 @@ void capturePreviews() {
           'commands': [],
         };
         await speak(app, 'Llamar al médico el viernes a las diez');
+        await p.shoot();
+      },
+    );
+
+    // P299 (UX-2612, D1): «Guardar como tarea» shows its task before saving.
+    preview(
+      result,
+      'as-written',
+      'Guardar como tarea tapped while the assistant was slow (8 s): the phone\'s reading on one card, Llamar al dentista y comprar pan for tomorrow, with Añadir al calendario; nothing is saved yet.',
+      [es1, es2, ca2],
+      (p) async {
+        final app = await PreviewApp.open(p, tasks: normalDay());
+        app.api.hold = Completer<void>();
+        await openSheet(app);
+        await hear(app, 'Mañana, llamar al dentista y comprar pan');
+        await sendWords(app);
+        for (var i = 0; i < 9; i++) {
+          await p.tester.pump(const Duration(seconds: 1));
+        }
+        await p.tester.tap(
+          find.widgetWithText(TextButton, p.l.captureSaveAsWritten),
+        );
+        await p.tester.pumpAndSettle();
         await p.shoot();
       },
     );
@@ -552,10 +734,10 @@ void capturePreviews() {
         app.api.answer = {
           'transcript': 'Recoger el coche del taller el jueves a las cinco',
           'tasks': [
+            // The server sends the day and no time when it asks which.
             serverTask(
               'Recoger el coche del taller',
-              date: next(DateTime.thursday).add(const Duration(hours: 17)),
-              time: true,
+              date: next(DateTime.thursday),
               questions: [question],
               clarifications: [
                 {
@@ -586,6 +768,33 @@ void capturePreviews() {
           'commands': [],
         };
         await speak(app, 'Comprar pilas para el mando');
+        await p.shoot();
+      },
+    );
+
+    preview(
+      result,
+      'more-no-day',
+      'One task said without a day, Más opciones open: the repeat row asks for a day, with a chevron; it opens the date sheet.',
+      [es1, ca2],
+      (p) async {
+        final app = await PreviewApp.open(p, tasks: normalDay());
+        app.api.answer = {
+          'transcript': 'Comprar pilas para el mando',
+          'tasks': [serverTask('Comprar pilas para el mando')],
+          'commands': [],
+        };
+        await speak(app, 'Comprar pilas para el mando');
+        await p.tester.tap(find.text(p.l.reviewOptions).hitTestable());
+        await p.tester.pumpAndSettle();
+        // «Más opciones» at the top, then just enough to show the row.
+        await p.tester.ensureVisible(find.text(p.l.reviewOptions));
+        await p.tester.pumpAndSettle();
+        await Scrollable.ensureVisible(
+          p.tester.element(find.text(p.l.repeatNeedsDate)),
+          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+        );
+        await p.tester.pumpAndSettle();
         await p.shoot();
       },
     );

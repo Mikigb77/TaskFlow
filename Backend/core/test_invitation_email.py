@@ -59,7 +59,7 @@ class InvitationTextTests(TestCase):
     def test_someone_without_an_account_hears_about_google_play_and_the_website(self):
         _, body = message("es")
         self.assertIn("¿Aún no usas TaskFlow? La app llegará pronto a Google Play. Mientras tanto, puedes ver lo que "
-                      "hace en https://taskflow.garbar.tech/", body)
+                      "hace en https://taskflow.garbar.tech/es/", body)  # In the email's language (UX-2617).
         self.assertIn("Cuando tengas la app, crea tu cuenta con otto@example.invalid", body)
         self.assertNotIn("staging", body)
         User.objects.create_user("otto@example.invalid", PASSWORD, email_verified=True)

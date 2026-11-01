@@ -10,14 +10,14 @@ import 'package:flutter_test/flutter_test.dart';
 
 const _second = <String, String>{
   'en':
-      'To add, find or change tasks, your words go over the internet to '
-      'Google’s AI.',
+      'To add, find or change tasks, or to ask for reminders your way, your '
+      'words go over the internet to Google’s AI.',
   'es':
-      'Para añadir, buscar o cambiar tareas, tus palabras van por internet a '
-      'la IA de Google.',
+      'Para añadir, buscar o cambiar tareas, o pedir recordatorios a tu '
+      'manera, tus palabras van por internet a la IA de Google.',
   'ca':
-      'Per afegir, cercar o canviar tasques, les teves paraules van per '
-      'internet a la IA de Google.',
+      'Per afegir, cercar o canviar tasques, o demanar recordatoris a la '
+      'teva manera, les teves paraules van per internet a la IA de Google.',
 };
 
 // The first, third and fourth sentences stay word for word.

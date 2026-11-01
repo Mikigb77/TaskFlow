@@ -217,6 +217,10 @@ class Task(models.Model):
     task_list = models.ForeignKey(TaskList, on_delete=models.SET_NULL, null=True, blank=True, related_name="tasks")
     labels = models.JSONField(default=list, blank=True)
     is_completed = models.BooleanField(default=False)
+    # When it was completed (D2, docs/COMPLETION_TIMES.md): a single task's time, and each
+    # completed repeat's, by date. Only Completadas' order uses them.
+    completed_at = models.DateTimeField(null=True, blank=True)
+    completed_times = models.JSONField(default=dict, blank=True)
     is_deleted = models.BooleanField(default=False)
     version = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/providers/regional_provider.dart';
@@ -6,6 +9,7 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/models/checklist_item.dart';
 import 'package:flutter/semantics.dart';
 import 'package:agenda/models/task_list_info.dart';
+import 'package:agenda/providers/project_scope_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
@@ -26,6 +30,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/capture_fixtures.dart';
 import 'support/design_fixtures.dart';
+import 'support/search_clear.dart';
 
 Widget app(ProviderContainer container, Widget home,
         {bool dark = false, String language = 'en'}) =>
@@ -391,10 +396,11 @@ void main() {
   }
 
   testWidgets(
-      'UX-459: on Notas filtered to a view-only project, scrolled down, a note saved with Añadir nota (to Personal) leaves the scroll where it was and lights no row',
+      'UX-459 / UX-2501: on Notas filtered to a view-only project there is no Añadir nota to save a note elsewhere; the read-only bar shows instead',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
+    final l10n = lookupAppLocalizations(const Locale('es'));
     final container = typingContainer(tasks: _ProjectNotes.new, projects: [
       TaskListInfo(id: 'group', name: 'Recetas', role: 'viewer', shared: true)
     ]);
@@ -402,19 +408,8 @@ void main() {
     await tester.pumpWidget(
         app(container, const NotesScreen(listId: 'group'), language: 'es'));
     await tester.pumpAndSettle();
-    final (before, after) = await saveScrolledDown(tester, 'Nota nueva');
-    // Saved, but to Personal: not in this project's list.
-    expect(
-        container
-            .read(taskProvider)
-            .requireValue
-            .where((t) => t.title == 'Nota nueva')
-            .single
-            .listId,
-        isNull);
-    expect(find.text('Nota nueva', skipOffstage: false), findsNothing);
-    expect(after, before);
-    expectNothingHighlighted(tester);
+    expect(find.text(l10n.addNote), findsNothing);
+    expect(find.text(l10n.readOnlyList), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -484,9 +479,9 @@ void main() {
   });
 
   for (final (language, noMatch, label, all) in [
-    ('es', 'No hay notas que coincidan', 'Proyecto', 'Todas las notas'),
-    ('ca', 'No hi ha notes que coincideixin', 'Projecte', 'Totes les notes'),
-    ('en', 'No matching notes', 'Project', 'All notes'),
+    ('es', 'No hay notas que coincidan', 'Proyecto', 'Todos los proyectos'),
+    ('ca', 'No hi ha notes que coincideixin', 'Projecte', 'Tots els projectes'),
+    ('en', 'No matching notes', 'Project', 'All projects'),
   ]) {
     testWidgets(
         'UX-312 / UX-323: no results say $noMatch; the filter is labelled $label, with $all ($language)',
@@ -496,7 +491,7 @@ void main() {
       final l10n = lookupAppLocalizations(Locale(language));
       expect(l10n.noteNoMatches, noMatch);
       expect(l10n.list, label);
-      expect(l10n.allNotes, all);
+      expect(l10n.projectsAll, all);
       final container = designContainer(
           tasks: _AccentNotes.new,
           projects: [TaskListInfo(id: 'casa', name: 'Casa')]);
@@ -686,7 +681,7 @@ void main() {
     expect(
         find.descendant(of: bar, matching: find.byTooltip(l10n.editNote)),
         findsNothing);
-    expect(find.descendant(of: bar, matching: find.byTooltip(l10n.delete)),
+    expect(find.descendant(of: bar, matching: find.byTooltip(l10n.deleteNote)),
         findsOneWidget);
     // At the bottom: under the note's body, in the screen's lower part.
     final screen = tester.getRect(find.byType(TaskDetailScreen));
@@ -882,6 +877,453 @@ void main() {
     expect(find.byType(TaskEditor), findsNothing);
     expect(tester.takeException(), isNull);
   });
+  // ---- P283 (UX-2501, UX-2515): Notas adds only where it can ----
+
+  group('P283 · Notas adds only where it can', () {
+    final es = lookupAppLocalizations(const Locale('es'));
+
+    /// [app] at [scale]: the acceptance checks read at 1×.
+    Widget scaled(ProviderContainer container, Widget home,
+            {double scale = 1}) =>
+        UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+                theme: AppTheme.light,
+                locale: const Locale('es'),
+                supportedLocales: AppLocalizations.supportedLocales,
+                localizationsDelegates:
+                    AppLocalizations.localizationsDelegates,
+                builder: (context, child) => MediaQuery(
+                    data: MediaQuery.of(context)
+                        .copyWith(textScaler: TextScaler.linear(scale)),
+                    child: child!),
+                home: home));
+
+    final viewer =
+        TaskListInfo(id: 'group', name: 'Coro', role: 'viewer', shared: true);
+    final mates = TaskListInfo(
+        id: 'mates', name: 'Matemáticas', role: 'editor', shared: true);
+    final casa = TaskListInfo(id: 'casa', name: 'Casa');
+
+    void expectReadOnlyBar(WidgetTester tester) {
+      expect(find.text(es.addNote), findsNothing);
+      expect(find.widgetWithText(FilledButton, es.addNote), findsNothing);
+      final readOnly = find.text(es.readOnlyList);
+      final help = find.text(es.listEditingAccessHelp);
+      expect(readOnly.hitTestable(), findsOneWidget);
+      expect(help.hitTestable(), findsOneWidget);
+      // In the button's place, at the bottom of the screen.
+      final screen = tester.getRect(find.byType(NotesScreen));
+      expect(tester.getRect(help).bottom, lessThanOrEqualTo(screen.bottom));
+      expect(tester.getRect(help).bottom,
+          greaterThan(screen.bottom - 48));
+      expect(tester.getRect(readOnly).top,
+          lessThan(tester.getRect(help).top));
+    }
+
+    Future<void> pick(WidgetTester tester, String value) async {
+      final filter = find.byType(DropdownButtonFormField<String>);
+      await tester.ensureVisible(filter);
+      await tester.pumpAndSettle();
+      await tester.tap(filter);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(value).last);
+      await tester.pumpAndSettle();
+    }
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+          'UX-2501: NotesScreen on a project this account only views shows no Añadir nota, and the read-only bar in its place (es ${scale}x)',
+          (tester) async {
+        await tester.binding.setSurfaceSize(const Size(360, 800));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final container = typingContainer(
+            tasks: _ProjectNotes.new, projects: [viewer, casa]);
+        addTearDown(container.dispose);
+        await tester.pumpWidget(scaled(
+            container, const NotesScreen(listId: 'group'),
+            scale: scale));
+        await tester.pumpAndSettle();
+        expectReadOnlyBar(tester);
+        expect(es.readOnlyList, 'Este proyecto es de solo lectura');
+        expect(es.listEditingAccessHelp,
+            'Si quieres hacer cambios, pídeselo al propietario del proyecto.');
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets(
+        'UX-2501: the Notas tab filtered to a view-only project shows the read-only bar; «Todos los proyectos» brings Añadir nota back',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final container =
+          typingContainer(tasks: _ProjectNotes.new, projects: [viewer, casa]);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+          scaled(container, const NotesScreen(isRoot: true)));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(FilledButton, es.addNote).hitTestable(),
+          findsOneWidget);
+      expect(find.text(es.readOnlyList), findsNothing);
+      await pick(tester, 'Coro');
+      expectReadOnlyBar(tester);
+      await pick(tester, es.projectsAll);
+      expect(find.widgetWithText(FilledButton, es.addNote).hitTestable(),
+          findsOneWidget);
+      expect(find.text(es.readOnlyList), findsNothing);
+      expect(find.text(es.listEditingAccessHelp), findsNothing);
+      // An editable project keeps the button too.
+      await pick(tester, 'Casa');
+      expect(find.widgetWithText(FilledButton, es.addNote).hitTestable(),
+          findsOneWidget);
+      expect(find.text(es.readOnlyList), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'UX-2501: with Calendar’s chip on «Matemáticas», a note added from Notas on «Todos los proyectos» is saved with no project; one added on «Casa» is saved in «Casa»',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final container =
+          typingContainer(tasks: _ManyNotes.new, projects: [mates, casa]);
+      addTearDown(container.dispose);
+      container.read(projectScopeProvider.notifier).state =
+          const ProjectScope(projectId: 'mates');
+      final captures = container.read(captureStoreProvider) as MemoryCaptures;
+      await tester.pumpWidget(
+          scaled(container, const NotesScreen(isRoot: true)));
+      await tester.pumpAndSettle();
+      Task saved(String title) => container
+          .read(taskProvider)
+          .requireValue
+          .singleWhere((item) => item.title == title);
+
+      await typeCapture(tester, es.addNote, 'Idea privada');
+      expect(captures.current!.projectId, isNull,
+          reason: 'the capture is told: no project');
+      await saveCapture(tester);
+      expect(saved('Idea privada').isNote, isTrue);
+      expect(saved('Idea privada').listId, isNull);
+      ScaffoldMessenger.of(tester.element(find.byType(NotesScreen)))
+          .removeCurrentSnackBar();
+      await tester.pumpAndSettle();
+
+      await pick(tester, 'Casa');
+      await typeCapture(tester, es.addNote, 'Lista de la compra');
+      expect(captures.current!.projectId, 'casa');
+      await saveCapture(tester);
+      expect(saved('Lista de la compra').isNote, isTrue);
+      expect(saved('Lista de la compra').listId, 'casa');
+      // Shown in «Casa», where it was saved.
+      expect(find.text('Lista de la compra'), findsOneWidget);
+      // Calendar's chip is left as it was.
+      expect(container.read(projectScopeProvider).projectId, 'mates');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'UX-2501: a task added from Calendar with the chip on «Matemáticas» still goes to «Matemáticas»: the scope fallback is unchanged elsewhere',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final captures = MemoryCaptures();
+      final container = designContainer(
+          tasks: _ManyNotes.new,
+          projects: [mates, casa],
+          overrides: [
+            captureStoreProvider.overrideWithValue(captures),
+            ...captureSheetOverrides(),
+          ]);
+      captures.tasks = container;
+      addTearDown(container.dispose);
+      container.read(projectScopeProvider.notifier).state =
+          const ProjectScope(projectId: 'mates');
+      // As Calendar's Añadir tarea opens it: no project given, and the
+      // default scope rule; typed, so no microphone is needed.
+      await tester.pumpWidget(scaled(
+          container,
+          Scaffold(
+              body: Builder(
+                  builder: (context) => Center(
+                      child: TextButton(
+                          onPressed: () => showCaptureSheet(context,
+                              typing: true, startListening: false),
+                          child: Text(es.addTask)))))));
+      await tester.pumpAndSettle();
+      final messenger = tester.binding.defaultBinaryMessenger;
+      const timezone = MethodChannel('flutter_timezone');
+      messenger.setMockMethodCallHandler(
+          timezone, (_) async => 'Europe/Madrid');
+      addTearDown(() => messenger.setMockMethodCallHandler(timezone, null));
+      await tester.tap(find.text(es.addTask).hitTestable());
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.byKey(const ValueKey('capture-words')), 'Repasar el tema tres');
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, es.done));
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(captures.current, isNotNull);
+      expect(captures.current!.kind, 'task');
+      expect(captures.current!.projectId, 'mates');
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(minutes: 1));
+    });
+
+    testWidgets(
+        'UX-2515: an empty Notas on an account with projects shows no Proyecto dropdown; with a note it reads Proyecto / Todos los proyectos',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      expect(es.list, 'Proyecto');
+      expect(es.projectsAll, 'Todos los proyectos');
+      final container =
+          typingContainer(tasks: _NoNotes.new, projects: [casa, mates]);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+          scaled(container, const NotesScreen(isRoot: true)));
+      await tester.pumpAndSettle();
+      expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+      expect(find.text(es.list), findsNothing);
+      expect(find.text(es.projectsAll), findsNothing);
+      expect(find.text(es.notesEmpty), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+
+      final withNote =
+          typingContainer(tasks: _OneNote.new, projects: [casa, mates]);
+      addTearDown(withNote.dispose);
+      await tester.pumpWidget(
+          scaled(withNote, const NotesScreen(isRoot: true)));
+      await tester.pumpAndSettle();
+      final filter = find.byType(DropdownButtonFormField<String>);
+      expect(filter, findsOneWidget);
+      expect(find.descendant(of: filter, matching: find.text(es.list)),
+          findsOneWidget);
+      expect(find.descendant(of: filter, matching: find.text(es.projectsAll)),
+          findsOneWidget);
+      expect(find.text('Todas las notas'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'UX-2515: an empty Notas opened from a project still shows its Proyecto filter, on that project',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final container =
+          typingContainer(tasks: _NoNotes.new, projects: [casa, mates]);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+          scaled(container, const NotesScreen(listId: 'casa')));
+      await tester.pumpAndSettle();
+      final filter = find.byType(DropdownButtonFormField<String>);
+      expect(filter, findsOneWidget);
+      expect(find.descendant(of: filter, matching: find.text('Casa')),
+          findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    test('UX-2515: no allNotes key remains in the catalogs', () {
+      for (final code in ['en', 'es', 'ca']) {
+        final catalog = jsonDecode(
+                File('lib/l10n/app_$code.arb').readAsStringSync())
+            as Map<String, dynamic>;
+        expect(catalog.containsKey('allNotes'), isFalse, reason: code);
+        expect(catalog.containsKey('@allNotes'), isFalse, reason: code);
+      }
+      expect(lookupAppLocalizations(const Locale('en')).projectsAll,
+          'All projects');
+      expect(lookupAppLocalizations(const Locale('ca')).projectsAll,
+          'Tots els projectes');
+    });
+  });
+
+  // ---- P288 (UX-2509): every search clears in one tap ----
+
+  group('P288 · Notas search clears in one tap', () {
+    final notes = [
+      Task(id: 1, kind: 'note', title: 'Cita del dentista', priority: 1),
+      Task(id: 2, kind: 'note', title: 'Contraseña del wifi', priority: 1),
+      Task(id: 3, kind: 'note', title: 'Receta de lentejas', priority: 1),
+    ];
+    final titles = [for (final note in notes) note.title];
+
+    Future<void> show(WidgetTester tester, String language) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final container = typingContainer(tasks: () => _Given(notes));
+      addTearDown(container.dispose);
+      await tester.pumpWidget(UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+              theme: AppTheme.light,
+              locale: Locale(language),
+              supportedLocales: AppLocalizations.supportedLocales,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              home: const NotesScreen())));
+      await tester.pumpAndSettle();
+    }
+
+    void expectNotes(Iterable<String> shown,
+        {Iterable<String> hidden = const []}) {
+      for (final title in shown) {
+        expect(find.text(title), findsOneWidget, reason: '$title shows');
+      }
+      for (final title in hidden) {
+        expect(find.text(title), findsNothing, reason: '$title is filtered out');
+      }
+    }
+
+    for (final language in ['es', 'en', 'ca']) {
+      testWidgets(
+          'UX-2509: ($language, 1×, 360×800) Notas: an empty search has no ✕; typing «dent» shows a 48 dp ✕ read as «Borrar búsqueda»; one tap clears it, every note comes back and the ✕ goes',
+          (tester) async {
+        final l = lookupAppLocalizations(Locale(language));
+        final semantics = tester.ensureSemantics();
+        await show(tester, language);
+        final field = searchField();
+        expect(field, findsOneWidget);
+        expectNotes(titles);
+        expectNoClear(field, l);
+
+        await tester.enterText(field, 'dent');
+        await tester.pumpAndSettle();
+        expectNotes(['Cita del dentista'],
+            hidden: ['Contraseña del wifi', 'Receta de lentejas']);
+        expectClear(tester, field, l);
+
+        await tapClear(tester, field, l);
+        expect(searchText(tester, field), isEmpty);
+        expectNotes(titles);
+        expectNoClear(field, l);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      });
+    }
+
+    testWidgets(
+        'UX-2509: (es, 1×, 360×800) Notas with no match: the ✕ is in view and brings the notes back',
+        (tester) async {
+      final es = lookupAppLocalizations(const Locale('es'));
+      final semantics = tester.ensureSemantics();
+      await show(tester, 'es');
+      final field = searchField();
+      await tester.enterText(field, 'zanahorias');
+      await tester.pumpAndSettle();
+      expectNotes(const [], hidden: titles);
+      expect(find.text(es.noteNoMatches), findsOneWidget);
+      expectClear(tester, field, es);
+
+      await tapClear(tester, field, es);
+      expect(find.text(es.noteNoMatches), findsNothing);
+      expectNotes(titles);
+      expectNoClear(field, es);
+      expect(tester.takeException(), isNull);
+      semantics.dispose();
+    });
+  });
+
+  // ---- Run 2026-10-28-app, round 2 · P303 (UX-2626) ----
+
+  group('P303 · a gone project on Notas', () {
+    final es = lookupAppLocalizations(const Locale('es'));
+    final viewer =
+        TaskListInfo(id: 'group', name: 'Coro', role: 'viewer', shared: true);
+    final casa = TaskListInfo(id: 'casa', name: 'Casa');
+
+    /// [home] in Spanish at 1× on a 360×800 view.
+    Future<void> open(
+        WidgetTester tester, ProviderContainer container, Widget home) async {
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+              theme: AppTheme.light,
+              locale: const Locale('es'),
+              supportedLocales: AppLocalizations.supportedLocales,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(context)
+                      .copyWith(textScaler: TextScaler.noScaling),
+                  child: child!),
+              home: home)));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+        'UX-2626: (es, 1x) NotesScreen on a gone project, with the projects loaded, shows Añadir nota and no read-only bar; a note added there is saved with no project',
+        (tester) async {
+      final container = typingContainer(
+          tasks: _GoneProjectNotes.new, projects: [viewer, casa]);
+      addTearDown(container.dispose);
+      final captures = container.read(captureStoreProvider) as MemoryCaptures;
+      await open(tester, container, const NotesScreen(listId: 'gone'));
+      // The projects have loaded, and «gone» isn't one of them.
+      final lists = container.read(taskListsProvider);
+      expect(lists.hasValue, isTrue);
+      expect(lists.requireValue.map((list) => list.id), isNot(contains('gone')));
+      // Nobody can grant this project: no bar asking the owner.
+      expect(find.text(es.readOnlyList), findsNothing);
+      expect(find.text(es.listEditingAccessHelp), findsNothing);
+      final add = find.widgetWithText(FilledButton, es.addNote);
+      expect(add.hitTestable(), findsOneWidget);
+      final screen = tester.getRect(find.byType(NotesScreen));
+      expect(tester.getRect(add).bottom, lessThanOrEqualTo(screen.bottom));
+      // The filter still names it as unavailable.
+      final filter = find.byType(DropdownButtonFormField<String>);
+      expect(find.descendant(of: filter, matching: find.text(es.listUnavailable)),
+          findsOneWidget);
+
+      await typeCapture(tester, es.addNote, 'Idea suelta');
+      expect(captures.current!.projectId, isNull,
+          reason: 'the capture is told: no project');
+      await saveCapture(tester);
+      final saved = container
+          .read(taskProvider)
+          .requireValue
+          .singleWhere((item) => item.title == 'Idea suelta');
+      expect(saved.isNote, isTrue);
+      expect(saved.listId, isNull);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'UX-2626: (es, 1x) Notas on a project this account only views still shows the read-only bar, and no Añadir nota',
+        (tester) async {
+      final container =
+          typingContainer(tasks: _ProjectNotes.new, projects: [viewer, casa]);
+      addTearDown(container.dispose);
+      await open(tester, container, const NotesScreen(listId: 'group'));
+      expect(find.text(es.readOnlyList).hitTestable(), findsOneWidget);
+      expect(find.text(es.listEditingAccessHelp).hitTestable(), findsOneWidget);
+      expect(find.text(es.addNote), findsNothing);
+      expect(find.widgetWithText(FilledButton, es.addNote), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  });
+}
+
+/// Three notes left in project `gone`, which this account no longer has;
+/// each added note gets the next id, as the database does.
+class _GoneProjectNotes extends _ManyNotes {
+  @override
+  Future<void> loadTasks() async {
+    if (state.hasValue) return;
+    state = AsyncData([
+      for (var id = 1; id <= 3; id++)
+        Task(
+            id: id,
+            kind: 'note',
+            title: 'Nota $id',
+            priority: 1,
+            listId: 'gone'),
+    ]);
+  }
 }
 
 /// Twelve notes, then each added note gets the next id, as the database does.

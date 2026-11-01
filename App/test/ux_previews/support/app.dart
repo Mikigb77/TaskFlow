@@ -81,9 +81,14 @@ class PreviewApp {
     List<TaskListInfo> projects = const [],
     bool hadTask = true,
     bool privacyShown = true,
+    // «A tu manera» has shown its privacy line on this phone.
+    bool reminderPrivacyShown = true,
     SpeechPermission mic = SpeechPermission.granted,
     bool notificationsAllowed = true,
     bool exactAlarms = true,
+    // The alerts the phone keeps, as `reminder_state` rows with `snooze_at`:
+    // a reminder that has rung, or is snoozed.
+    List<Map<String, Object?>> phoneAlerts = const [],
     // The saved session is still being read.
     bool restoring = false,
     // The app's language has on-device speech on this phone.
@@ -154,7 +159,7 @@ class PreviewApp {
     final access = FakeReminderAccess(
       allowed: notificationsAllowed,
       exact: exactAlarms,
-    );
+    )..kept = [...phoneAlerts];
     // Secure storage (the session, an address waiting for its code) answers
     // from memory: start-up waits for it before showing a signed-out screen.
     FlutterSecureStorage.setMockInitialValues({});
@@ -181,6 +186,7 @@ class PreviewApp {
               clock: ClockFormat.twentyFour,
               weekStart: 1,
               privacyShown: privacyShown,
+              reminderPrivacyShown: reminderPrivacyShown,
             ),
           ),
         ),

@@ -403,7 +403,7 @@ void main() {
       final usage = find.text(l.storageUsage(85, 100));
       expect(usage, findsOneWidget);
       if (language == 'es') {
-        expect(find.text('Archivos: 85 de 100 MB usados'), findsOneWidget);
+        expect(find.text('Archivos: 85 de 100 MB usados'), findsOneWidget);
       }
       expect(
           tester.getTopLeft(find.text(heading.toUpperCase())).dy,
@@ -446,7 +446,10 @@ void main() {
       billingLoadingProvider.overrideWithValue(false),
       apiClientProvider.overrideWithValue(api),
       authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
-      attachmentEntriesProvider.overrideWith((ref, taskId) async => []),
+      // A file kept only on the phone, which shows «Subir» (UX-2419).
+      attachmentEntriesProvider.overrideWith((ref, taskId) async => const [
+            AttachmentEntry('resultados.pdf', '/local/resultados.pdf', true)
+          ]),
       regionalStoreProvider.overrideWithValue(MemoryRegionalStore(
           const RegionalPreferences(
               language: 'es', clock: ClockFormat.twentyFour, weekStart: 1))),
@@ -509,7 +512,7 @@ void main() {
   // ---- b7 round 3 · P99 (UX-512): the file size limit says 6 MB everywhere ----
 
   test(
-      'UX-512: fileLocalHelp, fileLimit and requestError(fileLimit) say 6 MB and never MiB in EN, ES and CA; fileLimit still allows 20 files per task',
+      'UX-512: fileLimit and requestError(fileLimit) say 6 MB and never MiB in EN, ES and CA; fileLimit still allows 20 files per task',
       () {
     for (final (language, twenty) in [
       ('en', 'up to 20 files per task'),
@@ -518,7 +521,6 @@ void main() {
     ]) {
       final l = lookupAppLocalizations(Locale(language));
       for (final text in [
-        l.fileLocalHelp,
         l.fileLimit,
         l.requestError('fileLimit'),
       ]) {
@@ -529,12 +531,9 @@ void main() {
     }
     final en = lookupAppLocalizations(const Locale('en'));
     final ca = lookupAppLocalizations(const Locale('ca'));
-    expect(en.fileLocalHelp,
-        'Files stay on this device until you sign in and choose Upload in task details. Up to 6 MB per file.');
     expect(en.fileLimit,
         'Choose a non-empty file up to 6 MB. You can attach up to 20 files per task.');
     expect(en.requestError('fileLimit'), 'Choose a non-empty file up to 6 MB.');
-    expect(ca.fileLocalHelp, endsWith('Fins a 6 MB per fitxer.'));
     expect(ca.requestError('fileLimit'),
         'Tria un fitxer no buit de fins a 6 MB.');
   });
@@ -554,7 +553,7 @@ void main() {
 
   for (final signedIn in [false, true]) {
     testWidgets(
-        'UX-512: the task editor in Spanish, ${signedIn ? 'signed in, says new files upload up to 6 MB each' : 'signed out with a local file, ends its file help with Hasta 6 MB por archivo.'}',
+        'UX-512: the task editor in Spanish, ${signedIn ? 'signed in with a file kept only on the phone, says new files upload up to 6 MB each' : 'signed out with a local file, which offers no «Subir», shows no file help (UX-2419)'}',
         (tester) async {
       tester.view.physicalSize = const Size(390, 1600);
       tester.view.devicePixelRatio = 1;
@@ -567,7 +566,9 @@ void main() {
         apiClientProvider.overrideWithValue(api),
         authProvider.overrideWith((ref) =>
             signedIn ? SignedInFixtureAuth(api) : _SignedOutAuth(api)),
-        attachmentEntriesProvider.overrideWith((ref, taskId) async => []),
+        attachmentEntriesProvider.overrideWith((ref, taskId) async => const [
+              AttachmentEntry('resultados.pdf', '/local/resultados.pdf', true)
+            ]),
         regionalStoreProvider.overrideWithValue(MemoryRegionalStore(
             const RegionalPreferences(
                 language: 'es', clock: ClockFormat.twentyFour, weekStart: 1))),
@@ -604,24 +605,22 @@ void main() {
       await tester.tap(more);
       await tester.pumpAndSettle();
       // The file help shows in the attach sheet, not in the form.
-      final help =
-          find.text(signedIn ? es.fileUploadHelp : es.fileLocalHelp);
+      final help = find.text(es.fileUploadHelp);
       expect(help, findsNothing);
       final attach = find.text(es.addAttachment);
       await tester.scrollUntilVisible(attach, 200, scrollable: scroll);
       await tester.pumpAndSettle();
       await tester.tap(attach);
       await tester.pumpAndSettle();
-      expect(help, findsOneWidget);
-      final shown = tester.widget<Text>(help).data!;
+      expect(find.text(es.attachFile), findsOneWidget);
       if (signedIn) {
+        expect(help, findsOneWidget);
+        final shown = tester.widget<Text>(help).data!;
         expect(shown, contains('hasta 6 MB cada uno'));
-        expect(find.text(es.fileLocalHelp), findsNothing);
+        expect(shown, isNot(contains('MiB')));
       } else {
-        expect(shown, endsWith('Hasta 6 MB por archivo.'));
-        expect(find.text(es.fileUploadHelp), findsNothing);
+        expect(help, findsNothing);
       }
-      expect(shown, isNot(contains('MiB')));
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });
@@ -636,7 +635,7 @@ void main() {
 
   for (final scale in [1.0, 2.0]) {
     testWidgets(
-        'UX-1414: a file refused for the account’s own full space (tasks/detail.file-space-full, es, ${scale}x on 360 dp) says one sentence and shows exactly 4 buttons, with no «Reintentar transferencia»; «Eliminar archivo adjunto» is last, in the error colour, at least 12 dp below the others, and no two buttons are under 8 dp apart',
+        'UX-1414: a file refused for the account’s own full space (tasks/detail.file-space-full, es, ${scale}x on 360 dp) says one sentence and shows exactly 4 buttons, with no «Reintentar transferencia»; «Quitar archivo» is last, in the error colour, at least 12 dp below the others, and no two buttons are under 8 dp apart',
         (tester) async {
       await tester.binding.setSurfaceSize(const Size(360, 800));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -752,6 +751,283 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
+
+  // ---- Run 2026-10-28-app, round 1 · P281 (UX-2419): the attach sheet
+  // explains files only to a task with one kept only on the phone. ----
+  group('P281 · attach sheet', () {
+    const uploaded = TaskAttachment(
+        id: 'uploaded',
+        taskId: '7',
+        name: 'resultados.pdf',
+        size: 100,
+        sha256: '',
+        remote: true);
+
+    /// A signed-in account's saved task «Médico» in the Spanish edit form,
+    /// whose files are [entries]; its «Añadir adjunto» sheet open.
+    Future<void> openAttachSheet(
+        WidgetTester tester, List<AttachmentEntry> entries) async {
+      tester.view.physicalSize = const Size(390, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final api = OfflineApiClient();
+      final container = ProviderContainer(overrides: [
+        hasProProvider.overrideWithValue(false),
+        billingLoadingProvider.overrideWithValue(false),
+        apiClientProvider.overrideWithValue(api),
+        authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
+        attachmentEntriesProvider.overrideWith((ref, taskId) async => entries),
+        regionalStoreProvider.overrideWithValue(MemoryRegionalStore(
+            const RegionalPreferences(
+                language: 'es', clock: ClockFormat.twentyFour, weekStart: 1))),
+        pendingCapturesProvider.overrideWith((ref) async => []),
+        taskListsProvider.overrideWith((ref) async => []),
+        taskRepositoryProvider.overrideWithValue(_CloudTasks()),
+        taskProvider.overrideWith((ref) => DesignTaskNotifier()),
+        themeStoreProvider.overrideWithValue(MemoryThemeStore()),
+      ]);
+      addTearDown(api.close);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+              locale: const Locale('es'),
+              supportedLocales: AppLocalizations.supportedLocales,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              home: TaskEditor(
+                  task: Task(
+                      id: 7,
+                      title: 'Médico',
+                      priority: 3,
+                      filePaths: const ['/local/resultados.pdf'])))));
+      await tester.pumpAndSettle();
+      final scroll = find
+          .descendant(
+              of: find.byType(TaskEditor), matching: find.byType(Scrollable))
+          .first;
+      final more = find.byKey(const ValueKey('task-more-details'));
+      await tester.scrollUntilVisible(more, 200, scrollable: scroll);
+      await tester.pumpAndSettle();
+      await tester.tap(more);
+      await tester.pumpAndSettle();
+      final attach = find.text(
+          lookupAppLocalizations(const Locale('es')).addAttachment);
+      await tester.scrollUntilVisible(attach, 200, scrollable: scroll);
+      await tester.pumpAndSettle();
+      await tester.tap(attach);
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsOneWidget);
+    }
+
+    /// The sheet's texts, top to bottom.
+    List<String> sheetTexts(WidgetTester tester) => [
+          for (final element in find
+              .descendant(
+                  of: find.byType(BottomSheet), matching: find.byType(Text))
+              .evaluate())
+            (element.widget as Text).data ?? '',
+        ];
+
+    for (final (name, entries) in [
+      ('no files kept on the phone', const <AttachmentEntry>[]),
+      (
+        'only a file already in the account',
+        const [
+          AttachmentEntry('resultados.pdf', '/local/resultados.pdf', true,
+              item: uploaded)
+        ]
+      ),
+      (
+        'a phone-only file that is missing from the phone, so shows no «Subir»',
+        const [AttachmentEntry('resultados.pdf', null, false)]
+      ),
+    ]) {
+      testWidgets(
+          'UX-2419: «Añadir adjunto» on a saved task with $name shows its two rows and no paragraph',
+          (tester) async {
+        final es = lookupAppLocalizations(const Locale('es'));
+        await openAttachSheet(tester, entries);
+        expect(find.text(es.fileUploadHelp), findsNothing);
+        expect(sheetTexts(tester), [es.choosePhoto, es.attachFile]);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+
+    testWidgets(
+        'UX-2419: «Añadir adjunto» on a saved task with a file kept only on the phone, which shows «Subir», shows the paragraph above its two rows',
+        (tester) async {
+      final es = lookupAppLocalizations(const Locale('es'));
+      await openAttachSheet(tester, const [
+        AttachmentEntry('resultados.pdf', '/local/resultados.pdf', true,
+            item: uploaded),
+        AttachmentEntry('receta.pdf', '/local/receta.pdf', true),
+      ]);
+      expect(
+          find.descendant(
+              of: find.byType(BottomSheet),
+              matching: find.text(es.fileUploadHelp)),
+          findsOneWidget);
+      expect(sheetTexts(tester),
+          [es.fileUploadHelp, es.choosePhoto, es.attachFile]);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P293 (UX-2418): «Quitar archivo»
+  // in Spanish ----
+  group('P293 · Quitar archivo', () {
+    for (final (language, button, question) in [
+      ('es', 'Quitar archivo', '¿Quitar este archivo de la tarea?'),
+      ('en', 'Remove attachment', 'Remove this attachment?'),
+      ('ca', 'Treu el fitxer adjunt', 'Vols treure aquest fitxer adjunt?'),
+    ]) {
+      testWidgets(
+        'UX-2418: the remove-file dialog in $language reads «$question» with «$button»${language == 'es' ? '' : ' (unchanged)'}, and no «Eliminar»',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          expect(l.fileRemove, button);
+          expect(l.fileRemoveQuestion, question);
+          await pumpPanel(tester, language: language);
+          final remove = find.widgetWithText(TextButton, button);
+          await tester.ensureVisible(remove);
+          await tester.pumpAndSettle();
+          await tester.tap(remove);
+          await tester.pumpAndSettle();
+          final dialog = find.byType(AlertDialog);
+          expect(dialog, findsOneWidget);
+          expect(
+            find.descendant(of: dialog, matching: find.text(question)),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(
+              of: dialog,
+              matching: find.widgetWithText(FilledButton, button),
+            ),
+            findsOneWidget,
+          );
+          // The help under it still says the original stays.
+          expect(
+            find.descendant(
+              of: dialog,
+              matching: find.textContaining(l.fileRemoveHelp),
+            ),
+            findsOneWidget,
+          );
+          if (language == 'es') {
+            expect(
+              find.descendant(
+                of: dialog,
+                matching: find.textContaining('Eliminar'),
+              ),
+              findsNothing,
+            );
+          }
+          await tester.tap(find.widgetWithText(TextButton, l.cancel));
+          await tester.pumpAndSettle();
+          expect(dialog, findsNothing);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        },
+      );
+    }
+  });
+
+  // ---- UX loop 2026-11-01-screens, round 1 · P315 (UX-2645): the
+  // remove-file help says «Se quitará» ----
+  group('P315 · the task page', () {
+    const es =
+        'Se quitará de la tarea y, si lo has subido, de tus otros dispositivos al sincronizar. Tu archivo original no se elimina.';
+    const en =
+        'This removes it from the task and, if uploaded, your other devices when they sync. Your original file is not deleted.';
+    const ca =
+        'Es traurà de la tasca i, si s’ha pujat, dels altres dispositius quan se sincronitzin. El fitxer original no se suprimirà.';
+
+    testWidgets(
+      'UX-2645: in ES the remove-file dialog reads «¿Quitar este archivo de la tarea?», the file’s name, then «Se quitará de la tarea…», with «Quitar archivo»; nothing in it says «Se eliminará»',
+      (tester) async {
+        final l = lookupAppLocalizations(const Locale('es'));
+        expect(l.fileRemoveHelp, es);
+        await pumpPanel(tester, language: 'es');
+        final remove = find.widgetWithText(TextButton, l.fileRemove);
+        await tester.ensureVisible(remove);
+        await tester.pumpAndSettle();
+        await tester.tap(remove);
+        await tester.pumpAndSettle();
+        final dialog = find.byType(AlertDialog);
+        expect(dialog, findsOneWidget);
+
+        final question = find.descendant(
+          of: dialog,
+          matching: find.text(l.fileRemoveQuestion),
+        );
+        final body = find.descendant(
+          of: dialog,
+          matching: find.text('Local notes.txt\n\n$es'),
+        );
+        final button = find.descendant(
+          of: dialog,
+          matching: find.widgetWithText(FilledButton, l.fileRemove),
+        );
+        expect(question, findsOneWidget);
+        expect(body, findsOneWidget, reason: 'the name, then the help');
+        expect(button, findsOneWidget);
+        // Read top to bottom: the question, the name and help, the button.
+        expect(
+          tester.getTopLeft(question).dy,
+          lessThan(tester.getTopLeft(body).dy),
+        );
+        expect(
+          tester.getBottomLeft(body).dy,
+          lessThanOrEqualTo(tester.getTopLeft(button).dy),
+        );
+
+        final words = tester
+            .widgetList<Text>(
+              find.descendant(of: dialog, matching: find.byType(Text)),
+            )
+            .map((text) => text.data ?? text.textSpan?.toPlainText() ?? '')
+            .join(' | ');
+        expect(words, isNot(contains('Se eliminará')), reason: words);
+        expect(words, isNot(contains('eliminará')), reason: words);
+
+        await tester.tap(find.widgetWithText(TextButton, l.cancel));
+        await tester.pumpAndSettle();
+        expect(dialog, findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+
+    for (final (language, help) in [('en', en), ('ca', ca)]) {
+      testWidgets(
+        'UX-2645: the $language help line under the remove-file question is unchanged',
+        (tester) async {
+          final l = lookupAppLocalizations(Locale(language));
+          expect(l.fileRemoveHelp, help);
+          await pumpPanel(tester, language: language);
+          final remove = find.widgetWithText(TextButton, l.fileRemove);
+          await tester.ensureVisible(remove);
+          await tester.pumpAndSettle();
+          await tester.tap(remove);
+          await tester.pumpAndSettle();
+          expect(
+            find.descendant(
+              of: find.byType(AlertDialog),
+              matching: find.text('Local notes.txt\n\n$help'),
+            ),
+            findsOneWidget,
+          );
+          await tester.tap(find.widgetWithText(TextButton, l.cancel));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        },
+      );
+    }
+  });
 }
 
 /// Nobody is signed in: files stay on this phone.

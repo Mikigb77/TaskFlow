@@ -15,6 +15,7 @@ import 'package:agenda/screens/task_detail_screen.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
+import 'package:agenda/widgets/search_clear.dart';
 import 'package:agenda/widgets/task_list_picker.dart';
 import 'package:agenda/services/capture_store.dart';
 
@@ -140,11 +141,18 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
       if (_newerThan == null || !next.hasValue) return;
       if (!_land(next.value) && _settling) _newerThan = null;
     });
-    final lists = ref.watch(taskListsProvider).valueOrNull ?? [];
+    final loadedLists = ref.watch(taskListsProvider);
+    final lists = loadedLists.valueOrNull ?? [];
     final content = ref.watch(taskProvider);
     // The search waits for a first note.
     final hasNotes =
         content.valueOrNull?.any((item) => item.isNote) ?? false;
+    // Only a project the account can see but not edit gets the project
+    // page's read-only bar. A gone one has nobody to ask, so «Añadir nota»
+    // shows and the note is saved with no project.
+    final shownList =
+        lists.where((list) => list.id == _listId).firstOrNull;
+    final readOnly = shownList != null && !shownList.canEdit;
     return Scaffold(
       appBar: CustomAppBar(title: context.l10n.notes, isRoot: widget.isRoot),
       body: RefreshIndicator(
@@ -175,7 +183,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                           Navigator.pushNamed(context, '/captures'),
                       child: Text(context.l10n.checkCaptures))),
               if (hasNotes) ...[
-                TextField(
+                SearchField(
                     key: const ValueKey('note-search'),
                     controller: _search,
                     onChanged: (value) =>
@@ -185,14 +193,21 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                         prefixIcon: const Icon(Icons.search_rounded))),
                 const SizedBox(height: 12),
               ],
-              if (lists.isNotEmpty)
+              // By the search's rule, or while a project is shown.
+              if (lists.isNotEmpty && (hasNotes || _listId != null))
                 DropdownButtonFormField<String>(
                     isExpanded: true,
+                    // At large text the choice wraps instead of being cut;
+                    // at 1× the field is as tall as the search above it.
+                    isDense: false,
                     initialValue: _listId ?? '',
-                    decoration: InputDecoration(labelText: context.l10n.list),
+                    decoration: InputDecoration(
+                        labelText: context.l10n.list,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 6)),
                     items: [
                       DropdownMenuItem(
-                          value: '', child: Text(context.l10n.allNotes)),
+                          value: '', child: Text(context.l10n.projectsAll)),
                       if (_listId != null &&
                           !lists.any((list) => list.id == _listId))
                         DropdownMenuItem(
@@ -254,19 +269,30 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
             ]),
       ),
       // One button, as on Calendar and Tareas: the mic while it is
-      // available (Pro, or free dictations left), typing without it.
+      // available (Pro, or free dictations left), typing without it. A
+      // project the user can't add to gets its page's read-only bar instead.
       bottomNavigationBar: SafeArea(
           top: false,
-          child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
-              child: FilledButton.icon(
-                  icon: Icon(ref.watch(voiceAvailableProvider)
-                      ? Icons.mic_none_rounded
-                      : Icons.add_rounded),
-                  label: Text(context.l10n.addNote),
-                  onPressed: () => _add(() => showCaptureSheet(context,
-                      kind: 'note',
-                      projectId: _saveTo))))),
+          child: readOnly
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                  child: ListTile(
+                      leading: const Icon(Icons.visibility_outlined),
+                      title: Text(context.l10n.readOnlyList),
+                      subtitle: Text(context.l10n.listEditingAccessHelp)))
+              : Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+                  child: FilledButton.icon(
+                      icon: Icon(ref.watch(voiceAvailableProvider)
+                          ? Icons.mic_none_rounded
+                          : Icons.add_rounded),
+                      label: Text(context.l10n.addNote),
+                      // The project shown, or on all projects none at all:
+                      // a note never follows another screen's filter.
+                      onPressed: () => _add(() => showCaptureSheet(context,
+                          kind: 'note',
+                          projectId: _saveTo,
+                          useScope: false))))),
     );
   }
 

@@ -115,6 +115,7 @@ Future<void> openInvitation(
               content: Text(
                 context.l10n.declineInvitationConfirm(invitation.name),
               ),
+              actionsOverflowButtonSpacing: 8,
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
@@ -152,7 +153,10 @@ Future<void> openInvitation(
     await refreshAfterInvitation(container, invitation.id);
   } catch (error) {
     if (messenger.mounted) {
-      showFeedback(messenger, requestProblemText(strings, error));
+      showFeedback(
+        messenger,
+        requestProblemText(strings, error, keptNote: false),
+      );
     }
   } finally {
     _responding = false;
@@ -226,7 +230,7 @@ class _JoinDialogState extends State<_JoinDialog> {
       setState(
         () => _problem = sharingProblemReason(error) == 'code'
             ? strings.invitationCodeWrong
-            : requestProblemText(strings, error),
+            : requestProblemText(strings, error, keptNote: false),
       );
     } finally {
       _responding = false;
@@ -258,6 +262,7 @@ class _JoinDialogState extends State<_JoinDialog> {
               textInputAction: TextInputAction.done,
               decoration: InputDecoration(
                 labelText: context.l10n.invitationCode,
+                counterText: '',
                 errorText: _problem,
                 // Room for the longest problem at 2× text in 320 dp.
                 errorMaxLines: 12,
@@ -276,6 +281,8 @@ class _JoinDialogState extends State<_JoinDialog> {
       ),
       // Decline can't be undone: it sits away from Join.
       actionsAlignment: MainAxisAlignment.spaceBetween,
+      // Stacked at large text, the buttons keep apart.
+      actionsOverflowButtonSpacing: 8,
       actions: [
         TextButton(
           key: const ValueKey('decline-invitation'),
@@ -286,6 +293,7 @@ class _JoinDialogState extends State<_JoinDialog> {
         ),
         OverflowBar(
           spacing: 8,
+          overflowSpacing: 8,
           overflowAlignment: OverflowBarAlignment.end,
           children: [
             TextButton(

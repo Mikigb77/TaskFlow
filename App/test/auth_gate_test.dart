@@ -2110,12 +2110,12 @@ void main() {
   );
 
   testWidgets(
-    'UX-1603: TalkBack on the folded sign-in (ES) reads Inicia sesión, the pitch, Continuar con Google, then Continuar con mi correo',
+    'UX-1603: TalkBack on the folded sign-in (ES) reads Entra o crea tu cuenta, the pitch, Continuar con Google, then Continuar con mi correo',
     (tester) async {
       final semantics = tester.ensureSemantics();
       await openFolded(tester);
       final stops = readingOrder(tester);
-      final heading = readAt(stops, (label) => label == es.signInHeading);
+      final heading = readAt(stops, (label) => label == es.signInOrUpHeading);
       final pitch = readAt(stops, (label) => label == es.authPitch);
       final viaGoogle = readAt(
         stops,
@@ -2125,7 +2125,7 @@ void main() {
         stops,
         (label) => label.contains(es.continueWithEmail),
       );
-      expect(es.signInHeading, 'Inicia sesión');
+      expect(es.signInOrUpHeading, 'Entra o crea tu cuenta');
       for (final at in [heading, pitch, viaGoogle, viaEmail]) {
         expect(at, isNot(-1), reason: '$stops');
       }
@@ -2135,6 +2135,126 @@ void main() {
       semantics.dispose();
     },
   );
+
+  // ---- UX loop 2026-10-28-app, round 1 · P291 (UX-2606, UX-2611) ----
+  group('P291 · the first screen names both ways in; recovery’s links apart', () {
+    test('UX-2606: the folded heading reads as planned in ES, EN and CA', () {
+      expect(es.signInOrUpHeading, 'Entra o crea tu cuenta');
+      expect(
+        lookupAppLocalizations(const Locale('en')).signInOrUpHeading,
+        'Sign in or sign up',
+      );
+      expect(
+        lookupAppLocalizations(const Locale('ca')).signInOrUpHeading,
+        'Entra o crea el teu compte',
+      );
+    });
+
+    /// [text]'s lines as drawn.
+    int linesOf(WidgetTester tester, Finder text) {
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: text, matching: find.byType(RichText)),
+      );
+      final plain = paragraph.text.toPlainText();
+      return {
+        for (final box in paragraph.getBoxesForSelection(
+          TextSelection(baseOffset: 0, extentOffset: plain.length),
+        ))
+          box.top.round(),
+      }.length;
+    }
+
+    for (final (language, scale) in [
+      ('es', 1.0),
+      ('es', 2.0),
+      ('ca', 2.0),
+      ('en', 2.0),
+    ]) {
+      testWidgets(
+        'UX-2606: auth/sign-in.sign-in, $language at ${scale.toInt()}× on 360×800, the email form folded: the heading reads «${lookupAppLocalizations(Locale(language)).signInOrUpHeading}», on 2 lines or fewer, and TalkBack names the screen with it',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          await (FontLoader('Manrope')
+                ..addFont(rootBundle.load('assets/fonts/Manrope.ttf')))
+              .load();
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final l = lookupAppLocalizations(Locale(language));
+          await openFolded(tester, language: language);
+          expect(continueWithEmail, findsOneWidget, reason: 'folded');
+          final heading = find.descendant(
+            of: find.byType(AuthHeading),
+            matching: find.text(l.signInOrUpHeading),
+          );
+          expect(heading, findsOneWidget);
+          expect(find.text(l.signInHeading), findsNothing);
+          expect(linesOf(tester, heading), lessThanOrEqualTo(2));
+          final rect = tester.getRect(heading);
+          expect(rect.left, greaterThanOrEqualTo(0));
+          expect(rect.right, lessThanOrEqualTo(360.5));
+          final node = tester.getSemantics(find.byType(AuthHeading));
+          expect(node.label, l.signInOrUpHeading);
+          expect(node.flagsCollection.isHeader, isTrue);
+          expect(node.flagsCollection.namesRoute, isTrue);
+          semantics.dispose();
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2606: auth/sign-in.email-open still reads «Inicia sesión»; create keeps «Crea tu cuenta» and recovery its own heading',
+      (tester) async {
+        await openFolded(tester, size: const Size(390, 844));
+        await tapVisible(tester, continueWithEmail);
+        expect(find.text(es.signInHeading), findsOneWidget);
+        expect(es.signInHeading, 'Inicia sesión');
+        expect(find.text(es.signInOrUpHeading), findsNothing);
+        await tapVisible(tester, find.text(es.createAnAccount));
+        expect(find.text(es.registerHeading), findsOneWidget);
+        expect(es.registerHeading, 'Crea tu cuenta');
+        expect(find.text(es.signInOrUpHeading), findsNothing);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        await tapVisible(tester, find.text(es.forgotPassword));
+        expect(find.text(es.recoveryHeading), findsOneWidget);
+        expect(find.text(es.signInOrUpHeading), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final language in ['es', 'ca']) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets(
+          'UX-2611: auth/sign-in.recovery, $language at ${scale.toInt()}× on 360×800: 8 dp or more between «Ya tengo un código» and «Volver a iniciar sesión»',
+          (tester) async {
+            tester.platformDispatcher.textScaleFactorTestValue = scale;
+            addTearDown(
+              tester.platformDispatcher.clearTextScaleFactorTestValue,
+            );
+            final l = lookupAppLocalizations(Locale(language));
+            await openIn(tester, language: language);
+            await tapVisible(tester, find.text(l.forgotPassword));
+            final code = find.widgetWithText(
+              TextButton,
+              l.authHaveRecoveryCode,
+            );
+            final back = find.widgetWithText(TextButton, l.backToSignIn);
+            await tester.ensureVisible(back);
+            await tester.pumpAndSettle();
+            expect(code, findsOneWidget);
+            expect(back, findsOneWidget);
+            expect(
+              tester.getRect(back).top - tester.getRect(code).bottom,
+              greaterThanOrEqualTo(8 - 0.5),
+              reason: 'apart, so a tap on one doesn’t land on the other',
+            );
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  });
 }
 
 /// The server for sign-in: [signInError] answers every sign-in until it is

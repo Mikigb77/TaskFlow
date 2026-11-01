@@ -1,3 +1,4 @@
+import 'package:agenda/models/reminder_plan.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/services/attachment_store.dart';
@@ -32,6 +33,21 @@ class TaskRepository {
   Future<int> updateTask(Task task) async {
     return await _database.updateTask(task);
   }
+
+  /// Sets only this account's own reminders on task [id], the one change a
+  /// project's «lector» can make ([TaskDatabase.updateOwnReminders]).
+  Future<int> updateOwnReminders(
+    int id, {
+    int? minutes,
+    int? time,
+    ReminderPlan? plan,
+  }) => _database.updateOwnReminders(
+    id,
+    ownerKey: ownerKey,
+    minutes: minutes,
+    time: time,
+    plan: plan,
+  );
 
   Future<int> deleteTask(int id) async {
     return await _database.deleteTask(id);

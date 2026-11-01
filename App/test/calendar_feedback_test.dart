@@ -23,13 +23,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/capture_fixtures.dart';
 import 'support/design_fixtures.dart';
+import 'support/never_syncing_tasks.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/request_locale.dart';
 import 'package:agenda/models/device_calendar_event.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/device_calendar_provider.dart';
 import 'package:agenda/screens/completed_tasks_screen.dart';
+import 'package:agenda/models/task_list_info.dart';
+import 'package:agenda/screens/task_detail_screen.dart';
 import 'package:agenda/screens/day_timeline_screen.dart';
+import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/local_capture.dart';
 import 'package:agenda/screens/device_calendars_screen.dart';
@@ -129,7 +133,8 @@ void main() {
       await tester.tap(checkbox);
       await tester.pumpAndSettle();
       await tester.pump(const Duration(seconds: 9));
-      expect(find.text(l.taskCompleted), findsOneWidget);
+      // The day's only task: its tick says the day is clear (WD34).
+      expect(find.text(l.dayAllClear), findsOneWidget);
       await tester.pump(const Duration(seconds: 1));
       await tester.pumpAndSettle();
       expect(find.byType(SnackBar), findsNothing);
@@ -208,7 +213,8 @@ void main() {
           await tester.pumpAndSettle();
           await tester.tap(checkbox);
           await tester.pumpAndSettle();
-          expect(find.text(l.taskCompleted), findsOneWidget);
+          // The day's only task: its tick says the day is clear (WD34).
+          expect(find.text(l.dayAllClear), findsOneWidget);
           expect(
             tester.getRect(find.byType(SnackBar)).bottom,
             lessThanOrEqualTo(tester.getRect(find.byType(TaskActions)).top),
@@ -242,7 +248,7 @@ void main() {
           await tester.tap(checkbox);
           await tester.pumpAndSettle();
           await tester.pump(const Duration(seconds: 3));
-          expect(find.text(l.taskCompleted), findsOneWidget);
+          expect(find.text(l.dayAllClear), findsOneWidget);
           await tester.pump(const Duration(seconds: 1));
           await tester.pumpAndSettle();
           expect(find.byType(SnackBar), findsNothing);
@@ -341,7 +347,7 @@ void main() {
   }
 
   testWidgets(
-    'UX-201: yesterday’s open task shows under Atrasada above today’s, counts as pending and completes with Deshacer',
+    'UX-201: yesterday’s open task shows under Atrasada below today’s, counts as pending and completes with Deshacer',
     (tester) async {
       final now = DateTime.now();
       final yesterday = DateTime(now.year, now.month, now.day - 1, 10);
@@ -362,15 +368,16 @@ void main() {
       final todayRow = find.widgetWithText(TaskTile, 'Llamar a mamá');
       expect(header, findsOneWidget);
       expect(overdueRow, findsOneWidget);
-      await reveal(tester, todayRow);
+      await reveal(tester, overdueRow);
       expect(todayRow, findsOneWidget);
+      // UX-2302: today's own rows first, then «Atrasada · 1» and its row.
+      expect(
+        tester.getTopLeft(todayRow).dy,
+        lessThan(tester.getTopLeft(header).dy),
+      );
       expect(
         tester.getTopLeft(header).dy,
         lessThan(tester.getTopLeft(overdueRow).dy),
-      );
-      expect(
-        tester.getTopLeft(overdueRow).dy,
-        lessThan(tester.getTopLeft(todayRow).dy),
       );
       // The overdue row shows its own (yesterday's) date.
       expect(
@@ -392,8 +399,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(l.taskCompleted), findsOneWidget);
       expect(find.text(l.undo), findsOneWidget);
-      expect(header, findsNothing);
-      expect(overdueRow, findsNothing);
+      // UX-2304: the ticked row stays under its heading, struck through, and
+      // counts as completed.
+      expect(header, findsOneWidget);
+      expect(overdueRow, findsOneWidget);
+      expect(tester.widget<Checkbox>(checkbox).value, isTrue);
+      expect(find.text(l.agendaCounts(1, 1)), findsOneWidget);
       expect(
         container
             .read(taskProvider)
@@ -450,11 +461,11 @@ void main() {
       expect(find.text(l.overdueCount(1)), findsOneWidget);
       final rows = find.widgetWithText(TaskTile, 'Tomar la pastilla');
       await scrollAgendaToEnd(tester);
-      // One overdue row and today's own (completed) occurrence.
+      // Today's own (completed) occurrence, then one overdue row.
       expect(rows, findsNWidgets(2));
       expect(
         find.descendant(
-          of: rows.first,
+          of: rows.last,
           matching: find.textContaining(context.dayLabel(yesterday)),
         ),
         findsOneWidget,
@@ -1161,7 +1172,7 @@ void main() {
   }
 
   testWidgets(
-    'UX-217: with four phone events the tasks come first, and one 4 eventos · … line under them opens every event',
+    'UX-217: with four phone events the tasks come first, then three events by name and a «Ver los 4 eventos» row that opens every event',
     (tester) async {
       final now = DateTime.now();
       DateTime at(int hour, int minute) =>
@@ -1204,31 +1215,25 @@ void main() {
       );
       final context = tester.element(find.byType(CalendarScreen));
       final l = context.l10n;
-      final line = find.byKey(const ValueKey('calendar-events-line'));
+      final line = find.byKey(const ValueKey('calendar-events-all'));
       await reveal(tester, line);
       expect(line, findsOneWidget);
       expect(
-        find.descendant(
-          of: line,
-          matching: find.text(
-            [
-              l.calendarEventCount(4),
-              context.clockTime(at(9, 0)),
-              context.clockTime(at(11, 30)),
-              context.clockTime(at(16, 0)),
-            ].join(' · '),
-          ),
-        ),
+        find.descendant(of: line, matching: find.text(l.calendarSeeAllEvents(4))),
         findsOneWidget,
       );
-      // The events aren't listed in the agenda; the tasks come first.
-      expect(find.text('Cita 0'), findsNothing);
-      for (final title in ['Comprar pan', 'Llamar a mamá']) {
-        expect(
-          tester.getBottomLeft(find.widgetWithText(TaskTile, title)).dy,
-          lessThanOrEqualTo(tester.getTopLeft(line).dy),
-        );
+      // The first three events show by name; the tasks come first.
+      for (final (i, start) in [at(9, 0), at(11, 30), at(16, 0)].indexed) {
+        final row = find.text('Cita $i · ${context.clockTime(start)}');
+        expect(row, findsOneWidget);
+        for (final title in ['Comprar pan', 'Llamar a mamá']) {
+          expect(
+            tester.getBottomLeft(find.widgetWithText(TaskTile, title)).dy,
+            lessThanOrEqualTo(tester.getTopLeft(row).dy),
+          );
+        }
       }
+      expect(find.textContaining('Cita 3'), findsNothing);
       await tester.tap(line);
       await tester.pumpAndSettle();
       final sheet = find.byType(BottomSheet);
@@ -1371,7 +1376,7 @@ void main() {
   });
 
   testWidgets(
-    'UX-226: a passed deadline reads “· Fecha límite vencida” on the tile and on the detail',
+    'UX-226, UX-2313: a passed deadline reads «Venció el …» once on the tile and on the detail',
     (tester) async {
       final now = DateTime.now();
       await openCalendar(tester, [
@@ -1389,7 +1394,7 @@ void main() {
       expect(
         find.descendant(
           of: row,
-          matching: find.textContaining(' · ${l.deadlineOverdue}'),
+          matching: find.textContaining(l.deadlinePassedOn('')),
         ),
         findsOneWidget,
       );
@@ -1397,7 +1402,7 @@ void main() {
           .state<NavigatorState>(find.byType(Navigator))
           .pushNamed('/taskDetails', arguments: 1);
       await tester.pumpAndSettle();
-      expect(find.textContaining(' · ${l.deadlineOverdue}'), findsOneWidget);
+      expect(find.textContaining(l.deadlinePassedOn('')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -2053,14 +2058,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(l.calendarReadRetry), findsNothing);
       expect(
-        find.descendant(
-          of: line,
-          matching: find.text(
-            [
-              l.calendarEventCount(1),
-              context.clockTime(DateTime(now.year, now.month, now.day, 9)),
-            ].join(' · '),
-          ),
+        find.text(
+          'Dentista · '
+          '${context.clockTime(DateTime(now.year, now.month, now.day, 9))}',
         ),
         findsOneWidget,
       );
@@ -2231,7 +2231,7 @@ void main() {
       );
 
       testWidgets(
-        'UX-447: when $what retry succeeds the line shows the event count with its icon and no spinner',
+        'UX-447: when $what retry succeeds the event shows by name with its icon and no spinner',
         (tester) async {
           final now = DateTime.now();
           final bridge = failing(calendars: calendars);
@@ -2243,20 +2243,17 @@ void main() {
           final l = context.l10n;
           await retryHeld(tester, bridge, succeed: true);
           expect(find.text(l.calendarReadRetry), findsNothing);
+          final name = find.text(
+            'Dentista · '
+            '${context.clockTime(DateTime(now.year, now.month, now.day, 9))}',
+          );
+          expect(name, findsOneWidget);
+          final row = find.ancestor(of: name, matching: find.byType(InkWell));
           expect(
-            find.descendant(
-              of: line,
-              matching: find.text(
-                [
-                  l.calendarEventCount(1),
-                  context.clockTime(DateTime(now.year, now.month, now.day, 9)),
-                ].join(' · '),
-              ),
-            ),
+            find.descendant(of: row, matching: find.byIcon(Icons.event_outlined)),
             findsOneWidget,
           );
-          expect(eventIcon(), findsOneWidget);
-          expect(spinner(), findsNothing);
+          expect(find.byType(CircularProgressIndicator), findsNothing);
           expect(tester.takeException(), isNull);
         },
       );
@@ -2344,8 +2341,15 @@ void main() {
         bridge.statusGate = null;
         statusGate.complete();
         await tester.pumpAndSettle();
-        // Once read, the day's event shows as usual.
-        expect(eventIcon(), findsOneWidget);
+        // Once read, the day's event shows as usual, by name.
+        expect(
+          find.descendant(
+            of: find.byType(DeviceCalendarEvents),
+            matching: find.byIcon(Icons.event_outlined),
+          ),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Dentista · '), findsOneWidget);
         expect(spinner(), findsNothing);
         expect(tester.takeException(), isNull);
       },
@@ -3153,13 +3157,13 @@ void main() {
         find.descendant(of: emptyState(), matching: find.byType(Icon)),
         findsNothing,
       );
-      final events = find.byKey(const ValueKey('calendar-events-line'));
+      final events = find.textContaining('Dentista · ');
       await reveal(tester, events);
       expect(events, findsOneWidget);
       expect(
         tester.getRect(find.text(l.noScheduledTasks)).bottom,
         lessThanOrEqualTo(tester.getRect(events).top),
-        reason: 'the tasks line, then the events line',
+        reason: 'the tasks line, then the event',
       );
       expect(find.text(l.calendarEmpty), findsNothing);
       expect(tester.takeException(), isNull);
@@ -3620,7 +3624,7 @@ void main() {
         size: const Size(360, 800),
         overrides: [calendarClockProvider.overrideWithValue(() => october20)],
       );
-      expect(find.text('10 pendientes · 1 completada'), findsOneWidget);
+      expect(find.text('10\u00a0pendientes · 1\u00a0completada'), findsOneWidget);
       expect(dayValues(tester), contains('hoy · 10 tareas'));
       expect(dayValues(tester), isNot(contains('hoy · 9 tareas')));
       semantics.dispose();
@@ -3719,6 +3723,1983 @@ void main() {
       },
     );
   }
+
+  // ---- 2026-10-28-app · P268 (UX-2301): ticks and moves never wait on the
+  // server; the sync runs behind ----
+
+  group('P268 · ticks and moves show at once', () {
+    // Three of today's tasks still open, so no tick here is the day's last
+    // one. The date sheet's Mañana counts from the phone's own clock.
+    final now = DateTime.now();
+    DateTime today(int hour) => DateTime(now.year, now.month, now.day, hour);
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    List<Task> day() => [
+      Task(
+        id: 1,
+        title: 'Comprar pan',
+        priority: 1,
+        dueDate: today(9),
+        hasTime: true,
+      ),
+      Task(
+        id: 2,
+        title: 'Llamar a Ana',
+        priority: 1,
+        dueDate: today(11),
+        hasTime: true,
+      ),
+      Task(
+        id: 3,
+        title: 'Regar las plantas',
+        priority: 1,
+        dueDate: today(13),
+        hasTime: true,
+      ),
+    ];
+
+    /// Calendar in Spanish at 1× on 360×800, with the real task list over
+    /// tasks on the phone whose cloud sync never completes.
+    Future<NeverSyncingTasks> openHanging(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final cloud = NeverSyncingTasks(day());
+      final container = designContainer(
+        regionalStore: MemoryRegionalStore(
+          const RegionalPreferences(language: 'es'),
+        ),
+        tasks: () => TaskNotifier(cloud),
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const MyApp()),
+      );
+      await tester.pumpAndSettle();
+      expect(cloud.syncs, greaterThan(0), reason: 'a sync is under way');
+      expect(cloud.finished, 0, reason: 'and it never finishes');
+      return cloud;
+    }
+
+    Finder row(String title) => find.widgetWithText(TaskTile, title);
+    Finder circle(String title) =>
+        find.descendant(of: row(title), matching: find.byType(Checkbox));
+    bool? checked(WidgetTester tester, String title) =>
+        tester.widget<Checkbox>(circle(title)).value;
+
+    /// Two frames: what a tap shows "at once".
+    Future<void> twoFrames(WidgetTester tester) async {
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+
+    testWidgets(
+      'UX-2301: with a sync that never completes, ticking a Calendar row checks it and says Tarea completada · Deshacer within two frames; Deshacer reopens it at once',
+      (tester) async {
+        platform.setMockMethodCallHandler(timeoutChannel, (_) async => 10000);
+        final cloud = await openHanging(tester);
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        await tester.ensureVisible(row('Comprar pan'));
+        await tester.pumpAndSettle();
+        expect(checked(tester, 'Comprar pan'), isFalse);
+
+        await tester.tap(circle('Comprar pan'));
+        await twoFrames(tester);
+        expect(checked(tester, 'Comprar pan'), isTrue);
+        expect(find.text(l.taskCompleted), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(SnackBar),
+            matching: find.text(l.undo),
+          ),
+          findsOneWidget,
+        );
+        expect(cloud.byId(1)!.isCompleted, isTrue);
+        expect(cloud.finished, 0);
+
+        // Let the message slide in, then undo: the row reopens at once.
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.tap(find.text(l.undo));
+        await twoFrames(tester);
+        expect(checked(tester, 'Comprar pan'), isFalse);
+        expect(cloud.byId(1)!.isCompleted, isFalse);
+        expect(cloud.finished, 0);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2301: with the same never-ending sync, a second row ticked straight after the first checks at once too, and both are written',
+      (tester) async {
+        platform.setMockMethodCallHandler(timeoutChannel, (_) async => 10000);
+        final cloud = await openHanging(tester);
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        await tester.ensureVisible(row('Llamar a Ana'));
+        await tester.pumpAndSettle();
+        expect(circle('Comprar pan').hitTestable(), findsOneWidget);
+        expect(circle('Llamar a Ana').hitTestable(), findsOneWidget);
+
+        await tester.tap(circle('Comprar pan'));
+        await tester.pump();
+        expect(circle('Llamar a Ana').hitTestable(), findsOneWidget);
+        await tester.tap(circle('Llamar a Ana'));
+        await twoFrames(tester);
+        expect(checked(tester, 'Comprar pan'), isTrue);
+        expect(checked(tester, 'Llamar a Ana'), isTrue);
+        expect(checked(tester, 'Regar las plantas'), isFalse);
+        expect(find.text(l.taskCompleted), findsOneWidget);
+        expect(cloud.byId(1)!.isCompleted, isTrue);
+        expect(cloud.byId(2)!.isCompleted, isTrue);
+        expect(cloud.finished, 0);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2301: with the same never-ending sync, Cambiar fecha › Mañana on a row says Movida al … as the sheet closes, and the row leaves the day',
+      (tester) async {
+        platform.setMockMethodCallHandler(timeoutChannel, (_) async => 10000);
+        final cloud = await openHanging(tester);
+        final calendar = tester.element(find.byType(CalendarScreen));
+        final l = calendar.l10n;
+        await tester.ensureVisible(row('Comprar pan'));
+        await tester.pumpAndSettle();
+        // A row's long press is its Cambiar fecha.
+        await tester.longPress(row('Comprar pan'));
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsOneWidget);
+        expect(find.text(l.rescheduleTask), findsOneWidget);
+
+        await tester.tap(find.widgetWithText(ChoiceChip, l.tomorrow));
+        final moved = l.movedOccurrenceDate(calendar.weekdayDate(tomorrow));
+        await twoFrames(tester);
+        expect(find.text(moved), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(SnackBar),
+            matching: find.text(l.undo),
+          ),
+          findsOneWidget,
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(find.text(moved), findsOneWidget);
+        expect(row('Comprar pan'), findsNothing, reason: 'it left today');
+        expect(row('Llamar a Ana'), findsOneWidget);
+        expect(Task.day(cloud.byId(1)!.dueDate!), tomorrow);
+        expect(cloud.finished, 0);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2301: with the same never-ending sync, a swipe right on a row springs back at once, checked',
+      (tester) async {
+        platform.setMockMethodCallHandler(timeoutChannel, (_) async => 10000);
+        final cloud = await openHanging(tester);
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        await tester.ensureVisible(row('Comprar pan'));
+        await tester.pumpAndSettle();
+        // The row's face: what slides under the finger.
+        final face = find
+            .descendant(
+              of: find.descendant(
+                of: row('Comprar pan'),
+                matching: find.byType(Dismissible),
+              ),
+              matching: find.byType(Material),
+            )
+            .first;
+        final rest = tester.getRect(face);
+
+        await tester.drag(row('Comprar pan'), const Offset(300, 0));
+        // Known and older than this round: while dragging, the swipe
+        // background's label can overflow a one-line row by a few pixels.
+        final swipe = tester.takeException();
+        expect(
+          swipe == null || '$swipe'.contains('RenderFlex overflowed'),
+          isTrue,
+          reason: '$swipe',
+        );
+        // The row first slides the rest of the way out, Dismissible's own
+        // 200 ms; then the tick shows within two frames, with no wait for a
+        // sync.
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 200));
+        await twoFrames(tester);
+        expect(checked(tester, 'Comprar pan'), isTrue);
+        expect(find.text(l.taskCompleted), findsOneWidget);
+        // And it springs back home in Dismissible's own 200 ms.
+        await tester.pump(const Duration(milliseconds: 200));
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(tester.getRect(face).left, moreOrLessEquals(rest.left));
+        expect(checked(tester, 'Comprar pan'), isTrue);
+        expect(cloud.byId(1)!.isCompleted, isTrue);
+        expect(cloud.finished, 0);
+        final after = tester.takeException();
+        expect(
+          after == null || '$after'.contains('RenderFlex overflowed'),
+          isTrue,
+          reason: '$after',
+        );
+      },
+    );
+  });
+
+  group('P276 · «Sin fecha» means no day and no deadline', () {
+    // A Thursday at least two days away on the phone's own clock, and the
+    // app's "today" the Tuesday before it, so both sit in one week strip
+    // and the deadline is never past.
+    DateTime thursday() {
+      final now = DateTime.now();
+      var day = DateTime(now.year, now.month, now.day + 2);
+      while (day.weekday != DateTime.thursday) {
+        day = DateTime(day.year, day.month, day.day + 1);
+      }
+      return day;
+    }
+
+    Finder row(String title) => find.widgetWithText(TaskTile, title);
+    Finder inCalendar(Finder finder) =>
+        find.descendant(of: find.byType(CalendarScreen), matching: finder);
+    Finder sinFechaPage() => find.byWidgetPredicate(
+      (widget) => widget is HomeScreen && !widget.isRoot,
+    );
+
+    testWidgets(
+      'UX-2308: a deadline-only task (Thursday at 17:00) isn’t counted in «Sin fecha · N» on today or Thursday, isn’t on the Sin fecha page or under Tareas’ «Sin fecha» chip, and shows on Thursday and in Tareas; a task with neither a day nor a deadline is still counted and listed',
+      (tester) async {
+        final day = thursday();
+        final tuesday = DateTime(day.year, day.month, day.day - 2, 10);
+        await openCalendar(
+          tester,
+          [
+            Task(
+              id: 1,
+              title: 'Terminar el diseño',
+              priority: 1,
+              deadline: DateTime(day.year, day.month, day.day, 17),
+            ),
+            Task(id: 2, title: 'Ordenar el trastero', priority: 1),
+          ],
+          overrides: [calendarClockProvider.overrideWithValue(() => tuesday)],
+        );
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        final count = inCalendar(find.byKey(const ValueKey('calendar-inbox')));
+
+        // Today: one task without a day or a deadline.
+        await reveal(tester, count);
+        expect(
+          find.descendant(of: count, matching: find.text(l.inboxCount(1))),
+          findsOneWidget,
+        );
+        expect(inCalendar(find.text(l.inboxCount(2))), findsNothing);
+
+        // Thursday: the deadline's row, and the same count.
+        await tester.tap(dayCell(day));
+        await tester.pumpAndSettle();
+        expect(
+          find.text(DateFormat.MMMMEEEEd('es').format(day)),
+          findsOneWidget,
+        );
+        expect(inCalendar(row('Terminar el diseño')), findsOneWidget);
+        await reveal(tester, count);
+        expect(
+          find.descendant(of: count, matching: find.text(l.inboxCount(1))),
+          findsOneWidget,
+        );
+        expect(inCalendar(find.text(l.inboxCount(2))), findsNothing);
+
+        // The page «Sin fecha · 1» opens lists only the undated task.
+        await tester.tap(count);
+        await tester.pumpAndSettle();
+        expect(sinFechaPage(), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.descendant(
+              of: sinFechaPage(),
+              matching: find.byType(AppBar),
+            ),
+            matching: find.text(l.inbox),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: sinFechaPage(),
+            matching: row('Ordenar el trastero'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: sinFechaPage(),
+            matching: row('Terminar el diseño'),
+          ),
+          findsNothing,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(sinFechaPage(), findsNothing);
+
+        // Tareas lists both; its «Sin fecha» chip only the undated one.
+        await tester.tap(
+          find.descendant(
+            of: find.byType(NavigationBar),
+            matching: find.text(l.tasks),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(row('Terminar el diseño').hitTestable(), findsOneWidget);
+        expect(row('Ordenar el trastero').hitTestable(), findsOneWidget);
+        final chip = find.widgetWithText(FilterChip, l.inbox);
+        await tester.ensureVisible(chip);
+        await tester.pumpAndSettle();
+        await tester.tap(chip);
+        await tester.pumpAndSettle();
+        expect(tester.widget<FilterChip>(chip).selected, isTrue);
+        expect(row('Ordenar el trastero').hitTestable(), findsOneWidget);
+        expect(row('Terminar el diseño'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2308: with only a deadline-only task, Calendar shows no «Sin fecha» row on any day, and the Sin fecha page doesn’t list it',
+      (tester) async {
+        final day = thursday();
+        final tuesday = DateTime(day.year, day.month, day.day - 2, 10);
+        await openCalendar(
+          tester,
+          [
+            Task(
+              id: 1,
+              title: 'Terminar el diseño',
+              priority: 1,
+              deadline: DateTime(day.year, day.month, day.day, 17),
+            ),
+          ],
+          overrides: [calendarClockProvider.overrideWithValue(() => tuesday)],
+        );
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        final count = inCalendar(find.byKey(const ValueKey('calendar-inbox')));
+        await scrollAgendaToEnd(tester);
+        expect(count, findsNothing);
+        expect(inCalendar(find.text(l.inboxCount(1))), findsNothing);
+        await tester.tap(dayCell(day));
+        await tester.pumpAndSettle();
+        expect(inCalendar(row('Terminar el diseño')), findsOneWidget);
+        await scrollAgendaToEnd(tester);
+        expect(count, findsNothing);
+        expect(inCalendar(find.text(l.inboxCount(1))), findsNothing);
+
+        unawaited(
+          Navigator.of(
+            tester.element(find.byType(CalendarScreen)),
+          ).pushNamed('/inbox'),
+        );
+        await tester.pumpAndSettle();
+        expect(sinFechaPage(), findsOneWidget);
+        expect(
+          find.descendant(of: sinFechaPage(), matching: find.byType(TaskTile)),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  group('P269 · Today lists its own tasks first, ticked rows stay, the day’s last tick', () {
+    // Today, early on the app's clock: none of today's timed tasks has
+    // passed, and yesterday's and older ones are overdue.
+    final now = DateTime.now();
+    final morning = DateTime(now.year, now.month, now.day, 8);
+    DateTime today(int hour) => DateTime(now.year, now.month, now.day, hour);
+    DateTime daysAgo(int days) =>
+        DateTime(now.year, now.month, now.day - days, 10);
+    final clock = calendarClockProvider.overrideWithValue(() => morning);
+
+    Finder inCalendar(Finder finder) =>
+        find.descendant(of: find.byType(CalendarScreen), matching: finder);
+    Finder row(String title) => inCalendar(find.widgetWithText(TaskTile, title));
+    Finder circleIn(Finder row) =>
+        find.descendant(of: row, matching: find.byType(Checkbox));
+    Finder circle(String title) => circleIn(row(title));
+    bool? ticked(WidgetTester tester, Finder row) =>
+        tester.widget<Checkbox>(circleIn(row)).value;
+    bool struck(WidgetTester tester, Finder row, String title) =>
+        tester
+            .widget<Text>(find.descendant(of: row, matching: find.text(title)))
+            .style
+            ?.decoration ==
+        TextDecoration.lineThrough;
+
+    Future<void> tick(WidgetTester tester, Finder circle) async {
+      await tester.ensureVisible(circle);
+      await tester.pumpAndSettle();
+      await tester.tap(circle);
+      await tester.pumpAndSettle();
+    }
+
+    /// Lets the message close: the phone gives no timeout here, so the
+    /// app's own few seconds.
+    Future<void> waitOutMessage(WidgetTester tester) async {
+      await tester.pump(const Duration(seconds: 12));
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
+    }
+
+    Future<void> tab(WidgetTester tester, String label) async {
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text(label),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    /// The swipe background's label can overflow a one-line row by a few
+    /// pixels while dragging: known and older than this round.
+    void allowSwipeOverflow(WidgetTester tester) {
+      final error = tester.takeException();
+      expect(
+        error == null || '$error'.contains('RenderFlex overflowed'),
+        isTrue,
+        reason: '$error',
+      );
+    }
+
+    testWidgets(
+      'UX-2302: on today with three overdue tasks and two of today’s, ES 1× on 360×800, today’s two rows come first, in view without scrolling, and before «Atrasadas · 3» in TalkBack’s order',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await openCalendar(
+          tester,
+          [
+            Task(id: 1, title: 'Pagar el recibo', priority: 1, dueDate: daysAgo(3)),
+            Task(id: 2, title: 'Comprar pan', priority: 1, dueDate: daysAgo(2)),
+            Task(id: 3, title: 'Regar las plantas', priority: 1, dueDate: daysAgo(1)),
+            Task(id: 4, title: 'Llamar a mamá', priority: 1, dueDate: today(10), hasTime: true),
+            Task(id: 5, title: 'Ir al médico', priority: 1, dueDate: today(18), hasTime: true),
+          ],
+          size: const Size(360, 800),
+          overrides: [clock],
+        );
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        expect(l.localeName, 'es');
+        final heading = inCalendar(find.text(l.overdueCount(3)));
+        expect(heading, findsOneWidget);
+        expect(find.text(l.agendaCounts(5, 0)), findsOneWidget);
+
+        // Without scrolling: both of today's rows whole between the top of
+        // the agenda and «Añadir tarea».
+        final view = tester.getRect(agenda());
+        final actions = tester.getRect(
+          inCalendar(find.byType(TaskActions)),
+        );
+        for (final title in ['Llamar a mamá', 'Ir al médico']) {
+          expect(row(title), findsOneWidget, reason: title);
+          final rect = tester.getRect(row(title));
+          expect(rect.top, greaterThanOrEqualTo(view.top), reason: title);
+          expect(rect.bottom, lessThanOrEqualTo(actions.top), reason: title);
+          expect(
+            tester.getTopLeft(row(title)).dy,
+            lessThan(tester.getTopLeft(heading).dy),
+            reason: '$title comes before «Atrasadas · 3»',
+          );
+        }
+        expect(
+          tester.getTopLeft(row('Llamar a mamá')).dy,
+          lessThan(tester.getTopLeft(row('Ir al médico')).dy),
+        );
+
+        // TalkBack's order follows the screen's.
+        final order = [
+          for (final node in tester.semantics.simulatedAccessibilityTraversal())
+            node.label,
+        ];
+        int at(String text) => order.indexWhere((label) => label.contains(text));
+        expect(at('Llamar a mamá'), isNonNegative, reason: '$order');
+        expect(at('Ir al médico'), greaterThan(at('Llamar a mamá')));
+        expect(at(l.overdueCount(3)), greaterThan(at('Ir al médico')));
+        await reveal(tester, row('Regar las plantas'));
+        expect(row('Pagar el recibo'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'UX-2304: an overdue row ticked on today stays under «Atrasada · 1», struck through, its circle reading «Reabrir», counts as «1 completada», and goes once Calendar has been left for Tareas',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        final container = await openCalendar(
+          tester,
+          [
+            Task(id: 1, title: 'Comprar pan', priority: 1, dueDate: daysAgo(1)),
+            Task(id: 2, title: 'Llamar a mamá', priority: 1, dueDate: today(18), hasTime: true),
+          ],
+          size: const Size(360, 800),
+          overrides: [clock],
+        );
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        final heading = inCalendar(find.text(l.overdueCount(1)));
+        final overdue = row('Comprar pan');
+        expect(heading, findsOneWidget);
+        final before = tester.getRect(overdue);
+
+        await tick(tester, circle('Comprar pan'));
+        expect(
+          container
+              .read(taskProvider)
+              .requireValue
+              .firstWhere((task) => task.id == 1)
+              .isCompleted,
+          isTrue,
+        );
+        // Still there, where it was, under its heading.
+        expect(heading, findsOneWidget);
+        expect(overdue, findsOneWidget);
+        expect(tester.getRect(overdue).top, moreOrLessEquals(before.top));
+        expect(
+          tester.getTopLeft(heading).dy,
+          lessThan(tester.getTopLeft(overdue).dy),
+        );
+        expect(ticked(tester, overdue), isTrue);
+        expect(struck(tester, overdue, 'Comprar pan'), isTrue);
+        expect(
+          tester.getSemantics(circle('Comprar pan')).label,
+          contains(l.reopenNamedTask('Comprar pan')),
+        );
+        expect(find.text(l.agendaCounts(1, 1)), findsOneWidget);
+        await waitOutMessage(tester);
+        expect(overdue, findsOneWidget);
+        expect(find.text(l.agendaCounts(1, 1)), findsOneWidget);
+
+        // Leaving Calendar for Tareas and coming back: it's gone, and its
+        // heading with it, as it was the last.
+        await tab(tester, l.tasks);
+        await tab(tester, l.calendar);
+        expect(find.byType(CalendarScreen).hitTestable(), findsOneWidget);
+        expect(overdue, findsNothing);
+        expect(heading, findsNothing);
+        expect(inCalendar(find.textContaining('Atrasada')), findsNothing);
+        expect(row('Llamar a mamá'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'UX-2304: a ticked overdue row goes once another screen has covered Calendar',
+      (tester) async {
+        await openCalendar(
+          tester,
+          [
+            Task(id: 1, title: 'Comprar pan', priority: 1, dueDate: daysAgo(1)),
+            Task(id: 2, title: 'Llamar a mamá', priority: 1, dueDate: today(18), hasTime: true),
+          ],
+          size: const Size(360, 800),
+          overrides: [clock],
+        );
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        await tick(tester, circle('Comprar pan'));
+        expect(row('Comprar pan'), findsOneWidget);
+        expect(inCalendar(find.text(l.overdueCount(1))), findsOneWidget);
+        unawaited(
+          tester
+              .state<NavigatorState>(find.byType(Navigator))
+              .pushNamed('/completedTasks'),
+        );
+        await tester.pumpAndSettle();
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byType(CompletedTasksScreen), findsNothing);
+        expect(row('Comprar pan'), findsNothing);
+        expect(inCalendar(find.textContaining('Atrasada')), findsNothing);
+        expect(row('Llamar a mamá'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2304, WD34: a today with only overdue tasks keeps «Atrasadas · 2» and both struck-through rows after the last tick, which says «Todo listo. Respira.», and never shows «Nada previsto para este día.»',
+      (tester) async {
+        await openCalendar(
+          tester,
+          [
+            Task(id: 1, title: 'Comprar pan', priority: 1, dueDate: daysAgo(2)),
+            Task(id: 2, title: 'Regar las plantas', priority: 1, dueDate: daysAgo(1)),
+          ],
+          size: const Size(360, 800),
+          overrides: [clock],
+        );
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        final heading = inCalendar(find.text(l.overdueCount(2)));
+        expect(heading, findsOneWidget);
+
+        // One overdue task still open: the usual line.
+        await tick(tester, circle('Comprar pan'));
+        expect(find.text(l.taskCompleted), findsOneWidget);
+        expect(find.text(l.dayAllClear), findsNothing);
+        await waitOutMessage(tester);
+
+        // The last one: the day is clear.
+        await tick(tester, circle('Regar las plantas'));
+        expect(find.text(l.dayAllClear), findsOneWidget);
+        expect(find.text(l.taskCompleted), findsNothing);
+        expect(find.text(l.undo), findsOneWidget);
+        for (final title in ['Comprar pan', 'Regar las plantas']) {
+          expect(row(title), findsOneWidget, reason: title);
+          expect(ticked(tester, row(title)), isTrue, reason: title);
+          expect(struck(tester, row(title), title), isTrue, reason: title);
+        }
+        expect(heading, findsOneWidget);
+        expect(find.text(l.calendarEmpty), findsNothing);
+        expect(find.text(l.agendaCounts(0, 2)), findsOneWidget);
+
+        // And so while Calendar stays shown, after the message has gone.
+        await waitOutMessage(tester);
+        expect(heading, findsOneWidget);
+        expect(row('Comprar pan'), findsOneWidget);
+        expect(row('Regar las plantas'), findsOneWidget);
+        expect(find.text(l.calendarEmpty), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2304: on Completadas a row reopened there stays in place, unticked; after leaving the page and coming back it’s gone',
+      (tester) async {
+        await openCalendar(
+          tester,
+          [
+            Task(id: 1, title: 'Ayer', priority: 1, isCompleted: true, dueDate: daysAgo(1)),
+            Task(id: 2, title: 'Hace dos días', priority: 1, isCompleted: true, dueDate: daysAgo(2)),
+            Task(id: 3, title: 'Hace tres días', priority: 1, isCompleted: true, dueDate: daysAgo(3)),
+          ],
+          size: const Size(360, 800),
+          overrides: [clock],
+        );
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+        unawaited(navigator.pushNamed('/completedTasks'));
+        await tester.pumpAndSettle();
+        Finder done(String title) => find.descendant(
+          of: find.byType(CompletedTasksScreen),
+          matching: find.widgetWithText(TaskTile, title),
+        );
+        final before = {
+          for (final title in ['Ayer', 'Hace dos días', 'Hace tres días'])
+            title: tester.getRect(done(title)).top,
+        };
+
+        await tick(tester, circleIn(done('Hace dos días')));
+        expect(find.text(l.taskReopened), findsOneWidget);
+        for (final title in before.keys) {
+          expect(done(title), findsOneWidget, reason: title);
+          expect(
+            tester.getRect(done(title)).top,
+            moreOrLessEquals(before[title]!),
+            reason: '$title stays where it was',
+          );
+        }
+        expect(ticked(tester, done('Hace dos días')), isFalse);
+        expect(struck(tester, done('Hace dos días'), 'Hace dos días'), isFalse);
+        expect(ticked(tester, done('Ayer')), isTrue);
+        await waitOutMessage(tester);
+        expect(done('Hace dos días'), findsOneWidget);
+
+        // Left and opened again: the reopened row is gone.
+        navigator.pop();
+        await tester.pumpAndSettle();
+        expect(find.byType(CompletedTasksScreen), findsNothing);
+        unawaited(navigator.pushNamed('/completedTasks'));
+        await tester.pumpAndSettle();
+        expect(done('Hace dos días'), findsNothing);
+        expect(done('Ayer'), findsOneWidget);
+        expect(done('Hace tres días'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    // WD34, in each language and at 1× and 2× on 360×800.
+    for (final language in ['es', 'en', 'ca']) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets(
+          'WD34 (UX-2303) in $language at ${scale.toInt()}×: of two open tasks, the first tick says «Tarea completada»; the last, by its circle and by a swipe right, says «Todo listo. Respira.» with Deshacer, which reopens it',
+          (tester) async {
+            final container = await openCalendar(
+              tester,
+              [
+                Task(id: 1, title: 'Comprar pan', priority: 1, dueDate: today(10), hasTime: true),
+                Task(id: 2, title: 'Llamar a mamá', priority: 1, dueDate: today(18), hasTime: true),
+              ],
+              language: language,
+              size: const Size(360, 800),
+              textScale: scale,
+              overrides: [clock],
+            );
+            final l = tester.element(find.byType(CalendarScreen)).l10n;
+            expect(l.localeName, language);
+            // The website demo's own words.
+            expect(l.dayAllClear, switch (language) {
+              'es' => 'Todo listo. Respira.',
+              'en' => 'All clear. Take a breath.',
+              _ => 'Tot fet. Respira.',
+            });
+            bool done(int id) => container
+                .read(taskProvider)
+                .requireValue
+                .firstWhere((task) => task.id == id)
+                .isCompleted;
+            void expectWhole(String message) {
+              final text = find.text(message);
+              expect(text, findsOneWidget);
+              final rect = tester.getRect(text);
+              final bar = tester.getRect(find.byType(SnackBar));
+              expect(rect.left, greaterThanOrEqualTo(bar.left));
+              expect(rect.right, lessThanOrEqualTo(bar.right));
+              expect(rect.bottom, lessThanOrEqualTo(800));
+              expect(
+                tester.renderObject<RenderParagraph>(text).didExceedMaxLines,
+                isFalse,
+              );
+            }
+
+            // The first: one task still open.
+            await tick(tester, circle('Comprar pan'));
+            expect(done(1), isTrue);
+            expectWhole(l.taskCompleted);
+            expect(find.text(l.dayAllClear), findsNothing);
+            await waitOutMessage(tester);
+
+            // The last, by its circle.
+            await tick(tester, circle('Llamar a mamá'));
+            expect(done(2), isTrue);
+            expectWhole(l.dayAllClear);
+            expect(find.text(l.taskCompleted), findsNothing);
+            expect(find.text(l.undo).hitTestable(), findsOneWidget);
+            await tester.tap(find.text(l.undo));
+            await tester.pumpAndSettle();
+            expect(done(2), isFalse);
+            expect(ticked(tester, row('Llamar a mamá')), isFalse);
+            expect(done(1), isTrue);
+            await waitOutMessage(tester);
+
+            // The last again, by a swipe right.
+            await tester.ensureVisible(row('Llamar a mamá'));
+            await tester.pumpAndSettle();
+            await tester.drag(row('Llamar a mamá'), const Offset(300, 0));
+            allowSwipeOverflow(tester);
+            await tester.pumpAndSettle();
+            allowSwipeOverflow(tester);
+            expect(done(2), isTrue);
+            expectWhole(l.dayAllClear);
+            expect(find.text(l.taskCompleted), findsNothing);
+            expect(find.text(l.undo).hitTestable(), findsOneWidget);
+            await tester.tap(find.text(l.undo));
+            await tester.pumpAndSettle();
+            expect(done(2), isFalse);
+            expect(ticked(tester, row('Llamar a mamá')), isFalse);
+
+            // Unticking still says «Tarea reabierta».
+            await waitOutMessage(tester);
+            await tick(tester, circle('Comprar pan'));
+            expect(done(1), isFalse);
+            expect(find.text(l.taskReopened), findsOneWidget);
+            expect(find.text(l.dayAllClear), findsNothing);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+
+    testWidgets(
+      'WD34 (UX-2303): on today with an open overdue task, ticking the day’s own last task says «Tarea completada»',
+      (tester) async {
+        await openCalendar(
+          tester,
+          [
+            Task(id: 1, title: 'Comprar pan', priority: 1, dueDate: daysAgo(1)),
+            Task(id: 2, title: 'Llamar a mamá', priority: 1, dueDate: today(18), hasTime: true),
+          ],
+          size: const Size(360, 800),
+          overrides: [clock],
+        );
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        await tick(tester, circle('Llamar a mamá'));
+        expect(ticked(tester, row('Llamar a mamá')), isTrue);
+        expect(find.text(l.taskCompleted), findsOneWidget);
+        expect(find.text(l.dayAllClear), findsNothing);
+        await waitOutMessage(tester);
+
+        // Then the overdue one, now the last open task: the day is clear.
+        await tick(tester, circle('Comprar pan'));
+        expect(find.text(l.dayAllClear), findsOneWidget);
+        expect(find.text(l.taskCompleted), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'WD34 (UX-2303): ticking the day’s last open task on Tareas says «Tarea completada»',
+      (tester) async {
+        await openCalendar(
+          tester,
+          [
+            Task(id: 1, title: 'Llamar a mamá', priority: 1, dueDate: today(18), hasTime: true),
+          ],
+          size: const Size(360, 800),
+          overrides: [clock],
+        );
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        await tab(tester, l.tasks);
+        final tasksRow = find.descendant(
+          of: find.byType(HomeScreen),
+          matching: find.widgetWithText(TaskTile, 'Llamar a mamá'),
+        );
+        expect(tasksRow, findsOneWidget);
+        await tick(tester, circleIn(tasksRow));
+        expect(ticked(tester, tasksRow), isTrue);
+        expect(find.text(l.taskCompleted), findsOneWidget);
+        expect(find.text(l.dayAllClear), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'WD34 (UX-2303): ticking the day’s last open task on a project page says «Tarea completada»',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final container = designContainer(
+          regionalStore: MemoryRegionalStore(
+            const RegionalPreferences(language: 'es'),
+          ),
+          projects: [TaskListInfo(id: 'casa', name: 'Casa')],
+          tasks: () => _GivenTasks([
+            Task(
+              id: 1,
+              title: 'Llamar a mamá',
+              priority: 1,
+              dueDate: today(18),
+              hasTime: true,
+              listId: 'casa',
+            ),
+          ]),
+          overrides: [clock],
+        );
+        addTearDown(container.dispose);
+        await tester.pumpWidget(
+          UncontrolledProviderScope(container: container, child: const MyApp()),
+        );
+        await tester.pumpAndSettle();
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        unawaited(
+          Navigator.of(tester.element(find.byType(CalendarScreen))).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const HomeScreen(listId: 'casa', isRoot: false),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final projectRow = find.descendant(
+          of: find.byWidgetPredicate(
+            (widget) => widget is HomeScreen && widget.listId == 'casa',
+          ),
+          matching: find.widgetWithText(TaskTile, 'Llamar a mamá'),
+        );
+        expect(projectRow, findsOneWidget);
+        await tick(tester, circleIn(projectRow));
+        expect(ticked(tester, projectRow), isTrue);
+        expect(find.text(l.taskCompleted), findsOneWidget);
+        expect(find.text(l.dayAllClear), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'WD34 (UX-2303): Completar on the day’s last open task’s own page says «Tarea completada»',
+      (tester) async {
+        final container = await openCalendar(
+          tester,
+          [
+            Task(id: 1, title: 'Llamar a mamá', priority: 1, dueDate: today(18), hasTime: true),
+          ],
+          size: const Size(360, 800),
+          overrides: [clock],
+        );
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        unawaited(
+          tester
+              .state<NavigatorState>(find.byType(Navigator))
+              .pushNamed('/taskDetails', arguments: 1),
+        );
+        await tester.pumpAndSettle();
+        final complete = find.descendant(
+          of: find.byType(TaskDetailScreen),
+          matching: find.text(l.complete),
+        );
+        expect(complete, findsOneWidget);
+        await tester.ensureVisible(complete);
+        await tester.pumpAndSettle();
+        await tester.tap(complete);
+        await tester.pumpAndSettle();
+        expect(
+          container.read(taskProvider).requireValue.single.isCompleted,
+          isTrue,
+        );
+        expect(find.text(l.taskCompleted), findsOneWidget);
+        expect(find.text(l.dayAllClear), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- Run 2026-10-28-app, round 1 · P277 (UX-2306, UX-2310): phone events
+  // by name on Calendar, sheets that end with «Cerrar», read errors you can
+  // retry in the events sheet ----
+
+  group('P277 · phone events by name', () {
+    final sheet = find.byType(BottomSheet);
+    Finder inSheet(Finder finder) =>
+        find.descendant(of: sheet, matching: finder);
+    final inbox = find.byKey(const ValueKey('calendar-inbox'));
+
+    _FlakyCalendars twoEvents() {
+      final now = DateTime.now();
+      return _FlakyCalendars()
+        ..data = [
+          DeviceCalendarEvent(
+            id: '50',
+            calendarId: workCalendar.id,
+            title: 'Reunión de equipo',
+            start: DateTime(now.year, now.month, now.day, 10),
+            end: DateTime(now.year, now.month, now.day, 11),
+            allDay: false,
+          ),
+          DeviceCalendarEvent(
+            id: '51',
+            calendarId: workCalendar.id,
+            title: 'Cita con el dentista',
+            start: DateTime(now.year, now.month, now.day, 17),
+            end: DateTime(now.year, now.month, now.day, 18),
+            allDay: false,
+          ),
+        ];
+    }
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'UX-2306: at ${scale}x on 360×800 in Spanish, two phone events read «Reunión de equipo · 10:00» and «Cita con el dentista · 17:00», at least 8 dp above «Sin fecha · 1», and a tap opens that event',
+        (tester) async {
+          final now = DateTime.now();
+          final bridge = twoEvents();
+          addTearDown(bridge.close);
+          await openCalendar(
+            tester,
+            [Task(id: 1, title: 'Algún día', priority: 1)],
+            overrides: phoneCalendar(bridge),
+            size: const Size(360, 800),
+            textScale: scale,
+          );
+          final context = tester.element(find.byType(CalendarScreen));
+          final l = context.l10n;
+          final ten = find.text(
+            'Reunión de equipo · '
+            '${context.clockTime(DateTime(now.year, now.month, now.day, 10))}',
+          );
+          final five = find.text(
+            'Cita con el dentista · '
+            '${context.clockTime(DateTime(now.year, now.month, now.day, 17))}',
+          );
+          await scrollAgendaToEnd(tester);
+          expect(ten, findsOneWidget);
+          expect(five, findsOneWidget);
+          // No grey count line any more.
+          expect(
+            find.byKey(const ValueKey('calendar-events-line')),
+            findsNothing,
+          );
+          expect(find.textContaining('2 eventos'), findsNothing);
+          // In order, each row a 48 dp target.
+          Finder row(Finder text) =>
+              find.ancestor(of: text, matching: find.byType(InkWell)).first;
+          expect(
+            tester.getRect(row(five)).top,
+            greaterThanOrEqualTo(tester.getRect(row(ten)).bottom - 0.5),
+          );
+          for (final text in [ten, five]) {
+            expect(tester.getSize(row(text)).height, greaterThanOrEqualTo(48));
+          }
+          // «Sin fecha · 1» right under the events, kept 8 dp apart.
+          expect(inbox, findsOneWidget);
+          expect(
+            find.descendant(of: inbox, matching: find.text(l.inboxCount(1))),
+            findsOneWidget,
+          );
+          expect(
+            tester.getRect(inbox).top - tester.getRect(row(five)).bottom,
+            greaterThanOrEqualTo(8),
+            reason: 'the last event and «Sin fecha · 1» don’t touch',
+          );
+          // The rows sit inside the screen, not cut at its side.
+          for (final text in [ten, five]) {
+            expect(tester.getRect(text).right, lessThanOrEqualTo(360));
+          }
+          // A tap on a row opens that event.
+          await tester.tap(five);
+          await tester.pumpAndSettle();
+          expect(sheet, findsOneWidget);
+          expect(inSheet(find.text('Cita con el dentista')), findsOneWidget);
+          expect(inSheet(find.text('Reunión de equipo')), findsNothing);
+          expect(inSheet(find.text(l.calendarOpenEvent)), findsOneWidget);
+          // «Cerrar» closes it.
+          final close = inSheet(find.widgetWithText(TextButton, l.close));
+          expect(l.close, 'Cerrar');
+          expect(close.hitTestable(), findsOneWidget);
+          await tester.tap(close);
+          await tester.pumpAndSettle();
+          expect(sheet, findsNothing);
+          await tester.tap(ten);
+          await tester.pumpAndSettle();
+          expect(inSheet(find.text('Reunión de equipo')), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    for (final list in [false, true]) {
+      final which = list ? 'the list of events' : 'an event';
+      testWidgets(
+        'UX-2310: when the events fail to read with $which open, its sheet says «No se pudieron leer los eventos. Toca para reintentar.», and a tap reads again, busy meanwhile',
+        (tester) async {
+          final now = DateTime.now();
+          final bridge = _FlakyCalendars()
+            ..data = [
+              for (var i = 0; i < (list ? 4 : 1); i++)
+                DeviceCalendarEvent(
+                  id: '${60 + i}',
+                  calendarId: workCalendar.id,
+                  title: 'Dentista $i',
+                  start: DateTime(now.year, now.month, now.day, 9 + i),
+                  end: DateTime(now.year, now.month, now.day, 10 + i),
+                  allDay: false,
+                ),
+            ];
+          addTearDown(bridge.close);
+          final container = await openCalendar(
+            tester,
+            [],
+            overrides: phoneCalendar(bridge),
+            size: const Size(360, 800),
+          );
+          final l = tester.element(find.byType(CalendarScreen)).l10n;
+          expect(
+            l.calendarReadRetry,
+            'No se pudieron leer los eventos. Toca para reintentar.',
+          );
+          final opener = list
+              ? find.byKey(const ValueKey('calendar-events-all'))
+              : find.textContaining('Dentista 0 · ');
+          await reveal(tester, opener);
+          await tester.tap(opener);
+          await tester.pumpAndSettle();
+          expect(inSheet(find.text('Dentista 0')), findsOneWidget);
+
+          // The phone's events can't be read now: the sheet reads them again.
+          bridge.failEvents = true;
+          await container.read(deviceCalendarProvider.notifier).refresh();
+          await tester.pumpAndSettle();
+          final line = inSheet(
+            find.byKey(const ValueKey('calendar-events-line')),
+          );
+          expect(line, findsOneWidget);
+          expect(
+            find.descendant(of: line, matching: find.text(l.calendarReadRetry)),
+            findsOneWidget,
+          );
+          expect(inSheet(find.text('Dentista 0')), findsNothing);
+          expect(line.hitTestable(), findsOneWidget);
+          expect(tester.widget<InkWell>(line).onTap, isNotNull);
+          expect(tester.getSize(line).height, greaterThanOrEqualTo(48));
+          expect(
+            find.descendant(
+              of: line,
+              matching: find.byType(CircularProgressIndicator),
+            ),
+            findsNothing,
+          );
+
+          // A tap reads again; meanwhile the line stays, busy, and takes no tap.
+          final reads = bridge.eventReads;
+          bridge.held = 0;
+          final gate = bridge.gate = Completer<void>();
+          bridge.failEvents = false;
+          await tester.tap(line);
+          for (var i = 0; i < 3; i++) {
+            await tester.pump();
+          }
+          expect(bridge.held, greaterThanOrEqualTo(1), reason: 'read again');
+          expect(sheet, findsOneWidget, reason: 'the sheet stays open');
+          expect(line, findsOneWidget);
+          expect(
+            find.descendant(of: line, matching: find.text(l.calendarReadRetry)),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(
+              of: line,
+              matching: find.byType(CircularProgressIndicator),
+            ),
+            findsOneWidget,
+          );
+          expect(tester.widget<InkWell>(line).onTap, isNull);
+          bridge.gate = null;
+          gate.complete();
+          await tester.pumpAndSettle();
+
+          // Read: the sheet shows the events again.
+          expect(bridge.eventReads, greaterThan(reads));
+          expect(line, findsNothing);
+          expect(inSheet(find.text('Dentista 0')), findsOneWidget);
+          if (list) {
+            expect(inSheet(find.text('Dentista 3')), findsOneWidget);
+          } else {
+            expect(inSheet(find.text(l.calendarOpenEvent)), findsOneWidget);
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2310: a retry in the events sheet that fails again brings the tappable line back',
+      (tester) async {
+        final now = DateTime.now();
+        final bridge = _FlakyCalendars()
+          ..data = [
+            DeviceCalendarEvent(
+              id: '70',
+              calendarId: workCalendar.id,
+              title: 'Dentista',
+              start: DateTime(now.year, now.month, now.day, 9),
+              end: DateTime(now.year, now.month, now.day, 10),
+              allDay: false,
+            ),
+          ];
+        addTearDown(bridge.close);
+        final container = await openCalendar(
+          tester,
+          [],
+          overrides: phoneCalendar(bridge),
+          size: const Size(360, 800),
+        );
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        final row = find.textContaining('Dentista · ');
+        await reveal(tester, row);
+        await tester.tap(row);
+        await tester.pumpAndSettle();
+        bridge.failEvents = true;
+        await container.read(deviceCalendarProvider.notifier).refresh();
+        await tester.pumpAndSettle();
+        final line = inSheet(
+          find.byKey(const ValueKey('calendar-events-line')),
+        );
+        final reads = bridge.eventReads;
+        await tester.tap(line);
+        await tester.pumpAndSettle();
+        expect(bridge.eventReads, greaterThan(reads), reason: 'read again');
+        expect(
+          find.descendant(of: line, matching: find.text(l.calendarReadRetry)),
+          findsOneWidget,
+        );
+        expect(tester.widget<InkWell>(line).onTap, isNotNull);
+        expect(
+          find.descendant(
+            of: line,
+            matching: find.byType(CircularProgressIndicator),
+          ),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- UX loop 2026-10-28-app, round 1 · P300 (UX-2311, D2): Completadas
+  // lists the last one done first ----
+  group('P300 · completion times', () {
+    final now = DateTime.now();
+    DateTime daysAgo(int days, [int hour = 10]) =>
+        DateTime(now.year, now.month, now.day - days, hour);
+    DateTime daysAhead(int days) =>
+        DateTime(now.year, now.month, now.day + days);
+    DateTime todayAt(int hour, [int minute = 0]) =>
+        DateTime(now.year, now.month, now.day, hour, minute);
+
+    Finder done(String title) => find.descendant(
+      of: find.byType(CompletedTasksScreen),
+      matching: find.widgetWithText(TaskTile, title),
+    );
+
+    /// The rows of Completadas, top to bottom, as (title, repetition date).
+    List<(String, String?)> rows(WidgetTester tester) {
+      final tiles = find.descendant(
+        of: find.byType(CompletedTasksScreen),
+        matching: find.byType(TaskTile),
+      );
+      final list = tester.widgetList<TaskTile>(tiles).toList()
+        ..sort(
+          (a, b) => tester
+              .getTopLeft(find.byWidget(a))
+              .dy
+              .compareTo(tester.getTopLeft(find.byWidget(b)).dy),
+        );
+      return [for (final tile in list) (tile.task.title, tile.task.occurrenceId)];
+    }
+
+    Future<void> openCompleted(WidgetTester tester) async {
+      unawaited(
+        tester
+            .state<NavigatorState>(find.byType(Navigator))
+            .pushNamed('/completedTasks'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(CompletedTasksScreen), findsOneWidget);
+    }
+
+    Future<void> leaveAndReturn(WidgetTester tester) async {
+      tester.state<NavigatorState>(find.byType(Navigator)).pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(CompletedTasksScreen), findsNothing);
+      await openCompleted(tester);
+    }
+
+    Future<void> untick(WidgetTester tester, Finder row) async {
+      final circle = find.descendant(of: row, matching: find.byType(Checkbox));
+      await tester.ensureVisible(circle);
+      await tester.pumpAndSettle();
+      await tester.tap(circle);
+      await tester.pumpAndSettle();
+    }
+
+    List<Task> fourTicks() => [
+      // Planned on three different days; ticked at 09:00, 10:00 and 11:00.
+      Task(id: 1, title: 'Pagar la luz', priority: 1, dueDate: daysAgo(1), hasTime: false, isCompleted: true, completedAt: todayAt(9)),
+      Task(id: 2, title: 'Renovar el DNI', priority: 1, dueDate: daysAgo(20), hasTime: false, isCompleted: true, completedAt: todayAt(10)),
+      Task(id: 3, title: 'Reservar el hotel', priority: 1, dueDate: daysAhead(30), hasTime: false, isCompleted: true, completedAt: todayAt(11)),
+      // No day, ticked last, at 11:30.
+      Task(id: 4, title: 'Comprar pan', priority: 1, isCompleted: true, completedAt: todayAt(11, 30)),
+    ];
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'UX-2311: Completadas, ES ${scale.toInt()}×: three dated tasks ticked at 09:00, 10:00 and 11:00, then «Comprar pan» with no day at 11:30, read «Comprar pan», then the 11:00, 10:00 and 09:00 tasks, whatever their planned days; no row shows a time or a new line',
+        (tester) async {
+          await openCalendar(
+            tester,
+            fourTicks(),
+            size: const Size(360, 800),
+            textScale: scale,
+          );
+          await openCompleted(tester);
+          final order = <String>[];
+          // At 2× not every row fits: read them top to bottom, scrolling.
+          for (final title in [
+            'Comprar pan',
+            'Reservar el hotel',
+            'Renovar el DNI',
+            'Pagar la luz',
+          ]) {
+            await tester.scrollUntilVisible(
+              done(title),
+              120,
+              scrollable: find
+                  .descendant(
+                    of: find.byType(CompletedTasksScreen),
+                    matching: find.byType(Scrollable),
+                  )
+                  .last,
+            );
+            await tester.pumpAndSettle();
+            order.add(title);
+            final texts = tester
+                .widgetList<Text>(
+                  find.descendant(of: done(title), matching: find.byType(Text)),
+                )
+                .map((text) => text.data ?? text.textSpan?.toPlainText() ?? '')
+                .join(' | ');
+            for (final time in ['09:00', '10:00', '11:00', '11:30', '9:00']) {
+              expect(texts, isNot(contains(time)), reason: '$title: $texts');
+            }
+          }
+          await tester.drag(
+            find
+                .descendant(
+                  of: find.byType(CompletedTasksScreen),
+                  matching: find.byType(Scrollable),
+                )
+                .last,
+            const Offset(0, 3000),
+          );
+          await tester.pumpAndSettle();
+          if (scale == 1.0) {
+            expect(rows(tester).map((row) => row.$1), [
+              'Comprar pan',
+              'Reservar el hotel',
+              'Renovar el DNI',
+              'Pagar la luz',
+            ]);
+          } else {
+            // The first rows in view are the newest.
+            expect(rows(tester).first.$1, 'Comprar pan');
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2311: a timed row and an untimed one of the same kind are drawn the same height: the time adds no line',
+      (tester) async {
+        await openCalendar(tester, [
+          Task(id: 1, title: 'Comprar pan', priority: 1, isCompleted: true, completedAt: todayAt(11, 30)),
+          Task(id: 2, title: 'Comprar sal', priority: 1, isCompleted: true),
+        ], size: const Size(360, 800));
+        await openCompleted(tester);
+        expect(
+          tester.getSize(done('Comprar pan')).height,
+          tester.getSize(done('Comprar sal')).height,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2311: completions with no time come after every timed row, in today’s order: latest planned day first, undated last',
+      (tester) async {
+        await openCalendar(tester, [
+          Task(id: 1, title: 'Sin hora, hace tres días', priority: 1, dueDate: daysAgo(3), isCompleted: true),
+          Task(id: 2, title: 'Sin hora, sin día', priority: 1, isCompleted: true),
+          Task(id: 3, title: 'Con hora, hace un mes', priority: 1, dueDate: daysAgo(30), isCompleted: true, completedAt: daysAgo(30, 9)),
+          Task(id: 4, title: 'Sin hora, ayer', priority: 1, dueDate: daysAgo(1), isCompleted: true),
+          Task(id: 5, title: 'Con hora, hoy', priority: 1, dueDate: daysAgo(8), isCompleted: true, completedAt: todayAt(8)),
+        ], size: const Size(360, 1400));
+        await openCompleted(tester);
+        expect(rows(tester).map((row) => row.$1), [
+          'Con hora, hoy',
+          'Con hora, hace un mes',
+          'Sin hora, ayer',
+          'Sin hora, hace tres días',
+          'Sin hora, sin día',
+        ]);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2311: a daily task’s 3rd repetition ticked after a one-off task lists above it; its 2nd, ticked earlier, lists below both',
+      (tester) async {
+        final second = Task.dateKey(daysAgo(2));
+        final third = Task.dateKey(daysAgo(1));
+        await openCalendar(tester, [
+          Task(
+            id: 1,
+            title: 'Regar las plantas',
+            priority: 1,
+            dueDate: daysAgo(3, 9),
+            recurrence: 'daily',
+            completedDates: [second, third],
+            completedTimes: {second: daysAgo(2, 9), third: todayAt(10)},
+          ),
+          Task(id: 2, title: 'Llamar a Ana', priority: 1, dueDate: daysAgo(5), isCompleted: true, completedAt: todayAt(9)),
+        ], size: const Size(360, 1000));
+        await openCompleted(tester);
+        expect(rows(tester), [
+          ('Regar las plantas', third),
+          ('Llamar a Ana', null),
+          ('Regar las plantas', second),
+        ]);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2311 / UX-2304: with three timed rows, reopening the newest leaves it first, unticked, until the page is left; back on the page, it’s gone',
+      (tester) async {
+        await openCalendar(tester, fourTicks().sublist(0, 3), size: const Size(360, 800));
+        await openCompleted(tester);
+        expect(rows(tester).map((row) => row.$1), [
+          'Reservar el hotel',
+          'Renovar el DNI',
+          'Pagar la luz',
+        ]);
+        await untick(tester, done('Reservar el hotel'));
+        expect(rows(tester).map((row) => row.$1), [
+          'Reservar el hotel',
+          'Renovar el DNI',
+          'Pagar la luz',
+        ]);
+        expect(
+          tester
+              .widget<Checkbox>(
+                find.descendant(
+                  of: done('Reservar el hotel'),
+                  matching: find.byType(Checkbox),
+                ),
+              )
+              .value,
+          isFalse,
+        );
+        await tester.pump(const Duration(seconds: 12));
+        await tester.pumpAndSettle();
+        expect(rows(tester).first.$1, 'Reservar el hotel');
+        await leaveAndReturn(tester);
+        expect(rows(tester).map((row) => row.$1), [
+          'Renovar el DNI',
+          'Pagar la luz',
+        ]);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2311: reopen a row on Completadas, then tap Deshacer: after leaving and coming back, the row is in its old place, and its stored time is the one it had, not the Deshacer’s',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        var clock = todayAt(12);
+        final repository = _StampingTasks(fourTicks(), () => clock);
+        final container = designContainer(
+          regionalStore: MemoryRegionalStore(
+            const RegionalPreferences(language: 'es'),
+          ),
+          tasks: () => TaskNotifier(repository),
+        );
+        addTearDown(container.dispose);
+        await tester.pumpWidget(
+          UncontrolledProviderScope(container: container, child: const MyApp()),
+        );
+        await tester.pumpAndSettle();
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        await openCompleted(tester);
+        final before = rows(tester).map((row) => row.$1).toList();
+        expect(before, [
+          'Comprar pan',
+          'Reservar el hotel',
+          'Renovar el DNI',
+          'Pagar la luz',
+        ]);
+        await untick(tester, done('Renovar el DNI'));
+        expect(find.text(l.taskReopened), findsOneWidget);
+        expect(repository.task(2).completedAt, isNull, reason: 'reopened');
+        clock = todayAt(13, 45);
+        await tester.tap(find.text(l.undo));
+        await tester.pumpAndSettle();
+        expect(repository.task(2).isCompleted, isTrue);
+        expect(
+          repository.task(2).completedAt,
+          todayAt(10),
+          reason: 'the time it had, not the Deshacer’s',
+        );
+        await tester.pump(const Duration(seconds: 12));
+        await tester.pumpAndSettle();
+        await leaveAndReturn(tester);
+        expect(rows(tester).map((row) => row.$1).toList(), before);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- UX loop 2026-10-28-app, round 2 · P310 (UX-2638): ticking again a
+  // row reopened on Completadas keeps the time it was done at ----
+  group('P310 · re-ticking on Completadas keeps the time', () {
+    final now = DateTime.now();
+    DateTime daysAgo(int days, [int hour = 10]) =>
+        DateTime(now.year, now.month, now.day - days, hour);
+    DateTime todayAt(int hour, [int minute = 0]) =>
+        DateTime(now.year, now.month, now.day, hour, minute);
+
+    Finder done(String title) => find.descendant(
+      of: find.byType(CompletedTasksScreen),
+      matching: find.widgetWithText(TaskTile, title),
+    );
+
+    /// The rows of Completadas, top to bottom, as (title, repetition date).
+    List<(String, String?)> rows(WidgetTester tester) {
+      final tiles = find.descendant(
+        of: find.byType(CompletedTasksScreen),
+        matching: find.byType(TaskTile),
+      );
+      final list = tester.widgetList<TaskTile>(tiles).toList()
+        ..sort(
+          (a, b) => tester
+              .getTopLeft(find.byWidget(a))
+              .dy
+              .compareTo(tester.getTopLeft(find.byWidget(b)).dy),
+        );
+      return [for (final tile in list) (tile.task.title, tile.task.occurrenceId)];
+    }
+
+    Future<void> openCompleted(WidgetTester tester) async {
+      unawaited(
+        tester
+            .state<NavigatorState>(find.byType(Navigator))
+            .pushNamed('/completedTasks'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(CompletedTasksScreen), findsOneWidget);
+    }
+
+    Future<void> leaveAndReturn(WidgetTester tester) async {
+      tester.state<NavigatorState>(find.byType(Navigator)).pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(CompletedTasksScreen), findsNothing);
+      await openCompleted(tester);
+    }
+
+    Future<void> tapCircle(WidgetTester tester, Finder row) async {
+      final circle = find.descendant(of: row, matching: find.byType(Checkbox));
+      await tester.ensureVisible(circle);
+      await tester.pumpAndSettle();
+      await tester.tap(circle);
+      await tester.pumpAndSettle();
+    }
+
+    bool ticked(WidgetTester tester, Finder row) =>
+        tester
+            .widget<Checkbox>(
+              find.descendant(of: row, matching: find.byType(Checkbox)),
+            )
+            .value ??
+        false;
+
+    /// The app in Spanish on 360×800, its tasks stored with the database's
+    /// rule for completion times, with [clock] as now.
+    Future<_StampingTasks> open(
+      WidgetTester tester,
+      List<Task> tasks,
+      DateTime Function() clock,
+    ) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final repository = _StampingTasks(tasks, clock);
+      final container = designContainer(
+        regionalStore: MemoryRegionalStore(
+          const RegionalPreferences(language: 'es'),
+        ),
+        tasks: () => TaskNotifier(repository),
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const MyApp()),
+      );
+      await tester.pumpAndSettle();
+      return repository;
+    }
+
+    testWidgets(
+      'UX-2638: Completadas, ES 1× on 360×800, three tasks ticked at 09:00, 10:00 and 11:00: the 10:00 row reopened and ticked again at 12:00 keeps 10:00, and on the next visit the order is 11:00, 10:00, 09:00',
+      (tester) async {
+        var clock = todayAt(11, 30);
+        final repository = await open(tester, [
+          Task(id: 1, title: 'Pagar la luz', priority: 1, dueDate: daysAgo(1), hasTime: false, isCompleted: true, completedAt: todayAt(9)),
+          Task(id: 2, title: 'Renovar el DNI', priority: 1, dueDate: daysAgo(20), hasTime: false, isCompleted: true, completedAt: todayAt(10)),
+          Task(id: 3, title: 'Reservar el hotel', priority: 1, dueDate: daysAgo(2), hasTime: false, isCompleted: true, completedAt: todayAt(11)),
+        ], () => clock);
+        await openCompleted(tester);
+        const order = ['Reservar el hotel', 'Renovar el DNI', 'Pagar la luz'];
+        expect(rows(tester).map((row) => row.$1), order);
+
+        await tapCircle(tester, done('Renovar el DNI'));
+        expect(ticked(tester, done('Renovar el DNI')), isFalse);
+        expect(repository.task(2).isCompleted, isFalse, reason: 'reopened');
+        clock = todayAt(12);
+        await tapCircle(tester, done('Renovar el DNI'));
+        expect(ticked(tester, done('Renovar el DNI')), isTrue);
+        expect(repository.task(2).isCompleted, isTrue);
+        expect(
+          repository.task(2).completedAt!.isAtSameMomentAs(todayAt(10)),
+          isTrue,
+          reason:
+              'stored ${repository.task(2).completedAt}, not the re-tick’s 12:00',
+        );
+        expect(rows(tester).map((row) => row.$1), order);
+
+        await tester.pump(const Duration(seconds: 12));
+        await tester.pumpAndSettle();
+        await leaveAndReturn(tester);
+        expect(rows(tester).map((row) => row.$1), order);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2638: a repeating task’s repetition ticked at 10:00, between rows ticked at 09:00 and 11:00: reopened and ticked again at 12:00, its time for that date stays 10:00 and it keeps its place on the next visit',
+      (tester) async {
+        final key = Task.dateKey(daysAgo(1));
+        var clock = todayAt(11, 30);
+        final repository = await open(tester, [
+          Task(
+            id: 1,
+            title: 'Regar las plantas',
+            priority: 1,
+            dueDate: daysAgo(3, 9),
+            recurrence: 'daily',
+            completedDates: [key],
+            completedTimes: {key: todayAt(10)},
+          ),
+          Task(id: 2, title: 'Llamar a Ana', priority: 1, dueDate: daysAgo(5), isCompleted: true, completedAt: todayAt(9)),
+          Task(id: 3, title: 'Pedir cita', priority: 1, dueDate: daysAgo(6), isCompleted: true, completedAt: todayAt(11)),
+        ], () => clock);
+        await openCompleted(tester);
+        final order = [
+          ('Pedir cita', null),
+          ('Regar las plantas', key),
+          ('Llamar a Ana', null),
+        ];
+        expect(rows(tester), order);
+
+        await tapCircle(tester, done('Regar las plantas'));
+        expect(repository.task(1).completedDates, isNot(contains(key)));
+        clock = todayAt(12);
+        await tapCircle(tester, done('Regar las plantas'));
+        expect(repository.task(1).completedDates, contains(key));
+        final time = repository.task(1).completedTimes[key];
+        expect(
+          time != null && time.isAtSameMomentAs(todayAt(10)),
+          isTrue,
+          reason: 'stored $time, not the re-tick’s 12:00',
+        );
+
+        await tester.pump(const Duration(seconds: 12));
+        await tester.pumpAndSettle();
+        await leaveAndReturn(tester);
+        expect(rows(tester), order);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2638: ticking an open task on Calendar, or on Tareas, at 12:00 still stores 12:00',
+      (tester) async {
+        final repository = await open(tester, [
+          Task(id: 1, title: 'Llamar a Ana', priority: 1, dueDate: todayAt(0), hasTime: false),
+          Task(id: 2, title: 'Comprar pan', priority: 1, dueDate: todayAt(0), hasTime: false),
+        ], () => todayAt(12));
+        final calendarRow = find.descendant(
+          of: find.byType(CalendarScreen),
+          matching: find.widgetWithText(TaskTile, 'Llamar a Ana'),
+        );
+        await tapCircle(tester, calendarRow);
+        expect(repository.task(1).isCompleted, isTrue);
+        expect(
+          repository.task(1).completedAt!.isAtSameMomentAs(todayAt(12)),
+          isTrue,
+          reason: 'Calendar stored ${repository.task(1).completedAt}',
+        );
+
+        final es = lookupAppLocalizations(const Locale('es'));
+        await tester.tap(
+          find.descendant(
+            of: find.byType(NavigationBar),
+            matching: find.text(es.tasks),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final tasksRow = find.descendant(
+          of: find.byType(HomeScreen),
+          matching: find.widgetWithText(TaskTile, 'Comprar pan'),
+        );
+        await tapCircle(tester, tasksRow);
+        expect(repository.task(2).isCompleted, isTrue);
+        expect(
+          repository.task(2).completedAt!.isAtSameMomentAs(todayAt(12)),
+          isTrue,
+          reason: 'Tareas stored ${repository.task(2).completedAt}',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  // ---- UX loop 2026-11-01-screens, round 1 · P315 (UX-2646): Completar on
+  // the page of a row opened from Completadas keeps the row's time ----
+  group('P315 · the task page', () {
+    final now = DateTime.now();
+    DateTime daysAgo(int days, [int hour = 10]) =>
+        DateTime(now.year, now.month, now.day - days, hour);
+    DateTime todayAt(int hour, [int minute = 0]) =>
+        DateTime(now.year, now.month, now.day, hour, minute);
+    final es = lookupAppLocalizations(const Locale('es'));
+
+    Finder done(String title) => find.descendant(
+      of: find.byType(CompletedTasksScreen),
+      matching: find.widgetWithText(TaskTile, title),
+    );
+
+    /// The rows of Completadas, top to bottom, as (title, repetition date).
+    List<(String, String?)> rows(WidgetTester tester) {
+      final tiles = find.descendant(
+        of: find.byType(CompletedTasksScreen),
+        matching: find.byType(TaskTile),
+      );
+      final list = tester.widgetList<TaskTile>(tiles).toList()
+        ..sort(
+          (a, b) => tester
+              .getTopLeft(find.byWidget(a))
+              .dy
+              .compareTo(tester.getTopLeft(find.byWidget(b)).dy),
+        );
+      return [for (final tile in list) (tile.task.title, tile.task.occurrenceId)];
+    }
+
+    Future<void> openCompleted(WidgetTester tester) async {
+      unawaited(
+        tester
+            .state<NavigatorState>(find.byType(Navigator))
+            .pushNamed('/completedTasks'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(CompletedTasksScreen), findsOneWidget);
+    }
+
+    Future<void> leaveAndReturn(WidgetTester tester) async {
+      tester.state<NavigatorState>(find.byType(Navigator)).pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(CompletedTasksScreen), findsNothing);
+      await openCompleted(tester);
+    }
+
+    Future<void> tapCircle(WidgetTester tester, Finder row) async {
+      final circle = find.descendant(of: row, matching: find.byType(Checkbox));
+      await tester.ensureVisible(circle);
+      await tester.pumpAndSettle();
+      await tester.tap(circle);
+      await tester.pumpAndSettle();
+    }
+
+    /// Taps [row]'s title, as a person opens a task, and waits for its page.
+    Future<void> openPage(WidgetTester tester, Finder row, String title) async {
+      final name = find.descendant(of: row, matching: find.text(title));
+      await tester.ensureVisible(name.first);
+      await tester.pumpAndSettle();
+      await tester.tap(name.first);
+      await tester.pumpAndSettle();
+      expect(find.byType(TaskDetailScreen), findsOneWidget);
+    }
+
+    Finder pageButton(String label) => find.descendant(
+      of: find.byType(TaskDetailScreen),
+      matching: find.text(label),
+    );
+
+    Future<void> tapOnPage(WidgetTester tester, String label) async {
+      final button = pageButton(label);
+      expect(button, findsOneWidget, reason: '«$label» on the page');
+      await tester.ensureVisible(button);
+      await tester.pumpAndSettle();
+      await tester.tap(button);
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+    }
+
+    /// Ends the snackbar's time, so leaving isn't held by it.
+    Future<void> settleMessages(WidgetTester tester) async {
+      await tester.pump(const Duration(seconds: 12));
+      await tester.pumpAndSettle();
+    }
+
+    /// The app in Spanish on 360×800, its tasks stored with the database's
+    /// rule for completion times, with [clock] as now.
+    Future<_StampingTasks> open(
+      WidgetTester tester,
+      List<Task> tasks,
+      DateTime Function() clock,
+    ) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final repository = _StampingTasks(tasks, clock);
+      final container = designContainer(
+        regionalStore: MemoryRegionalStore(
+          const RegionalPreferences(language: 'es'),
+        ),
+        tasks: () => TaskNotifier(repository),
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: const MyApp()),
+      );
+      await tester.pumpAndSettle();
+      return repository;
+    }
+
+    List<Task> threeTicks() => [
+      Task(id: 1, title: 'Pagar la luz', priority: 1, dueDate: daysAgo(1), hasTime: false, isCompleted: true, completedAt: todayAt(9)),
+      Task(id: 2, title: 'Renovar el DNI', priority: 1, dueDate: daysAgo(20), hasTime: false, isCompleted: true, completedAt: todayAt(10)),
+      Task(id: 3, title: 'Reservar el hotel', priority: 1, dueDate: daysAgo(2), hasTime: false, isCompleted: true, completedAt: todayAt(11)),
+    ];
+    const order = ['Reservar el hotel', 'Renovar el DNI', 'Pagar la luz'];
+
+    void expectStoredAt(Task task, DateTime at) => expect(
+      task.completedAt != null && task.completedAt!.isAtSameMomentAs(at),
+      isTrue,
+      reason: '«${task.title}» stored ${task.completedAt}, expected $at',
+    );
+
+    testWidgets(
+      'UX-2646: Completadas, ES 1× on 360×800, ticked at 09:00, 10:00 and 11:00: the 10:00 row reopened with its circle, opened, and given «Completar» at 12:00 on its page: the page closes, it keeps 10:00, and the list reads 11:00, 10:00, 09:00 on this visit and the next',
+      (tester) async {
+        var clock = todayAt(11, 30);
+        final repository = await open(tester, threeTicks(), () => clock);
+        await openCompleted(tester);
+        expect(rows(tester).map((row) => row.$1), order);
+
+        await tapCircle(tester, done('Renovar el DNI'));
+        expect(repository.task(2).isCompleted, isFalse, reason: 'reopened');
+        await settleMessages(tester);
+        expect(rows(tester).map((row) => row.$1), order);
+
+        await openPage(tester, done('Renovar el DNI'), 'Renovar el DNI');
+        clock = todayAt(12);
+        await tapOnPage(tester, es.complete);
+        expect(find.byType(TaskDetailScreen), findsNothing,
+            reason: 'Completar closes the page');
+        expect(find.byType(CompletedTasksScreen), findsOneWidget);
+        expect(repository.task(2).isCompleted, isTrue);
+        expectStoredAt(repository.task(2), todayAt(10));
+        expect(rows(tester).map((row) => row.$1), order, reason: 'this visit');
+
+        await settleMessages(tester);
+        await leaveAndReturn(tester);
+        expect(rows(tester).map((row) => row.$1), order, reason: 'next visit');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2646: the 10:00 row’s page opened while it is done: «Reabrir» keeps the page, then «Completar» at 12:00 stores 10:00, and the next visit reads 11:00, 10:00, 09:00',
+      (tester) async {
+        var clock = todayAt(11, 30);
+        final repository = await open(tester, threeTicks(), () => clock);
+        await openCompleted(tester);
+        expect(rows(tester).map((row) => row.$1), order);
+
+        await openPage(tester, done('Renovar el DNI'), 'Renovar el DNI');
+        await tapOnPage(tester, es.reopen);
+        expect(find.byType(TaskDetailScreen), findsOneWidget,
+            reason: 'Reabrir keeps the page');
+        expect(repository.task(2).isCompleted, isFalse, reason: 'reopened');
+        expect(pageButton(es.complete), findsOneWidget);
+        await settleMessages(tester);
+
+        clock = todayAt(12);
+        await tapOnPage(tester, es.complete);
+        expect(find.byType(TaskDetailScreen), findsNothing);
+        expect(repository.task(2).isCompleted, isTrue);
+        expectStoredAt(repository.task(2), todayAt(10));
+
+        await settleMessages(tester);
+        await leaveAndReturn(tester);
+        expect(rows(tester).map((row) => row.$1), order, reason: 'next visit');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2646: a repeating task’s repetition done at 10:00, between rows done at 09:00 and 11:00, reopened on Completadas and given «Completar» on its page at 12:00: its time for that date stays 10:00 and it keeps its place on the next visit',
+      (tester) async {
+        final key = Task.dateKey(daysAgo(1));
+        var clock = todayAt(11, 30);
+        final repository = await open(tester, [
+          Task(
+            id: 1,
+            title: 'Regar las plantas',
+            priority: 1,
+            dueDate: daysAgo(3, 9),
+            recurrence: 'daily',
+            completedDates: [key],
+            completedTimes: {key: todayAt(10)},
+          ),
+          Task(id: 2, title: 'Llamar a Ana', priority: 1, dueDate: daysAgo(5), isCompleted: true, completedAt: todayAt(9)),
+          Task(id: 3, title: 'Pedir cita', priority: 1, dueDate: daysAgo(6), isCompleted: true, completedAt: todayAt(11)),
+        ], () => clock);
+        await openCompleted(tester);
+        final repetitionOrder = [
+          ('Pedir cita', null),
+          ('Regar las plantas', key),
+          ('Llamar a Ana', null),
+        ];
+        expect(rows(tester), repetitionOrder);
+
+        await tapCircle(tester, done('Regar las plantas'));
+        expect(repository.task(1).completedDates, isNot(contains(key)));
+        await settleMessages(tester);
+
+        await openPage(tester, done('Regar las plantas'), 'Regar las plantas');
+        clock = todayAt(12);
+        await tapOnPage(tester, es.complete);
+        expect(find.byType(TaskDetailScreen), findsNothing);
+        expect(repository.task(1).completedDates, contains(key));
+        final time = repository.task(1).completedTimes[key];
+        expect(
+          time != null && time.isAtSameMomentAs(todayAt(10)),
+          isTrue,
+          reason: 'stored $time for $key, not the page’s 12:00',
+        );
+
+        await settleMessages(tester);
+        await leaveAndReturn(tester);
+        expect(rows(tester), repetitionOrder);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2646: a task’s page opened from Calendar, or from Tareas: «Completar» at 12:00 still stores 12:00',
+      (tester) async {
+        final repository = await open(tester, [
+          Task(id: 1, title: 'Llamar a Ana', priority: 1, dueDate: todayAt(0), hasTime: false),
+          Task(id: 2, title: 'Comprar pan', priority: 1, dueDate: todayAt(0), hasTime: false),
+        ], () => todayAt(12));
+
+        final calendarRow = find.descendant(
+          of: find.byType(CalendarScreen),
+          matching: find.widgetWithText(TaskTile, 'Llamar a Ana'),
+        );
+        await openPage(tester, calendarRow, 'Llamar a Ana');
+        await tapOnPage(tester, es.complete);
+        expect(find.byType(TaskDetailScreen), findsNothing);
+        expect(repository.task(1).isCompleted, isTrue);
+        expectStoredAt(repository.task(1), todayAt(12));
+        await settleMessages(tester);
+
+        await tester.tap(
+          find.descendant(
+            of: find.byType(NavigationBar),
+            matching: find.text(es.tasks),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final tasksRow = find.descendant(
+          of: find.byType(HomeScreen),
+          matching: find.widgetWithText(TaskTile, 'Comprar pan'),
+        );
+        await openPage(tester, tasksRow, 'Comprar pan');
+        await tapOnPage(tester, es.complete);
+        expect(find.byType(TaskDetailScreen), findsNothing);
+        expect(repository.task(2).isCompleted, isTrue);
+        expectStoredAt(repository.task(2), todayAt(12));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }
 
 /// Tasks whose first read fails, as when the phone's database can't be read.
@@ -3801,6 +5782,32 @@ class _OneTask extends TaskRepository {
   @override
   Future<int> updateTask(Task value) async {
     task = value;
+    return 1;
+  }
+}
+
+/// P300: tasks in memory, written by the database's rule for completion
+/// times ([Task.withCompletionTimes]) with [clock] as now.
+class _StampingTasks extends TaskRepository {
+  _StampingTasks(List<Task> tasks, this.clock) : super(TaskDatabase()) {
+    for (final task in tasks) {
+      rows[task.id!] = task;
+    }
+  }
+  final DateTime Function() clock;
+  final rows = <int, Task>{};
+
+  Task task(int id) => rows[id]!;
+
+  @override
+  Future<List<Task>> getAllTasks() async =>
+      rows.values.map((task) => Task.fromMap(task.toMap())).toList();
+
+  @override
+  Future<int> updateTask(Task task) async {
+    rows[task.id!] = Task.fromMap(
+      task.withCompletionTimes(rows[task.id!], clock()).toMap(),
+    );
     return 1;
   }
 }

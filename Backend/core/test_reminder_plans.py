@@ -358,6 +358,61 @@ class PersonalSingleReminderTests(TestCase):
         self.assertFalse(TaskReminder.objects.exists())
 
 
+class ReaderRemindersTests(TestCase):
+    """D9 (the owner, 2026-10-31): a reader («lector») chooses their own reminders on a shared
+    task. A PUT that changes only their reminders is saved; anything else from a reader is refused."""
+
+    def setUp(self):
+        cache.clear()
+        self.ana = User.objects.create_user("ana-reader@example.invalid", PASSWORD, first_name="Ana")
+        self.lu = User.objects.create_user("lu-reader@example.invalid", PASSWORD, first_name="Lu")
+        self.project = TaskList.objects.create(owner=self.ana, name="Casa", shared=True)
+        ListMembership.objects.create(task_list=self.project, user=self.lu, role="viewer")
+        self.path = f"/api/tasks/{uuid.uuid4()}/"
+        self.task = {"title": "Pagar el alquiler", "due_date": "2026-11-02T10:00:00+01:00",
+                     "list_id": str(self.project.pk), "assignment": "group"}
+        created = self.put(self.ana, 0, reminder_minutes=60)
+        self.assertEqual(created.status_code, 201, created.data)
+
+    def put(self, user, version, **fields):
+        client = APIClient()
+        client.force_authenticate(user)
+        return client.put(self.path, {**self.task, "version": version, **fields}, format="json")
+
+    def reminders_of(self, user):
+        row = TaskReminder.objects.filter(user=user).first()
+        return (row.minutes, row.plan) if row else None
+
+    def test_a_reader_saves_their_own_reminders_and_nothing_else_changes(self):
+        events, told = TaskEvent.objects.count(), TaskNotification.objects.count()
+        saved = self.put(self.lu, 1, reminder_minutes=15, reminder_plan=RHYTHM)
+        self.assertEqual(saved.status_code, 200, saved.data)
+        self.assertEqual((saved.data["version"], saved.data["reminder_minutes"]), (1, 15))
+        self.assertEqual(self.reminders_of(self.lu), (15, RHYTHM))
+        self.assertEqual(self.reminders_of(self.ana), (60, None))
+        self.assertEqual((TaskEvent.objects.count(), TaskNotification.objects.count()), (events, told))
+        self.assertEqual(Task.objects.get().version, 1)
+
+    def test_a_reader_still_changes_nothing_of_the_task(self):
+        for fields in ({"title": "Pagado", "reminder_minutes": 15}, {"title": "Pagado"}, {"is_completed": True}):
+            self.assertEqual(self.put(self.lu, 1, **fields).status_code, 403, fields)
+        # Out of the project is refused too, as for anyone.
+        self.assertEqual(self.put(self.lu, 1, list_id=None, reminder_minutes=15).status_code, 400)
+        self.assertIsNone(self.reminders_of(self.lu))
+        task = Task.objects.get()
+        self.assertEqual((task.title, task.is_completed, task.version), ("Pagar el alquiler", False, 1))
+        # Nor can a reader add a task to the project.
+        self.path = f"/api/tasks/{uuid.uuid4()}/"
+        self.assertEqual(self.put(self.lu, 0, reminder_minutes=15).status_code, 403)
+
+    def test_a_reader_with_a_stale_copy_keeps_their_reminders_and_gets_the_current_task(self):
+        self.assertEqual(self.put(self.ana, 1, title="Pagar el alquiler de noviembre").status_code, 200)
+        stale = self.put(self.lu, 1, reminder_minutes=-1)
+        self.assertEqual(stale.status_code, 409, stale.data)
+        self.assertEqual(stale.data["current"]["title"], "Pagar el alquiler de noviembre")
+        self.assertEqual(self.reminders_of(self.lu), (-1, None))
+
+
 class PersonalRemindersMigrationTests(TransactionTestCase):
     """Migration 0025: a single reminder chosen on a task before 2026-10-23 goes to the person whose
     phone it rang on, beside that person's plan; everyone else keeps their defaults."""

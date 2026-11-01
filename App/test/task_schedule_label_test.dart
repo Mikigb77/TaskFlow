@@ -81,7 +81,7 @@ void main() {
   });
 
   testWidgets(
-    'UX-445: a tile’s past deadline reads Vence <weekday date> · Fecha límite vencida, in the same format as its date, never Vence 12 oct',
+    'UX-445, UX-2313: a tile’s past deadline reads Venció el <weekday date>, once, in the same format as its date, never Venció el 12 oct',
     (tester) async {
       final container = designContainer();
       addTearDown(container.dispose);
@@ -109,8 +109,7 @@ void main() {
       final context = tester.element(find.byType(TaskTile));
       final l = context.l10n;
       final deadline = DateTime(2026, 10, 12);
-      final expected =
-          '${l.deadlineLabel(context.weekdayDate(deadline))} · ${l.deadlineOverdue}';
+      final expected = l.deadlinePassedOn(context.weekdayDate(deadline));
       final tile = find.byType(TaskTile);
       expect(
         find.descendant(of: tile, matching: find.text(expected)),
@@ -125,7 +124,7 @@ void main() {
         find.descendant(
           of: tile,
           matching: find.textContaining(
-            l.deadlineLabel(context.shortDate(deadline)),
+            l.deadlinePassedOn(context.shortDate(deadline)),
           ),
         ),
         findsNothing,
@@ -133,7 +132,7 @@ void main() {
       expect(
         find.descendant(
           of: tile,
-          matching: find.textContaining('Vence 12 oct'),
+          matching: find.textContaining('Venció el 12 oct'),
         ),
         findsNothing,
       );

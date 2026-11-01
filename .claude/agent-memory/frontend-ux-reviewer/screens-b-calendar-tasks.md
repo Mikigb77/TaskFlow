@@ -96,4 +96,13 @@ Current as of 2026-10-13 (whole-app run, slice B). Paths are under `App/lib/`.
   - a typed task: 3, plus typing.
 - **Task detail of a plain task:** about 45 words.
 
+## Run 2026-10-28-app (closed in code 2026-11-01)
+- **Task page:** Completar closes the page (`_toggle`); «Reabrir» stays. Occurrence pinned at first build (`_pinned`), held while leaving (`_leaving`). Date card is one row: «Planificado para» over `dayHeading` [· time]; no «Hora» row; no date row for deadline-only tasks. Labels are one grey line; notes are one TalkBack node.
+- **Steps (checklist):** checkbox + title merged for TalkBack (`MergeSemantics`, off while renaming); ⋮ stays separate.
+- **Edit form** saves on `paused`; Deshacer returns to `_opened`.
+- **Completadas:** newest completion first (see [[ui-patterns]] › Completion times).
+- **Remove file:** ES «Quitar archivo» / «¿Quitar este archivo de la tarea?»; help line «Se quitará de la tarea y, si lo has subido, de tus otros dispositivos al sincronizar. Tu archivo original no se elimina.» (2026-11-01; EN/CA already said remove). Render `tasks/detail.remove-file.*`.
+- **Completar on a page opened from Completadas** keeps the row's time and place (2026-11-01, see [[ui-patterns]] › Completion times).
+- **Reminder chip** (`ReminderChip`, `reminder_control.dart` ~:764): hugs its longest line; centred only when tappable. At ES 1× on 360 dp the passed-alert line wraps (80 dp cap; UX-2648 open).
+
 Related: [[ui-patterns]], [[screens-a-voice-capture]].

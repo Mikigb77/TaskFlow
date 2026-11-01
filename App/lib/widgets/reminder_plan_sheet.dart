@@ -40,10 +40,11 @@ typedef ReminderRow = ({int value, String label, String? subtitle});
 /// for Pro, a field to type or say a rhythm. A plan shows what it gives
 /// (its words, a strip of dots from today to the day, the count and the
 /// next one) and applies with «Listo». [current] is the single row in use,
-/// null while [plan] is set. [task] is the task as it would be saved. On a
-/// [shared] task one line under the title, which stays in view while the
-/// choices scroll, says that every choice here is only for this person:
-/// none, once or a plan, each is each account's own.
+/// null while [plan] is set. [task] is the task as it would be saved. The
+/// title stays in view while the choices scroll. On a [shared] task one line
+/// under it says that every choice here is only for this person: none, once
+/// or a plan, each is each account's own. The first time «A tu manera» opens
+/// on this phone, with Pro, a line under its field says where its words go.
 Future<ReminderSheetChoice?> showReminderPlanSheet(
   BuildContext context, {
   required String title,
@@ -141,6 +142,11 @@ class _ReminderPlanSheetState extends ConsumerState<_ReminderPlanSheet> {
   /// A choice was applied: nothing left in the field is kept.
   bool _chosen = false;
 
+  /// The line that the words go to Google's AI, under the field: shown
+  /// while this sheet is open, the first time «A tu manera» opened on this
+  /// phone.
+  bool _privacy = false;
+
   // Listening, with the phone's own recognizer. Its runs are numbered apart
   // from capture's, which may be open underneath.
   late final NativeSpeech _speech = ref.read(nativeSpeechProvider);
@@ -171,6 +177,7 @@ class _ReminderPlanSheetState extends ConsumerState<_ReminderPlanSheet> {
       }
     });
     _words.addListener(_wordsChanged);
+    if (_open == _Open.custom) _showPrivacyOnce();
     // Opened on a plan: its row at the top, its section below it, rather
     // than under the single rows.
     if (_open != _Open.none) {
@@ -251,10 +258,30 @@ class _ReminderPlanSheetState extends ConsumerState<_ReminderPlanSheet> {
     });
   }
 
+  /// The first time «A tu manera»'s field shows on this phone, the line that
+  /// its words go to Google's AI shows under it for this sheet; later
+  /// openings leave it to Voz. Without Pro there is no field, and no line.
+  void _showPrivacyOnce() {
+    if (_privacy || !ref.read(hasProProvider)) return;
+    final regional = ref.read(regionalProvider.notifier);
+    final preferences = ref.read(regionalProvider);
+    if (preferences.reminderPrivacyShown) return;
+    _privacy = true;
+    // Remembered after this frame: the sheet may be building.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(
+        regional
+            .set(preferences.withReminderPrivacyShown())
+            .catchError((Object _) {}),
+      );
+    });
+  }
+
   void _toggle(_Open open) {
     setState(() {
       _open = _open == open ? _Open.none : open;
       _problem = null;
+      if (_open == _Open.custom) _showPrivacyOnce();
     });
     if (_open == _Open.none) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -511,13 +538,12 @@ class _ReminderPlanSheetState extends ConsumerState<_ReminderPlanSheet> {
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
       child: Text(widget.title, style: theme.textTheme.titleMedium),
     );
-    Widget choices({required bool withTitle}) => SingleChildScrollView(
-      padding: EdgeInsets.only(top: withTitle ? 16 : 0, bottom: 16),
+    final choices = SingleChildScrollView(
+      padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (withTitle) title,
           // The single reminder, as the list has always been: a tap
           // applies it and closes.
           for (final row in widget.rows)
@@ -673,6 +699,17 @@ class _ReminderPlanSheetState extends ConsumerState<_ReminderPlanSheet> {
                       ),
                     ),
                   ),
+                  if (_privacy)
+                    Padding(
+                      key: const ValueKey('reminder-plan-privacy'),
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        l.capturePrivacyLine,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 8),
                   Wrap(
                     crossAxisAlignment: WrapCrossAlignment.center,
@@ -745,28 +782,26 @@ class _ReminderPlanSheetState extends ConsumerState<_ReminderPlanSheet> {
         padding: EdgeInsets.only(
           bottom: MediaQuery.viewInsetsOf(context).bottom,
         ),
-        // On a shared task the title and the line that every choice is only
-        // this person's stay above the choices as they scroll (UX-2026). A
-        // thin line marks where the choices scroll under the title and the
-        // note (UX-2035).
-        child: widget.shared
-            ? Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    title,
-                    const _JustYou(),
-                    const Divider(
-                      height: 1,
-                      key: ValueKey('reminder-sheet-header-edge'),
-                    ),
-                    Flexible(child: choices(withTitle: false)),
-                  ],
-                ),
-              )
-            : choices(withTitle: true),
+        // On every task the title stays above the choices as they scroll, so
+        // a row is never read as the sheet's heading (UX-2412); on a shared
+        // one with the line that every choice is only this person's
+        // (UX-2026). A thin line marks where the choices scroll under them
+        // (UX-2035). The title sits right under the drag handle, as in the
+        // app's other sheets, so the fixed title leaves the choices the room
+        // they had.
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            title,
+            if (widget.shared) const _JustYou(),
+            const Divider(
+              height: 1,
+              key: ValueKey('reminder-sheet-header-edge'),
+            ),
+            Flexible(child: choices),
+          ],
+        ),
       ),
     );
   }

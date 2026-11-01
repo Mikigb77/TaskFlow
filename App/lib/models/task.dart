@@ -29,6 +29,21 @@ class Task {
   final DateTime? repeatUntil;
   final List<String> completedDates;
 
+  /// When this task was completed, if it doesn't repeat; null while it's
+  /// open, and for a completion from before the app kept times
+  /// (Backend/docs/COMPLETION_TIMES.md). Only Completadas' order uses it.
+  final DateTime? completedAt;
+
+  /// When each completed repetition was ticked, by its date's [dateKey], as
+  /// [completedDates] has them; a date completed before the app kept times
+  /// has none. Empty for a task that doesn't repeat.
+  final Map<String, DateTime> completedTimes;
+
+  /// When this row was completed: a repetition's own date's time, else
+  /// [completedAt]. Null for an open row or an untimed completion.
+  DateTime? get completedTime =>
+      occurrenceId != null ? completedTimes[occurrenceId] : completedAt;
+
   /// A calendar projection, never persisted as the series start date.
   final DateTime? occurrenceDate;
   final String? occurrenceKey;
@@ -90,6 +105,8 @@ class Task {
     List<OccurrenceException> exceptions = const [],
     this.repeatUntil,
     List<String>? completedDates,
+    DateTime? completedAt,
+    Map<String, DateTime>? completedTimes,
     this.occurrenceDate,
     this.occurrenceKey,
     this.occurrenceHasTime,
@@ -120,6 +137,21 @@ class Task {
        ),
        _isCompleted = isCompleted,
        completedDates = List.unmodifiable(completedDates ?? []),
+       // Only what the completion says: a task that doesn't repeat has a
+       // time while it's completed; a repeating one, for its completed dates.
+       // Reopening, or a date leaving completedDates, drops the time.
+       completedAt = recurrence == 'none' || dueDate == null
+           ? (isCompleted ? completedAt : null)
+           : null,
+       completedTimes = Map.unmodifiable(
+         recurrence == 'none' || dueDate == null
+             ? const <String, DateTime>{}
+             : {
+                 for (final entry in (completedTimes ?? const {}).entries)
+                   if (completedDates?.contains(entry.key) == true)
+                     entry.key: entry.value,
+               },
+       ),
        filePaths = filePaths ?? [],
        checklist = List.unmodifiable(checklist ?? []),
        labels = List.unmodifiable(
@@ -179,6 +211,10 @@ class Task {
   };
   bool get isRecurring => recurrence != 'none' && dueDate != null;
   DateTime? get displayDate => occurrenceDate ?? dueDate;
+
+  /// «Sin fecha»: neither a day nor a deadline. A deadline-only task shows on
+  /// its deadline's day, so it isn't undated.
+  bool get undated => dueDate == null && deadline == null;
 
   /// Repeating deadlines retain their civil-day offset from the ORIGINAL
   /// occurrence. Moving a single planned slot must not move its deadline.
@@ -515,6 +551,56 @@ class Task {
     return occurrence == null || occurrence.isCompleted ? null : occurrence;
   }
 
+  /// This task as a write stores it, with each completion's time set by the
+  /// server's rule (Backend/docs/COMPLETION_TIMES.md), so phone and server
+  /// agree: a time this task carries wins; else the time [before], the row
+  /// as stored, had for that completion; else [now], for a completion new in
+  /// this write. One that was already there without a time stays without.
+  Task withCompletionTimes(Task? before, DateTime now) {
+    if (!isRecurring) {
+      if (!_isCompleted || completedAt != null) return this;
+      return copyWith(
+        completedAt: before?._isCompleted == true ? before!.completedAt : now,
+      );
+    }
+    final kept = before?.completedTimes ?? const <String, DateTime>{};
+    final already = before?.completedDates.toSet() ?? const <String>{};
+    return copyWith(
+      completedTimes: {
+        for (final date in completedDates)
+          if (completedTimes[date] ??
+                  kept[date] ??
+                  (already.contains(date) ? null : now)
+              case final time?)
+            date: time,
+      },
+    );
+  }
+
+  Map<String, String> get _timesJson => {
+    for (final entry in completedTimes.entries)
+      entry.key: entry.value.toUtc().toIso8601String(),
+  };
+
+  /// A stored or sent date-time; anything else is no time, never an error.
+  static DateTime? _instant(Object? value) =>
+      value is String ? DateTime.tryParse(value)?.toLocal() : null;
+
+  static Map<String, DateTime> _times(Object? Function() read) {
+    Object? value;
+    try {
+      value = read();
+    } catch (_) {
+      return const {};
+    }
+    if (value is! Map) return const {};
+    return {
+      for (final entry in value.entries)
+        if (entry.key is String)
+          if (_instant(entry.value) case final time?) entry.key as String: time,
+    };
+  }
+
   Task copyWith({
     int? id,
     String? title,
@@ -530,6 +616,8 @@ class Task {
     List<OccurrenceException>? exceptions,
     Object? repeatUntil = _unchanged,
     List<String>? completedDates,
+    Object? completedAt = _unchanged,
+    Map<String, DateTime>? completedTimes,
     Object? occurrenceDate = _unchanged,
     Object? occurrenceKey = _unchanged,
     Object? occurrenceHasTime = _unchanged,
@@ -573,6 +661,10 @@ class Task {
         ? this.repeatUntil
         : repeatUntil as DateTime?,
     completedDates: completedDates ?? this.completedDates,
+    completedAt: identical(completedAt, _unchanged)
+        ? this.completedAt
+        : completedAt as DateTime?,
+    completedTimes: completedTimes ?? this.completedTimes,
     occurrenceDate: identical(occurrenceDate, _unchanged)
         ? this.occurrenceDate
         : occurrenceDate as DateTime?,
@@ -640,6 +732,8 @@ class Task {
     ),
     'repeatUntil': repeatUntil == null ? null : dateKey(repeatUntil!),
     'completedDates': jsonEncode(completedDates),
+    'completedAt': completedAt?.toUtc().toIso8601String(),
+    'completedTimes': jsonEncode(_timesJson),
     'priority': priority,
     'reminderMinutes': reminderMinutes,
     'reminderTime': reminderTime,
@@ -687,6 +781,8 @@ class Task {
     completedDates: List<String>.from(
       jsonDecode(map['completedDates'] ?? '[]'),
     ),
+    completedAt: _instant(map['completedAt']),
+    completedTimes: _times(() => jsonDecode(map['completedTimes'] ?? '{}')),
     priority: map['priority'],
     reminderMinutes: map['reminderMinutes'],
     reminderTime: map['reminderTime'],
@@ -733,6 +829,8 @@ class Task {
     'exceptions': exceptions.map((change) => change.toJson()).toList(),
     'repeat_until': repeatUntil == null ? null : dateKey(repeatUntil!),
     'completed_dates': completedDates,
+    'completed_at': completedAt?.toUtc().toIso8601String(),
+    'completed_times': _timesJson,
     'priority': priority,
     'reminder_minutes': reminderMinutes,
     'reminder_time': reminderTime,
@@ -776,6 +874,9 @@ class Task {
         ? null
         : DateTime.parse(data['repeat_until']),
     completedDates: List<String>.from(data['completed_dates'] ?? []),
+    // Missing on an older server, or not a date-time: no time.
+    completedAt: _instant(data['completed_at']),
+    completedTimes: _times(() => data['completed_times']),
     priority: data['priority'],
     reminderMinutes: data['reminder_minutes'],
     reminderTime: data['reminder_time'],

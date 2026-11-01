@@ -61,7 +61,9 @@ void main() {
         .state<NavigatorState>(find.byType(Navigator))
         .pushNamed('/taskDetails', arguments: savedTask.id);
     await tester.pumpAndSettle();
-    expect(find.text('14:35'), findsOneWidget);
+    // UX-2410 (P280): the time is part of the one «Planned for» row,
+    // after the day, with no «Time» row of its own.
+    expect(find.textContaining('14:35'), findsOneWidget);
   });
 
   testWidgets('reopening and cancelling the picker keeps the selected time', (
@@ -159,9 +161,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('task-repeat')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<String>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Weekly').last);
+    await tester.tap(find.byKey(const ValueKey('repeat-weekly')));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Done').last);
     await tester.pumpAndSettle();
@@ -200,10 +200,18 @@ void main() {
         find.descendant(of: sheet, matching: find.text(l.repeat)),
         findsOneWidget,
       );
+      // UX-2407: its five choices are rows, not a dropdown.
       expect(
         find.descendant(
           of: sheet,
           matching: find.byType(DropdownButtonFormField<String>),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: sheet,
+          matching: find.byKey(const ValueKey('repeat-daily')),
         ),
         findsOneWidget,
       );

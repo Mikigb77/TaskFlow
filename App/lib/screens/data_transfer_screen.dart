@@ -197,11 +197,15 @@ class _DataTransferScreenState extends ConsumerState<DataTransferScreen> {
               FilledButton.icon(
                   onPressed: _busy ? null : _export,
                   icon: const Icon(Icons.download_outlined),
-                  label: Text(context.l10n.exportTaskFlowFile)),
+                  label: Text(context.l10n.exportTaskFlowFile,
+                      textAlign: TextAlign.center,
+                      textWidthBasis: TextWidthBasis.longestLine)),
               OutlinedButton.icon(
                   onPressed: _busy ? null : _preview,
                   icon: const Icon(Icons.upload_file_outlined),
-                  label: Text(context.l10n.chooseImportFile)),
+                  label: Text(context.l10n.chooseImportFile,
+                      textAlign: TextAlign.center,
+                      textWidthBasis: TextWidthBasis.longestLine)),
             ]),
             const SizedBox(height: 8),
             Text(context.l10n.chooseImportFileHelp),

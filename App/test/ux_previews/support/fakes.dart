@@ -426,6 +426,9 @@ class PreviewDeviceCalendars extends DeviceCalendars {
   List<DeviceCalendar> sources = const [work, family];
   List<DeviceCalendarEvent> data = const [];
 
+  /// Reading events fails, as when the calendar provider errs.
+  bool failEvents = false;
+
   @override
   Future<CalendarAccess> status({bool request = false}) async => access;
 
@@ -437,13 +440,15 @@ class PreviewDeviceCalendars extends DeviceCalendars {
   Future<CalendarRead<DeviceCalendarEvent>> events(
     Set<String> ids,
     DateTime day,
-  ) async => CalendarRead([
-    for (final event in data)
-      if (event.start.toLocal().year == day.year &&
-          event.start.toLocal().month == day.month &&
-          event.start.toLocal().day == day.day)
-        event,
-  ]);
+  ) async => failEvents
+      ? throw StateError('preview: events unreadable')
+      : CalendarRead([
+          for (final event in data)
+            if (event.start.toLocal().year == day.year &&
+                event.start.toLocal().month == day.month &&
+                event.start.toLocal().day == day.day)
+              event,
+        ]);
 }
 
 /// Which phone calendars Calendar shows, in memory.
