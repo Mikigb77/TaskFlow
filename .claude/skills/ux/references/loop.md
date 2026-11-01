@@ -120,4 +120,4 @@ Learned the hard way; each cost a run, or hours.
 - **Each run:** a load step, one final check, the record and the reviewer's memory.
 - **Whole-app review:** 6 reviewers and an organizer before any of that.
 
-To change a model or an effort level, edit the agent's frontmatter. The workflow runs the mechanical steps (loading the plan, merging) on a small model at low effort.
+To change a model or an effort level, edit the agent's frontmatter. The fix workflow lowers the effort of verification, the re-plan and the record, and runs the mechanical steps (loading the plan, merging) on a small model.
