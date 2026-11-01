@@ -1268,6 +1268,114 @@
     "Phone with many reminders: switching the language closes the sheet at once; the reminders show in the new language shortly after."
    ],
    "dependsOn": []
+  },
+  {
+   "id": "P299",
+   "title": "«Guardar como tarea» shows its one task on a result card; only «Añadir al calendario» saves it (D1)",
+   "area": "A",
+   "size": "M",
+   "severity": 2,
+   "findings": [
+    "UX-2612"
+   ],
+   "files": [
+    "App/lib/screens/voice_task_screen.dart",
+    "App/test/capture_sheet_test.dart",
+    "App/test/capture_free_dictations_test.dart",
+    "App/test/capture_recovery_test.dart",
+    "App/test/calendar_feedback_test.dart",
+    "App/test/voice_command_cards_test.dart",
+    "App/test/ux_previews/capture_previews.dart",
+    "App/test/ux_previews/commands_previews.dart"
+   ],
+   "brief": [
+    "D1 is answered: (a), as recommended (DECISIONS.md, «2026-10-31 (later) — D1 and D2 of run 2026-10-28-app»; the owner on 2026-11-01: «D1 and D2 both yes, as recommended»). «Guardar como tarea» shows the phone's own reading as a normal result card, with «Añadir al calendario», before anything is saved: after the 8 s wait, after a failure (the dictation limit included), on «No he encontrado ninguna tarea…», and, since it's the same button, on a command result whose commands all found nothing. The conventions' line that lists «this plan's D1 (UX-2612) and D2 (UX-2311)» as still open was written before the answer and doesn't apply to this package. For this button, D1 replaces UX_REVIEW §3.5's «instantly», which D3 approved. UX-615 is unchanged: every other result keeps its one confirming tap and gains none.",
+    "UX-2612 (S2, review A1's question D-A1-1, filed by the organizer). Line numbers are at 5bcd6d9; b2's P283 edits `showCaptureSheet` in the same file before you, so search for the names. The sheet's `_saveAsWritten` (App/lib/screens/voice_task_screen.dart:1630-1666) and `_saveResultAsWritten` (:1669-1688) both set `_saveAtOnce = written.id` (:1655, :1684; the field at :547-548, cleared by `_sayAgain` at :1769). `build` passes `saveAtOnce: _saveAtOnce == result.id` to `CaptureResult` (:2215-2226), whose `initState` saves at once when every pending draft is ready (:2808-2822; the parameter and its doc at :2759-2765). The reading is `CaptureProcessor.asWritten` → `localDrafts` (App/lib/services/local_capture.dart:81-150), always one task: «Mañana, llamar al dentista y comprar pan» is saved, unseen, as «Llamar al dentista y comprar pan». The buttons that call it: the slow state's TextButton (:2614-2620, P273); the filled one after a failure (:2373-2382) and after the dictation limit (:2332-2342); the TextButton on «No he encontrado ninguna tarea…» (:2343-2367); and the command result's `result-save-as-written` (:4537-4551, :4775-4782, through `_CaptureResultState._saveAsWritten` at :4291-4308).",
+    "Fix: remove the save-at-once path: the `_saveAtOnce` field and its writes, and `CaptureResult.saveAtOnce` with its branch in `initState`. The written result then reveals and announces itself as any result does (`_reveal()`, `_announce()`), on the card any one-task result gets, with nothing added: the date line first, the title, «Más opciones», and the button the label logic already picks (:4569-4620). That's «Añadir al calendario» / “Add to calendar” / «Afegeix al calendari» for a task with a day, «Añadir tarea» / “Add task” / «Afegeix la tasca» for one without, and «Guardar nota» for a note. An hour that could be morning or afternoon («a las 5») is asked on the card, as now. The tap saves and lands like any result's: the message, Calendar on the task, Deshacer.",
+    "Keep a fresh result after `_saveResultAsWritten`. `asWritten` keeps the session's id (App/lib/services/capture_processor.dart:151, `existing.copyWith`), and today only the key's second half, `ValueKey((result.id, saveAtOnce))` (:2219-2221), makes the command card give way to a new `CaptureResult`, whose state reads its drafts once (:2779-2782). Keep a key that changes when the words are rebuilt as written, for example `(result.id, result.commands.isEmpty)` or an id both paths set, and keep its comment true.",
+    "Unchanged: «Guardar como tarea» keeps its name and its places (D3 of 2026-10-18; UX-2103's quiet button while the assistant works, filled after a failure). Its tap still ends the running understanding step (`_attempts++` and `asWritten`'s cancel), so a late answer never replaces the card, however long the card stays open, and no dictation is used. On the card, Cancelar, Back and a swipe ask «¿Conservar lo que has dicho para más tarde?», as on any result with a task to add (D1 of 2026-10-18 (night)); «Conservar» leaves it in «Sin guardar» with this reading, and opening it there shows the same card. «Volver a decirlo» works as on any spoken result. Update the comments that say it's saved at once (:547, :1630-1632, :1669-1671, :2220, :2763-2765). No copy changes and no new strings.",
+    "Tests: the ones that expect «Guardar como tarea» to save at once rightly break. They include U7's (:725), UX-604's (:1713) and UX-618's (:1749) in App/test/capture_sheet_test.dart, UX-499's in App/test/capture_free_dictations_test.dart (:489), UX-901's and UX-919's in App/test/voice_command_cards_test.dart (:2400, :6179), UX-701's in App/test/calendar_feedback_test.dart (:2819) and UX-901's in App/test/capture_recovery_test.dart (:723). Make each tap the card's button once the card shows, keep what it proves, and say which you changed. The speed bar test keeps passing. Put new tests in a group 'P299 · Guardar como tarea shows its card' at the end of main().",
+    "Previews: add `result.as-written` to App/test/ux_previews/capture_previews.dart, with the `result` states (es 1×, es 2×, ca 2×). It shows «Mañana, llamar al dentista y comprar pan» in the 8 s slow state after a tap on «Guardar como tarea»: one card, «Llamar al dentista y comprar pan», for tomorrow, with «Añadir al calendario». Keep true the descriptions that name the button; App/test/ux_previews/commands_previews.dart:1275 («offers Guardar como tarea to keep the words as a task») now shows the words as a task first, so say so. Re-render capture/ and commands/.",
+    "Not yours: the result card's widgets (App/lib/widgets/capture_review_editor.dart, App/lib/widgets/capture_command_cards.dart); `localDrafts` and the phone's parser, whose reading stays as it is; the copy and placement of «Guardar como tarea» (P273, verified); `showCaptureSheet`'s parameters (P283, b2); completion times (P300, beside you)."
+   ],
+   "acceptance": [
+    "ES 1× on 360×800, the words «Mañana, llamar al dentista y comprar pan», the assistant still working at 8 s: a tap on the TextButton «Guardar como tarea» shows a result card in the sheet, with one task, «Llamar al dentista y comprar pan», its date line tomorrow, and the FilledButton «Añadir al calendario». No task has been saved yet. A tap on «Añadir al calendario» saves exactly that task, for tomorrow, and Calendar lands on it, as after any one-task result.",
+    "After a 503 (with «Reintentar» and a filled «Guardar como tarea»), after the dictation limit (429), and on «No he encontrado ninguna tarea…», «Guardar como tarea» shows the same kind of card, and the task list doesn't change until the card's button is tapped.",
+    "A command result whose change found no task: `result-save-as-written` replaces the command card with a one-task card built from the words. No command is applied, and only the new card's button saves.",
+    "Words with no day, captured on today: the card shows the task without a date, and its button reads «Añadir tarea».",
+    "An hour that could be morning or afternoon («Mañana a las 5, llamar a Ana»): the card asks which, and its button saves only after the answer, at 05:00 or 17:00.",
+    "The fake assistant answers 3 s after «Guardar como tarea»: the card still shows the phone's one task, and «Añadir al calendario» adds exactly one task.",
+    "Cancelar on the card asks «¿Conservar lo que has dicho para más tarde?». «Conservar» closes with «Sin guardar · 1», and opening that shows the same one-task card; «Descartar» leaves no pending capture and no new task.",
+    "`capture/result.as-written` renders at ES 1×, ES 2× and CA 2× on 360×800, with the date line, the title and «Añadir al calendario» / «Afegeix al calendari» whole.",
+    "The speed bar test ('a plain single-task dictation looks and saves exactly as before, with no new tap', App/test/voice_command_cards_test.dart) passes."
+   ],
+   "deviceChecks": [
+    "TaskFlow_Review emulator lane, in airplane mode: dictate «médico el viernes» and tap «Guardar como tarea». The card shows Friday's date and «Añadir al calendario», and tapping it saves the task on Friday. This is U7's phone check, now with the card.",
+    "With TalkBack: after «Guardar como tarea», the card is announced as any result is, and «Añadir al calendario» can be reached and activated."
+   ],
+   "dependsOn": [
+    "P273"
+   ]
+  },
+  {
+   "id": "P300",
+   "title": "Each tick keeps its time, on the phone and in the sync; Completadas lists the last one done first (D2)",
+   "area": "B",
+   "size": "L",
+   "severity": 2,
+   "findings": [
+    "UX-2311"
+   ],
+   "files": [
+    "App/lib/models/task.dart",
+    "App/lib/models/task_schedule_change.dart",
+    "App/lib/services/task_database.dart",
+    "App/lib/services/reminder_engine.dart",
+    "App/lib/providers/task_provider.dart",
+    "App/lib/widgets/task_list.dart",
+    "App/lib/screens/completed_tasks_screen.dart",
+    "App/test/sync_test.dart",
+    "App/test/sharing_sync_test.dart",
+    "App/test/calendar_feedback_test.dart",
+    "App/test/reminder_engine_test.dart",
+    "App/test/archive_test.dart",
+    "App/test/ux_previews/calendar_previews.dart"
+   ],
+   "brief": [
+    "D2 is answered: (a), as recommended (DECISIONS.md, «2026-10-31 (later) — D1 and D2 of run 2026-10-28-app»; the owner on 2026-11-01: «D1 and D2 both yes, as recommended»). Each completion's time is kept, per task and per repetition, on the phone and on the server; Completadas lists by it, newest first, and older completions without a time follow in today's order. Nothing shows the time: only the order uses it. The server half is committed (8064257: migration 0026, `TaskSerializer.validate_completion_times` in Backend/core/serializers.py:363-389, the contract Backend/docs/COMPLETION_TIMES.md), and Backend/ stays out of scope. Two lines of the conventions were written before the answer and don't apply to this package: the one that lists D2 (UX-2311) as still open, and «UX-2311 if the owner says yes» among the server notes.",
+    "UX-2311 (S2, review B1). Completadas (App/lib/screens/completed_tasks_screen.dart:98-139) shows its rows through `TaskList(newestFirst: true)`, which sorts by planned day, latest first, undated last (App/lib/widgets/task_list.dart:19-20, :39-46). «Comprar pan», ticked by mistake this morning with no day, sits under months of dated history, and a task due next month and done today sits at the top. The app keeps no completion time.",
+    "The contract (Backend/docs/COMPLETION_TIMES.md) adds two fields to the task API. `completed_at` is an ISO date-time or null: when a task that doesn't repeat was completed, null while it's open and for completions from before 2026-10-31. `completed_times` is an object mapping each date of `completed_dates` that has a time (the same `YYYY-MM-DD` keys) to when it was ticked, and is always {} for a task that doesn't repeat. On every PUT a time the app sends wins, clamped to the server's now; without one, the server keeps the time it has for that completion, or uses its own now for a completion new in that save. Reopening clears the time, and a completion that was already there without a time stays without one. An app that sends neither field still works.",
+    "The model (App/lib/models/task.dart): two fields, for example `completedAt` (DateTime?, an instant) and `completedTimes` (Map<String, DateTime>, keyed by occurrence key, `Task.dateKey`, as `completedDates` is). Where the task is built, keep them to what its completion says: a task that doesn't repeat has no `completedTimes`, and a `completedAt` only while it's completed; a repeating task has no `completedAt`, and a time only for a date in `completedDates`. Then reopening, a date leaving `completedDates`, and a schedule change that resets them (App/lib/models/task_schedule_change.dart:52) all drop the time with no extra code. Carry both through `copyWith`, `toMap`/`fromMap` (for example columns `completedAt`, TEXT in UTC ISO 8601, and `completedTimes`, TEXT as JSON, default '{}') and `toApi`/`fromApi` (`completed_at`: UTC ISO 8601 or null; `completed_times`: key → UTC ISO 8601). Read them leniently: a value that isn't a date-time, or a key that isn't a completed date, is left out, never an error (Exportar e importar reads every archived task through `fromApi`: App/lib/models/task_archive.dart:288). Add one getter for the order, for example `completedTime`: a repetition row's own date's time (`occurrenceId` set), else `completedAt`.",
+    "The database (App/lib/services/task_database.dart). Schema 21 (`schemaVersion`, :17): the two columns in `onCreate` (:57-76) and in a new `< 21` step after the `< 20` one (:248-255), with a comment: completions from before have no time and list after the timed ones; rows waiting to be sent keep their change. Stamp the time in `updateTask` (:530-591), which already reads the row before writing, by the server's own rule, so phone and server agree: a time the written task carries wins; else the time the row had for that completion; else, for a completion new in this write (a task that wasn't completed, or a date not in the row's `completedDates`), now; a reopened one has none. Put the rule in one helper, used here and by the reminder engine (next), with a clock the tests can set, as `ReminderEngine.clock` is (App/lib/services/reminder_engine.dart:98, :115). Inserts stamp nothing and keep what they're given (`insertTask`, `insertTasks`, `restoreTask`, `preserveConflict`'s copy, `importLocalTasks`). In `_remoteValues` (:793-807) the server's values win, but a server that doesn't send `completed_at` or `completed_times` leaves this phone's as they are, as the `reminderPlan` line there already does.",
+    "The notification's «Completar» (`ReminderEngine.action`, App/lib/services/reminder_engine.dart:825-893) writes `completedDates` or `isCompleted` straight to the row (:867-886). Write the time with them, through the same helper and the engine's `clock()`: `complete` stamps it, and `undo` clears it.",
+    "The sync needs no change (App/lib/repositories/cloud_task_repository.dart). `_payload` (:41-45) sends `Task.fromMap(row).toApi()`, so the tick's own time goes with the next sync however late it runs, and a tick made offline keeps its moment. `_sameContent` (:47-105) must not compare the times: a different time is never a conflict and never makes a «(copia local)». A reader's reminders-only send (`_sendReminders`, :124-155) sends the server's own values back.",
+    "Deshacer keeps a completion's own time. `TaskNotifier.setCompleted` (App/lib/providers/task_provider.dart:209-233) builds its write from the stored task; when it completes, carry the time the passed `occurrence` itself had for that completion. Deshacer after a reopen passes the row as it was, time included (`TaskInteractions.toggle`'s undo, App/lib/widgets/task_interactions.dart:37); a plain tick passes an open row, so the database stamps now. Likewise `TaskScheduleChange.restore` (App/lib/models/task_schedule_change.dart:26-35) brings back `before`'s completion times with `before`'s dates when it brings those back, so a Deshacer after a repeating task lost its repeat doesn't make old completions look new. Voice commands (App/lib/services/command_runner.dart:176-210, the undo at :215-246) write through `updateTask` and need no change.",
+    "The order (App/lib/widgets/task_list.dart:39-46; `newestFirst` is used only by Completadas, completed_tasks_screen.dart:137): rows with a completion time first, the newest first; then the rows without one, in today's order (latest planned day first, undated last). Rows reopened on the page keep their place (P269's `_doneHere`, completed_tasks_screen.dart:35-37, :41-56, :64, :100). Remember, for each row seen done on the page, the time it had (for example `_doneHere` as a Map<String, DateTime?>), and order by that, so a reopened row, whose time is now cleared, doesn't move until the page is left (UX-2304, verified, holds). For example `TaskList` takes a `DateTime? Function(Task)` for this order in place of `newestFirst`; keep its doc comment true.",
+    "No copy, and nothing new on screen: no row shows a time, and the page's lines stay as they are. Exportar e importar needs no change: the fields ride along through `toApi`/`fromApi`, so an export keeps them, an import restores them, and an archive without them imports as before.",
+    "Tests, in a group 'P300 · completion times' at the end of main(): the 20 → 21 upgrade (App/test/sharing_sync_test.dart's upgrade from schema 19, :620-680, is a model); the PUT body (App/test/sync_test.dart's fake API, :648); the stamping rule and `_remoteValues` on a real SQLite database; Completadas' order and the reopened row (App/test/calendar_feedback_test.dart, near UX-2304's test in P269's group); the notification action (App/test/reminder_engine_test.dart); export and import (App/test/archive_test.dart). Existing tests that build completed tasks with no times keep passing: untimed rows keep today's order.",
+    "Previews (App/test/ux_previews/calendar_previews.dart:535-551, `completedTasks` 'list'): give its completed fixtures times, with a no-date task ticked today among them, so the render shows that task first. Keep the description true, for example «Tasks already done, the last one ticked first», and re-render calendar/completed.*.",
+    "Not yours: Backend/ (done); Completadas' help line «Pulsa una casilla…» (UX-2312) and the rows' look, both P279's; a task page's Completar (P280), which ends in `setCompleted`, covered here; checklist steps, which keep no times; the capture sheet (P299, beside you)."
+   ],
+   "acceptance": [
+    "Completadas, ES 1×: three dated one-off tasks, planned on three different days, are ticked at 09:00, 10:00 and 11:00, then «Comprar pan», with no day, at 11:30. The rows read «Comprar pan», then the 11:00, 10:00 and 09:00 tasks, whatever their planned days.",
+    "Completions with no time (rows from before schema 21, or from a server that never sent one) come after every timed row, in today's order: latest planned day first, undated last.",
+    "A daily task's 3 Nov repetition ticked after a one-off task lists above it; its 2 Nov repetition, ticked earlier, lists below both.",
+    "With three timed rows on Completadas, reopening the newest leaves it first, unticked, until the page is left; back on the page, it's gone (UX-2304).",
+    "Reopen a row on Completadas, then tap Deshacer: after leaving and coming back, the row is in its old place, and its stored time is the one it had, not the time of the Deshacer.",
+    "A one-off task ticked offline at 08:15 and synced at 09:00: the PUT body has `completed_at` 08:15 (UTC, ISO 8601) and `completed_times` {}. The 2026-11-03 repetition of a daily task, ticked: `completed_times` is {\"2026-11-03\": the tick's time} and `completed_at` null. After reopening, `completed_at` is null and the date has left `completed_times`.",
+    "Pulling a task whose JSON has `completed_at` and `completed_times` sets the row's times to the server's; pulling one whose JSON lacks both fields leaves the row's times as they were.",
+    "A schema 20 database upgrades to 21 with every task's times empty, and its other columns and pending flags unchanged.",
+    "The notification's «Completar» on a one-off task stores the engine clock's time, and «Deshacer» on its notice clears it; on a repeating task it stores the time under that repetition's date.",
+    "Editing a completed task's title keeps its completion time. A schedule change that ends a repeating task's repeat (`TaskScheduleChange.apply` with no day), then its Deshacer (`restore`), brings its completion times back unchanged.",
+    "Completadas at ES 1× and 2× shows no time and no new line on any row.",
+    "A task completed with a time keeps that time through Exportar and Importar; an archive with no times imports as before."
+   ],
+   "deviceChecks": [
+    "TaskFlow_Review emulator lane, with the local Docker API at migration 0026 (8064257; after `docker compose up -d --build`, run `migrate`): in airplane mode, tick a no-date task; wait two minutes, then turn airplane mode off. The server's `completed_at` for it (GET /api/tasks/<id>/) is the tick's time, not the sync's, and Completadas lists it first. Reopen it: `completed_at` is null on the server."
+   ],
+   "dependsOn": [
+    "P269"
+   ]
   }
  ],
  "decisions": [
@@ -1277,7 +1385,13 @@
    "findings": [
     "UX-2612"
    ],
-   "recommendation": "(a), as review A1 recommends: it's the app's least reliable reading, and seeing it costs one tap on a path that's rare. One small package after this run (the card already exists); reversible."
+   "recommendation": "(a), as review A1 recommends: it's the app's least reliable reading, and seeing it costs one tap on a path that's rare. One small package after this run (the card already exists); reversible.",
+   "status": "answered",
+   "answer": "Answered 2026-11-01 (the owner: «D1 and D2 both yes, as recommended»; DECISIONS.md, 2026-10-31 (later)): (a). «Guardar como tarea» shows the phone's reading as a normal result card, with «Añadir al calendario», before it's saved: after the 8 s wait, after a failure and on «No he encontrado ninguna tarea…», and on a command result that found nothing. Built by P299, in batch b3.",
+   "relatedPackages": [
+    "P299",
+    "P273"
+   ]
   },
   {
    "id": "D2",
@@ -1285,7 +1399,13 @@
    "findings": [
     "UX-2311"
    ],
-   "recommendation": "(a). The page's job is getting back what was just ticked, and a completion time is the smallest change that does it; nothing shows the time, only the order uses it. Server first (the main session), then one small app package."
+   "recommendation": "(a). The page's job is getting back what was just ticked, and a completion time is the smallest change that does it; nothing shows the time, only the order uses it. Server first (the main session), then one small app package.",
+   "status": "answered",
+   "answer": "Answered 2026-11-01 (the owner: «D1 and D2 both yes, as recommended»; DECISIONS.md, 2026-10-31 (later)): (a). Each completion's time is kept, per task and per repetition, on the phone and on the server, and Completadas lists by it, newest first, with untimed completions after in today's order. The server half is committed (8064257: migration 0026, Backend/docs/COMPLETION_TIMES.md); the app half is P300, in batch b3.",
+   "relatedPackages": [
+    "P300",
+    "P269"
+   ]
   }
  ],
  "skipped": [
@@ -1326,5 +1446,43 @@
   "For the main session (server or tools; no package changes them): (1) UX-2508's server half: each Novedades item carries the changed `fields` (Backend/core/group_views.py:325), as UX-1514 added `assignee_name`; P287's app half works without it and reads it when present. (2) UX-2617, the invitation email's link (Backend/core/invitation_email.py:18). (3) D14 of 2026-10-13 (Google invitees join without the code) is decided but still not built: the server requires the code (Backend/core/list_views.py:273-275, group_views.py:283-285), and the join dialog asks for 16 or more characters (invitation_cards.dart:270-272); review C. (4) D2, if the owner says yes: a completion time per task and per repeat. (5) The preview suite: render each area within one day, or have `dayLabel` read the clock seam (reviews B1 and C: the run crossed midnight, so `completed.list` and project rows read the real clock); P269 fixes the calendar fixtures' «Comer con Ana».",
   "Noted in the reviews' cross-slice notes and not planned, with the reason: the snackbar's look, a task card's surface with an outline (review B1 to D: app_theme.dart:137-147, set in the 2026-09-21 design refresh, a design choice for the owner or a later review); «Para mí» alone on a second row of scope chips at 1× in Spanish (B1 to C, two reasonable fixes); Voz's long privacy paragraph (A1 to D, no copy proposed; P282 changes one sentence of it); «Mediana 0.18 s» in Diagnóstico de captura (A1, a debug screen, D13); the flag icon for both deadline and priority on a task's page (A2 to B2, not filed); the English widget help's “launcher” (UX-2613 is Spanish only).",
   "Waves, as the fix workflow will plan them (files shared, then plan order, up to 12 side by side): 1 P266, P267, P268, P270, P276, P278, P281, P284, P287, P290, P291, P292; 2 P269, P271, P273, P282, P285, P293, P295; 3 P272, P274, P279, P286; 4 P275, P277, P280, P283; 5 P288, P289; 6 P294. App/lib/widgets/reminder_control.dart (P270, P271, P272, P275, P289) and App/lib/screens/task_detail_screen.dart (P271, P279, P280, P294) set the length. P289 raises every filled button to 60 dp in wave 5: its brief asks it to fix the 2× fits the earlier waves' tests measure."
+ ],
+ "replans": [
+  {
+   "date": "2026-11-01",
+   "why": "The owner answered D1 and D2: «D1 and D2 both yes, as recommended» (DECISIONS.md, 2026-10-31 (later)). D2's server half was committed first (8064257: migration 0026, Backend/docs/COMPLETION_TIMES.md). Batch b1 (P266–P277, with round 2's P296–P298 in plan-b1-r2.json) is done and committed (5bcd6d9; report-b1.md). P266–P295 are unchanged.",
+   "added": [
+    "P299",
+    "P300"
+   ],
+   "batches": {
+    "b1": "done: P266–P277, round 2 P296–P298 (plan-b1-r2.json); 5bcd6d9; report-b1.md",
+    "b2": [
+     "P278",
+     "P279",
+     "P280",
+     "P281",
+     "P282",
+     "P283",
+     "P284",
+     "P285",
+     "P286",
+     "P287",
+     "P288",
+     "P289"
+    ],
+    "b3": [
+     "P290",
+     "P291",
+     "P292",
+     "P293",
+     "P294",
+     "P295",
+     "P299",
+     "P300"
+    ]
+   },
+   "notes": "b2 runs with recordMemory false, b3, the last batch, with recordMemory true. P299 and P300 share no file with each other or with P290–P295, so b3 is one wave of 8. The conventions (2026-10-31) still call D1 and D2 open: P299's and P300's briefs say they're answered, and no other package touches either."
+  }
  ]
 }

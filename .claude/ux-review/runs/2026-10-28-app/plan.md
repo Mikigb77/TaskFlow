@@ -1,13 +1,16 @@
 # UX plan — the whole app, run 2026-10-28-app (2026-10-31)
 
+> **2026-11-01:** batch b1 is done and committed (P266–P277, with round 2's P296–P298; 5bcd6d9; `report-b1.md`): all 39 of its findings are closed, 31 verified and 8 waiting for a phone or the emulator. You answered D1 and D2 «both yes, as recommended». They are now P299 and P300, under «Re-plan after your answers (2026-11-01)» at the end, and run in batch b3 with P290–P295.
+
 Six reviews (A1, A2, B1, B2, C, D) filed 90 new findings, none at severity 4: nothing stops a core task, but a tick waits for the server, a reminder that just rang says «Sin recordatorio», and a reader's «Completar» makes an English «(offline copy)».
 This plan fixes 89 findings in 30 packages (P266–P295), D9 and WD34 included. Two questions are yours (D1, D2). As you asked on 2026-10-31 («do everything»), the run goes straight to `ux fix`, and nothing waits for your answers.
 
 Evidence: the UX preview suite at 6281e3d (486 renders with AUDIT.md: widget-test evidence), the calendar previews of 2026-10-29, and 238 captures from the TaskFlow_Review emulator (emulator evidence, not a phone). The app code hasn't changed since.
 
-## Decisions for you
+## Decisions for you (both answered 2026-11-01)
 
 ### D1 · Should «Guardar como tarea» show its one task before saving? (UX-2612)
+- **Answered 2026-11-01: (a), as recommended** (DECISIONS.md, 2026-10-31 (later)). Planned as P299, in batch b3.
 - **Today:** it saves the phone's own reading at once, unseen: after the 8 s wait, after a failure, and on «No se encontraron tareas». UX_REVIEW §3.5 says "instantly", and your D3 approved that section.
 - **The problem:** that reading is always one task. «Mañana, llamar al dentista y comprar pan» becomes one task with both things in its title. Every other result keeps a confirming tap (UX-615).
 - **Already in this plan:** P273 makes the button a quiet text button while the assistant still works (UX-2103), so it gets pressed less by mistake.
@@ -15,6 +18,7 @@ Evidence: the UX preview suite at 6281e3d (486 renders with AUDIT.md: widget-tes
 - **Recommendation: (a)**, as review A1 recommends. One small package after this run; reversible.
 
 ### D2 · Keep the time each task is completed, so Completadas lists the newest first? (UX-2311)
+- **Answered 2026-11-01: (a), as recommended** (DECISIONS.md, 2026-10-31 (later)). The server half is done (8064257); the app half is P300, in batch b3.
 - **Today:** Completadas follows the planned date, with undated tasks last. «Comprar pan» ticked by mistake this morning sits after months of dated history. A task due next month and done today sits at the top.
 - **Why it's yours:** neither the app nor the server keeps a completion time (the server has only `updated_at`). Ordering by when each task, or each repeat, was done means storing that time with every tick, on the phone and on the server.
 - **Already in this plan:** P269 keeps a reopened row in place until the page is left.
@@ -200,7 +204,7 @@ Each line: finding (its severity) — what changes. The packages' full instructi
 1. UX-2508's server half: each Novedades item carries its changed `fields` (`Backend/core/group_views.py:325`). P287 reads them when present.
 2. UX-2617: link `/es/` or `/ca/` by the email's language in `Backend/core/invitation_email.py:18`, as the app's `site_links.dart` does.
 3. D14 (2026-10-13), Google invitees join without the code: decided, still not built (review C).
-4. D2, if the owner says yes: a completion time per task and per repeat, server first.
+4. D2, if the owner says yes: a completion time per task and per repeat, server first. **Done:** the owner said yes; the server half is 8064257 (migration 0026), and the app half is P300.
 5. Previews: render each area within one day, or have `dayLabel` read the clock seam (reviews B1, C). P269 fixes the calendar fixtures' «Comer con Ana».
 
 ## Noted in the reviews, not planned
@@ -248,3 +252,40 @@ None: no finding has failed twice.
 ### For the main session (noted by the implementers, not by a reviewer, so not planned)
 - P269's implementer: Tareas' `_openHere` (`home_screen.dart:446`) checks only TickerMode, so a row ticked on Tareas stays in place across a switch to Calendar and back. The same `Visibility.of` check would fix it.
 - P275's implementer: AUDIT still counts 0 dp vertical gaps between a collapsed row's title and its «Fecha y hora» line in `capture/result · several`. The reviewer judged this outside UX-2205.
+
+## Re-plan after your answers (2026-11-01)
+
+You answered D1 and D2 «both yes, as recommended» (DECISIONS.md, 2026-10-31 (later)). Two new packages build them: P299 for D1, and P300 for D2's app half. They run in batch b3 with P290–P295, and P266–P298 are unchanged. With these two, the plan fixes 91 of the reviews' findings in 32 packages (P266–P295, P299, P300); round 2 of b1 added P296–P298 for three regressions.
+
+### Where the run is
+- **Batch b1 is done:** P266–P277, and round 2's P296–P298 (`plan-b1-r2.json`). All 39 of its findings are closed: 31 verified, and 8 waiting for a phone or the emulator. Nothing was escalated. It's committed in 5bcd6d9, and the report is `report-b1.md`.
+- **Batch b2 is next:** P278–P289, as planned.
+- **Batch b3 is last:** P290–P295, then P299 and P300. None of these eight packages shares a file, so they all run side by side.
+
+### The answers, and where they go
+- **D1 · UX-2612 (S2) → P299.** «Guardar como tarea» now shows the phone's reading on a normal result card, and only «Añadir al calendario» saves it. That covers every place the button appears: after the 8 s wait, after a failure or the dictation limit, on «No he encontrado ninguna tarea…», and on a command result that found nothing.
+- **D2 · UX-2311 (S2) → P300.** Each tick keeps its own time on the phone, and the next sync sends it, even after time offline. Completadas lists the newest first, and completions without a time follow in today's order. The server half is already done (8064257: migration 0026, `Backend/docs/COMPLETION_TIMES.md`), so no server work is planned.
+
+### Settled here (each is a line to strike if you disagree)
+- **«Guardar como tarea» keeps its name and its places** (D3 of 2026-10-18; P273's quiet button while the assistant works). The card's button is the one any one-task result shows: «Añadir al calendario» with a day, «Añadir tarea» without one.
+- **Deshacer gives a completion back its own time.** After «Reabrir» and then «Deshacer», a task goes back to its old place in Completadas, not to the top.
+- **Exportar e importar keeps the times**, as it already keeps completion dates. An older app opening such a file warns about fields it doesn't know.
+- **No time shows anywhere.** Only the order uses it, as D2 says.
+
+### New packages, in order
+**P299 · S2 · A · M — «Guardar como tarea» shows its task first** (after P273)
+- UX-2612 (S2) — «Mañana, llamar al dentista y comprar pan» shows as one card, «Llamar al dentista y comprar pan», for tomorrow, and only «Añadir al calendario» saves it. A late answer from the assistant still changes nothing.
+
+**P300 · S2 · B · L — Completadas lists the last thing done first** (after P269)
+- UX-2311 (S2) — each tick's time is stored on the phone (schema 21) and sent as `completed_at` or `completed_times`, a notification's «Completar» included. «Comprar pan», ticked this morning, comes first. A row reopened on the page keeps its place until you leave.
+
+### Ledger
+- UX-2612 and UX-2311 move from «Decision needed» to «Open», planned in P299 and P300.
+- Still yours: U13 (with U10 and UX-331), and UX-615 (the confirming tap stays until the §7 test; D1 adds no tap anywhere else).
+- No new IDs, and nothing skipped.
+
+### For the main session
+1. Before P300's device check, the local Docker API needs migration 0026 (RESUME.md: `docker compose up -d --build`, then `migrate`).
+2. D2 stores a new piece of data on the server: when each task was completed. The website's privacy text already lists «completion history» (`../TaskFlowWeb/src/content/legal/en.ts:30`); the `/ux-web` changes run in RESUME.md should confirm that covers it.
+3. U7's phone check gains a tap: in airplane mode, «Guardar como tarea» now shows the card, and «Añadir al calendario» saves it.
+4. plan.json's shared conventions, written 2026-10-31, still call D1 and D2 open. P299's and P300's briefs say they're answered, and no other package touches either one.
