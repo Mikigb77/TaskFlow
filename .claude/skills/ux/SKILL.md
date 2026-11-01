@@ -1,6 +1,6 @@
 ---
 name: ux
-description: Run TaskFlow's UX loop. frontend-ux-reviewer reviews what changed since the last review (or the whole app, or named screens), ux-organizer plans the fixes, ux-implementer makes them one package at a time, and the reviewer re-checks until they hold. Use when the owner types /ux, asks for a UX review of recent changes or of the app, or when AGENTS.md's UX review step applies after user-facing work.
+description: Run TaskFlow's UX loop. frontend-ux-reviewer reviews what changed since the last review (or the whole app, or named screens), ux-organizer plans the fixes, ux-implementers make them side by side, each package tested and re-checked on its own until it holds. Use when the owner types /ux, asks for a UX review of recent changes or of the app, or when AGENTS.md's UX review step applies after user-facing work.
 argument-hint: "[app | fix [skip P3 | only P1 P2] | <screens or flows>]"
 ---
 
@@ -140,39 +140,46 @@ When it returns:
 
 ## 6. Fix and verify — workflow `ux-fix`
 
-1. **Make the starting point.** If `git status --porcelain` shows uncommitted user-facing changes, commit exactly those files first, so the round's own commit can be reverted on its own. Message: `Changes reviewed by the UX loop (<run id>)`, plus the attribution line.
-2. **Run the workflow.** First:
-   - Keep the PC awake while it runs. In the desktop app, call `mcp__ccd_host__request_keep_awake` with `until: "session_idle"`. The longest runs so far each lost 2–4 hours to a sleeping or restarting laptop.
-   - Packages that share no file run side by side, each in its own worktree: up to 12 at once, even while a `ux-web-fix` run is going (owner, 2026-10-21). The machine is protected by the gate, not by the agent count: heavy commands run 3 at a time. How waves work: `.claude/skills/ux/references/loop.md`, step 5.
+Every package flows through on its own, in its own git worktree: ux-implementer, then ux-tester (tests, and renders of its screens), then frontend-ux-reviewer; if it falls short, one fix and a second check; then it's merged into the main checkout. A package starts as soon as its `dependsOn` are merged and an agent is free; it never waits for unrelated packages. When every package is in, one final check runs the analyzer, the whole suite and the previews; what still fails is re-planned once. How it works: `.claude/skills/ux/references/loop.md`, step 5.
 
-   Then call the Workflow tool with `scriptPath` set to the absolute path of `.claude/skills/ux/workflows/ux-fix.js`, and args `{ runId, runDir, date, repoRoot, maxParallel, heavySlots, skip, only, batch, notes }`:
-   - `repoRoot` is `git rev-parse --show-toplevel`, with forward slashes. Without it, every package runs in the main checkout, one at a time.
-   - `maxParallel` is 12. `heavySlots` is 3.
-   - Set `batch` (for example `trial`, then `main`) when a plan runs in several batches, so each batch keeps its own report and verify files. For `/ux fix`, the run folder is the newest one under `runs/` that has a `plan.json` but no `report.md`.
-3. **When it returns:**
+1. **Make the starting point.** If `git status --porcelain` shows uncommitted user-facing changes, commit exactly those files first, so the run's own commit can be reverted on its own. Message: `Changes reviewed by the UX loop (<run id>)`, plus the attribution line.
+2. **Get ready.**
+   - Keep the PC awake while it runs. In the desktop app, call `mcp__ccd_host__request_keep_awake` with `until: "session_idle"`. The longest runs so far each lost 2–4 hours to a sleeping or restarting laptop.
+   - Move the session to the repo root, `cd "$(git rev-parse --show-toplevel)"`, and stay there: the workflow's worktrees are made from the session's folder. On 2026-10-31 a session left elsewhere made a whole batch's worktrees fail, and its packages ran one at a time for hours. The workflow now checks this first, and stops with an error if worktrees don't work.
+   - Count the CPUs: `nproc`. A workflow runs at most min(16, CPUs − 2) agents at once, whatever its args say: 14 on a 16-CPU PC, but only 2 in a 4-CPU cloud session. That cap, not the plan, is why runs in the cloud took so long.
+   - While it runs, don't edit, commit, stash or switch branches in the main checkout: every package's worktree is seeded from it, and every merge writes it.
+3. **Run it.** Call the Workflow tool with `scriptPath` set to the absolute path of `.claude/skills/ux/workflows/ux-fix.js`, and args `{ runId, runDir, date, repoRoot, heavySlots, skip, only, notes }`:
+   - `repoRoot` is `git rev-parse --show-toplevel`, with forward slashes.
+   - `heavySlots` is 3, or 2 on a machine with 4 CPUs or fewer. Every Flutter command, of every run and lane at once, waits for one of these slots.
+   - For `/ux fix`, the run folder is the newest one under `runs/` that has a `plan.json` but no `report.md`.
+   - Leave `maxParallel`, `agents`, `fileLimit`, `fixAttempts` and `maxExtraRounds` at their defaults unless the owner asks.
+   - Save the args of every run you start, with its run ID: resuming needs exactly the same args.
+
+   **Lanes, on a machine with fewer than 8 CPUs** (a cloud session has 4): run the plan as several workflows at once, so each brings its own agents.
+   1. Split it: `python -I -X utf8 .claude/skills/ux/scripts/pkg.py <runDir> --lanes 4`, adding `--only …` or `--skip …` as the owner asked. It prints each lane's packages; packages that depend on each other share a lane.
+   2. Start one run per lane, all in the same message: the args above plus `part: "packages"`, `lane: "L1"` (`"L2"`, …) and `only` set to that lane's packages.
+   3. When every lane has returned, start one more run with the same args plus `part: "finish"` and `laneResults` set to the list of the lanes' results, unchanged. It runs the final check, the re-plan and the record. Its result is what step 4 uses.
+4. **When it returns:**
    - **Save the report.** Write `close.report` to `<runDir>/<reportName>`. Subagents may not write report files, so the organizer returns the text.
-   - **`testsPassed` is true:** commit the round.
-     - Stage it: `git add -- <filesChanged> .claude/ux-review .claude/agent-memory`.
+   - **`testsPassed` is true:** commit the run.
+     - Stage it: `git add -- <filesChanged> .claude/ux-review .claude/agent-memory`. `filesChanged` lists only what was merged into the main checkout, with `App/lib/l10n/generated` when an ARB file changed.
      - Subject: `UX loop <run id>: <n> fixes verified`.
      - Body: the verified IDs, then the IDs still open, each with a short reason.
      - End with the attribution line.
    - **`testsPassed` is false:** don't commit. Tell the owner which checks fail, and that the changes are left uncommitted for them to look at.
+   - **Packages set aside** (`packages[].patch`): a package whose own tests still failed after its fix isn't merged; its patch is in the run folder. List them for the owner; don't apply them.
    - Either way, run `bash .claude/skills/ux/scripts/ux.sh save` afterwards.
+   - **Leftovers:** `git worktree list` should show only the main checkout. A run that was stopped can leave worktrees behind; remove each with `python -I -X utf8 .claude/skills/ux/scripts/waves.py drop --worktree <path> --save <runDir>/leftover-<name>.patch`.
 
 Never push. Never commit on `main`. Never skip hooks.
 
-### Big plans run in batches
+### Big plans run in one go
 
-A plan with more than about 16 packages runs in batches of about 12, in plan order. Waves make a batch's width, not its length, the cost, so batches are bigger than before 2026-10-21 (they were 5).
-- Each batch is one `ux-fix` run, with `only` set to the batch's packages and `batch` set to `b1`, `b2`, and so on.
-- Set `recordMemory: false` on every batch except the last, so the reviewer updates its memory once per plan.
-- After each batch: save its report, commit, run `ux.sh save`, then start the next batch.
-- Don't wait for the owner between batches.
-- Stop and tell the owner if a batch's tests fail, or if it escalates more than two findings.
+Run the whole approved plan in one run, or one set of lanes. Don't split it into batches: each package already gets its own tester and reviewer, and every batch only added a final check, a record and a wait for its slowest package. `batch` still names a run's report and records, for a plan that must be split for another reason, such as the owner approving it in parts.
 
-Batching catches regressions while they're still small, and it gives one commit per batch. Testers and verifiers stay focused anyway: packages done side by side get a tester each, and a verifier checks at most 4 packages.
+### How long it takes
 
-The first real `ux-fix` run (2026-10-13, 2 small packages, 3 rounds) took about 110 minutes and 1.9M tokens. Expect a batch of 5 to take a few hours.
+The 2026-10-28-app plan (32 packages) took about 15 hours in a 4-CPU cloud session on 2026-10-31 and 11-01: three batches of waves, two agents at a time, with up to three rounds each. With packages flowing through on their own, the same plan comes to about 6–7 hours there in one run, 2½–3 hours in 4 lanes, and about 2 hours on a 16-CPU PC. These are estimates from that run's measured step times, not a measured run. Where the time went, and why: `references/speed-2026-11-01.md`.
 
 ## 7. Tell the owner
 
@@ -185,7 +192,9 @@ Keep it short; the details live in `report.md`.
 
 ## Size and cost
 
-- **Scoped run, one area:** 1 reviewer, 1 organizer, 1–3 implementers, 1 tester, 1 verifier, 2 recording steps. That's about 7–8 agents.
-- **Whole app:** 4 reviewers and 1 organizer, then one implementer per approved package, one tester per round, and one verifier per area touched. A large plan can take hours.
+- **Each package:** an implementer, a tester and a reviewer; a fix and a second check when it falls short; a share of a merge step (a small model runs it). A conflict at merge adds an integrator.
+- **Each run:** a load step, one final check, the record and the reviewer's memory; a re-plan and its packages if the final check fails.
+- **Scoped run, one area:** 1 reviewer and 1 organizer, then about 4–6 agents per package. A two-package run is about 12–15 agents.
+- **Whole app:** 6 reviewers and 1 organizer, then the same per package. A large plan takes hours; see "How long it takes" above.
 
-Models and effort are set in each agent's frontmatter in `.claude/agents/`.
+Models and effort are set in each agent's frontmatter in `.claude/agents/`; the workflow lowers effort for the mechanical steps.

@@ -102,8 +102,9 @@ Do every step. Don't stop after the first few problems.
 
 The delegation picks one. The default is **review**: the method above.
 
-- **Verify** — after the UX loop has fixed something. You get finding IDs, their acceptance checks, and the files that changed (`git diff HEAD -- <file>`).
+- **Verify** — after the UX loop has fixed something. You get one work package: its finding IDs, their acceptance checks, what its tester proved, and where to read it. Usually that's the package's own worktree, before it's merged: read its files there, its changes with the diff command the delegation gives, and the renders its tester made under that worktree's `App/build/ux/`. Otherwise it's the main checkout (`git diff HEAD -- <file>`).
   - Judge each finding: fixed, partly fixed or not fixed. Give evidence: `path:line`, and a render when a preview covers the screen.
+  - A second check comes after one fix: keep the IDs of regressions you found the first time, and say which still hold.
   - Then look for regressions, but only in the changed files and the flows they touch. This isn't a full review:
     - Leave untouched screens alone.
     - An issue already in `ISSUES.md` isn't a regression.

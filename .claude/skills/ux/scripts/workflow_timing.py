@@ -3,6 +3,9 @@
 Reads every workflow run's agent transcripts (each line has a timestamp) and their meta files, from
 this project's Claude Code session folders. First used on 2026-10-21, when 50 runs showed agents
 working one at a time, implementers running the whole suite, and runs stalled by a sleeping laptop.
+On 2026-11-01 it showed a 19-hour run never above 2 agents at once: the runtime caps a workflow at
+min(16, CPUs - 2), and the cloud session had 4 CPUs. Each run's peak and average concurrency is
+printed below for that reason.
 
 Usage: python -X utf8 .claude/skills/ux/scripts/workflow_timing.py <projects dir> <out json>
   <projects dir>: ~/.claude/projects/<this repo's folder>, e.g.
@@ -40,7 +43,7 @@ def category(name, tool_input):
         return "web: webkit renders"
     if "flutter test" in c:
         if "write_ux_previews" in c:
-            return "app: previews (ux suite)" if "--plain-name" not in c else "app: previews (one area)"
+            return "app: previews (ux suite)" if "--plain-name" not in c and "--name" not in c else "app: previews (some screens)"
         if re.search(r"write_(calendar|review|auth|form|web)_", c):
             return "app: other previews"
         # A whole-suite run names no test file.
@@ -143,6 +146,11 @@ for folder in sorted(root.glob("*/subagents/workflows/wf_*")):
         kind = "ux-review"
     else:
         kind = "other"
+    edges = sorted([(ts(a["start"]), 1) for a in agents] + [(ts(a["end"]), -1) for a in agents], key=lambda e: (e[0], e[1]))
+    live = peak = 0
+    for _, step in edges:
+        live += step
+        peak = max(peak, live)
     workflows.append({
         "id": folder.name,
         "kind": kind,
@@ -150,6 +158,7 @@ for folder in sorted(root.glob("*/subagents/workflows/wf_*")):
         "end": end,
         "wall_seconds": (ts(end) - ts(start)).total_seconds(),
         "agent_seconds": sum(a["seconds"] for a in agents),
+        "max_concurrent_agents": peak,
         "agents": agents,
     })
 
@@ -170,6 +179,19 @@ for w in workflows:
 for kind, items in sorted(by_kind.items()):
     walls = sorted(w["wall_seconds"] for w in items)
     print(f"\n== {kind}: {len(items)} runs, wall total {sum(walls) / H:.1f} h, median {fmt(walls[len(walls) // 2])}, max {fmt(walls[-1])}")
+    for w in sorted(items, key=lambda x: x["start"])[-8:]:
+        busy = w["agent_seconds"] / w["wall_seconds"] if w["wall_seconds"] else 0
+        print(f"   {w['start'][:16]}  wall {fmt(w['wall_seconds'])}  agents at once: peak {w['max_concurrent_agents']}, average {busy:.1f}")
+
+print("\n== Per step (the first word of each agent's label: implement, test, verify, fix, merge, ...)")
+steps = defaultdict(lambda: [0, 0.0])
+for w in workflows:
+    for a in w["agents"]:
+        step = (a["label"] or "?").split(" ")[0]
+        steps[step][0] += 1
+        steps[step][1] += a["seconds"]
+for step, (n, s) in sorted(steps.items(), key=lambda kv: -kv[1][1])[:15]:
+    print(f"{step:14} n={n:4}  total {s / H:5.1f} h  avg {fmt(s / n)}")
 
 print("\n== Per agent type (all runs)")
 per_type = defaultdict(lambda: [0, 0.0, 0.0, 0])

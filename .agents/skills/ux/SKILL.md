@@ -77,8 +77,8 @@ device-only checks stay pending; it cannot establish a pass. A personal phone
 test still requires the owner. Never uninstall or clear personal app data.
 
 The independent tester runs meaningful acceptance tests, `flutter analyze
---no-pub`, the app suite (`flutter test --no-pub`) once per round, and refreshes
-the affected previews. Generate localization after ARB changes; do not hand-edit
+--no-pub`, the app suite (`flutter test --no-pub`) once per run, after the last
+package is in (owner, 2026-11-01), and refreshes the affected previews. Generate localization after ARB changes; do not hand-edit
 generated Dart. Compile native changes when needed. Match known failures exactly
 and report new ones. Do not start backend services or make paid AI calls as an
 incidental consequence of a UI review.
