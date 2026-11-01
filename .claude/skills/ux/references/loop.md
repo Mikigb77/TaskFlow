@@ -36,19 +36,22 @@ After user-facing work, the main session runs `/ux` by itself; AGENTS.md asks it
    - sends product decisions to you;
    - groups the fixes into work packages, each with an exact brief.
 5. **Fix.** Every package flows through on its own, in its own git worktree, as many at once as the machine allows (2026-11-01):
-   - `ux-implementer` (Opus, high effort) changes the code, the copy in all three languages, and the existing tests its change breaks. It runs the analyzer and the tests that cover its change, never the whole suite, and renders no previews.
+   - `ux-implementer` (Opus, high effort) changes the code, the copy in all three languages, and the existing tests its change breaks. It runs the package check, never the whole suite, and renders no previews.
+   - **The package check** (`scripts/check.py`, 2026-11-01) is how every step of a package tests what it touched, and only that: `flutter gen-l10n` if an ARB file changed; the analyzer on the files changed and the files that use them; the tests of those files, of the screens that show a changed ARB key, the tests that name that key, the catalog test, and the tests that failed last time. It works them out from the imports and the ARB keys, says why it chose each test, and keeps its state in the worktree's git folder: the first run counts the package since its seed, each later run only what changed since, plus what failed. It takes one gate slot for the whole check.
    - A package starts as soon as the packages in its `dependsOn` are merged and an agent is free. It never waits for unrelated packages: there are no waves and no rounds to wait for. At most two packages change one file at once; ARB and test files don't count.
    - Earlier packages go first: a package's next step runs before a later package starts, so packages finish one after another and later ones are seeded with more of the run.
-   - Heavy commands (Flutter, builds) go through `waves.py gate`, so only 3 run at once (2 on a 4-CPU machine) and the machine doesn't swap.
+   - Heavy commands (Flutter, builds) go through `waves.py gate`, so only 3 run at once and the machine doesn't swap.
+   - On a machine under 8 CPUs, where a workflow gets only CPUs − 2 agents, the plan runs in lanes: several workflows at once, one per 5 packages, up to 6 (`pkg.py --lanes auto`), then one finish run.
 6. **Test.** `ux-tester` (Opus, high effort), in the package's worktree, right after its implementer.
    - It writes a test for every acceptance check a test can prove, working from the plan rather than the code, so the fix and its proof come from different hands.
-   - It runs its new tests, and renders the package's screens for the reviewer.
+   - It runs the package check with the previews: only its new tests, since the implementer's check, and the previews of the screens the package changed, for the reviewer.
    - If a test fails because the app falls short, that finding counts as not fixed, whatever the reviewer says. Every fix that passes stays protected by its test.
 7. **Verify, and fix once.** The reviewer checks the package in its worktree: only its findings and the files it changed, with its tester's renders. If it falls short, the implementer fixes exactly what the reviewer and the tester found, in the same worktree, and the reviewer checks again. A finding still short after that has failed twice, and comes to you.
 8. **Merge, then the final check.**
    - `waves.py merge` brings the worktree into the main checkout, like a pull request: ARB keys one by one, other files with a three-way merge. A package that conflicts is carried over by an implementer into a fresh worktree (`waves.py carry`), then merged. A package whose own tests still fail after its fix isn't merged: its patch is saved in the run folder for you.
-   - When every package is in, `ux-tester` runs the final check once in the main checkout: the analyzer, the whole suite and the UX previews, side by side.
-   - Tests that fail there, and regressions a package's own fix didn't clear, go back to the organizer for one more round, which ends with the final check again.
+   - When every package is in, `ux-tester` runs the final check once in the main checkout: the analyzer, the whole suite and the UX previews, side by side. It is the run's only whole-suite run.
+   - What fails there goes first to one repair: an implementer fixes the causes in the main checkout and reruns the failing tests and the check of what it changed.
+   - What the repair can't clear, and regressions a package's own fix didn't clear, go back to the organizer for one more round. That round ends with a re-check of its own changes and the tests that failed before, not the whole suite again.
 9. **Record.** The issue log and the run report are updated, and the reviewer updates its memory. If the final check passed, the run is committed on `dev`. The snapshot then moves forward.
 
 ## Rules (your decisions, 2026-10-13)
@@ -67,8 +70,9 @@ The skill, `.claude/skills/ux/`, holds everything the loop does:
 | `SKILL.md` | The `/ux` command: modes, scope, renders, the review and the fix runs. |
 | `workflows/ux-review.js`, `workflows/ux-fix.js` | The two workflows, run with the Workflow tool by `scriptPath`. |
 | `scripts/ux.sh` | The snapshot helper (`refs/ux-review/last`). It never touches your branch or files. |
+| `scripts/check.py` | The package check: the analyzer, tests and previews a package's change touches, and only those (step 5). `--list` shows what it would run and why. |
 | `scripts/waves.py` | Side-by-side packages: seeds each worktree (once), merges it back (idempotent, one package's error never stops the others), carries a conflicted package into a fresh worktree, sets aside an unmerged one with its patch, and gates heavy commands. |
-| `scripts/pkg.py`, `scripts/phone_checks.py` | Print plan packages for the agents, the headers and the machine for the fix workflow (`--headers`), and lanes (`--lanes N`); rebuild `PHONE_CHECKS.md`. |
+| `scripts/pkg.py`, `scripts/phone_checks.py` | Print plan packages for the agents, the headers and the machine for the fix workflow (`--headers`), and lanes (`--lanes auto` or `N`); rebuild `PHONE_CHECKS.md`. |
 | `scripts/workflow_timing.py` | Where a fix run's time went, from the session's agent transcripts. |
 | `scripts/stage_hunk.py` | Stages only your own change to a file another session also edited, leaving theirs unstaged. |
 | `scripts/emulator/` | The device-capture lane. `capture.py` captures Android's own surfaces from the `TaskFlow_Review` test emulator into `App/build/ux/device/`, with its own `INDEX.md`. Its test account, `review.local.json`, is gitignored. |
@@ -117,7 +121,7 @@ Learned the hard way; each cost a run, or hours.
 ## Cost
 
 - **Each package:** an implementer, a tester and a reviewer, a fix and a second check when it falls short, and a share of a merge step.
-- **Each run:** a load step, one final check, the record and the reviewer's memory.
+- **Each run:** a load step, one final check (the only whole-suite run), the record and the reviewer's memory; a repair when the final check fails.
 - **Whole-app review:** 6 reviewers and an organizer before any of that.
 
 To change a model or an effort level, edit the agent's frontmatter. The fix workflow lowers the effort of verification, the re-plan and the record, and runs the mechanical steps (loading the plan, merging) on a small model.

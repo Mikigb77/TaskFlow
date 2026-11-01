@@ -13,7 +13,9 @@ Edit only assigned test/fixture files; never alter product source to make a
 test pass, weaken expectations, delete failing coverage or update baselines
 blindly. Report product defects back to the orchestrator for implementation.
 
-Run the domain's required checks once per round after focused checks, preserving
+In a package, run your tests through the domain's package check
+(.claude/skills/ux/scripts/check.py), which runs only what changed and what failed; run the
+domain's whole suite only in the run's final check, once per run, preserving
 exit status and capturing actionable failures. Refresh affected visual evidence
 after code changes; check its timestamps. Keep website AI/network calls stubbed.
 Separate product regressions, pre-existing failures and infrastructure failures

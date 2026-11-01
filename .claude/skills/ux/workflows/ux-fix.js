@@ -1,11 +1,11 @@
 export const meta = {
   name: 'ux-fix',
-  description: 'TaskFlow UX loop, part 2: every package flows through on its own, in its own worktree (ux-implementer, ux-tester, frontend-ux-reviewer, one fix and a second check if it falls short, then the merge), as many at once as the machine allows; one final check runs the analyzer, the whole suite and the previews; what still fails is re-planned once; then the ledger, report and reviewer memory',
+  description: 'TaskFlow UX loop, part 2: every package flows through on its own, in its own worktree (ux-implementer, ux-tester, frontend-ux-reviewer, one fix and a second check if it falls short, then the merge), as many at once as the machine allows, each step running only the tests its change touches; one final check runs the analyzer, the whole suite and the previews, once; a repair fixes what it finds and reruns only that; what still fails is re-planned once; then the ledger, report and reviewer memory',
   whenToUse: 'Started by the /ux skill after ux-review, with the run folder whose plan.json should be carried out.',
   phases: [
     { title: 'Load', detail: 'check that worktrees work from this session, and read the package headers' },
-    { title: 'Packages', detail: 'each package in its own worktree: implement, test, verify, fix once and verify again if it falls short, then merge. A package starts as soon as its dependencies are merged and a slot is free; it never waits for unrelated packages.' },
-    { title: 'Check', detail: 'the final check in the main checkout: analyzer, whole suite and UX previews, side by side' },
+    { title: 'Packages', detail: 'each package in its own worktree: implement, test, verify, fix once and verify again if it falls short, then merge. Every step runs check.py: only the analysis, tests and previews its change touches. A package starts as soon as its dependencies are merged and a slot is free; it never waits for unrelated packages.' },
+    { title: 'Check', detail: 'the final check in the main checkout, the only whole-suite run: analyzer, whole suite and UX previews, side by side; then a repair of what it finds, re-checked by check.py' },
     { title: 'Re-plan', detail: 'ux-organizer plans what the final check or the reviewers left failing (one extra round by default)' },
     { title: 'Record', detail: 'ledger, run report and reviewer memory' },
   ],
@@ -15,7 +15,8 @@ export const meta = {
 //   runId, runDir, date
 //   repoRoot:       absolute path of the main checkout, with forward slashes (required).
 //   heavySlots:     heavy commands (Flutter, builds) at once on this machine, across every
-//                   workflow and lane of this repo; default 3, and 2 on a machine with 4 CPUs.
+//                   workflow and lane of this repo; default 3. The package checks are short,
+//                   so 3 fit a 4-CPU machine too.
 //   agents:         agents at once in this workflow; default the runtime's own cap,
 //                   min(16, CPUs - 2), from the CPU count the load step reads.
 //   maxParallel:    packages in flight at once (admitted, holding their files); default agents + 2.
@@ -29,8 +30,9 @@ export const meta = {
 //   recordMemory:   false skips the reviewer's memory step (optional; default true).
 //   notes:          owner context from the conversation (optional).
 //   part:           'all' (default); 'packages' runs only the packages and returns their
-//                   records, for one lane of several; 'finish' runs the final check, the
-//                   re-plan and the record for lanes that ran, given laneResults.
+//                   records, for one lane of several (pkg.py --lanes auto splits the plan);
+//                   'finish' runs the final check, the repair, the re-plan and the record for
+//                   lanes that ran, given laneResults.
 //   lane:           this lane's name, for its labels and logs (with part 'packages').
 //   laneResults:    [the result of each lane] (with part 'finish').
 //   worktrees:      false runs every package in the main checkout, one at a time (a fallback
@@ -66,6 +68,9 @@ const PY = 'python -I -X utf8'
 const WAVES = `${PY} "${ROOT}/.claude/skills/ux/scripts/waves.py"`
 const GATE = `${WAVES} gate --slots ${SLOTS} --`
 const PKG = `${PY} "${ROOT}/.claude/skills/ux/scripts/pkg.py" "${RUN}"`
+// The package check: only the tests, analysis and previews a change touches, through the gate.
+// The final check is the only whole-suite run.
+const CHECK_CMD = `${PY} "${ROOT}/.claude/skills/ux/scripts/check.py" --slots ${SLOTS}`
 const PREVIEWS = 'flutter test --no-pub --dart-define=WRITE_UX_PREVIEWS=true test/ux_previews/ux_previews_test.dart'
 const MERGE_LOG = `${RUN}/merges${batch ? `-${batch}` : ''}${LANE ? `-${LANE}` : ''}.jsonl`
 
@@ -383,13 +388,20 @@ async function drain() {
 const ids = list => (list.length ? list.join(', ') : 'none')
 const missed = r => (r && r.notAddressed && r.notAddressed.length ? `; not addressed: ${r.notAddressed.map(n => `${n.id} (${n.reason})`).join('; ')}` : '')
 const why = r => (!r ? 'its agent returned nothing' : r.status === 'failed' ? `it failed: ${r.notes || 'no notes'}` : !r.worktree ? 'it reported no worktree' : `it worked in ${r.worktree}, not in a worktree of its own`)
-const isTest = c => /flutter test/.test(c.command) && !/WRITE_\w*PREVIEWS/.test(c.command)
+// A test run: the package check (its result counts its analyzer and tests, not its previews),
+// or flutter test without the previews.
+const isTest = c => /check\.py/.test(c.command) || (/flutter test/.test(c.command) && !/WRITE_\w*PREVIEWS/.test(c.command))
+const CHECK_LINE = [
+  `The check: ${CHECK_CMD}, from anywhere in the worktree. It runs, through the gate, flutter gen-l10n if an ARB file changed, the analyzer on the files changed and the files that use them, and only the tests that cover the change: the tests of the files changed and of the screens that show a changed ARB key, the tests that name a changed key, the catalog test, and the tests that failed last time. It compiles the APK when a native file changed. The first run counts everything since the worktree's seed; each later run counts only what changed since the run before, plus what failed in it.`,
+  'Never run flutter test, flutter analyze or the whole suite yourself: the run\'s final check runs the whole suite once, after every package is merged. To debug one failing test alone, the check takes --tests <file>.',
+  'Report the check as one entry in checks: its command, passed (its last run passed), and in note what it ran and what failed.',
+].join('\n')
 
 function where(wt) {
   if (!ISOLATE) return `Work in the main checkout at ${ROOT}; packages run one at a time there.`
   return [
     `Work only in the package's worktree at ${wt}: read and write files under it, and run every command as cd "${wt}/App" && <command> (each command may start in another folder). Never touch the main checkout at ${ROOT}: other packages are being worked on at the same time, in their own worktrees.`,
-    `Run every heavy command through the gate, which lets only ${SLOTS} run at once on this machine: ${GATE} <command>. That covers flutter analyze, flutter test, the previews, flutter gen-l10n and flutter build. Reading, searching and editing run freely.`,
+    `Heavy commands run through the gate, which lets only ${SLOTS} run at once on this machine. The check (${CHECK_CMD}) takes its own place there; anything else heavy goes through it too: ${GATE} <command>. Reading, searching and editing run freely.`,
   ].join('\n')
 }
 
@@ -407,7 +419,7 @@ function implementPrompt(p, ctx, depNote, extra) {
       `You work in your own git worktree, a copy of the repo made for you. Other packages are implemented, tested and checked at the same time in theirs, so never touch the main checkout at ${ROOT}.`,
       `Before anything else, from your worktree's root (your starting directory), run: ${WAVES} seed --run ${a.runDir}`,
       'It brings the run so far (every package merged before yours), the plan and the decisions into your worktree, and runs flutter pub get. Then work only inside your worktree, with paths relative to it. If seed refuses (you are in the main checkout) or fails, stop and report failed with its message.',
-      `Run every heavy command through the gate, which lets only ${SLOTS} run at once on this machine: ${GATE} <command>. That covers flutter analyze, flutter test, flutter gen-l10n and flutter build. Reading, searching and editing run freely.`,
+      `Heavy commands run through the gate, which lets only ${SLOTS} run at once on this machine; the check below takes its own place there. Reading, searching and editing run freely.`,
       'Return your worktree\'s absolute path (git rev-parse --show-toplevel) in "worktree".',
     )
   } else {
@@ -419,8 +431,10 @@ function implementPrompt(p, ctx, depNote, extra) {
     LEAN,
     'Earlier packages in this run may already have changed the code; build on their work.',
     'Test files listed in the package are for ux-tester, who writes the acceptance tests after you. Only update existing tests your change breaks.',
-    'Checks, from App/: flutter gen-l10n if you touched an ARB file; flutter analyze --no-pub; then the existing tests that cover your change, all in one flutter test call. Never run the whole suite: the run\'s final check runs it once. ux-tester renders the screens you changed, after you, for the reviewer: render one yourself only if you can\'t judge a layout change any other way, and then only that screen.',
-    'If you change Kotlin, Gradle, the manifest or Android resources, compile with: flutter build apk --debug --no-pub --target-platform android-x64 (from App/; build only, never install). The analyzer and tests do not compile native code.',
+    ISOLATE
+      ? CHECK_LINE
+      : `Checks, from ${ROOT}: ${CHECK_CMD} --main --files <every file you changed>. It runs only the analysis and tests your change touches; never the whole suite, which the run's final check runs once. Report it as one entry in checks.`,
+    'Run the check when your change is complete, fix what it reports, and run it again until it passes. Don\'t render previews: ux-tester renders the screens you changed, after you, for the reviewer.',
   )
   if (extra) lines.push(extra)
   if (a.notes) lines.push(`From the owner, this session: ${a.notes}`)
@@ -429,19 +443,22 @@ function implementPrompt(p, ctx, depNote, extra) {
 }
 
 function testPrompt(p, ctx, r, wt) {
-  const ran = r.checks.filter(c => c.passed && isTest(c)).map(c => c.command)
+  const ran = r.checks.filter(c => c.passed && isTest(c)).map(c => `${c.command}${c.note ? ` (${c.note})` : ''}`)
   return [
     `UX loop run ${a.runId}, round ${ctx.round}. Mode: package. Lock work package ${p.id} with tests: ${p.title}.`,
     `Area ${p.area}, findings ${p.findings.join(', ')}. Its implementer reported: ${r.status}${missed(r)}.`,
     where(wt),
     `Files the implementer changed: ${ids(r.filesChanged)}.`,
     ran.length
-      ? `The implementer already ran these, green; don't run them again unless you change those test files: ${ran.join(' ; ')}`
-      : 'The implementer reported no green test run.',
+      ? `The implementer's check passed: ${ran.join(' ; ')}. Those tests don't run again.`
+      : 'The implementer reported no passing check.',
     `1. Write the tests for ${p.id}'s acceptance checks only, as your instructions say.`,
-    `2. Run your new and changed test files, in one call: ${GATE} flutter test --no-pub <files>. Then analyze just those files: ${GATE} flutter analyze --no-pub <files>.`,
-    `3. Render the previews of the screens ${p.id} changed, for the reviewer, in one call: ${GATE} ${PREVIEWS} --name "<area>/<screen>\\.|<area>/<screen>\\." (screen names are in the preview files in App/test/ux_previews/, and in ${ROOT}/App/build/ux/INDEX.md). If a preview's flow breaks because the screen changed on purpose, update the flow in App/test/ux_previews/. If no UX preview shows what changed, skip this step and say so in your notes.`,
-    'Skip the run\'s check: no whole suite, no whole-app analyzer, no older preview commands, no native build. The final check runs those once, after every package is merged.',
+    ISOLATE
+      ? `2. Run the check with the previews, from the worktree: ${CHECK_CMD} --previews auto. It analyzes and runs only your new and changed test files (and anything that failed in the implementer's last run), then renders, for the reviewer, the previews of every screen whose sources ${p.id} changed (by the Sources in ${ROOT}/App/build/ux/INDEX.md). Fix your own tests and run it again until your tests are right; a test that fails because the app falls short stays failing.`
+      : `2. Run, from ${ROOT}: ${CHECK_CMD} --main --files <your test files and the files ${p.id} changed> --previews auto. It runs only those tests and renders the previews of the screens ${p.id} changed.`,
+    `3. Read which previews it rendered. If a screen ${p.id} changed has a preview it missed, render it too with --previews "<area>/<screen>\\." (names in INDEX.md). If a preview's flow breaks because the screen changed on purpose, update the flow in App/test/ux_previews/ and run the check again. If no preview shows what changed, say so in your notes.`,
+    'Skip the run\'s check: no whole suite, no whole-app analyzer, no older preview commands. The final check runs those once, after every package is merged.',
+    'Report the check as one entry in checks: its command, passed, and in note what it ran.',
     'Parts of a package marked "waits on D#" were left out on purpose; do not test them.',
     LEAN,
     'Return the structured result for this package only. filesChanged lists the test and preview files you changed, relative to the repo root.',
@@ -476,6 +493,10 @@ function verifyPrompt(p, ctx, r, t, wt, check, fixNote) {
 
 function fixPrompt(p, ctx, state, t, wt) {
   const testFiles = t ? t.filesChanged.filter(f => /_test\.dart$/.test(f)) : []
+  const failingTests = [...new Set([...state.failing.filter(f => f.testFailed), ...state.stray]
+    .map(f => (String(f.evidence || f.test).match(/(?:App\/)?(test\/[\w/.-]+?_test\.dart)/) || [])[1])
+    .filter(Boolean)
+    .map(f => `App/${f}`))]
   return [
     `UX loop run ${a.runId}, round ${ctx.round}. Mode: fix. Work package ${p.id}: ${p.title}. Area ${p.area}, findings ${p.findings.join(', ')}.`,
     'It was implemented, locked with tests and checked by the reviewer, who found it short:',
@@ -486,7 +507,10 @@ function fixPrompt(p, ctx, state, t, wt) {
     ISOLATE ? `${where(wt)}\nThe worktree is seeded already: don't run seed.` : where(wt),
     LEAN,
     'If a test is wrong rather than the app, say so in your notes and leave the test alone: ux-tester owns the acceptance tests.',
-    `Then, from App/: flutter gen-l10n if you touched an ARB file; flutter analyze --no-pub; one flutter test call with the package's tests${testFiles.length ? ` (${testFiles.join(', ')})` : ''} and the existing tests that cover what you changed; and, if a screen's look changed, its previews again: ${ISOLATE ? `${GATE} ` : ''}${PREVIEWS} --name "<area>/<screen>\\.".`,
+    ISOLATE
+      ? `Then run the check with the previews, from the worktree, until it passes: ${CHECK_CMD} --previews auto. It reruns what failed in the last check and the tests of what you change now, and renders again the previews of the screens your fix changed, for the reviewer's second look; nothing else.${failingTests.length ? ` If one of these failing tests isn't rerun, add it with --also: ${failingTests.join(' ')}.` : ''}`
+      : `Then run, from ${ROOT}, until it passes: ${CHECK_CMD} --main --files <every file you changed> --previews auto${testFiles.length ? ` --also ${testFiles.join(' ')}` : ''}.`,
+    CHECK_LINE.split('\n').slice(1).join('\n'),
     a.notes ? `From the owner, this session: ${a.notes}` : '',
     `Return the structured result: filesChanged is every file you changed in this fix; worktree is ${ISOLATE ? wt : 'empty'}.`,
   ].filter(Boolean).join('\n')
@@ -501,7 +525,8 @@ function integratePrompt(p, ctx, oldWt, conflicts) {
     `1. From your worktree's root (your starting directory): ${WAVES} seed --run ${a.runDir}`,
     `2. Then: ${WAVES} carry --from "${oldWt}"`,
     '   It brings the package\'s changes over with three-way merges and prints JSON. Each file under "conflicts" holds conflict markers (main checkout now / the package\'s seed / the package): resolve each by hand, keeping both packages\' intent. If they truly contradict, keep what the main checkout has now and say so in your notes.',
-    `3. Checks, through the gate (${GATE} <command>), from App/: flutter gen-l10n if an ARB file changed; flutter analyze --no-pub; one flutter test call with the package's tests and the existing tests of the files you resolved.`,
+    `3. Resolve the conflicts, then run the check until it passes: ${CHECK_CMD}. In this fresh worktree it counts the whole package since the seed: the analysis and tests the package touches, nothing more.`,
+    CHECK_LINE.split('\n').slice(1).join('\n'),
     `4. When they pass, remove the old worktree: ${WAVES} drop --worktree "${oldWt}"`,
     `Your instructions are package ${p.id}, as before: ${PKG} ${p.id} --conventions`,
     LEAN,
@@ -547,16 +572,49 @@ function finalPrompt(round, recs, files) {
   ].join('\n')
 }
 
-function replanPrompt(round, failures, regressions, fin) {
-  const failedChecks = fin ? fin.checks.filter(c => !c.passed).map(c => c.command + (c.note ? ` (${c.note})` : '')) : []
+// The tests a failure names, as repo-relative files.
+const testFilesOf = failures => [...new Set(failures
+  .map(f => (String(f.test).replace(/\\/g, '/').match(/(?:App\/)?(test\/[\w/.-]+?_test\.dart)/) || [])[1])
+  .filter(Boolean)
+  .map(f => `App/${f}`))]
+
+function repairPrompt(round, recs, failures, failedChecks) {
+  const files = testFilesOf(failures)
+  return [
+    `UX loop run ${a.runId}. Mode: repair. Every package of this run is merged into the main checkout at ${ROOT}, and the run's final check (the whole suite, once) found it short:`,
+    ...failures.map(f => `- ${f.test}${f.finding ? ` (${f.finding})` : ''}: ${f.evidence}`),
+    ...failedChecks.map(c => `- ${c.command}: failed${c.note ? `. ${c.note}` : ''}`),
+    'Each passed in its own package, so the cause is usually two packages meeting in the main checkout, or a package that broke something its check did not cover. Find each cause and fix it there, in the main checkout: nothing else runs there now.',
+    `Keep every package's intent. If two truly contradict, keep the later one's and say so. The packages: ${ids(recs.filter(r => r.merged).map(r => r.id))}; read one with ${PKG} <id> --conventions, and what the run changed in a file with git diff HEAD -- <file>.`,
+    'If a test is wrong rather than the app (a package changed that copy or behaviour on purpose), say so in your notes and leave it: ux-tester owns the tests.',
+    LEAN,
+    `Then run, from ${ROOT}, until it passes: ${CHECK_CMD} --main --files <every file you changed>${files.length ? ` --also ${files.join(' ')}` : ''}`,
+    'It reruns the tests that failed and the analysis and tests of what you changed, nothing else: the whole suite has run once already. Report it as one entry in checks.',
+    a.notes ? `From the owner, this session: ${a.notes}` : '',
+    'Return the structured result: filesChanged is every file you changed, repo-relative; worktree is empty.',
+  ].filter(Boolean).join('\n')
+}
+
+function recheckPrompt(round, recs, files, also) {
+  const findings = [...new Set(recs.filter(r => r.round === round).flatMap(r => r.findings))]
+  return [
+    `UX loop run ${a.runId}. Mode: re-check, after redo round ${round}. The run's final check has run the whole suite once already; don't run it again. Round ${round}'s packages are merged into the main checkout at ${ROOT}; check only what they changed. Write no new tests.`,
+    `Run, from ${ROOT}: ${CHECK_CMD} --main --files ${files.join(' ')}${also.length ? ` --also ${also.join(' ')}` : ''}`,
+    'It runs gen-l10n if an ARB file changed, the analyzer on those files and the files that use them, the tests that cover them and the tests that failed before. It can take several minutes: run it in the background if one tool call can\'t wait that long.',
+    `Report every failing test against its finding (this round's findings: ${ids(findings)}), or with no finding if it proves none, as in a final check. Failures listed in ${ROOT}/.claude/ux-review/KNOWN_FAILURES.md don't count.`,
+    'Return the structured result: checks holds the check.',
+  ].join('\n')
+}
+
+function replanPrompt(round, failures, regressions, failedChecks) {
   return [
     `Mode: replan. UX loop run ${a.runId}, after round ${round}. Today is ${a.date}. Run folder: ${a.runDir}.`,
     'Every package was implemented, locked by tests and checked on its own, and fixed once where it fell short. Findings still short after that fix are escalated to the owner, not re-planned. What is left for you:',
-    'Failing tests in the final check (from ux-tester):',
+    'Failing tests in the final check that its repair in the main checkout could not clear (from ux-tester):',
     ...(failures.length ? failures.map(f => `- ${f.test} (${f.owner}${f.finding ? `, ${f.finding}` : ''}): ${f.evidence}`) : ['- none']),
     'Regressions the reviewers found that the package\'s own fix did not clear:',
     ...(regressions.length ? regressions.map(g => `- ${g.id} (from ${g.pkg}), severity ${g.severity}: ${g.title}. ${g.where}. Fix: ${g.fix}`) : ['- none']),
-    failedChecks.length ? `Final check: failed. ${failedChecks.join('; ')}` : '',
+    failedChecks.length ? `Final check: failed. ${failedChecks.map(c => c.command + (c.note ? ` (${c.note})` : '')).join('; ')}` : '',
     LEAN,
     `Read only the verify notes of the packages involved (${RUN}/verify-${tag}r${round}-<package>*.md). In ISSUES.md, edit only the lines you change.`,
     'Plan packages only for these. Give every new package its "files" (repo-relative paths): packages run side by side, and their files decide how many touch one file at once.',
@@ -579,7 +637,7 @@ function closePrompt(recs, finals, files) {
       `verify notes ${ids(r.verifyReports)}.`,
     ].join(' ')),
     'Final checks:',
-    ...(finals.length ? finals.map(f => `- after round ${f.round}: ${f.passed ? 'passed' : 'failed'}${f.failures.length ? `; failing: ${f.failures.map(x => `${x.test} (${x.owner}${x.finding ? `, ${x.finding}` : ''})`).join('; ')}` : ''}`) : ['- none ran: nothing was merged']),
+    ...(finals.length ? finals.map(f => `- after round ${f.round}: ${f.passed ? 'passed' : 'failed'}${f.note ? ` (${f.note})` : ''}${f.failures.length ? `; failing: ${f.failures.map(x => `${x.test} (${x.owner}${x.finding ? `, ${x.finding}` : ''})`).join('; ')}` : ''}`) : ['- none ran: nothing was merged']),
     `Escalated to the owner: ${escalated.length ? escalated.map(e => `${e.id} (${e.reason})`).join('; ') : 'none'}.`,
     `Files changed: ${ids(files)}.`,
     'A finding counts as verified only if the last check of it said "fixed" and no test for it failed. Note which verified findings are locked by a test. Phone checks stay listed for the owner.',
@@ -912,50 +970,91 @@ async function runAll(list, round, planFile) {
 
 // ---------------------------------------------------------------- finish
 
-async function finalCheck(round, recs) {
+async function finalCheck(round, recs, targeted) {
   const files = [...changedAll].sort()
-  const fin = await call(0, finalPrompt(round, recs, files), {
+  const fin = await call(0, targeted ? recheckPrompt(round, recs, targeted.files, targeted.also) : finalPrompt(round, recs, files), {
     agentType: 'ux-tester',
-    label: `final check${round > 1 ? ` · round ${round}` : ''}`,
+    label: targeted ? `re-check · round ${round}` : `final check${round > 1 ? ` · round ${round}` : ''}`,
     phase: 'Check',
     schema: TESTED,
   })
-  return fin || { passed: false, checks: [], findings: [], failures: [], filesChanged: [], notes: 'The final check did not return a result.' }
+  return fin || { passed: false, checks: [], findings: [], failures: [], filesChanged: [], notes: `The ${targeted ? 're-check' : 'final check'} did not return a result.` }
 }
 
-// A test that fails in the final check overrides "fixed" for its finding.
+// A test that fails in the final check overrides "fixed" for its finding. Returns the findings
+// it took from "fixed", so a repair that makes the test pass can give them back.
 function applyFinal(recs, fin) {
-  const stray = []
+  const demoted = []
   for (const f of fin.failures.filter(x => x.owner === 'app')) {
     const owner = f.finding ? [...recs].reverse().find(r => r.merged && r.findings.includes(f.finding)) : null
-    if (!owner) {
-      stray.push(f)
-      continue
-    }
+    if (!owner) continue
+    if (owner.fixed.includes(f.finding)) demoted.push({ rec: owner, id: f.finding })
     owner.fixed = owner.fixed.filter(x => x !== f.finding)
     if (!owner.notFixed.some(x => x.id === f.finding)) {
       owner.notFixed.push({ id: f.finding, result: 'partly', evidence: `A test fails in the final check: ${f.test}: ${f.evidence}` })
     }
   }
-  return stray
+  return demoted
+}
+
+// What the final check finds short goes to one repair in the main checkout. Its check reruns
+// the failing tests and covers what the repair changed: the whole suite never runs twice.
+async function repair(round, recs, fin, demoted) {
+  const failures = fin.failures.filter(f => f.owner === 'app')
+  const failedChecks = fin.checks.filter(c => !c.passed && !isTest(c) && !/WRITE_\w*PREVIEWS/.test(c.command))
+  if (!failures.length && !failedChecks.length) return null
+  const r = await call(0, repairPrompt(round, recs, failures, failedChecks), {
+    agentType: 'ux-implementer',
+    label: `repair after the final check${round > 1 ? ` · round ${round}` : ''}`,
+    phase: 'Check',
+    schema: IMPLEMENTED,
+  })
+  if (!r) return null
+  const files = (r.filesChanged || []).map(f => norm(f)).map(f => (f.startsWith(`${ROOT}/`) ? f.slice(ROOT.length + 1) : f))
+  files.forEach(f => changedAll.add(f))
+  const ran = r.checks.filter(isTest)
+  const ok = r.status === 'done' && ran.length > 0 && ran.every(c => c.passed)
+  log(`Repair after the final check: ${r.status}; its check ${ran.length ? (ok ? 'passed' : 'failed') : 'did not run'}; ${files.length} file(s) changed.`)
+  if (ok) {
+    for (const d of demoted) {
+      d.rec.notFixed = d.rec.notFixed.filter(x => !(x.id === d.id && /^A test fails in the final check/.test(x.evidence)))
+      if (!d.rec.fixed.includes(d.id) && !d.rec.notFixed.some(x => x.id === d.id)) d.rec.fixed.push(d.id)
+    }
+  }
+  return { ok, files, notes: r.notes || '' }
 }
 
 async function finish(recs) {
   let round = Math.max(1, ...recs.map(r => r.round))
   const finals = []
   let fin = null
+  let passed = true
+  let open = [] // app failures of the final check that no repair cleared: the re-plan gets them
+  let openSteps = [] // failed steps (the analyzer, gen-l10n, the APK build) that no repair cleared
+  const infra = () => (fin ? fin.failures.filter(f => f.owner !== 'app') : [])
   if (recs.some(r => r.merged)) {
     fin = await finalCheck(round, recs)
     fin.filesChanged.forEach(f => changedAll.add(f))
-    applyFinal(recs, fin)
+    const demoted = applyFinal(recs, fin)
     finals.push({ round, passed: fin.passed, failures: fin.failures })
     log(`Final check after round ${round}: ${fin.passed ? 'passed' : 'failed'}; ${fin.failures.length} failure(s).`)
+    passed = fin.passed
+    open = fin.failures.filter(f => f.owner === 'app')
+    openSteps = fin.checks.filter(c => !c.passed && !isTest(c))
+    if (!fin.passed) {
+      const fixed = await repair(round, recs, fin, demoted)
+      if (fixed && fixed.ok) {
+        open = []
+        openSteps = []
+        passed = !infra().length
+        finals.push({ round, passed, failures: infra(), note: `repaired in the main checkout (${ids(fixed.files)}); its check reran the failing tests and the tests of what it changed, not the whole suite` })
+      }
+    }
   }
   for (let extra = 0; extra < EXTRA_ROUNDS; extra++) {
-    const failures = fin ? fin.failures.filter(f => f.owner === 'app') : []
     const regressions = recs.flatMap(r => r.regressions.map(g => ({ ...g, pkg: r.id })))
-    if (!failures.length && !regressions.length) break
-    const next = await call(0, replanPrompt(round, failures, regressions, fin), {
+    if (!open.length && !openSteps.length && !regressions.length) break
+    const next = await call(0, replanPrompt(round, open, regressions, openSteps), {
       agentType: 'ux-organizer',
       label: `re-plan after round ${round}`,
       phase: 'Re-plan',
@@ -974,11 +1073,18 @@ async function finish(recs) {
     const more = await runAll(next.packages, round, `${a.runDir}/plan-${tag}r${round}.json`)
     recs.push(...more)
     if (more.some(r => r.merged)) {
-      fin = await finalCheck(round, recs)
-      fin.filesChanged.forEach(f => changedAll.add(f))
-      applyFinal(recs, fin)
-      finals.push({ round, passed: fin.passed, failures: fin.failures })
-      log(`Final check after round ${round}: ${fin.passed ? 'passed' : 'failed'}; ${fin.failures.length} failure(s).`)
+      // The whole suite ran once already: re-check only this round's changes, and the tests that failed.
+      const files = [...new Set(more.filter(r => r.merged).flatMap(r => r.applied))].sort()
+      const re = await finalCheck(round, recs, { files, also: testFilesOf(open) })
+      re.filesChanged.forEach(f => changedAll.add(f))
+      applyFinal(recs, re)
+      finals.push({ round, passed: re.passed, failures: re.failures, note: 're-check of the round\'s changes and the tests that failed before, not the whole suite' })
+      log(`Re-check after round ${round}: ${re.passed ? 'passed' : 'failed'}; ${re.failures.length} failure(s).`)
+      open = re.failures.filter(f => f.owner === 'app')
+      openSteps = re.checks.filter(c => !c.passed && !isTest(c))
+      passed = re.passed && !infra().length
+    } else if (open.length || openSteps.length) {
+      passed = false
     }
   }
   if ([...changedAll].some(f => /\.arb$/.test(f))) changedAll.add('App/lib/l10n/generated')
@@ -1005,7 +1111,7 @@ async function finish(recs) {
     runDir: a.runDir,
     reportName,
     rounds: round,
-    testsPassed: fin ? fin.passed : true,
+    testsPassed: passed,
     filesChanged: files,
     escalated,
     packages: recs.map(r => ({ id: r.id, round: r.round, outcome: r.outcome, fixed: r.fixed, notFixed: r.notFixed.map(x => x.id), patch: r.patch })),
@@ -1055,7 +1161,7 @@ if (!packages.length) {
 }
 log(`${packages.length} package(s)${LANE ? ` in lane ${LANE}` : ''}: up to ${AGENTS} agents at once (${loaded.cpus} CPUs), ${FLIGHT} packages in flight, ${FILE_LIMIT} per file, ${SLOTS} heavy commands at once.`)
 if (AGENTS <= 4 && packages.length > 2 * AGENTS && PART === 'all') {
-  log(`This machine allows only ${AGENTS} agents per workflow. A plan this size runs faster in lanes, several runs at once (SKILL.md, "Lanes").`)
+  log(`This machine allows only ${AGENTS} agents per workflow. A plan this size runs faster in lanes, several runs at once: pkg.py --lanes auto (SKILL.md, "Lanes").`)
 }
 
 phase('Packages')
