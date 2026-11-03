@@ -141,7 +141,25 @@ stay on the backend and paid access is verified independently of the phone.
 
 ## Rebuild and redeploy
 
-From `Backend`, using PowerShell 7:
+**A merge into `main` deploys staging.** When a push to `main` changes what the
+API's image is built from (`core/`, `config/`, `templates/`, `manage.py`, the
+requirements, the Dockerfile or `scripts/start-server.sh`),
+`.github/workflows/deploy-backend.yml` runs the tests, then
+`Backend/scripts/deploy-staging-ci.sh`: it builds the image, pins the newest
+version of the `taskflow-api-staging-config` secret, migrates, redeploys the
+maintenance job, replaces the API service and checks `/api/health/`. To deploy
+again without a change, use **Actions → Deploy backend → Run workflow** on `main`.
+Pull requests that touch `Backend/` run the tests first
+(`.github/workflows/backend-checks.yml`).
+
+Google sign-in is keyless (Workload Identity Federation), and only `main` can
+use it. The one-time setup is TaskFlowWeb's `scripts/dev/setup-github-deploy.sh`,
+run once in Google Cloud Shell; its README, "Deploy from GitHub", has the steps.
+The automatic deploy doesn't change the secret's values, the email queue, the
+scheduler or any permission.
+
+To change the runtime secret's values, or to set up new cloud resources, deploy
+by hand from `Backend`, using PowerShell 7:
 
 ```powershell
 ./scripts/deploy-staging.ps1
