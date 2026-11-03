@@ -26,8 +26,8 @@ jobs:
       run:
         working-directory: Backend
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14" # the Docker image's Python
           cache: pip
@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       # The same build Cloud Build runs on a deploy; .dockerignore keeps .env out.
       - run: docker build --pull --tag taskflow-api:check Backend
       - name: The image starts its Python and imports Django

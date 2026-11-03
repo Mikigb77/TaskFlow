@@ -42,8 +42,8 @@ jobs:
       run:
         working-directory: Backend
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
           cache: pip
@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: projects/177649734578/locations/global/workloadIdentityPools/github/providers/github

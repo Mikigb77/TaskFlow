@@ -17,9 +17,9 @@ Everything runs in GitHub Actions, so nothing needs your computer.
 
 | When | What runs | Workflow |
 |---|---|---|
-| A pull request into `main` or `dev` touches `App/` | `flutter analyze` and the whole test suite | [`app-checks.yml`](.github/workflows/app-checks.yml) |
+| A pull request into `main` or `dev` touches `App/` | `flutter analyze` and the whole test suite, split across four machines that run at once | [`app-checks.yml`](.github/workflows/app-checks.yml) |
 | A pull request into `main` or `dev` touches `Backend/` | The Django tests | [`backend-checks.yml`](.github/workflows/backend-checks.yml) |
-| A merge into `main` changes the app | Tests, then the signed staging APK, published as the newest [release](https://github.com/Mikigb77/TaskFlow/releases) | [`app-release.yml`](.github/workflows/app-release.yml) |
+| A merge into `main` changes the app | The same checks and the signed staging APK build, side by side; the APK is published as the newest [release](https://github.com/Mikigb77/TaskFlow/releases) | [`app-release.yml`](.github/workflows/app-release.yml) |
 | A merge into `main` changes the backend | Tests, then the staging API on Cloud Run: build, migrate, health check | [`deploy-backend.yml`](.github/workflows/deploy-backend.yml) |
 
 Every workflow can also be started by hand from **Actions → (workflow) → Run workflow** on `main`. The website deploys from its own repository the same way.
