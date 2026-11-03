@@ -41,7 +41,10 @@ if any(re.search("E2E|PASSWORD|SECRET|TOKEN", k) for k in c):
     sys.exit("Private test credentials must never be compiled into the distributable APK.")
 PY
 
-flutter build apk --release --no-pub --target=lib/main.dart --dart-define-from-file=config/staging.json
+# Without --no-pub: only a build that runs pub regenerates the plugin registrant
+# for release, without dev-only plugins such as integration_test. With it, the
+# debug registrant from `flutter pub get` stays and the release compile fails.
+flutter build apk --release --target=lib/main.dart --dart-define-from-file=config/staging.json
 
 apk=build/app/outputs/flutter-apk/app-release.apk
 aapt2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
