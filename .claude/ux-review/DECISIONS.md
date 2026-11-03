@@ -2,6 +2,14 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-11-03 — Meeting notes from a recording (planned, not built)
+The owner asked for notes from a recorded conversation, then a task with a checklist in one tap. Requirements: `App/docs/MEETING_NOTES.md`.
+- Record on the phone and send pieces of about 5 minutes while recording; no live streaming. "As cheap as we can while maintaining some quality", in any common language.
+- All AI on Vertex AI: "I wouldn't turn credits on AI Studio. I would rather use simply the Vertex AI, since we're already paying for it anyway."
+- Nothing unnecessary is kept: once the final notes exist, the pieces' text and chapter notes are deleted.
+- Abandoned recordings ("zombies") are cleaned up, but a few weeks without signal must not lose a real meeting.
+- Still open: Pro only or not, the consent reminder, the 7- and 30-day limits, and moving today's dictations to Vertex.
+
 ## 2026-11-01 — The UX loop as fast as the machine allows
 After the 2026-10-28-app plan took about 19 hours, the owner: "it cannot be that we are running for 19 hours … We should deploy all the agents that can be possibly deployed at the same time, if needed." What the main session put in place for it, reported to the owner (`.claude/skills/ux/references/speed-2026-11-01.md`):
 - Every package of a fix run flows through on its own, as many at once as the machine allows, and is checked and fixed in its own worktree before it's merged. No waves, and no batches.
