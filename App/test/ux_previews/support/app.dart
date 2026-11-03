@@ -167,7 +167,7 @@ class PreviewApp {
     FlutterSecureStorage.setMockInitialValues({});
     final container = ProviderContainer(
       retry: noRetry,
-      overrides: [
+      overrides: _withOwn(overrides, [
         invitationLinkProvider.overrideWith(
           (ref) => InvitationLinks(listen: false),
         ),
@@ -229,9 +229,7 @@ class PreviewApp {
         calendarPreferenceStoreProvider.overrideWithValue(
           PreviewCalendarPreferences(phoneCalendars),
         ),
-        // The preview's own, last: they win.
-        ...overrides,
-      ],
+      ]),
     );
     // What the last sync left, as the repository reports it.
     container.read(taskRepositoryProvider).syncError = syncError;
@@ -333,3 +331,11 @@ class PreviewApp {
     await tester.pumpAndSettle();
   }
 }
+
+/// The defaults, less those a preview overrides itself: Riverpod 3 refuses a
+/// provider overridden twice, so the preview's own replace them.
+List<Override> _withOwn(List<Override> own, List<Override> defaults) => [
+  for (final d in defaults)
+    if (!own.any((o) => o.origin == d.origin)) d,
+  ...own,
+];
