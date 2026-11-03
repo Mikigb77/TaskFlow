@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/models/task_list_info.dart';
@@ -19,6 +20,7 @@ import 'package:agenda/providers/invitations_provider.dart';
 import 'package:agenda/widgets/task_assignment_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 import 'support/capture_fixtures.dart';
@@ -46,7 +48,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     final store = _Lists();
     final captures = MemoryCaptures();
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       // Without Pro, tasks are added with the form (2026-10-18 later).
       hasProProvider.overrideWithValue(false),
       billingLoadingProvider.overrideWithValue(false),
@@ -161,7 +163,7 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     for (final dark in [false, true]) {
       final store = _Lists();
-      final container = ProviderContainer(overrides: [
+      final container = ProviderContainer(retry: noRetry, overrides: [
         apiClientProvider.overrideWith((ref) => OfflineApiClient()),
         taskProvider.overrideWith((ref) => DesignTaskNotifier()),
         taskListStoreProvider.overrideWithValue(store),
@@ -255,7 +257,7 @@ void main() {
             for (final name in ['Casa', 'Trabajo', 'Gimnasio', 'Viajes', 'Lectura'])
               TaskListInfo(id: name, name: name),
           ];
-        final container = ProviderContainer(overrides: [
+        final container = ProviderContainer(retry: noRetry, overrides: [
           apiClientProvider.overrideWith((ref) => OfflineApiClient()),
           taskProvider.overrideWith((ref) => DesignTaskNotifier()),
           taskListStoreProvider.overrideWithValue(store),
@@ -316,6 +318,7 @@ void main() {
     final store = _Lists();
     var task = Task(id: 1, title: 'Comprar pan', priority: 1);
     await tester.pumpWidget(ProviderScope(
+      retry: noRetry,
       overrides: [
         authProvider.overrideWith(
             (ref) => SignedInFixtureAuth(ref.read(apiClientProvider))),
@@ -380,7 +383,7 @@ void main() {
     final store = _Lists()..lists = lists;
     final counting = _CountingTasks(tasks);
     final api = _DeleteApi();
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       ...overrides,
       apiClientProvider.overrideWithValue(api),
       authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
@@ -934,7 +937,7 @@ void main() {
     addTearDown(tester.view.reset);
     final store = _Lists()..lists = lists;
     final client = api ?? _DeleteApi();
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       apiClientProvider.overrideWithValue(client),
       authProvider.overrideWith((ref) => SignedInFixtureAuth(client)),
       taskRepositoryProvider.overrideWithValue(MemoryTasks()),
@@ -1131,6 +1134,7 @@ void main() {
   Future<Task Function()> openPicker(WidgetTester tester, _Lists store) async {
     var task = Task(id: 1, title: 'Comprar billetes', priority: 1);
     await tester.pumpWidget(ProviderScope(
+      retry: noRetry,
       overrides: [
         authProvider.overrideWith(
             (ref) => SignedInFixtureAuth(ref.read(apiClientProvider))),
@@ -1199,6 +1203,7 @@ void main() {
         TaskListInfo(id: 'obra', name: 'Obra', version: 2),
       ];
     await tester.pumpWidget(ProviderScope(
+      retry: noRetry,
       overrides: [
         apiClientProvider.overrideWith((ref) => OfflineApiClient()),
         taskRepositoryProvider.overrideWithValue(MemoryTasks()),
@@ -1245,6 +1250,7 @@ void main() {
       final store = _Lists()
         ..lists = [TaskListInfo(id: 'casa', name: 'Casa', version: 2)];
       await tester.pumpWidget(ProviderScope(
+        retry: noRetry,
         overrides: [
           apiClientProvider.overrideWith((ref) => OfflineApiClient()),
           taskRepositoryProvider.overrideWithValue(MemoryTasks()),
@@ -1612,7 +1618,7 @@ void main() {
       addTearDown(tester.view.reset);
       final store = _Lists()
         ..lists = [for (final name in names) TaskListInfo(id: name, name: name)];
-      final container = ProviderContainer(overrides: [
+      final container = ProviderContainer(retry: noRetry, overrides: [
         apiClientProvider.overrideWith((ref) => OfflineApiClient()),
         taskProvider.overrideWith((ref) => DesignTaskNotifier()),
         taskListStoreProvider.overrideWithValue(store),
@@ -1726,7 +1732,7 @@ void main() {
       addTearDown(tester.view.reset);
       final store = _PinningLists()..lists = lists;
       final api = _DeleteApi();
-      final container = ProviderContainer(overrides: [
+      final container = ProviderContainer(retry: noRetry, overrides: [
         apiClientProvider.overrideWithValue(api),
         authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
         taskRepositoryProvider.overrideWithValue(MemoryTasks()),

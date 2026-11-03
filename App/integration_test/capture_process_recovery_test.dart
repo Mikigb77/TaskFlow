@@ -1,4 +1,5 @@
 // Entitlement is a fixture here; real paid access is covered by projects_flow_test.
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 // Run twice per LIFECYCLE_CASE on an emulator launched with `-audio none`.
 // First run waits for an external `adb shell am force-stop`; disconnection is
@@ -53,6 +54,7 @@ void main() {
         : Map<String, dynamic>.from(jsonDecode(rows.single['data'] as String));
     final api = _ControlledApi(checkpoint);
     final container = ProviderContainer(
+      retry: noRetry,
       overrides: [
         hasProProvider.overrideWithValue(true),
         captureOwnerProvider.overrideWithValue(_owner),

@@ -294,8 +294,8 @@ class QuickScheduleParser {
     if (match == null && !hasTime && ambiguousHour == null) return null;
     final ranges = <Match>[
       ?match,
-      if (deadlineMarker != null) deadlineMarker,
-      if (acceptedTime != null) acceptedTime,
+      ?deadlineMarker,
+      ?acceptedTime,
       ?acceptedPart,
     ]..sort((a, b) => b.start.compareTo(a.start));
     var title = input;

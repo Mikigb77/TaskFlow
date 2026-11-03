@@ -8,7 +8,6 @@ import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/repositories/cloud_task_repository.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/task_database.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -528,7 +527,7 @@ void main() {
         final notifier = TaskNotifier(cloud);
         addTearDown(notifier.dispose);
         var shown = <Task>[];
-        notifier.addListener((state) => shown = state.valueOrNull ?? shown);
+        notifier.addListener((state) => shown = state.value ?? shown);
         await slow.pullHeld.future.timeout(const Duration(seconds: 5));
         Task named(String title) => shown.firstWhere((t) => t.title == title);
         expect(shown, hasLength(4));

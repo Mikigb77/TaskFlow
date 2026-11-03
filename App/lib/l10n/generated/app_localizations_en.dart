@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -86,20 +87,15 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.selectLogic(reason, {
       'alreadyMember':
           'This person already has access. Manage their role in Members.',
-      'memberLimit':
-          'This project supports up to 20 members and 20 pending invitations. Remove someone or cancel an invitation first.',
-      'accepted':
-          'This invitation was already accepted. Manage the person’s access in Members.',
-      'owner':
-          'The owner cannot leave. You can delete the project if it is no longer needed.',
-      'expired':
-          'This invitation is no longer available. Ask the owner for a new one.',
+      'memberLimit': 'This project supports up to 20 members and 20 pending invitations. Remove someone or cancel an invitation first.',
+      'accepted': 'This invitation was already accepted. Manage the person’s access in Members.',
+      'owner': 'The owner cannot leave. You can delete the project if it is no longer needed.',
+      'expired': 'This invitation is no longer available. Ask the owner for a new one.',
       'code': 'Ask the project owner for the current invitation code.',
       'refresh': 'This project changed. Refresh before deleting it.',
       'ownerOnly':
           'Only the project owner can manage sharing and project details.',
-      'other':
-          'This project is read-only for your account. Ask the owner for editing access.',
+      'other': 'This project is read-only for your account. Ask the owner for editing access.',
     });
     return '$_temp0';
   }
@@ -107,20 +103,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String syncProblem(String reason) {
     String _temp0 = intl.Intl.selectLogic(reason, {
-      'assignmentChanged':
-          'The responsible person changed. Your unsent edit was kept as a personal copy.',
-      'listConflict':
-          'A project changed on another device. Choose which version to keep in Projects.',
-      'readOnly':
-          'This project is now read-only. Your unsent edit was kept as a personal copy.',
-      'accessChanged':
-          'Shared-project access changed. Refresh to finish syncing permitted edits.',
-      'taskConflict':
-          'A task changed on another device. Your edit was kept as an offline copy; a conflicting deletion was cancelled.',
-      'serverUpdate':
-          'Update this server before syncing notes. Your notes are kept on this phone.',
-      'other':
-          'The server did not preserve this content type. Your local copy is kept.',
+      'assignmentChanged': 'The responsible person changed. Your unsent edit was kept as a personal copy.',
+      'listConflict': 'A project changed on another device. Choose which version to keep in Projects.',
+      'readOnly': 'This project is now read-only. Your unsent edit was kept as a personal copy.',
+      'accessChanged': 'Shared-project access changed. Refresh to finish syncing permitted edits.',
+      'taskConflict': 'A task changed on another device. Your edit was kept as an offline copy; a conflicting deletion was cancelled.',
+      'serverUpdate': 'Update this server before syncing notes. Your notes are kept on this phone.',
+      'other': 'The server did not preserve this content type. Your local copy is kept.',
     });
     return '$_temp0';
   }
@@ -138,8 +127,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'session': 'Please sign in again to continue. Your local tasks are kept.',
       'accountChanged':
           'The account changed. Reopen this screen and try again.',
-      'password':
-          'Choose a password of 12–128 characters that is not common, entirely numeric or similar to your email.',
+      'password': 'Choose a password of 12–128 characters that is not common, entirely numeric or similar to your email.',
       'recoveryCode':
           'The recovery code is invalid or expired. Request a new one.',
       'forbidden':
@@ -147,17 +135,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'rateLimit':
           'Too many requests. Please wait a little before trying again.',
       'fileLimit': 'Choose a non-empty file up to 6 MB.',
-      'fileChanged':
-          'The file has changed or could not be verified. Choose it again or retry the download.',
+      'fileChanged': 'The file has changed or could not be verified. Choose it again or retry the download.',
       'network': 'No connection. Check Wi-Fi or mobile data and try again.',
-      'networkKept':
-          'No connection. Check Wi-Fi or mobile data and try again. Your tasks are still saved on this phone.',
+      'networkKept': 'No connection. Check Wi-Fi or mobile data and try again. Your tasks are still saved on this phone.',
       'unavailable': 'The service is unavailable. Please try again later.',
-      'validation':
-          'Some details were not accepted. Review the information and try again.',
+      'validation': 'Some details were not accepted. Review the information and try again.',
       'other': 'Could not complete the request. Please try again.',
-      'otherKept':
-          'Could not complete the request. Please try again. Your tasks are still saved on this phone.',
+      'otherKept': 'Could not complete the request. Please try again. Your tasks are still saved on this phone.',
     });
     return '$_temp0';
   }
@@ -3240,14 +3224,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'unsupportedPlatform': 'Subscriptions are available in the Android app.',
       'configuration':
           'Subscriptions are not available yet. Please try again later.',
-      'accountUnavailable':
-          'Could not connect to your TaskFlow account. Check your connection and open this screen again.',
-      'network':
-          'Could not check your subscription. Check your connection and open this screen again.',
+      'accountUnavailable': 'Could not connect to your TaskFlow account. Check your connection and open this screen again.',
+      'network': 'Could not check your subscription. Check your connection and open this screen again.',
       'notAllowed':
           'Purchases are restricted for this store account or device.',
-      'otherAccount':
-          'This purchase belongs to another account. Sign in to the original account to restore it.',
+      'otherAccount': 'This purchase belongs to another account. Sign in to the original account to restore it.',
       'store': 'The store didn’t answer. Open this screen again.',
       'other': 'The store didn’t answer. Open this screen again.',
     });
@@ -3260,14 +3241,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'active': 'TaskFlow Pro is active.',
       'restored': 'Your Pro subscription was restored.',
       'noPurchases': 'No active Pro purchase was found for this account.',
-      'awaitingEntitlement':
-          'Purchase received. Pro will turn on in a few moments; if it doesn’t, tap Restore purchases.',
+      'awaitingEntitlement': 'Purchase received. Pro will turn on in a few moments; if it doesn’t, tap Restore purchases.',
       'updated': 'Subscription status updated.',
-      'pending':
-          'Payment is pending. Pro will activate after the store confirms payment.',
+      'pending': 'Payment is pending. Pro will activate after the store confirms payment.',
       'busy': 'Please wait for the current operation to finish.',
-      'accountChanged':
-          'The account changed. Check the subscription on the purchasing account.',
+      'accountChanged': 'The account changed. Check the subscription on the purchasing account.',
       'other': 'The request could not be completed. Please try again.',
     });
     return '$_temp0';
@@ -3300,22 +3278,17 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String googleSignInError(String code) {
     String _temp0 = intl.Intl.selectLogic(code, {
-      'google_not_configured':
-          'Google sign-in is not available yet. Use email and password for now.',
-      'google_link_required':
-          'This email already has a TaskFlow account. Sign in with your password, then choose Link Google account.',
+      'google_not_configured': 'Google sign-in is not available yet. Use email and password for now.',
+      'google_link_required': 'This email already has a TaskFlow account. Sign in with your password, then choose Link Google account.',
       'google_password_required':
           'Enter your current TaskFlow password to link Google.',
-      'google_email_mismatch':
-          'Choose the Google account with the same email as your TaskFlow account.',
-      'google_already_linked':
-          'This Google account is already linked. Sign in to the original TaskFlow account.',
+      'google_email_mismatch': 'Choose the Google account with the same email as your TaskFlow account.',
+      'google_already_linked': 'This Google account is already linked. Sign in to the original TaskFlow account.',
       'google_account_changed':
           'Your account changed during sign-in. Please try again.',
       'google_invalid_token':
           'Google could not verify your sign-in. Please try again.',
-      'other':
-          'Google sign-in could not finish. Check your connection and try again.',
+      'other': 'Google sign-in could not finish. Check your connection and try again.',
     });
     return '$_temp0';
   }

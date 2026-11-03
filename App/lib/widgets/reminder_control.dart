@@ -40,8 +40,8 @@ bool _cannotFire(
   bool planned = false,
 }) {
   final preferences = ref.watch(reminderPreferencesProvider);
-  final permission = ref.watch(reminderCapabilityProvider).valueOrNull ?? true;
-  final settings = preferences.valueOrNull;
+  final permission = ref.watch(reminderCapabilityProvider).value ?? true;
+  final settings = preferences.value;
   if (settings == null || !hasDate) return false;
   if (!planned) {
     if (minutes == -1) return false;
@@ -56,7 +56,7 @@ bool _cannotFire(
 /// plan's are past once none is left on or before the task's day: the last
 /// notice, the day after, isn't a reminder of it.
 bool _alertPassed(WidgetRef ref, Task? task) {
-  final settings = ref.watch(reminderPreferencesProvider).valueOrNull;
+  final settings = ref.watch(reminderPreferencesProvider).value;
   if (task == null ||
       settings == null ||
       !settings.enabled ||
@@ -98,9 +98,9 @@ final _alertsProvider = FutureProvider.autoDispose
 /// saved too late to ring (D1), and while the alerts are read.
 ({DateTime when, bool snoozed})? _lastAlert(WidgetRef ref, Task? task) {
   final id = task?.id;
-  final settings = ref.watch(reminderPreferencesProvider).valueOrNull;
+  final settings = ref.watch(reminderPreferencesProvider).value;
   if (id == null || settings == null) return null;
-  final alerts = ref.watch(_alertsProvider(id)).valueOrNull;
+  final alerts = ref.watch(_alertsProvider(id)).value;
   if (alerts == null || alerts.isEmpty) return null;
   return ReminderEngine.lastAlert(
     task!,
@@ -143,7 +143,7 @@ String reminderPlanText(
   bool bare = false,
 }) {
   final plan = ReminderPlans.active(task)!;
-  final settings = ref.watch(reminderPreferencesProvider).valueOrNull;
+  final settings = ref.watch(reminderPreferencesProvider).value;
   return planLine(
     context.l10n,
     plan,
@@ -223,7 +223,7 @@ _Reason? _reasonFor(WidgetRef ref, Task? task) {
 
 TaskListInfo? _projectOf(WidgetRef ref, Task task) => task.listId == null
     ? null
-    : (ref.watch(taskListsProvider).valueOrNull ?? const <TaskListInfo>[])
+    : (ref.watch(taskListsProvider).value ?? const <TaskListInfo>[])
           .where((p) => p.id == task.listId)
           .firstOrNull;
 
@@ -485,7 +485,7 @@ Future<void> _chooseReminder(
           30,
           60,
           1440,
-          if (minutes != null) minutes,
+          ?minutes,
         }..remove(defaultLead))
       : <int>{if (defaultTime != null) useDefault, -1, pickTime};
   final current = hasTime
@@ -653,7 +653,7 @@ Future<int?> _pickFrom(
   final reason = _reasonFor(ref, task);
   if (reason?.hidden == true) return null;
   final preferences =
-      ref.watch(reminderPreferencesProvider).valueOrNull ??
+      ref.watch(reminderPreferencesProvider).value ??
       const ReminderPreferences();
   // A plan replaces the single reminder: the line is its one line. It's this
   // account's own, so it counts only where this phone rings.
@@ -846,7 +846,7 @@ class ReminderControl extends ConsumerWidget {
     // without a date, and offers nothing.
     final person = found?.block == ReminderBlock.notForAccount;
     final preferences = ref.watch(reminderPreferencesProvider);
-    final settings = preferences.valueOrNull ?? const ReminderPreferences();
+    final settings = preferences.value ?? const ReminderPreferences();
     // The task as it would be saved, with this plan, when it applies: only
     // where this phone rings, as the plan is this account's own.
     final ringsHere = reminderRingsHere(ref, task);

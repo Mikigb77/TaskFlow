@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/task_provider.dart';
@@ -33,7 +34,7 @@ final hadTaskProvider =
   final notifier = HadTaskNotifier(ref.watch(firstTaskStoreProvider),
       ref.watch(taskRepositoryProvider).ownerKey);
   ref.listen<AsyncValue<List<Task>>>(taskProvider, (_, tasks) {
-    if ((tasks.valueOrNull ?? const []).isNotEmpty) notifier.sawTask();
+    if ((tasks.value ?? const []).isNotEmpty) notifier.sawTask();
   }, fireImmediately: true);
   return notifier;
 });

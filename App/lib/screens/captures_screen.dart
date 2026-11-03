@@ -55,7 +55,7 @@ class CapturesScreen extends ConsumerWidget {
       appBar: CustomAppBar(title: context.l10n.unfinishedCaptures),
       body: ref.watch(pendingCapturesProvider).when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => Center(
+            error: (_, _) => Center(
                 child: FilledButton(
                     onPressed: () => ref.invalidate(pendingCapturesProvider),
                     child: Text(context.l10n.tryAgain))),

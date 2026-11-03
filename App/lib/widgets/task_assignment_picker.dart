@@ -59,7 +59,7 @@ class TaskAssignmentPicker extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final projects =
-        ref.watch(taskListsProvider).valueOrNull ?? <TaskListInfo>[];
+        ref.watch(taskListsProvider).value ?? <TaskListInfo>[];
     final project = projects.where((p) => p.id == task.listId).firstOrNull;
     final account = ref.watch(authProvider).account;
     final shared = project?.shared == true;

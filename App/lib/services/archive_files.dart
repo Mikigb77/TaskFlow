@@ -1,6 +1,5 @@
 import 'package:agenda/models/archive_diagnostic.dart';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:agenda/models/task.dart';
@@ -16,23 +15,19 @@ class ArchiveFiles {
   final String? fileName;
   ArchiveFiles({this.fileName});
   Future<ArchiveFile?> choose() async {
-    final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['json', 'csv'],
-        withData: false,
-        withReadStream: true);
-    if (result == null) return null;
-    final file = result.files.single;
-    if (file.size > TaskArchive.maxBytes) {
-      throw const ArchiveDiagnostic(ArchiveCode.fileTooLarge);
-    }
-    final stream = file.readStream ??
-        (file.path == null ? null : File(file.path!).openRead());
-    if (stream == null) {
+    final file = await FilePicker.pickFile(
+        type: FileType.custom, allowedExtensions: ['json', 'csv']);
+    if (file == null) return null;
+    // A null length means the picker could not read the file at all.
+    final size = file.lengthSync() ?? await file.length();
+    if (size == null) {
       throw const ArchiveDiagnostic(ArchiveCode.fileUnreadable);
     }
+    if (size > TaskArchive.maxBytes) {
+      throw const ArchiveDiagnostic(ArchiveCode.fileTooLarge);
+    }
     final bytes = BytesBuilder(copy: false);
-    await for (final chunk in stream) {
+    await for (final chunk in file.readAsByteStream()) {
       if (bytes.length + chunk.length > TaskArchive.maxBytes) {
         throw const ArchiveDiagnostic(ArchiveCode.fileTooLarge);
       }
@@ -43,17 +38,12 @@ class ArchiveFiles {
 
   Future<bool> save(String contents) async {
     final bytes = Uint8List.fromList(utf8.encode(contents));
-    final selected = await FilePicker.platform.saveFile(
+    // Every platform's picker writes the bytes itself, desktop included.
+    final selected = await FilePicker.saveFile(
         fileName: fileName ?? 'taskflow-${Task.dateKey(DateTime.now())}.json',
-        type: FileType.custom,
-        allowedExtensions: ['json'],
+        mimeType: 'application/json',
         bytes: bytes);
     if (selected == null) return false;
-    // The plugin writes mobile document-provider content itself. Desktop save
-    // dialogs return a path; they do not write the bytes.
-    if (!Platform.isAndroid && !Platform.isIOS) {
-      await File(selected).writeAsBytes(bytes, flush: true);
-    }
     return true;
   }
 }

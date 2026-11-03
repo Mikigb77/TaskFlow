@@ -4,6 +4,7 @@
 // the edit form keeps the work.
 // Round 2, P70 (UX-471, UX-472, UX-473): every row answers, taps are spoken,
 // Save offers Undo.
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/checklist_item.dart';
@@ -796,6 +797,7 @@ void main() {
       UncontrolledProviderScope(
         container: container,
         child: ProviderScope(
+          retry: noRetry,
           overrides: [
             attachmentEntriesProvider.overrideWith(
               (ref, id) async => [
@@ -3268,6 +3270,7 @@ class _ReaderPhone {
         container: container,
         // The design fixtures list no files; this phone's own win here.
         child: ProviderScope(
+          retry: noRetry,
           overrides: [
             attachmentEntriesProvider.overrideWith((ref, id) async => files),
           ],

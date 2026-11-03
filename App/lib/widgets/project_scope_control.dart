@@ -57,7 +57,7 @@ class ProjectScopeControl extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scope = ref.watch(projectScopeProvider);
-    final projects = ref.watch(taskListsProvider).valueOrNull ?? [];
+    final projects = ref.watch(taskListsProvider).value ?? [];
     final selectedId = fixedProjectId ?? scope.projectId;
     final team = this.team ?? scope.team;
     void setTeam(bool value) => onTeamChanged != null

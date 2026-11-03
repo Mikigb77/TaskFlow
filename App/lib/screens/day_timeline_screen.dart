@@ -183,10 +183,10 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
         : null;
     final events =
         eventRead != null && !eventRead.isLoading && !eventRead.hasError
-            ? eventRead.valueOrNull?.items ?? []
+            ? eventRead.value?.items ?? []
             : [];
     final data =
-        DayTimeline.build(_day, tasks.valueOrNull ?? [], events.cast());
+        DayTimeline.build(_day, tasks.value ?? [], events.cast());
     final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
     final minimumHeight = math.max(52.0, 46 * scale);
     final layout = TimelineLayout.place(
@@ -289,7 +289,7 @@ class _DayTimelineScreenState extends ConsumerState<DayTimelineScreen>
                                           onPressed: () => Navigator.pushNamed(
                                               context, '/deviceCalendars'),
                                           child: Text(l.calendarDenied)),
-                                    if (eventRead?.valueOrNull?.truncated ==
+                                    if (eventRead?.value?.truncated ==
                                         true)
                                       MessageBanner(l.calendarTruncated),
                                     if (data.entries.length > 200)

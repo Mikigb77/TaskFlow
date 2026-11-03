@@ -334,7 +334,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                   ],
                 ),
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (_, __) =>
+                error: (_, _) =>
                     LoadFailed(onRetry: () => ref.invalidate(groupsProvider)),
               ),
         ],
@@ -656,12 +656,12 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
 
   /// The group's name: from its page or, while that loads, from the list.
   String _title(BuildContext context) =>
-      (ref.watch(groupDetailsProvider(widget.groupId)).valueOrNull?['group']
+      (ref.watch(groupDetailsProvider(widget.groupId)).value?['group']
               as Map?)?['name']
           as String? ??
       ref
           .watch(groupsProvider)
-          .valueOrNull
+          .value
           ?.where((group) => group.id == widget.groupId)
           .firstOrNull
           ?.name ??
@@ -693,7 +693,7 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
         // was; only a page that never loaded says so.
         skipError: true,
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => ListView(
+        error: (_, _) => ListView(
           padding: const EdgeInsets.all(24),
           children: [
             LoadFailed(
@@ -707,7 +707,7 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
             Map<String, dynamic>.from(details['group']),
           );
           final me = ref.watch(authProvider).account?.id;
-          final projects = (ref.watch(taskListsProvider).valueOrNull ?? [])
+          final projects = (ref.watch(taskListsProvider).value ?? [])
               .where((p) => p.groupId == group.id);
           final invitations = details['invitations'] as List? ?? [];
           return RefreshIndicator(

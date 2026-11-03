@@ -148,7 +148,7 @@ class _TaskActionsState extends ConsumerState<TaskActions> {
                       ),
                     ),
               loading: () => const SizedBox.shrink(),
-              error: (_, __) => Padding(
+              error: (_, _) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: TextButton(
                   onPressed: () => Navigator.pushNamed(context, '/captures'),

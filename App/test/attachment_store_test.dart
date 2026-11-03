@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_attachment.dart';
 import 'package:agenda/services/api_client.dart';
@@ -460,6 +461,7 @@ void main() {
       return task(source.path);
     }))!;
     await tester.pumpWidget(ProviderScope(
+        retry: noRetry,
         overrides: [
           apiClientProvider.overrideWithValue(api),
           authProvider.overrideWith((ref) => _SavedAuth(api)),

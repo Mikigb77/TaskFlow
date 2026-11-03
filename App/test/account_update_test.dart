@@ -10,6 +10,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/task.dart';
@@ -29,6 +30,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -98,7 +100,7 @@ void main() {
   });
 
   ProviderContainer container({List<Override> extra = const []}) {
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       apiClientProvider.overrideWithValue(api),
       authProvider.overrideWith((ref) => _Auth(api)),
       ...extra,
@@ -173,7 +175,7 @@ void main() {
     final first = c.read(taskRepositoryProvider);
     expect(first.ownerKey, '$_server/users/1');
     expect(c.read(captureOwnerProvider), '$_server/users/1');
-    c.listen(taskProvider, (_, __) {}, fireImmediately: true);
+    c.listen(taskProvider, (_, _) {}, fireImmediately: true);
     await until(() => api.syncs == 1, reason: 'the first sync finishes');
 
     await c.read(authProvider.notifier).signOut();
@@ -217,8 +219,8 @@ void main() {
       final owner = c.read(captureOwnerProvider);
       expect(owner, '$_server/users/1');
       var ownerChanges = 0;
-      c.listen(captureOwnerProvider, (_, __) => ownerChanges++);
-      c.listen(pendingCapturesProvider, (_, __) {});
+      c.listen(captureOwnerProvider, (_, _) => ownerChanges++);
+      c.listen(pendingCapturesProvider, (_, _) {});
       await c.read(pendingCapturesProvider.future);
       expect(captures.reads, [owner]);
       final before = c.read(authProvider).account;

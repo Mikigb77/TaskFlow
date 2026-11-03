@@ -1243,7 +1243,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
             _speechLanguage,
             hints: speechHints(
               _speechLanguage,
-              projects: ref.read(taskListsProvider).valueOrNull ?? const [],
+              projects: ref.read(taskListsProvider).value ?? const [],
             ),
           );
         } catch (error) {
@@ -3155,7 +3155,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         assignmentReviewed: true,
       );
     }
-    final project = (ref.read(taskListsProvider).valueOrNull ?? const [])
+    final project = (ref.read(taskListsProvider).value ?? const [])
         .where((p) => p.id == chosen.task.listId)
         .firstOrNull;
     final member = draft.assignmentHints['member']?.trim().isNotEmpty == true;
@@ -3174,7 +3174,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         before?.choice != command.choice;
     // An existing project taken instead of a new one: its tasks go there.
     final picked = chose && command.existing
-        ? (ref.read(taskListsProvider).valueOrNull ?? const [])
+        ? (ref.read(taskListsProvider).value ?? const [])
               .where((p) => p.id == command.choice)
               .firstOrNull
         : null;
@@ -3233,7 +3233,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     if (name.isEmpty || _saving) return;
     final key = foldForSearch(spokenProjectName(name));
     final same = editableProjects(
-      ref.read(taskListsProvider).valueOrNull ?? const [],
+      ref.read(taskListsProvider).value ?? const [],
     ).where((p) => foldForSearch(p.name.trim()) == key).firstOrNull;
     setState(() {
       _commands = [
@@ -3283,7 +3283,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       },
       lists: {
         for (final command in asking)
-          if (command.existingListId case final id?) id,
+          ?command.existingListId,
       },
     );
   }
@@ -3348,8 +3348,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         if (command.shown)
           resolveCommand(
             command,
-            tasks: tasks.valueOrNull ?? const [],
-            projects: projects.valueOrNull ?? const [],
+            tasks: tasks.value ?? const [],
+            projects: projects.value ?? const [],
             accountId: auth.account?.id,
             now: now,
           ),
@@ -3776,13 +3776,13 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     final sheetMessages = ScaffoldMessenger.of(context);
     final appMessages = ScaffoldMessenger.of(navigator.context);
     final origin = context.getInheritedWidgetOfExactType<_CaptureOrigin>();
-    final projects = ref.read(taskListsProvider).valueOrNull ?? const [];
+    final projects = ref.read(taskListsProvider).value ?? const [];
     final api = ref.read(apiClientProvider);
     final accountId = ref.read(authProvider).account?.id;
     final runner = CommandRunner(
       notifier,
       ref.read(taskListStoreProvider),
-      current: () => container.read(taskProvider).valueOrNull ?? const [],
+      current: () => container.read(taskProvider).value ?? const [],
     );
     final applied = AppliedCommands();
     final before = _session.copyWith(drafts: _items, commands: _commands);
@@ -3799,8 +3799,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       String folded(String name) => foldForSearch(spokenProjectName(name));
       final ids = <String, String>{
         for (final view in views)
-          if (view.command.existingId case final id?)
-            folded(view.command.name): id,
+          folded(view.command.name): ?view.command.existingId,
       };
       final names = <String, String>{
         for (final view in actionable)
@@ -3940,7 +3939,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       final tasks = ready.where((item) => !item.task.isNote).toList();
       final landed = [
         for (final update in applied.updates)
-          if (update.landed case final task?) task,
+          ?update.landed,
       ];
       // The day a task lands on: its own, or its deadline's when it has
       // only a deadline, where Calendar lists it.

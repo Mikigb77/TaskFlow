@@ -67,7 +67,7 @@ class TaskList extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.fromLTRB(20, 0, 20, bottomPadding),
       itemCount: sorted.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (_, index) {
         final task = sorted[index];
         return landedIds.contains(task.id)

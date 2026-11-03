@@ -15,6 +15,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/capture_messages.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/region.dart';
@@ -53,6 +54,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -896,6 +898,7 @@ void main() {
     }) {
       final api = OfflineApiClient();
       final c = ProviderContainer(
+        retry: noRetry,
         overrides: [
           apiClientProvider.overrideWithValue(api),
           authProvider.overrideWith(
@@ -904,7 +907,7 @@ void main() {
               'email': 'a@example.invalid',
               'timezone': 'UTC',
               if (subscription != null) 'complimentary_pro': true,
-              if (free != null) 'free_voice': free,
+              'free_voice': ?free,
             }),
           ),
           if (pro != null) hasProProvider.overrideWithValue(pro),
@@ -1835,6 +1838,7 @@ void main() {
     }) {
       final api = OfflineApiClient();
       final c = ProviderContainer(
+        retry: noRetry,
         overrides: [
           apiClientProvider.overrideWithValue(api),
           authProvider.overrideWith(
@@ -1843,7 +1847,7 @@ void main() {
               'email': 'a@example.invalid',
               'timezone': 'UTC',
               if (subscription != null) 'complimentary_pro': true,
-              if (free != null) 'free_voice': free,
+              'free_voice': ?free,
             }),
           ),
           if (subscription != null)
@@ -4474,7 +4478,7 @@ Map<String, dynamic> _session(Map<String, dynamic>? free, {int id = 1}) => {
     'id': id,
     'email': 'free$id@example.invalid',
     'timezone': 'Europe/Madrid',
-    if (free != null) 'free_voice': free,
+    'free_voice': ?free,
   },
 };
 
@@ -4603,6 +4607,7 @@ class _FreeApp {
     );
     late final _FreeApp app;
     final container = ProviderContainer(
+      retry: noRetry,
       overrides: [
         invitationLinkProvider.overrideWith(
           (ref) => InvitationLinks(listen: false),

@@ -1,3 +1,4 @@
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/project_scope_provider.dart';
@@ -8,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -29,7 +31,7 @@ void main() {
     for (final language in ['es', 'ca']) {
       for (final dark in [false, true]) {
         final l10n = lookupAppLocalizations(Locale(language));
-        final container = ProviderContainer(overrides: [
+        final container = ProviderContainer(retry: noRetry, overrides: [
           taskListsProvider.overrideWith((ref) async => [
                 TaskListInfo(id: 'school', name: 'Col·legi'),
                 TaskListInfo(id: 'doctor', name: 'Médico'),
@@ -140,6 +142,7 @@ void main() {
       final l10n = lookupAppLocalizations(Locale(language));
       expect(l10n.forTeam, all);
       await tester.pumpWidget(ProviderScope(
+          retry: noRetry,
           overrides: [taskListsProvider.overrideWith((ref) async => [shared])],
           child: localized(const ProjectScopeControl(), language)));
       await tester.pumpAndSettle();
@@ -163,6 +166,7 @@ void main() {
       final api = OfflineApiClient();
       addTearDown(api.close);
       await tester.pumpWidget(ProviderScope(
+          retry: noRetry,
           overrides: [
             apiClientProvider.overrideWithValue(api),
             authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
@@ -203,7 +207,7 @@ void main() {
         tester.view.devicePixelRatio = 1;
         tester.view.viewInsets = const FakeViewPadding(bottom: 280);
         addTearDown(tester.view.reset);
-        final container = ProviderContainer(overrides: [
+        final container = ProviderContainer(retry: noRetry, overrides: [
           taskListsProvider.overrideWith((ref) async => [
                 for (final name in [
                   'Casa',
@@ -274,6 +278,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(ProviderScope(
+        retry: noRetry,
         overrides: [taskListsProvider.overrideWith((ref) async => projects)],
         child: MaterialApp(
             locale: const Locale('es'),
@@ -355,7 +360,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       // From 8 projects the sheet has a search (UX-1522).
-      final container = ProviderContainer(overrides: [
+      final container = ProviderContainer(retry: noRetry, overrides: [
         taskListsProvider.overrideWith((ref) async =>
             [for (final name in names) TaskListInfo(id: name, name: name)]),
       ]);
@@ -474,6 +479,7 @@ void main() {
       addTearDown(api.close);
       await tester.pumpWidget(
         ProviderScope(
+          retry: noRetry,
           overrides: [
             apiClientProvider.overrideWithValue(api),
             authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
@@ -545,6 +551,7 @@ void main() {
       'UX-2514: «Todos los proyectos»: only the scope chosen shows a ✓, first «Todos los proyectos», then «Casa» once chosen',
       (tester) async {
         final container = ProviderContainer(
+          retry: noRetry,
           overrides: [
             taskListsProvider.overrideWith((ref) async => [casa, trabajo]),
           ],
@@ -598,6 +605,7 @@ void main() {
           );
           await tester.pumpWidget(
             ProviderScope(
+              retry: noRetry,
               overrides: [
                 taskRepositoryProvider.overrideWithValue(MemoryTasks()),
               ],
@@ -719,6 +727,7 @@ void main() {
       addTearDown(api.close);
       await tester.pumpWidget(
         ProviderScope(
+          retry: noRetry,
           overrides: [
             apiClientProvider.overrideWithValue(api),
             authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
@@ -936,6 +945,7 @@ void main() {
       List<Override> overrides,
       Widget home,
     ) => ProviderScope(
+      retry: noRetry,
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.light,

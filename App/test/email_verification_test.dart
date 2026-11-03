@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:io' show File;
 import 'dart:ui' show Tristate;
 
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/request_locale.dart';
 import 'package:agenda/main.dart';
@@ -177,6 +178,7 @@ class _App {
       url: 'http://verify.test',
     );
     final container = ProviderContainer(
+      retry: noRetry,
       overrides: [
         invitationLinkProvider.overrideWith(
           (ref) => InvitationLinks(listen: false),

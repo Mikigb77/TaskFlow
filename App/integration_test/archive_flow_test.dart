@@ -1,5 +1,6 @@
 // Uses the real Android document picker, SQLite and Docker API. ADB/UI automation
 // must save and then choose the printed fixture filename when prompted.
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/occurrence_exception.dart';
@@ -76,7 +77,7 @@ void main() {
       original,
       Task(title: 'Archive Inbox', priority: 1, isCompleted: true)
     ]);
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       apiClientProvider.overrideWithValue(api),
       authProvider.overrideWith((ref) => _Auth(api)),
       taskRepositoryProvider.overrideWithValue(repository),

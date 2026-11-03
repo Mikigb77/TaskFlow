@@ -45,11 +45,11 @@ class ActivityButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Only people who share something have group activity: the same
     // condition shows the `Para mí` / `Todas` chips.
-    final shares = (ref.watch(taskListsProvider).valueOrNull ?? []).any(
+    final shares = (ref.watch(taskListsProvider).value ?? []).any(
       (project) => project.shared && !project.inactive,
     );
     if (!shares) return const SizedBox.shrink();
-    final count = ref.watch(collaborationUnreadProvider).valueOrNull ?? 0;
+    final count = ref.watch(collaborationUnreadProvider).value ?? 0;
     return IconButton(
       tooltip: context.l10n.groupActivity,
       icon: Badge(
@@ -181,7 +181,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
         .watch(collaborationActivityProvider)
         .when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => ListView(
+          error: (_, _) => ListView(
             padding: const EdgeInsets.all(24),
             children: [
               LoadFailed(
@@ -372,7 +372,7 @@ class _TaskActivityState extends ConsumerState<TaskActivity> {
               .watch(taskHistoryProvider(widget.taskId))
               .when(
                 loading: () => const LinearProgressIndicator(),
-                error: (_, __) => TextButton(
+                error: (_, _) => TextButton(
                   onPressed: () =>
                       ref.invalidate(taskHistoryProvider(widget.taskId)),
                   child: Text(context.l10n.retry),

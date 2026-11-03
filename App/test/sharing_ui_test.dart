@@ -1,3 +1,4 @@
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/region.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -49,7 +50,7 @@ void main() {
     ]) {
       final strings = lookupAppLocalizations(Locale(language));
       final api = _Api();
-      final container = ProviderContainer(overrides: [
+      final container = ProviderContainer(retry: noRetry, overrides: [
         apiClientProvider.overrideWithValue(api),
         authProvider.overrideWith((ref) => _Auth(api)),
         taskRepositoryProvider.overrideWithValue(MemoryTasks()),
@@ -104,7 +105,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(320, 568));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final api = _Api();
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       apiClientProvider.overrideWithValue(api),
       authProvider.overrideWith((ref) => _Auth(api)),
       taskProvider.overrideWith((ref) => DesignTaskNotifier()),
@@ -745,7 +746,7 @@ void main() {
   testWidgets('viewer sees task and checklist with disabled editing controls',
       (tester) async {
     final api = _Api();
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       apiClientProvider.overrideWithValue(api),
       authProvider.overrideWith((ref) => _Auth(api)),
       taskRepositoryProvider.overrideWithValue(MemoryTasks()),
@@ -1728,7 +1729,7 @@ Future<_LiveSharing> _openLiveSharing(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final api = _LiveSharing()..offline = offlineFromStart;
-  final container = ProviderContainer(overrides: [
+  final container = ProviderContainer(retry: noRetry, overrides: [
     apiClientProvider.overrideWithValue(api),
     authProvider.overrideWith((ref) => _Auth(api)),
     taskRepositoryProvider.overrideWithValue(MemoryTasks()),
@@ -1839,7 +1840,7 @@ Future<(_Recorder, ProviderContainer)> _openSharing(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final api = _Recorder();
-  final container = ProviderContainer(overrides: [
+  final container = ProviderContainer(retry: noRetry, overrides: [
     apiClientProvider.overrideWithValue(api),
     authProvider.overrideWith((ref) => _Auth(api)),
     taskRepositoryProvider.overrideWithValue(MemoryTasks()),
@@ -1948,7 +1949,7 @@ class _SharingApp {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final api = _Recorder();
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       apiClientProvider.overrideWithValue(api),
       authProvider.overrideWith((ref) => _Auth(api)),
       taskRepositoryProvider.overrideWithValue(MemoryTasks()),

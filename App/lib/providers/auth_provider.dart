@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:agenda/services/account_deletion.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/notification_service.dart';

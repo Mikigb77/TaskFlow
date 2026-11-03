@@ -74,7 +74,7 @@ class TaskTile extends ConsumerWidget {
     final colors = Theme.of(context).colorScheme;
     final priority = AppTheme.priorityColor(context, task.priority);
     final lists = ref.watch(taskListsProvider);
-    final list = (lists.valueOrNull ?? [])
+    final list = (lists.value ?? [])
         .where((list) => list.id == task.listId)
         .firstOrNull;
     final editable = ref.watch(listCanEditProvider(task.listId));

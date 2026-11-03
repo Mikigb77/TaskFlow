@@ -1,3 +1,4 @@
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/providers/reminder_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
@@ -43,6 +44,7 @@ void main() {
         for (final theme in [AppTheme.light, AppTheme.dark]) {
           await tester.pumpWidget(
             ProviderScope(
+              retry: noRetry,
               overrides: [
                 reminderPreferenceStoreProvider.overrideWithValue(store),
                 taskRepositoryProvider.overrideWithValue(
@@ -147,6 +149,7 @@ void main() {
       Widget home, {
       String language = 'es',
     }) => ProviderScope(
+      retry: noRetry,
       overrides: [
         ...reminderOverrides(store, access),
         taskRepositoryProvider.overrideWithValue(MemoryTasks()),
@@ -1313,6 +1316,7 @@ void main() {
       Widget home, {
       String language = 'es',
     }) => ProviderScope(
+      retry: noRetry,
       overrides: [
         ...reminderOverrides(store, access),
         taskRepositoryProvider.overrideWithValue(MemoryTasks()),
@@ -3006,6 +3010,7 @@ void main() {
       addTearDown(tester.view.reset);
       await tester.pumpWidget(
         ProviderScope(
+          retry: noRetry,
           overrides: [
             ...reminderOverrides(store, access),
             taskRepositoryProvider.overrideWithValue(MemoryTasks()),
@@ -3170,6 +3175,7 @@ void main() {
       addTearDown(tester.view.reset);
       await tester.pumpWidget(
         ProviderScope(
+          retry: noRetry,
           overrides: [
             ...reminderOverrides(store ?? MemoryReminderStore(), access),
             taskRepositoryProvider.overrideWithValue(MemoryTasks()),

@@ -1,5 +1,6 @@
 // Opens the real app (MyApp) for a preview: signed in or out, with Pro or
 // free dictations, tasks and projects in memory, the phone faked.
+import 'package:agenda/providers/no_retry.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/capture_session.dart';
@@ -32,6 +33,7 @@ import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/billing_fixtures.dart';
@@ -164,6 +166,7 @@ class PreviewApp {
     // from memory: start-up waits for it before showing a signed-out screen.
     FlutterSecureStorage.setMockInitialValues({});
     final container = ProviderContainer(
+      retry: noRetry,
       overrides: [
         invitationLinkProvider.overrideWith(
           (ref) => InvitationLinks(listen: false),
