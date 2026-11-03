@@ -32,7 +32,7 @@ The visual system, references, and Android preview workflow are documented in [D
 
 ## Getting Started
 
-For a phone build using the deployed Cloud Run/Neon backend, run
+Every merge into `main` that changes the app builds the signed staging APK in GitHub Actions and publishes it as the [newest release](https://github.com/Mikigb77/TaskFlow/releases/latest/download/taskflow-staging.apk) (see the root `README.md`). To build the same phone build locally, using the deployed Cloud Run/Neon backend, run
 `./scripts/build-staging.ps1` from `App`. The private APK appears at
 `build/releases/taskflow-staging.apk` as **TaskFlow Staging** and installs beside
 the local development app. See the [staging guide](../Backend/docs/STAGING.md) for

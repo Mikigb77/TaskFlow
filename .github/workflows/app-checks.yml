@@ -1,0 +1,41 @@
+# Checks every pull request into main or dev that touches the app: the
+# analyzer and the whole test suite. A merge into main then builds and
+# publishes the staging APK (app-release.yml).
+name: App checks
+
+on:
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "App/**"
+      - ".github/workflows/app-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: 3.47.9 # keep in step with App/README.md
+
+jobs:
+  test:
+    name: Analyze and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: App
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze --no-pub
+      - run: flutter test --no-pub

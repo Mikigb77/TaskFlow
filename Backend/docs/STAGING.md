@@ -6,7 +6,10 @@ Neon branch and the marketing website deployment remain separate.
 
 ## Use the private Android build
 
-- Build: `App/build/releases/taskflow-staging.apk` (not committed or published).
+- Build: the newest [GitHub release](https://github.com/Mikigb77/TaskFlow/releases/latest/download/taskflow-staging.apk),
+  built from `main` by `.github/workflows/app-release.yml` and visible only to
+  people with access to the repository. A local build lands in
+  `App/build/releases/taskflow-staging.apk`.
 - App label/package: **TaskFlow Staging**, `com.example.agenda.staging`.
 - API: <https://taskflow-api-staging-177649734578.europe-west3.run.app>.
 - Dependency health: `/api/health/`; process-only startup check: `/api/live/`.
