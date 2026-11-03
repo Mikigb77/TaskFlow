@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.15" # the Docker image's Python
+          python-version: "3.14" # the Docker image's Python
           cache: pip
           cache-dependency-path: Backend/requirements.lock
       - run: pip install -r requirements.lock
@@ -40,3 +40,14 @@ jobs:
           set -a; . ./.env; set +a
           export GEMINI_API_KEY= REVENUECAT_API_KEY= POSTGRES_PASSWORD= DJANGO_SECRET_KEY=ci-only-not-a-secret
           python manage.py test core --settings=config.test_settings
+
+  image:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      # The same build Cloud Build runs on a deploy; .dockerignore keeps .env out.
+      - run: docker build --pull --tag taskflow-api:check Backend
+      - name: The image starts its Python and imports Django
+        run: docker run --rm --entrypoint python taskflow-api:check -c "import django, gunicorn, psycopg; print(django.get_version())"
