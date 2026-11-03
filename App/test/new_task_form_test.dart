@@ -7,6 +7,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/main.dart';
@@ -40,10 +41,12 @@ import 'package:agenda/widgets/task_assignment_picker.dart';
 import 'package:agenda/widgets/task_editor.dart';
 import 'package:agenda/widgets/task_tile.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart' show XFile;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
@@ -2149,7 +2152,7 @@ void main() {
           (_) async => p.join(folder.path, 'support'),
         );
         addTearDown(() => platform.setMockMethodCallHandler(pathProvider, null));
-        FilePicker.platform = _OnePicked(pdf.path);
+        FilePickerPlatform.instance = _OnePicked(pdf.path);
 
         await _App.open(
           tester,
@@ -3003,6 +3006,7 @@ class _App {
     final memory = _Tasks(tasks);
     final speech = _Speech();
     final container = ProviderContainer(
+      retry: noRetry,
       overrides: [
         invitationLinkProvider.overrideWith(
           (ref) => InvitationLinks(listen: false),
@@ -3181,28 +3185,42 @@ class _Phone extends TaskRepository {
 }
 
 /// The phone's file picker, handing back [path].
-class _OnePicked extends FilePicker {
+class _OnePicked extends FilePickerPlatform {
   _OnePicked(this.path);
   final String path;
   @override
-  Future<FilePickerResult?> pickFiles({
+  Future<PlatformFile?> pickFile({
     String? dialogTitle,
     String? initialDirectory,
     FileType type = FileType.any,
     List<String>? allowedExtensions,
     Function(FilePickerStatus)? onFileLoading,
-    bool allowCompression = true,
-    int compressionQuality = 30,
-    bool allowMultiple = false,
-    bool withData = false,
-    bool withReadStream = false,
-    bool lockParentWindow = false,
-    bool readSequential = false,
-  }) async => FilePickerResult([
-    PlatformFile(
-      path: path,
-      name: p.basename(path),
-      size: File(path).lengthSync(),
-    ),
-  ]);
+    int compressionQuality = 0,
+    AndroidOptions androidOptions = const AndroidOptions(),
+    DarwinOptions darwinOptions = const DarwinOptions(),
+    WindowsOptions windowsOptions = const WindowsOptions(),
+    LinuxOptions linuxOptions = const LinuxOptions(),
+    WebOptions webOptions = const WebOptions(),
+  }) async => _PickedFile(File(path));
+}
+
+/// A file on disk, as the picker reports it.
+final class _PickedFile extends PlatformFile {
+  _PickedFile(this.file);
+  final File file;
+  @override
+  String get name => p.basename(file.path);
+  @override
+  Uri get uri => Uri.file(file.path);
+  @override
+  XFile get xFile => XFile(file.path, name: name);
+  @override
+  int? lengthSync() => file.lengthSync();
+  @override
+  Future<int?> length() => file.length();
+  @override
+  Future<Uint8List> readAsBytes() => file.readAsBytes();
+  @override
+  Stream<Uint8List> readAsByteStream() =>
+      file.openRead().map(Uint8List.fromList);
 }

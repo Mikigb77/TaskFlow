@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -36,6 +37,7 @@ Future<ProviderContainer> _open(
   addTearDown(tester.view.resetDevicePixelRatio);
   final api = ApiClient(transport: MockClient(respond));
   final container = ProviderContainer(
+    retry: noRetry,
     overrides: [
       apiClientProvider.overrideWithValue(api),
       taskRepositoryProvider.overrideWithValue(MemoryTasks()),

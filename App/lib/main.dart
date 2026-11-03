@@ -1,3 +1,4 @@
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/task_form_entry.dart';
 import 'dart:async';
@@ -59,6 +60,7 @@ Future<void> main() async {
   AppLanguageBridge.phoneLocales ??= await phone;
   runApp(
     ProviderScope(
+      retry: noRetry,
       overrides: [
         themeModeProvider.overrideWith((ref) => appearance),
         regionalProvider.overrideWith((ref) => regional),
@@ -418,7 +420,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
             ref
                 .read(apiClientProvider)
                 .request('POST', 'billing/access/', accountId: accountId)
-                .then<void>((_) {}, onError: (Object _, StackTrace __) {})
+                .then<void>((_) {}, onError: (Object _, StackTrace _) {})
                 .then((_) async {
                   if (!mounted) return;
                   final repository = ref.read(taskRepositoryProvider);

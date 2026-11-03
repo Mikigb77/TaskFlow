@@ -1,6 +1,7 @@
 // Emulator-only: the host observes each Spanish notification and taps its
 // actual Complete/Snooze button. This test never invokes the response handler.
 import 'dart:convert';
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -40,7 +41,7 @@ void main() {
     final regional = RegionalPreferenceStore(database);
     final preferences = ReminderPreferenceStore(database);
     final api = OfflineApiClient();
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       authProvider.overrideWith((ref) => _Auth(api)),
       regionalStoreProvider.overrideWithValue(regional),
       themeStoreProvider.overrideWithValue(MemoryThemeStore()),

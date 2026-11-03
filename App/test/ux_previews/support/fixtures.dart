@@ -54,7 +54,7 @@ Map<String, dynamic> account({
   'id': me,
   'email': 'maria.lopez@example.com',
   'timezone': 'Europe/Madrid',
-  if (firstName != null) 'first_name': firstName,
+  'first_name': ?firstName,
   if (google) 'google_linked': true,
   if (complimentary) 'complimentary_pro': true,
   if (storageMb != null)

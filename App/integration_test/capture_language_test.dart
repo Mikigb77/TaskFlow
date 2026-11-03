@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/task.dart';
@@ -48,7 +49,7 @@ void main() {
     final regional = RegionalPreferenceStore(database);
     await regional.write(const RegionalPreferences(language: 'en'));
     final api = _UnavailableApi();
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       authProvider.overrideWith((ref) => _Guest(api)),
       apiClientProvider.overrideWithValue(api),
       captureOwnerProvider.overrideWithValue('local'),

@@ -1,3 +1,4 @@
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/l10n/request_locale.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
@@ -44,6 +45,7 @@ void main() {
       (tester) async {
         final api = _InvitationApi(available);
         final container = ProviderContainer(
+          retry: noRetry,
           overrides: [
             apiClientProvider.overrideWithValue(api),
             authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
@@ -329,7 +331,7 @@ void main() {
         findsWidgets,
       );
       expect(find.text(es.joinedInvitation('Compras')), findsOneWidget);
-      expect(container.read(pendingInvitationsProvider).valueOrNull, isEmpty);
+      expect(container.read(pendingInvitationsProvider).value, isEmpty);
       expect(tester.takeException(), isNull);
     },
   );
@@ -449,6 +451,7 @@ void main() {
         ],
       );
       final container = ProviderContainer(
+        retry: noRetry,
         overrides: [
           apiClientProvider.overrideWithValue(api),
           authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
@@ -1297,6 +1300,7 @@ Future<ProviderContainer> _openApp(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final container = ProviderContainer(
+    retry: noRetry,
     overrides: [
       invitationLinkProvider.overrideWith(
         (ref) => InvitationLinks(

@@ -8,7 +8,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:workmanager/workmanager.dart';
-import 'package:timezone/data/latest.dart' as tzdata;
+import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:sqflite/sqflite.dart';
 import 'package:agenda/models/task.dart';
@@ -125,12 +125,16 @@ class _NotificationDriver implements ReminderDriver {
   Future<Set<int>> pendingIds() async =>
       (await plugin.pendingNotificationRequests()).map((n) => n.id).toSet();
   @override
-  Future<void> cancel(int id) => plugin.cancel(id);
+  Future<void> cancel(int id) => plugin.cancel(id: id);
   @override
   Future<void> show(int id, PlannedReminder reminder,
           {required String token}) =>
-      plugin.show(id, reminder.title, reminder.body,
-          reminderNotificationDetails(reminder, silent: true),
+      plugin.show(
+          id: id,
+          title: reminder.title,
+          body: reminder.body,
+          notificationDetails:
+              reminderNotificationDetails(reminder, silent: true),
           payload: jsonEncode({'id': id, 'token': token}));
 
   @override
@@ -138,7 +142,9 @@ class _NotificationDriver implements ReminderDriver {
       {required String languageCode, required String token}) async {
     final timeout = await TaskReminders.undoTimeout();
     return plugin.show(
-        id, text, null, undoNotificationDetails(languageCode, timeout),
+        id: id,
+        title: text,
+        notificationDetails: undoNotificationDetails(languageCode, timeout),
         payload: jsonEncode({'id': id, 'token': token}));
   }
 
@@ -146,17 +152,15 @@ class _NotificationDriver implements ReminderDriver {
   Future<void> schedule(int id, PlannedReminder reminder,
       {required bool exact, required String token}) async {
     await plugin.zonedSchedule(
-        id,
-        reminder.title,
-        reminder.body,
-        tz.TZDateTime.from(reminder.when, tz.local),
-        reminderNotificationDetails(reminder),
+        id: id,
+        title: reminder.title,
+        body: reminder.body,
+        scheduledDate: tz.TZDateTime.from(reminder.when, tz.local),
+        notificationDetails: reminderNotificationDetails(reminder),
         payload: jsonEncode({'id': id, 'token': token}),
         androidScheduleMode: exact
             ? AndroidScheduleMode.exactAllowWhileIdle
             : AndroidScheduleMode.inexactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents:
             reminder.daily ? DateTimeComponents.time : null);
   }
@@ -228,7 +232,7 @@ class TaskReminders {
     await TaskDatabase().database;
     final strings = await readReminderStrings(TaskDatabase());
     await plugin.initialize(
-        InitializationSettings(
+        settings: InitializationSettings(
             android: const AndroidInitializationSettings('app_notifications_icon'),
             iOS: DarwinInitializationSettings(
                 requestAlertPermission: false,

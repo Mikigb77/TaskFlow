@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/providers/regional_provider.dart';
@@ -170,7 +171,7 @@ void main() {
 
   testWidgets('shared view-only note offers no editing actions',
       (tester) async {
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       taskProvider.overrideWith((ref) => _Viewer()),
       taskRepositoryProvider.overrideWithValue(MemoryTasks()),
       taskListsProvider.overrideWith((ref) async => [
@@ -196,7 +197,7 @@ void main() {
     for (final language in ['es', 'ca', 'en']) {
       for (final dark in [false, true]) {
         final l10n = lookupAppLocalizations(Locale(language));
-        final container = ProviderContainer(overrides: [
+        final container = ProviderContainer(retry: noRetry, overrides: [
           taskProvider.overrideWith((ref) => _AccentNotes()),
           taskRepositoryProvider.overrideWithValue(MemoryTasks()),
           taskListsProvider.overrideWith((ref) async => []),
@@ -263,7 +264,7 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final l10n = lookupAppLocalizations(Locale(language));
       ProviderContainer notes(TaskNotifier Function() tasks) =>
-          ProviderContainer(overrides: [
+          ProviderContainer(retry: noRetry, overrides: [
             taskProvider.overrideWith((ref) => tasks()),
             taskRepositoryProvider.overrideWithValue(MemoryTasks()),
             taskListsProvider.overrideWith((ref) async => []),

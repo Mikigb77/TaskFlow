@@ -82,7 +82,7 @@ class _DeviceCalendarEventsState extends ConsumerState<DeviceCalendarEvents>
         skipLoadingOnRefresh: false,
         skipLoadingOnReload: false,
         loading: () => retrying ? busy : null,
-        error: (_, __) => retrying
+        error: (_, _) => retrying
             ? busy
             : CalendarReadRetryLine(
                 onRetry: () => retry(() => readDayEventsAgain(ref, key))),
@@ -319,7 +319,7 @@ class _CalendarSheetState extends ConsumerState<_CalendarSheet>
           skipLoadingOnRefresh: false,
           skipLoadingOnReload: false,
           loading: () => retrying ? busy : const LinearProgressIndicator(),
-          error: (_, __) => retrying
+          error: (_, _) => retrying
               ? busy
               : CalendarReadRetryLine(
                   inset: 0,

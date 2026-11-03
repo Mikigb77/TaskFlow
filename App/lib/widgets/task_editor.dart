@@ -93,7 +93,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor>
     assignment: _isNote
         ? 'personal'
         : _assignment ??
-              ((ref.read(taskListsProvider).valueOrNull ?? []).any(
+              ((ref.read(taskListsProvider).value ?? []).any(
                     (p) => p.id == _listId && p.shared,
                   )
                   ? 'group'
@@ -220,7 +220,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor>
         // Gone meanwhile: the next words start a new one.
         _capture = null;
         _captureId = null;
-        return _writeWords(text);
+        return await _writeWords(text);
       }
       final next = session.copyWith(text: text);
       if (CaptureStore.isEmpty(next)) {
@@ -783,7 +783,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor>
     }
     final entries = attachmentEntriesProvider(id);
     // Kept alive until read: nothing else may be listening.
-    final listening = ref.listenManual(entries, (_, __) {});
+    final listening = ref.listenManual(entries, (_, _) {});
     try {
       return (await ref.read(
         entries.future,
@@ -847,7 +847,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor>
           source: ImageSource.gallery,
         ))?.path;
       } else {
-        file = (await FilePicker.platform.pickFiles())?.files.single.path;
+        file = (await FilePicker.pickFile())?.path;
       }
       final selectedFile = file == null
           ? null
@@ -919,7 +919,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor>
                       // task starts with its title instead.
                       if (!_creating &&
                           (_listId != null ||
-                              (ref.watch(taskListsProvider).valueOrNull ??
+                              (ref.watch(taskListsProvider).value ??
                                       const [])
                                   .isNotEmpty)) ...[
                         _project(),
@@ -1123,7 +1123,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor>
                         const SizedBox(height: 8),
                         _stepsEditor(),
                         if (!_projectUpFront &&
-                            (ref.watch(taskListsProvider).valueOrNull ??
+                            (ref.watch(taskListsProvider).value ??
                                     const [])
                                 .isNotEmpty) ...[
                           const SizedBox(height: 8),
@@ -1487,7 +1487,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor>
                       width: 40,
                       height: 40,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
+                      errorBuilder: (_, _, _) =>
                           const Icon(Icons.broken_image_outlined),
                     ),
                   )

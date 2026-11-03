@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 /// Where just-saved tasks went: Calendar selects [day], scrolls to the tasks'
 /// rows and highlights them. With no [day] the tasks have no date, and

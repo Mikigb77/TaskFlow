@@ -19,7 +19,7 @@ final tasksWithFilesProvider =
     FutureProvider.autoDispose<List<(Task, TaskFileUsage)>>((ref) async {
       final repository = ref.watch(taskRepositoryProvider);
       final tasks =
-          ref.watch(taskProvider).valueOrNull ?? await repository.getAllTasks();
+          ref.watch(taskProvider).value ?? await repository.getAllTasks();
       final owned = {
         for (final list in await ref.watch(taskListsProvider.future))
           if (list.role == 'owner') list.id,
@@ -65,7 +65,7 @@ class TasksWithFilesScreen extends ConsumerWidget {
           .watch(tasksWithFilesProvider)
           .when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => SingleChildScrollView(
+            error: (_, _) => SingleChildScrollView(
               child: EmptyState(
                 title: l10n.fileLoadError,
                 message: l10n.tryLater,

@@ -401,7 +401,7 @@ void main() {
     'created_at': created.toIso8601String(),
     'read_at': created.toIso8601String(),
     if (name != null || you != null) 'assignee_name': name,
-    if (you != null) 'assignee_is_you': you,
+    'assignee_is_you': ?you,
   };
 
   for (final language in ['es', 'en', 'ca']) {
@@ -1371,7 +1371,7 @@ void main() {
       'project_name': 'Casa',
       'created_at': created.toIso8601String(),
       'read_at': created.toIso8601String(),
-      if (fields != null) 'fields': fields,
+      'fields': ?fields,
     };
 
     for (final language in ['es', 'en', 'ca']) {

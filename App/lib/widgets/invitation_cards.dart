@@ -51,7 +51,7 @@ class PendingInvitations extends ConsumerWidget {
       .watch(pendingInvitationsProvider)
       .when(
         loading: () => const SizedBox.shrink(),
-        error: (_, __) => const SizedBox.shrink(),
+        error: (_, _) => const SizedBox.shrink(),
         data: (invitations) => Column(
           children: [
             for (final invitation in invitations.where(

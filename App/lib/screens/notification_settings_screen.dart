@@ -390,7 +390,7 @@ class _NotificationSettingsScreenState
   /// Whether an open task that rings on this phone has a plan that takes its
   /// hour from «Tareas sin hora».
   bool _plansWithoutTime() =>
-      (ref.watch(taskProvider).valueOrNull ?? const []).any((task) {
+      (ref.watch(taskProvider).value ?? const []).any((task) {
         final plan = ReminderPlans.active(task);
         return plan != null &&
             plan.time == null &&

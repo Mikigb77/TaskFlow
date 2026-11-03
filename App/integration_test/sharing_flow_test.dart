@@ -1,6 +1,7 @@
 // Real Android UI/SQLite and two JWT accounts on the local Docker backend.
 // Credential storage is isolated; there are no AI, microphone or email calls.
 import 'dart:io';
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/task.dart';
@@ -92,7 +93,7 @@ void main() {
     final containers = <ProviderContainer>[];
     ProviderContainer containerFor(
         ApiClient api, CloudTaskRepository repository) {
-      final container = ProviderContainer(overrides: [
+      final container = ProviderContainer(retry: noRetry, overrides: [
         apiClientProvider.overrideWithValue(api),
         authProvider.overrideWith((ref) => _Auth(api)),
         taskRepositoryProvider.overrideWithValue(repository),

@@ -74,10 +74,10 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
   @override
   Widget build(BuildContext context) {
     final groupsMatter =
-        ref.watch(groupsProvider).valueOrNull?.isNotEmpty == true ||
+        ref.watch(groupsProvider).value?.isNotEmpty == true ||
         ref
                 .watch(pendingInvitationsProvider)
-                .valueOrNull
+                .value
                 ?.any((invitation) => invitation.group) ==
             true;
     return Scaffold(
@@ -89,7 +89,7 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
           .when(
             skipLoadingOnReload: true,
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => Center(
+            error: (_, _) => Center(
               child: TextButton(
                 onPressed: () => ref.invalidate(taskListsProvider),
                 child: Text(context.l10n.retryLists),
@@ -178,7 +178,7 @@ class _TaskListsScreenState extends ConsumerState<TaskListsScreen> {
   /// What's open in [list]: «3 tareas y notas».
   String _itemCount(BuildContext context, TaskListInfo list) =>
       context.l10n.listItemCount(
-        (ref.watch(taskProvider).valueOrNull ?? [])
+        (ref.watch(taskProvider).value ?? [])
             .where((task) => task.listId == list.id && !task.isCompleted)
             .length,
       );
@@ -577,7 +577,7 @@ Future<TaskListInfo?> editTaskList(
   final store = ref.read(taskListStoreProvider);
   var name = list?.name ?? '';
   var color = list?.color ?? 'teal';
-  final groups = (ref.read(groupsProvider).valueOrNull ?? <TaskGroupInfo>[])
+  final groups = (ref.read(groupsProvider).value ?? <TaskGroupInfo>[])
       .where((g) => g.canManage && !g.archived)
       .toList();
   var group = groups.where((g) => g.id == groupId).firstOrNull;

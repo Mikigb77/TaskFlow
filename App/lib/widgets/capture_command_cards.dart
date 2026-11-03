@@ -866,7 +866,7 @@ class ProjectCommandCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = context.l10n;
     final command = view.command;
-    final projects = ref.watch(taskListsProvider).valueOrNull ?? const [];
+    final projects = ref.watch(taskListsProvider).value ?? const [];
     final name = view.projectName;
     if (command.existing && !view.asking) {
       final id = command.existingId;
@@ -957,7 +957,7 @@ class FindCommandCard extends ConsumerWidget {
       );
     }
     final command = view.asked;
-    final projects = ref.watch(taskListsProvider).valueOrNull ?? const [];
+    final projects = ref.watch(taskListsProvider).value ?? const [];
     final accountId = ref.watch(authProvider).account?.id;
     final project = projects.where((p) => p.id == command.listId).firstOrNull;
     final heading =
@@ -1089,7 +1089,7 @@ class _FoundRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final projects = ref.watch(taskListsProvider).valueOrNull ?? const [];
+    final projects = ref.watch(taskListsProvider).value ?? const [];
     final shown = task.isRecurring ? task.nextOpenOccurrence() : task;
     final completed = shown == null || shown.isCompleted;
     final details = _taskDetails(
@@ -1528,7 +1528,7 @@ class UpdateCommandCard extends ConsumerWidget {
         plan.problemName ?? '',
         ref
                 .watch(taskListsProvider)
-                .valueOrNull
+                .value
                 ?.where((p) => p.id == task.listId)
                 .firstOrNull
                 ?.name ??
@@ -2177,7 +2177,7 @@ class BulkCommandCard extends ConsumerWidget {
     final target = view.asked.target;
     final bulk = view.bulk!;
     final question = _projectQuestion(context, view, onChanged, enabled);
-    final projects = ref.watch(taskListsProvider).valueOrNull ?? const [];
+    final projects = ref.watch(taskListsProvider).value ?? const [];
     final accountId = ref.watch(authProvider).account?.id;
     final delete = command.kind == CommandKind.delete;
     final icon = switch (command.kind) {

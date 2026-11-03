@@ -143,7 +143,7 @@ class AttachmentStore {
   Future<void> _releaseRefused(DatabaseExecutor tx, [String? id]) =>
       tx.update('task_attachments', {'error': null},
           where: 'owner_key = ? AND $_refused${id == null ? '' : ' AND id = ?'}',
-          whereArgs: [owner, ..._refusedArgs, if (id != null) id]);
+          whereArgs: [owner, ..._refusedArgs, ?id]);
 
   /// Sync again an upload the server refused for a full file space: one file
   /// on its Retry, or every one when Pro turns on.

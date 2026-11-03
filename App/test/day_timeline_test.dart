@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/design_fixtures.dart';
 import 'device_calendar_test.dart'
@@ -24,7 +25,7 @@ import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/services/device_calendars.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/task_tile.dart';
-import 'package:timezone/data/latest.dart' as tzdata;
+import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
 void main() {

@@ -317,7 +317,7 @@ Future<void> _offer(
   // The task as it is now: only one that still has no plan gets Normal.
   final current = container
       .read(taskProvider)
-      .valueOrNull
+      .value
       ?.where((item) => item.id == task.id)
       .firstOrNull;
   if (current == null ||

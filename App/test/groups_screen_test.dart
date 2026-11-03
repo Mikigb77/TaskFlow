@@ -3,6 +3,7 @@
 // so after the page closes.
 import 'dart:async';
 
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
@@ -233,6 +234,7 @@ void main() {
     addTearDown(tester.view.reset);
     final client = api ?? _Groups();
     final container = ProviderContainer(
+      retry: noRetry,
       overrides: [
         apiClientProvider.overrideWithValue(client),
         authProvider.overrideWith((ref) => SignedInFixtureAuth(client)),
@@ -637,6 +639,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final container = ProviderContainer(
+      retry: noRetry,
       overrides: [
         apiClientProvider.overrideWithValue(client),
         authProvider.overrideWith((ref) => SignedInFixtureAuth(client)),
@@ -958,6 +961,7 @@ void main() {
     addTearDown(tester.view.reset);
     final client = _Groups();
     final container = ProviderContainer(
+      retry: noRetry,
       overrides: [
         apiClientProvider.overrideWithValue(client),
         authProvider.overrideWith((ref) => SignedInFixtureAuth(client)),
@@ -1808,6 +1812,7 @@ void main() {
       addTearDown(tester.view.reset);
       final api = _LiveGroup('owner');
       final container = ProviderContainer(
+        retry: noRetry,
         overrides: [
           apiClientProvider.overrideWithValue(api),
           authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
@@ -1962,6 +1967,7 @@ Future<_Groups> _openP285(
   final api = _Groups();
   final owner = role == 'owner';
   final container = ProviderContainer(
+    retry: noRetry,
     overrides: [
       apiClientProvider.overrideWithValue(api),
       authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
@@ -2035,6 +2041,7 @@ Future<_LiveGroup> _openLiveGroup(
   addTearDown(tester.view.reset);
   final api = _LiveGroup(role);
   final container = ProviderContainer(
+    retry: noRetry,
     overrides: [
       apiClientProvider.overrideWithValue(api),
       authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
@@ -2161,6 +2168,7 @@ Future<_Groups> _open(
   var version = 1;
   var archived = false;
   final container = ProviderContainer(
+    retry: noRetry,
     overrides: [
       apiClientProvider.overrideWithValue(api),
       authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),

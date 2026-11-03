@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/auth_provider.dart';

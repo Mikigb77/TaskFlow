@@ -25,7 +25,7 @@ class CaptureDiagnosticsScreen extends ConsumerWidget {
         .watch(_summaryProvider)
         .when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => Center(
+          error: (_, _) => Center(
             child: FilledButton(
               onPressed: () => ref.invalidate(_summaryProvider),
               child: Text(context.l10n.retry),

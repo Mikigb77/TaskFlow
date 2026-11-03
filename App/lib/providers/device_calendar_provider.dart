@@ -5,6 +5,7 @@ import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/services/device_calendars.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -225,7 +226,7 @@ class DeviceCalendarController extends StateNotifier<DeviceCalendarState> {
         await _refresh(browse: next.enabled);
       }
     });
-    _writing = result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    _writing = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
     return result;
   }
 
