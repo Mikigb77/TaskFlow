@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart' show MediaType;
 
 class ApiException implements Exception {
   final int status;
@@ -139,6 +140,13 @@ class ApiClient {
   Map<String, dynamic>? _session;
   Future<void>? _refreshing;
   Future<void> _persisting = Future.value();
+
+  /// The refresh token this engine last read from or wrote to the phone's
+  /// storage. Another engine of the app (the background meeting uploader)
+  /// may refresh the same session meanwhile, and the server then refuses
+  /// the token this engine holds: a saved token that differs from this one
+  /// is that newer session ([_newerSaved]).
+  String? _knownRefresh;
   int _generation = 0;
   final _sessionInvalidated = StreamController<void>.broadcast();
 
@@ -156,12 +164,28 @@ class ApiClient {
   /// already forgotten here; carries that account's id, once.
   Stream<int> get accountDeleted => _accountDeleted.stream;
 
+  /// Whether this is a second engine of the app (the background meeting
+  /// uploader) rather than the app itself. It never removes the saved
+  /// session when the server refuses its login: it stops, and the app,
+  /// which the person sees, decides when it next uses the login.
+  final bool background;
+
+  /// How long a refused refresh waits for the session another engine may
+  /// be saving at that moment before taking the refusal as final. Only
+  /// Android runs a second engine (the background uploader).
+  final Duration sessionRaceWait;
+
   ApiClient({
     http.Client? transport,
     FlutterSecureStorage? storage,
     String? url,
+    this.background = false,
+    Duration? sessionRaceWait,
   }) : _http = transport ?? http.Client(),
        _storage = storage ?? const FlutterSecureStorage(),
+       sessionRaceWait =
+           sessionRaceWait ??
+           (Platform.isAndroid ? const Duration(seconds: 1) : Duration.zero),
        baseUrl =
            url ??
            const String.fromEnvironment(
@@ -184,6 +208,7 @@ class ApiClient {
         throw const FormatException();
       }
       _session = value;
+      _knownRefresh = value['refresh'] as String;
     } on FormatException {
       await _storage.delete(key: 'taskflow.session');
     } on TypeError {
@@ -300,7 +325,7 @@ class ApiClient {
       throw ApiException(401, 'The account changed. Please try again.');
     }
     final next = {..._session!, 'user': Map<String, dynamic>.from(user as Map)};
-    await _persist(next, generation);
+    await _persist(next, generation, update: true);
     if (generation != _generation) {
       throw ApiException(401, 'The account changed. Please try again.');
     }
@@ -324,7 +349,7 @@ class ApiClient {
       throw ApiException(401, 'The account changed. Please try again.');
     }
     final next = {..._session!, 'user': Map<String, dynamic>.from(user as Map)};
-    await _persist(next, generation);
+    await _persist(next, generation, update: true);
     if (generation != _generation) {
       throw ApiException(401, 'The account changed. Please try again.');
     }
@@ -360,14 +385,15 @@ class ApiClient {
           account?.id != accountId) {
         return;
       }
-      final next = {
+      final next = _withTokens({
         ...session,
         'user': {
           ...Map<String, dynamic>.from(session['user']),
           key: Map<String, dynamic>.from(block),
         },
-      };
+      }, await _newerSaved(session));
       await _storage.write(key: 'taskflow.session', value: jsonEncode(next));
+      _knownRefresh = next['refresh'] as String?;
       if (generation != _generation) return;
       _session = next;
       if (!_accountUpdated.isClosed) _accountUpdated.add(null);
@@ -419,44 +445,120 @@ class ApiClient {
     return _persist(null, _generation);
   }
 
-  Future<void> _persist(Map<String, dynamic>? session, int generation) {
+  /// Saves [session]. With [update], it's this engine's session with new
+  /// account details: tokens another engine saved meanwhile are kept.
+  Future<void> _persist(
+    Map<String, dynamic>? session,
+    int generation, {
+    bool update = false,
+  }) {
     _persisting = _persisting.catchError((_) {}).then((_) async {
       if (generation != _generation) return;
-      if (session == null) {
+      var value = session;
+      if (value == null) {
         await _storage.delete(key: 'taskflow.session');
       } else {
-        await _storage.write(
-          key: 'taskflow.session',
-          value: jsonEncode(session),
-        );
+        if (update) value = _withTokens(value, await _newerSaved(value));
+        await _storage.write(key: 'taskflow.session', value: jsonEncode(value));
       }
-      if (generation == _generation) _session = session;
+      _knownRefresh = value?['refresh'] as String?;
+      if (generation == _generation) _session = value;
     });
     return _persisting;
   }
 
+  static Map<String, dynamic> _withTokens(
+    Map<String, dynamic> session,
+    Map<String, dynamic>? tokens,
+  ) => tokens == null
+      ? session
+      : {...session, 'access': tokens['access'], 'refresh': tokens['refresh']};
+
+  /// The session saved on the phone, when another engine of this app
+  /// refreshed [current]'s account since this one last saw it.
+  Future<Map<String, dynamic>?> _newerSaved(
+    Map<String, dynamic> current,
+  ) async {
+    try {
+      final raw = await _storage.read(key: 'taskflow.session');
+      if (raw == null) return null;
+      final saved = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      final refresh = saved['refresh'];
+      if (saved['access'] is! String ||
+          refresh is! String ||
+          refresh == _knownRefresh ||
+          refresh == current['refresh'] ||
+          Map<String, dynamic>.from(saved['user'] as Map)['id'] !=
+              Map<String, dynamic>.from(current['user'] as Map)['id']) {
+        return null;
+      }
+      return saved;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Takes the tokens another engine saved for this session's account.
+  /// True when there were any.
+  Future<bool> _adoptNewerSaved(int generation) async {
+    final current = _session;
+    if (current == null) return false;
+    final saved = await _newerSaved(current);
+    if (saved == null || generation != _generation || _session == null) {
+      return false;
+    }
+    _session = _withTokens(_session!, saved);
+    _knownRefresh = saved['refresh'] as String;
+    return true;
+  }
+
+  /// After a refused refresh: whether another engine refreshed the same
+  /// session at that moment, its tokens now taken. It may still be saving
+  /// them, so storage is read again after [sessionRaceWait].
+  Future<bool> _adoptRacing(int generation) async {
+    if (await _adoptNewerSaved(generation)) return true;
+    if (sessionRaceWait <= Duration.zero) return false;
+    for (var i = 0; i < 2; i++) {
+      await Future<void>.delayed(sessionRaceWait);
+      if (generation != _generation) return false;
+      if (await _adoptNewerSaved(generation)) return true;
+    }
+    return false;
+  }
+
   Future<void> _refresh(int generation) async {
-    final previous = _session;
+    if (_session == null) throw ApiException(401, 'Sign in to continue.');
+    // The background uploader may have refreshed this session already: its
+    // refresh token replaced the one held here.
+    await _adoptNewerSaved(generation);
+    var previous = _session;
     if (previous == null) throw ApiException(401, 'Sign in to continue.');
     dynamic result;
-    try {
-      result = await request(
-        'POST',
-        'auth/refresh/',
-        authenticated: false,
-        data: {'refresh': previous['refresh']},
-      );
-    } on ApiException catch (error) {
-      // An offline/server failure retains the saved session. Only an explicit
-      // authentication rejection locks the app and removes the credentials.
-      if (error.status == 401) {
-        if (error.body?['code'] == _userNotFound) {
-          await _accountGone(generation);
-        } else {
-          await _invalidateSession(generation);
+    for (var attempt = 0; ; attempt++) {
+      try {
+        result = await request(
+          'POST',
+          'auth/refresh/',
+          authenticated: false,
+          data: {'refresh': previous!['refresh']},
+        );
+        break;
+      } on ApiException catch (error) {
+        // An offline/server failure retains the saved session. Only an
+        // explicit authentication rejection locks the app and removes the
+        // credentials, unless another engine refreshed it at the same time.
+        if (error.status == 401) {
+          if (error.body?['code'] == _userNotFound) {
+            await _accountGone(generation);
+          } else if (attempt == 0 && await _adoptRacing(generation)) {
+            previous = _session;
+            continue;
+          } else {
+            await _invalidateSession(generation);
+          }
         }
+        rethrow;
       }
-      rethrow;
     }
     if (generation != _generation) {
       throw ApiException(401, 'The account changed. Please try again.');
@@ -470,7 +572,8 @@ class ApiClient {
     _session = null;
     final invalidated = ++_generation;
     try {
-      await _persist(null, invalidated);
+      // The background engine only stops: the saved session is the app's.
+      if (!background) await _persist(null, invalidated);
     } finally {
       if (!_sessionInvalidated.isClosed && _generation == invalidated) {
         _sessionInvalidated.add(null);
@@ -501,7 +604,7 @@ class ApiClient {
     _session = null;
     final gone = ++_generation;
     try {
-      await _persist(null, gone);
+      if (!background) await _persist(null, gone);
     } finally {
       if (!_accountDeleted.isClosed && _generation == gone) {
         _accountDeleted.add(accountId);
@@ -574,21 +677,24 @@ class ApiClient {
                         '${e.key}: ${e.value is List ? (e.value as List).join(' ') : e.value}',
                   )
                   .join('\n');
-        final retryAfter = int.tryParse(
-          response.headers['retry-after']?.trim() ?? '',
-        );
         throw ApiException(
           response.statusCode,
           message.isEmpty ? 'The request failed. Please try again.' : message,
           map,
-          retryAfter == null || retryAfter < 0
-              ? null
-              : Duration(seconds: retryAfter),
+          _retryAfter(response),
         );
       }
       return body;
     }
     throw ApiException(401, 'Your session has ended. Please sign in again.');
+  }
+
+  /// How long the server asked to wait (`Retry-After`, in seconds).
+  static Duration? _retryAfter(http.Response response) {
+    final seconds = int.tryParse(
+      response.headers['retry-after']?.trim() ?? '',
+    );
+    return seconds == null || seconds < 0 ? null : Duration(seconds: seconds);
   }
 
   Future<http.Response> _send(
@@ -628,6 +734,13 @@ class ApiClient {
       return await perform().timeout(
         Duration(
           seconds: path.startsWith('ai/')
+              ? 100
+              // The call that completes a meeting can write its last
+              // chapter's notes and then the final notes: two AI calls of
+              // up to 90 s each on the server (MEETINGS.md).
+              : path.startsWith('meetings/') && path.endsWith('/finish/')
+              ? 200
+              : path.startsWith('meetings/')
               ? 100
               // Deleting an account removes all of it at once; giving up
               // early would leave the phone unsure whether it happened.
@@ -680,6 +793,47 @@ class ApiClient {
     }
   }
 
+  /// Sends piece [index] of meeting [meetingId] (Backend/docs/MEETINGS.md),
+  /// for account [accountId] only. The server transcribes it before it
+  /// answers, so the wait is long.
+  Future<Map<String, dynamic>> uploadMeetingPiece({
+    required String meetingId,
+    required int index,
+    required String filePath,
+    required String contentType,
+    required String filename,
+    required Map<String, String> fields,
+    required int accountId,
+  }) async {
+    final response = await _fileRequest(
+      'meetings/$meetingId/pieces/$index/',
+      accountId,
+      (url) async => http.MultipartRequest('PUT', url)
+        ..fields.addAll(fields)
+        ..files.add(
+          await http.MultipartFile.fromPath(
+            'audio',
+            filePath,
+            filename: filename,
+            contentType: MediaType.parse(contentType),
+          ),
+        ),
+      maxResponseBytes: 64 * 1024,
+      // Up to 120 s to transcribe it, then up to 90 s for its chapter's
+      // notes when it completes one, on the server.
+      timeout: const Duration(seconds: 240),
+    );
+    try {
+      return Map<String, dynamic>.from(
+        jsonDecode(utf8.decode(response.bodyBytes)) as Map,
+      );
+    } on FormatException {
+      throw ApiException(502, 'The server returned an invalid response.');
+    } on TypeError {
+      throw ApiException(502, 'The server returned an invalid response.');
+    }
+  }
+
   Future<Uint8List> downloadAttachment(
     String id, {
     required int accountId,
@@ -695,6 +849,7 @@ class ApiClient {
     int accountId,
     Future<http.BaseRequest> Function(Uri) create, {
     required int maxResponseBytes,
+    Duration timeout = const Duration(seconds: 45),
   }) async {
     final generation = _generation;
     void checkAccount() {
@@ -731,7 +886,7 @@ class ApiClient {
 
       late http.Response response;
       try {
-        response = await transfer().timeout(const Duration(seconds: 45));
+        response = await transfer().timeout(timeout);
       } on TimeoutException {
         throw ApiException(
           0,
@@ -785,6 +940,7 @@ class ApiClient {
               ? message!
               : 'The file transfer failed. Please retry.',
           body,
+          _retryAfter(response),
         );
       }
       return response;

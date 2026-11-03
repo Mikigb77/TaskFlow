@@ -5001,4 +5001,195 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get billingReasonReminderPlansExample =>
       '“a week before, and the day before at 8”';
+
+  @override
+  String get meetingRecord => 'Record a meeting';
+
+  @override
+  String get meetingScreenTitle => 'Meeting';
+
+  @override
+  String get meetingListening => 'Recording';
+
+  @override
+  String get meetingListeningHelp =>
+      'You can lock the phone. It keeps recording.';
+
+  @override
+  String get meetingStop => 'Stop';
+
+  @override
+  String get meetingDiscardQuestion =>
+      'Discard this recording? It’s deleted from your phone and can’t be recovered.';
+
+  @override
+  String get meetingKeepRecording => 'Keep recording';
+
+  @override
+  String get meetingPreparing => 'Preparing your notes…';
+
+  @override
+  String get meetingPreparingHelp =>
+      'It takes a few seconds. You can leave this screen: we’ll let you know when they’re ready.';
+
+  @override
+  String get meetingWaitingConnection => 'Waiting for connection';
+
+  @override
+  String get meetingWaitingConnectionHelp =>
+      'Your recording is safe on this phone. The notes are made once you’re back online, and we’ll let you know.';
+
+  @override
+  String get meetingNothingHeard =>
+      'Nothing was heard, so there’s nothing to save.';
+
+  @override
+  String meetingStoppedAt(String time) {
+    return 'Your recording stopped at $time. Continue, finish or discard?';
+  }
+
+  @override
+  String get meetingContinue => 'Continue';
+
+  @override
+  String get meetingFinish => 'Finish';
+
+  @override
+  String meetingRecordingNow(String time) {
+    return 'Recording a meeting · $time';
+  }
+
+  @override
+  String get meetingOpen => 'Open';
+
+  @override
+  String get meetingProRequired =>
+      'Meeting notes are part of TaskFlow Pro. Your recording waits on this phone.';
+
+  @override
+  String get meetingAllowanceUsed =>
+      'You’ve used this month’s meeting time. Your recording waits on this phone until next month.';
+
+  @override
+  String get meetingCantMakeNotes =>
+      'Part of this recording couldn’t be sent, so no notes can be made from it.';
+
+  @override
+  String get meetingMicrophoneBlocked =>
+      'To record a meeting, open Settings and tap Permissions › Microphone › Allow.';
+
+  @override
+  String get meetingLowSpace =>
+      'Your phone is almost full. Free up some space to record a meeting.';
+
+  @override
+  String get meetingSpaceLowWarning =>
+      'Low on space: the recording stops by itself if the phone fills up.';
+
+  @override
+  String get meetingStartFailed => 'The recording couldn’t start. Try again.';
+
+  @override
+  String get meetingStoppedNoSpace =>
+      'Your phone ran out of space, so the recording stopped.';
+
+  @override
+  String get meetingMicrophoneFailed =>
+      'The microphone stopped working, so the recording stopped.';
+
+  @override
+  String get meetingNoticeTitle => 'Recording a meeting';
+
+  @override
+  String get meetingRecordingChannel => 'Meeting recording';
+
+  @override
+  String get meetingNotesChannel => 'Meeting notes';
+
+  @override
+  String get meetingNotesReady => 'Your meeting notes are ready';
+
+  @override
+  String get meetingNoteDecisions => 'Decisions';
+
+  @override
+  String get meetingNoteOpenQuestions => 'Open questions';
+
+  @override
+  String get meetingNoteChapters => 'Parts of the meeting';
+
+  @override
+  String get meetingNoteStartMissing =>
+      'The start of this recording expired, so these notes cover only the rest.';
+
+  @override
+  String get meetingNoteUntitled => 'Meeting notes';
+
+  @override
+  String get meetingCreateTask => 'Create task';
+
+  @override
+  String meetingSignOutQuestion(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count meeting recordings haven’t been sent yet. Send them before signing out, or discard them?',
+      one:
+          'A meeting recording hasn’t been sent yet. Send it before signing out, or discard it?',
+    );
+    return '$_temp0 Reminders on this phone stop until you sign in again.';
+  }
+
+  @override
+  String get meetingSendFirst => 'Send first';
+
+  @override
+  String get meetingDiscardAndSignOut => 'Discard and sign out';
+
+  @override
+  String get meetingSending => 'Sending your recording…';
+
+  @override
+  String get meetingSendFailed =>
+      'Not everything could be sent. Try again with a connection, or discard it.';
+
+  @override
+  String get meetingNotesExpired =>
+      'This recording was kept too long without being finished, so no notes can be made from it.';
+
+  @override
+  String get meetingSendFailedPro =>
+      'Your recording can’t be sent without TaskFlow Pro. Stay signed in to keep it, or discard it.';
+
+  @override
+  String get meetingSendFailedAllowance =>
+      'You’ve used this month’s meeting time, so your recording can’t be sent until next month. Stay signed in to keep it, or discard it.';
+
+  @override
+  String get meetingSendFailedLost =>
+      'A recording can’t become notes any more. Discard it to sign out.';
+
+  @override
+  String meetingDiscardNamed(String time) {
+    return 'Discard the recording of $time';
+  }
+
+  @override
+  String meetingFinishNamed(String time) {
+    return 'Finish the recording of $time';
+  }
+
+  @override
+  String meetingContinueNamed(String time) {
+    return 'Continue the recording of $time';
+  }
+
+  @override
+  String get billingReasonMeetingNotes =>
+      'With Pro, record a meeting and get its notes:';
+
+  @override
+  String get billingReasonMeetingNotesExample =>
+      'a summary, the decisions and the to-dos';
 }

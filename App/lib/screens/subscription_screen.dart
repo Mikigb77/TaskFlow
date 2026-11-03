@@ -9,7 +9,7 @@ import 'package:agenda/widgets/custom_app_bar.dart';
 
 /// What led to the Pro screen, when a Pro choice was tapped: the screen
 /// says first what Pro gives there.
-enum ProReason { reminderPlans }
+enum ProReason { reminderPlans, meetingNotes }
 
 class SubscriptionScreen extends ConsumerStatefulWidget {
   const SubscriptionScreen({super.key, this.reason});
@@ -76,7 +76,17 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     // Without Pro, «Ver suscripción» stays in view, as the task form's button.
     final offer = !state.hasPro && state.monthly != null;
     final restore = !state.complimentary && !state.hasPro;
-    final reason = widget.reason == ProReason.reminderPlans;
+    final reason = widget.reason != null;
+    final (reasonHeading, reasonExample) = switch (widget.reason) {
+      ProReason.meetingNotes => (
+        l10n.billingReasonMeetingNotes,
+        l10n.billingReasonMeetingNotesExample,
+      ),
+      _ => (
+        l10n.billingReasonReminderPlans,
+        l10n.billingReasonReminderPlansExample,
+      ),
+    };
     // The height of a benefit's first line, for its check icon: the body text
     // the Scaffold's Material gives its Text.
     final bodyStyle = Theme.of(context).textTheme.bodyMedium!;
@@ -104,7 +114,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                     Semantics(
                       header: true,
                       child: Text(
-                        l10n.billingReasonReminderPlans,
+                        reasonHeading,
                         key: const ValueKey('subscription-reason'),
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(color: colors.onPrimaryContainer),
@@ -112,7 +122,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      l10n.billingReasonReminderPlansExample,
+                      reasonExample,
                       key: const ValueKey('subscription-reason-example'),
                       style: TextStyle(color: colors.onPrimaryContainer),
                     ),
@@ -164,7 +174,8 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                     for (final (index, benefit) in [
                       l10n.proBenefitDictation,
                       l10n.proBenefitTyping,
-                      if (!reason) l10n.proBenefitReminders,
+                      if (widget.reason != ProReason.reminderPlans)
+                        l10n.proBenefitReminders,
                     ].indexed)
                       Padding(
                         padding: EdgeInsets.only(top: index == 0 ? 0 : 8),

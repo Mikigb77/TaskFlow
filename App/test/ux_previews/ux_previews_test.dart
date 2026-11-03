@@ -18,6 +18,7 @@ import 'commands_previews.dart';
 import 'delete_previews.dart';
 import 'first_run_previews.dart';
 import 'form_previews.dart';
+import 'meeting_previews.dart';
 import 'notes_previews.dart';
 import 'reminders_previews.dart';
 import 'settings_previews.dart';
@@ -62,6 +63,8 @@ const _routes = <String, String>{
   'Sharing, invitations, groups, activity (pushed, no route)':
       '`sharing/*`',
   'Email confirmation (pushed after sign-up)': '`auth/verify-email.*`',
+  'Meeting notes: the recording screen and what follows Stop (pushed, no route)':
+      '`meetings/recording.*`, `meetings/after-stop.*`; Notas\'s meeting lines `meetings/notes-lines.*`, the meeting\'s note and its Crear tarea `meetings/note.*`, the Pro reason `meetings/pro.*`, the sign-out question `meetings/sign-out.*`',
   'Sign-in again over open screens': '`auth/sign-in.sign-in-again.*`',
   'Sheets and dialogs':
       'the used-up notice `capture/used-up-notice.*`, the reminder question `first-run/reminder-question.*`, the reminder sheet with its plans `reminders/sheet.*`, the plan offer `reminders/offer.*`, keep-or-discard `capture/sheet.keep-question.*`, the series deletion `commands/cards.delete-series.*`, the view menu `calendar/agenda.view-menu.*`, the invite dialog `sharing/project-sharing.invite.*`',
@@ -76,7 +79,7 @@ const _notCovered = <String, String>{
   'The home-screen widget:':
       'a native Android widget (`CaptureWidget.kt` and its layout), outside Flutter. Phone only.',
   'Notifications and reminders in the shade:':
-      'Android draws them; their text comes from `lib/services/reminder_copy.dart` and `notification_service.dart`, a reminder plan\'s too («Faltan 12 días · jue, 12 nov», «Es mañana a las 17:00», «Fecha límite: hoy», «Era para ayer», «Venció ayer»), from `planBody`. Read the copy there; check delivery, actions and grouping on a phone.',
+      'Android draws them; their text comes from `lib/services/reminder_copy.dart` and `notification_service.dart` (the meeting\'s «Las notas de tu reunión están listas» there too, and its ongoing «Grabando una reunión» from `meeting_copy.dart`, drawn by the recorder\'s foreground service), a reminder plan\'s too («Faltan 12 días · jue, 12 nov», «Es mañana a las 17:00», «Fecha límite: hoy», «Era para ayer», «Venció ayer»), from `planBody`. Read the copy there; check delivery, actions and grouping on a phone.',
   'System permission dialogs:':
       'the microphone, notification, exact-alarm and calendar prompts are Android\'s. The app\'s own explanations before and after them are covered (the reminder question sheet, the blocked-microphone message).',
   'The share sheet:':
@@ -149,6 +152,7 @@ void main() {
   remindersPreviews();
   sharingPreviews();
   notesPreviews();
+  meetingPreviews();
   authPreviews();
   settingsPreviews();
   deletePreviews();

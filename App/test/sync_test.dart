@@ -680,7 +680,7 @@ void main() {
         });
         final rowsBefore = await old.query('tasks', orderBy: 'id');
         await TaskDatabase.upgrade(old, 20, 21);
-        expect(TaskDatabase.schemaVersion, 21);
+        expect(TaskDatabase.schemaVersion, greaterThanOrEqualTo(21));
         final after = await columns();
         expect(after, containsAll(['completedAt', 'completedTimes']));
         final rowsAfter = await old.query('tasks', orderBy: 'id');

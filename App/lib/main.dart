@@ -28,6 +28,9 @@ import 'package:agenda/screens/data_transfer_screen.dart';
 import 'package:agenda/services/app_language.dart';
 import 'package:agenda/services/capture_entries.dart';
 import 'package:agenda/services/capture_store.dart';
+import 'package:agenda/services/meeting_controller.dart';
+import 'package:agenda/screens/meeting_screen.dart';
+import 'package:agenda/widgets/meeting_banners.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/l10n/region.dart';
@@ -107,6 +110,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     ref.read(pendingVerificationLoadProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) => _openInvitation());
     TaskReminders.openRequest.addListener(_openReminder);
+    TaskReminders.openNote.addListener(_openMeetingNote);
+    TaskReminders.meetingAction.addListener(_openMeetingAction);
     // Scheduling also emits changes; reload only in response to action callbacks.
     _actions = TaskReminders.actionChanges.stream.listen((_) {
       if (mounted && ref.read(authProvider).account != null) {
@@ -114,6 +119,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _openReminder());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _openMeetingNote());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _openMeetingAction());
     _entries = ref
         .read(captureEntriesProvider)
         .changes
@@ -124,6 +131,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     TaskReminders.openRequest.removeListener(_openReminder);
+    TaskReminders.openNote.removeListener(_openMeetingNote);
+    TaskReminders.meetingAction.removeListener(_openMeetingAction);
     AppLanguageBridge.phone.removeListener(_phoneLocalesChanged);
     WidgetsBinding.instance.removeObserver(this);
     _actions?.cancel();
@@ -371,6 +380,64 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     });
   }
 
+  /// A tapped "Your meeting notes are ready" opens its note, for the
+  /// account that recorded it only (MN-11).
+  void _openMeetingNote() {
+    final request = TaskReminders.openNote.value;
+    final auth = ref.read(authProvider);
+    if (!mounted ||
+        request == null ||
+        auth.loading ||
+        auth.expired ||
+        auth.account == null) {
+      return;
+    }
+    TaskReminders.openNote.value = null;
+    if (request.ownerKey != ref.read(captureOwnerProvider)) return;
+    unawaited(
+      ref
+          .read(meetingControllerProvider.notifier)
+          .markSeen(request.meetingId)
+          .catchError((Object _) {}),
+    );
+    final session = _navigationSession;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted &&
+          session == _navigationSession &&
+          _navigator.currentState != null) {
+        _navigator.currentState!.push(
+          MaterialPageRoute<void>(
+            builder: (_) => TaskDetailScreen(taskId: request.noteId),
+          ),
+        );
+      }
+    });
+  }
+
+  /// A tap on the recording notification, or its Stop or Discard (MN-1,
+  /// MN-25): the recording screen opens and does it. Nothing once the
+  /// recording has ended.
+  void _openMeetingAction() {
+    final action = TaskReminders.meetingAction.value;
+    final auth = ref.read(authProvider);
+    if (!mounted ||
+        action == null ||
+        auth.loading ||
+        auth.expired ||
+        auth.account == null) {
+      return;
+    }
+    TaskReminders.meetingAction.value = null;
+    if (ref.read(meetingsProvider).recording == null) return;
+    final session = _navigationSession;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final navigator = _navigator.currentState;
+      if (mounted && session == _navigationSession && navigator != null) {
+        unawaited(openMeetingNoticeAction(navigator, action));
+      }
+    });
+  }
+
   /// Covers the open screens with sign-in, so nothing typed in them is lost.
   void _showSignInAgain() {
     final navigator = _navigator.currentState;
@@ -413,7 +480,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         if (accountId != null) {
           // Clear a recent negative server lookup after purchase or restore.
           // The server independently rechecks the account's RevenueCat identity.
-          // Then send again the files refused for a full file space.
+          // Then send again the files refused for a full file space, and
+          // the meetings held for Pro.
           unawaited(
             ref
                 .read(apiClientProvider)
@@ -421,6 +489,14 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
                 .then<void>((_) {}, onError: (Object _, StackTrace __) {})
                 .then((_) async {
                   if (!mounted) return;
+                  // Meetings held for Pro are sent now, not after their
+                  // 6-hour wait.
+                  unawaited(
+                    ref
+                        .read(meetingControllerProvider.notifier)
+                        .proGained()
+                        .catchError((Object _) {}),
+                  );
                   final repository = ref.read(taskRepositoryProvider);
                   if (repository.ownerKey == 'local') return;
                   await repository.attachments.retryRefused();
@@ -444,6 +520,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       }
       if (!next.loading && next.account != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) => _openReminder());
+        WidgetsBinding.instance.addPostFrameCallback((_) => _openMeetingNote());
+        WidgetsBinding.instance.addPostFrameCallback((_) => _openMeetingAction());
         WidgetsBinding.instance.addPostFrameCallback((_) => _openEntries());
         WidgetsBinding.instance.addPostFrameCallback((_) => _openInvitation());
       }

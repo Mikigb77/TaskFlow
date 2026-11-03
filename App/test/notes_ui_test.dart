@@ -775,14 +775,18 @@ void main() {
     expect(find.textContaining('Guarda información'), findsNothing);
     expect(find.textContaining('Escribe o dicta una nota'), findsNothing);
     // One explanation only: besides the empty state's title and line, and
-    // Añadir nota, nothing else is written on the page.
+    // the buttons Añadir nota and Grabar una reunión, nothing else is
+    // written on the page.
     final words = tester
         .widgetList<Text>(find.descendant(
             of: find.byType(ListView), matching: find.byType(Text)))
         .map((text) => text.data)
         .whereType<String>()
         .where((text) =>
-            text != es.notes && text != es.notesEmpty && text != es.addNote)
+            text != es.notes &&
+            text != es.notesEmpty &&
+            text != es.addNote &&
+            text != es.meetingRecord)
         .toList();
     expect(words, [es.notesEmptyHelp]);
     expect(find.byKey(const ValueKey('note-search')), findsNothing);

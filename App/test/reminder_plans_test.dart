@@ -266,7 +266,7 @@ void main() {
           ..remove('completedTimes');
         await old.insert('tasks', {...row, 'sync_id': 'kept', 'revision': 4});
         await TaskDatabase.upgrade(old, 18, TaskDatabase.schemaVersion);
-        expect(TaskDatabase.schemaVersion, 21);
+        expect(TaskDatabase.schemaVersion, greaterThanOrEqualTo(21));
         final columns = (await old.rawQuery(
           'PRAGMA table_info(tasks)',
         )).map((row) => row['name']).toSet();

@@ -16,6 +16,8 @@ import 'package:agenda/services/attachment_files.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/google_sign_in_service.dart';
 import 'package:agenda/services/invitation_links.dart';
+import 'package:agenda/services/meeting_store.dart';
+import 'package:agenda/models/meeting.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -66,6 +68,7 @@ void main() {
     late LocalAccountData local;
     late Directory captures;
     late CaptureStore captureStore;
+    late MeetingStore meetingStore;
     String scope(String owner) =>
         sha256.convert(utf8.encode(owner)).toString();
 
@@ -80,12 +83,17 @@ void main() {
       database = await openDatabase(p.join(directory.path, 'data.db'));
       captures = Directory(p.join(directory.path, 'captures'));
       captureStore = CaptureStore(database, directory: captures);
+      meetingStore = MeetingStore(
+        database,
+        directory: Directory(p.join(directory.path, 'meetings')),
+      );
       local = LocalAccountData(
         database,
         files: AttachmentFiles(
           directory: Directory(p.join(directory.path, 'attachments')),
         ),
         captures: captureStore,
+        meetings: meetingStore,
       );
     });
     tearDown(() async {
@@ -93,6 +101,67 @@ void main() {
       expect(p.isWithin(Directory.systemTemp.path, directory.path), isTrue);
       await directory.delete(recursive: true);
     });
+
+    test(
+      'its recorded meetings go with their audio; another account’s stay',
+      () async {
+        final now = DateTime.utc(2026, 11, 3, 10);
+        Future<(Meeting, List<File>)> recorded(String owner) async {
+          final meeting = await meetingStore.create(
+            owner,
+            format: MeetingAudioFormat.opus,
+            now: now,
+          );
+          final files = <File>[];
+          for (var i = 0; i < 2; i++) {
+            final path = await meetingStore.piecePath(
+              meeting.id,
+              Duration(minutes: 5 * i),
+              meeting.format,
+            );
+            files.add(await File(path).writeAsBytes(List.filled(2048, 1)));
+            if (i == 0) {
+              await meetingStore.openPiece(
+                meeting,
+                index: 0,
+                offset: Duration.zero,
+                path: path,
+                now: now,
+              );
+            }
+          }
+          await meetingStore.closePiece(
+            meeting,
+            index: 0,
+            duration: const Duration(minutes: 5),
+            hasSound: true,
+            now: now,
+            nextPath: files[1].path,
+          );
+          await meetingStore.acquireLease(owner, 'app', now);
+          return (meeting, files);
+        }
+
+        final (mine, myFiles) = await recorded(gone);
+        final (theirs, theirFiles) = await recorded(other);
+        await local.erase(gone);
+
+        expect(await meetingStore.meeting(mine.id, gone), isNull);
+        expect(await meetingStore.pieces(mine.id, gone), isEmpty);
+        expect(await meetingStore.backlog(gone), isA<MeetingBacklog>().having((b) => b.isEmpty, 'isEmpty', isTrue));
+        final sql = await database.database;
+        expect(await sql.query('meeting_leases', where: 'owner_key = ?', whereArgs: [gone]), isEmpty);
+        for (final file in myFiles) {
+          expect(file.existsSync(), isFalse);
+        }
+        expect(myFiles.first.parent.existsSync(), isFalse);
+        expect(await meetingStore.meeting(theirs.id, other), isNotNull);
+        expect(await meetingStore.pieces(theirs.id, other), hasLength(2));
+        for (final file in theirFiles) {
+          expect(file.existsSync(), isTrue);
+        }
+      },
+    );
 
     test(
       'every record of the account goes, with the app’s copies of its files, its downloads and its recordings; other accounts, what was kept before signing in, and the person’s own files stay',

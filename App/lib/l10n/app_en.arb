@@ -4012,5 +4012,240 @@
   "billingReasonReminderPlansExample": "“a week before, and the day before at 8”",
   "@billingReasonReminderPlansExample": {
     "description": "On the Pro screen, under billingReasonReminderPlans: an example of a reminder rhythm said in your own words, in quotes and with no final period. Use the same example as reminderPlanYourWayHint: a rhythm that Gentle, Normal and Intense don’t give, so it doesn’t sell a free rhythm as Pro. Keep no-break spaces inside the time phrase (ES «a las 8», CA «a les 8», EN “at 8”), so it never wraps apart."
+  },
+  "meetingRecord": "Record a meeting",
+  "@meetingRecord": {
+    "description": "In the Notes tab, under “Add a note”: records a conversation (a meeting with a client, a class) and turns it into notes. Pro only; without Pro it opens the Pro screen."
+  },
+  "meetingScreenTitle": "Meeting",
+  "@meetingScreenTitle": {
+    "description": "The title of the screen that records a meeting and then prepares its notes."
+  },
+  "meetingListening": "Recording",
+  "@meetingListening": {
+    "description": "On the recording screen, above the elapsed time: says the microphone is listening. Short."
+  },
+  "meetingListeningHelp": "You can lock the phone. It keeps recording.",
+  "@meetingListeningHelp": {
+    "description": "On the recording screen, under the elapsed time."
+  },
+  "meetingStop": "Stop",
+  "@meetingStop": {
+    "description": "The large button that stops recording a meeting; its notes are then prepared. Also the Stop button of the ongoing “recording a meeting” notification."
+  },
+  "meetingDiscardQuestion": "Discard this recording? It’s deleted from your phone and can’t be recovered.",
+  "@meetingDiscardQuestion": {
+    "description": "Asked before a meeting recording is discarded, while recording or after it stopped."
+  },
+  "meetingKeepRecording": "Keep recording",
+  "@meetingKeepRecording": {
+    "description": "In meetingDiscardQuestion while recording: closes the question and goes on recording."
+  },
+  "meetingPreparing": "Preparing your notes…",
+  "@meetingPreparing": {
+    "description": "After Stop: the meeting’s notes are being made. Also the Notes tab’s line for a meeting waiting for its notes."
+  },
+  "meetingPreparingHelp": "It takes a few seconds. You can leave this screen: we’ll let you know when they’re ready.",
+  "@meetingPreparingHelp": {
+    "description": "Under meetingPreparing on the meeting screen."
+  },
+  "meetingWaitingConnection": "Waiting for connection",
+  "@meetingWaitingConnection": {
+    "description": "A stopped meeting whose recording can’t be sent: the phone has no signal."
+  },
+  "meetingWaitingConnectionHelp": "Your recording is safe on this phone. The notes are made once you’re back online, and we’ll let you know.",
+  "@meetingWaitingConnectionHelp": {
+    "description": "Under meetingWaitingConnection on the meeting screen."
+  },
+  "meetingNothingHeard": "Nothing was heard, so there’s nothing to save.",
+  "@meetingNothingHeard": {
+    "description": "A short message after Stop when the recording was only silence."
+  },
+  "meetingStoppedAt": "Your recording stopped at {time}. Continue, finish or discard?",
+  "@meetingStoppedAt": {
+    "description": "In the Notes tab, for a meeting recording that stopped without Stop (the app closed, the phone switched off). time is how much was recorded, as 1:42 or 4:05:10.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "1:42"
+      }
+    }
+  },
+  "meetingContinue": "Continue",
+  "@meetingContinue": {
+    "description": "On meetingStoppedAt: records more into the same meeting."
+  },
+  "meetingFinish": "Finish",
+  "@meetingFinish": {
+    "description": "On meetingStoppedAt: makes the notes from what was recorded."
+  },
+  "meetingRecordingNow": "Recording a meeting · {time}",
+  "@meetingRecordingNow": {
+    "description": "In the Notes tab while a meeting records and its screen was left. time is the elapsed time, as 12:03.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "12:03"
+      }
+    }
+  },
+  "meetingOpen": "Open",
+  "@meetingOpen": {
+    "description": "On meetingRecordingNow: opens the recording screen."
+  },
+  "meetingProRequired": "Meeting notes are part of TaskFlow Pro. Your recording waits on this phone.",
+  "@meetingProRequired": {
+    "description": "A stopped meeting whose notes the server refused: the account no longer has Pro."
+  },
+  "meetingAllowanceUsed": "You’ve used this month’s meeting time. Your recording waits on this phone until next month.",
+  "@meetingAllowanceUsed": {
+    "description": "A stopped meeting held back: this month’s allowance of meeting time is used."
+  },
+  "meetingCantMakeNotes": "Part of this recording couldn’t be sent, so no notes can be made from it.",
+  "@meetingCantMakeNotes": {
+    "description": "A stopped meeting that can only be discarded: a piece of its audio is lost or refused for good."
+  },
+  "meetingMicrophoneBlocked": "To record a meeting, open Settings and tap Permissions › Microphone › Allow.",
+  "@meetingMicrophoneBlocked": {
+    "description": "The microphone permission was refused. Same path as captureMicrophoneBlocked; followed by captureOpenSettings."
+  },
+  "meetingLowSpace": "Your phone is almost full. Free up some space to record a meeting.",
+  "@meetingLowSpace": {
+    "description": "Under about 100 MB free: a meeting can’t start."
+  },
+  "meetingSpaceLowWarning": "Low on space: the recording stops by itself if the phone fills up.",
+  "@meetingSpaceLowWarning": {
+    "description": "On the recording screen, under the elapsed time, when the phone has under about 300 MB free: recording goes on, and stops safely by itself near 100 MB."
+  },
+  "meetingStartFailed": "The recording couldn’t start. Try again.",
+  "@meetingStartFailed": {
+    "description": "The microphone failed to start a meeting recording."
+  },
+  "meetingStoppedNoSpace": "Your phone ran out of space, so the recording stopped.",
+  "@meetingStoppedNoSpace": {
+    "description": "On the meeting screen, above meetingPreparing: the recording stopped itself to keep the phone working."
+  },
+  "meetingMicrophoneFailed": "The microphone stopped working, so the recording stopped.",
+  "@meetingMicrophoneFailed": {
+    "description": "On the meeting screen, above the stopped recording's question: the microphone failed mid-recording."
+  },
+  "meetingNoticeTitle": "Recording a meeting",
+  "@meetingNoticeTitle": {
+    "description": "The title of the ongoing notification while a meeting records."
+  },
+  "meetingRecordingChannel": "Meeting recording",
+  "@meetingRecordingChannel": {
+    "description": "The name Android’s notification settings give the ongoing “recording a meeting” notification."
+  },
+  "meetingNotesChannel": "Meeting notes",
+  "@meetingNotesChannel": {
+    "description": "The name Android’s notification settings give the “your meeting notes are ready” notification."
+  },
+  "meetingNotesReady": "Your meeting notes are ready",
+  "@meetingNotesReady": {
+    "description": "The title of the notification when a meeting’s notes are saved; its text is the note’s title. Tapping it opens the note."
+  },
+  "meetingNoteDecisions": "Decisions",
+  "@meetingNoteDecisions": {
+    "description": "In a note made from a meeting: the heading over the decisions taken. Written in the meeting’s language."
+  },
+  "meetingNoteOpenQuestions": "Open questions",
+  "@meetingNoteOpenQuestions": {
+    "description": "In a note made from a meeting: the heading over what was left unanswered."
+  },
+  "meetingNoteChapters": "Parts of the meeting",
+  "@meetingNoteChapters": {
+    "description": "In a note made from a meeting: the heading over one line per half hour, as “0:30–1:00 Pricing”."
+  },
+  "meetingNoteStartMissing": "The start of this recording expired, so these notes cover only the rest.",
+  "@meetingNoteStartMissing": {
+    "description": "The first line of a note made from a meeting whose first part was deleted from the server after 30 days without signal."
+  },
+  "meetingNoteUntitled": "Meeting notes",
+  "@meetingNoteUntitled": {
+    "description": "The title of a note made from a meeting in which nothing was said."
+  },
+  "meetingCreateTask": "Create task",
+  "@meetingCreateTask": {
+    "description": "On a note with steps (a meeting’s to-dos): opens the review with a task titled like the note and its steps as the checklist."
+  },
+  "meetingSignOutQuestion": "{count, plural, =1{A meeting recording hasn’t been sent yet. Send it before signing out, or discard it?} other{{count} meeting recordings haven’t been sent yet. Send them before signing out, or discard them?}} Reminders on this phone stop until you sign in again.",
+  "@meetingSignOutQuestion": {
+    "description": "Asked on Sign out when meeting recordings still wait on this phone: they belong to this account and can’t be sent after signing out.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "meetingSendFirst": "Send first",
+  "@meetingSendFirst": {
+    "description": "In meetingSignOutQuestion: sends the recordings, then signs out."
+  },
+  "meetingDiscardAndSignOut": "Discard and sign out",
+  "@meetingDiscardAndSignOut": {
+    "description": "In meetingSignOutQuestion: deletes the recordings, then signs out."
+  },
+  "meetingSending": "Sending your recording…",
+  "@meetingSending": {
+    "description": "On the account screen while meetingSendFirst sends."
+  },
+  "meetingSendFailed": "Not everything could be sent. Try again with a connection, or discard it.",
+  "@meetingSendFailed": {
+    "description": "After meetingSendFirst, when the phone couldn’t reach the server: you stay signed in."
+  },
+  "meetingNotesExpired": "This recording was kept too long without being finished, so no notes can be made from it.",
+  "@meetingNotesExpired": {
+    "description": "A stopped meeting that can only be discarded: it waited so long that the server deleted what it had already received."
+  },
+  "meetingSendFailedPro": "Your recording can’t be sent without TaskFlow Pro. Stay signed in to keep it, or discard it.",
+  "@meetingSendFailedPro": {
+    "description": "After meetingSendFirst, when the account no longer has Pro: you stay signed in."
+  },
+  "meetingSendFailedAllowance": "You’ve used this month’s meeting time, so your recording can’t be sent until next month. Stay signed in to keep it, or discard it.",
+  "@meetingSendFailedAllowance": {
+    "description": "After meetingSendFirst, when this month’s meeting allowance is used: you stay signed in."
+  },
+  "meetingSendFailedLost": "A recording can’t become notes any more. Discard it to sign out.",
+  "@meetingSendFailedLost": {
+    "description": "After meetingSendFirst, when a recording can only be discarded (meetingCantMakeNotes or meetingNotesExpired): you stay signed in."
+  },
+  "meetingDiscardNamed": "Discard the recording of {time}",
+  "@meetingDiscardNamed": {
+    "description": "Read by TalkBack for Discard on a meeting line in Notes (shown as “Discard”), so several lines’ buttons can be told apart. {time} is the recorded length.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "1:42:00"
+      }
+    }
+  },
+  "meetingFinishNamed": "Finish the recording of {time}",
+  "@meetingFinishNamed": {
+    "description": "Read by TalkBack for meetingFinish on a stopped meeting’s line. {time} is the recorded length.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "1:42:00"
+      }
+    }
+  },
+  "meetingContinueNamed": "Continue the recording of {time}",
+  "@meetingContinueNamed": {
+    "description": "Read by TalkBack for meetingContinue on a stopped meeting’s line. {time} is the recorded length.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "1:42:00"
+      }
+    }
+  },
+  "billingReasonMeetingNotes": "With Pro, record a meeting and get its notes:",
+  "@billingReasonMeetingNotes": {
+    "description": "On the Pro screen, opened from “Record a meeting” in Notes: what Pro adds there. A heading, followed by billingReasonMeetingNotesExample."
+  },
+  "billingReasonMeetingNotesExample": "a summary, the decisions and the to-dos",
+  "@billingReasonMeetingNotesExample": {
+    "description": "On the Pro screen, under billingReasonMeetingNotes: what the notes hold, with no final period."
   }
 }

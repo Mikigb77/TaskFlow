@@ -55,6 +55,7 @@ dependencies:
   file_picker: ^8.1.2
   open_file: ^3.5.3
   http: ^1.2.2
+  http_parser: ^4.1.2
   flutter_secure_storage: ^9.2.4
   flutter_timezone: ^5.1.0
   record: ^6.2.0

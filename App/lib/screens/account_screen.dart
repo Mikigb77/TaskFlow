@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/l10n/request_locale.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:agenda/models/meeting.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/services/google_sign_in_service.dart';
+import 'package:agenda/services/meeting_controller.dart';
 import 'package:agenda/widgets/google_login_button.dart';
+import 'package:agenda/widgets/meeting_banners.dart';
 import 'package:agenda/widgets/name_ask_sheet.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
@@ -24,8 +27,11 @@ class AccountScreen extends ConsumerStatefulWidget {
 
 enum _Action { sync, import, google, signOut }
 
+enum _MeetingsChoice { send, discard }
+
 class _AccountScreenState extends ConsumerState<AccountScreen> {
   _Action? _running;
+  bool _sendingMeetings = false;
   bool _failed = false;
   String? _message;
   Object? _failure;
@@ -54,10 +60,8 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     }
   }
 
-  Future<void> _sync() => _run(
-    _Action.sync,
-    () => ref.read(taskProvider.notifier).loadTasks(),
-  );
+  Future<void> _sync() =>
+      _run(_Action.sync, () => ref.read(taskProvider.notifier).loadTasks());
 
   Future<void> _import() async {
     final count = await _localItems;
@@ -95,6 +99,22 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
   }
 
   Future<void> _signOut() async {
+    // Meeting recordings waiting here belong to this account (MN-13).
+    // Right after launch they may not have been read yet: read them now.
+    final reading = ref.read(meetingControllerProvider.notifier);
+    try {
+      await reading.ready;
+      await reading.refresh();
+    } catch (_) {
+      /* Counted from what the app has read. */
+    }
+    if (!mounted) return;
+    final meetings = ref.read(meetingsProvider);
+    final waiting =
+        (meetings.recording == null ? 0 : 1) +
+        meetings.stopped.length +
+        meetings.waiting.length;
+    if (waiting > 0) return _signOutWithMeetings(waiting);
     // Signing out cancels every reminder on this phone, so ask first.
     final confirmed = await showDialog<bool>(
       context: context,
@@ -114,10 +134,83 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    await _run(
-      _Action.signOut,
-      () => ref.read(authProvider.notifier).signOut(),
+    // A meeting's notes just saved: the server hears it may delete the
+    // meeting while this account can still tell it (MN-24).
+    final unacknowledged = meetings.ready.any(
+      (meeting) => meeting.phase == MeetingPhase.saved,
     );
+    final controller = ref.read(meetingControllerProvider.notifier);
+    await _run(_Action.signOut, () async {
+      if (unacknowledged) await tellServerBeforeSignOut(controller);
+      await ref.read(authProvider.notifier).signOut();
+    });
+  }
+
+  /// Recordings still wait to be sent (MN-13): send them first, or discard
+  /// them, then sign out. If they can't all be sent, the account stays.
+  Future<void> _signOutWithMeetings(int count) async {
+    final choice = await showDialog<_MeetingsChoice>(
+      context: context,
+      builder: (context) => AlertDialog(
+        scrollable: true,
+        actionsOverflowButtonSpacing: 8,
+        content: Text(context.l10n.meetingSignOutQuestion(count)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(context.l10n.cancel),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(context, _MeetingsChoice.discard),
+            child: Text(context.l10n.meetingDiscardAndSignOut),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, _MeetingsChoice.send),
+            child: Text(context.l10n.meetingSendFirst),
+          ),
+        ],
+      ),
+    );
+    if (choice == null || !mounted) return;
+    final controller = ref.read(meetingControllerProvider.notifier);
+    final strings = context.l10n;
+    await _run(_Action.signOut, () async {
+      if (choice == _MeetingsChoice.discard) {
+        // Deleted on the server too, before the account's token goes
+        // (MN-13, MN-25).
+        await controller.discardAll();
+        await tellServerBeforeSignOut(controller);
+      } else {
+        setState(() => _sendingMeetings = true);
+        try {
+          // Sent as they are: one recording now stops, and those that
+          // stopped by themselves are finished into notes.
+          final now = ref.read(meetingsProvider);
+          if (now.recording != null) await controller.stop();
+          for (final meeting in now.stopped) {
+            await controller.finishMeeting(meeting.id);
+          }
+          if (!await controller.uploadNow()) {
+            if (mounted) {
+              setState(() {
+                _message = meetingSendFailure(
+                  strings,
+                  ref.read(meetingsProvider),
+                );
+                _failed = true;
+              });
+            }
+            return;
+          }
+        } finally {
+          if (mounted) setState(() => _sendingMeetings = false);
+        }
+      }
+      await ref.read(authProvider.notifier).signOut();
+    });
   }
 
   Future<void> _linkGoogle() async {
@@ -186,8 +279,10 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
               if (name.isNotEmpty) ...[
                 Semantics(
                   header: true,
-                  child: Text(name,
-                      style: Theme.of(context).textTheme.headlineMedium),
+                  child: Text(
+                    name,
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
                 ),
                 const SizedBox(height: 8),
               ],
@@ -313,7 +408,9 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                   onPressed: busy ? null : _signOut,
                   icon: _running == _Action.signOut
                       ? progress(
-                          context.l10n.accountSigningOut,
+                          _sendingMeetings
+                              ? context.l10n.meetingSending
+                              : context.l10n.accountSigningOut,
                           color: colors.error,
                         )
                       : null,

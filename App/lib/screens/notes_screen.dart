@@ -11,10 +11,12 @@ import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
+import 'package:agenda/screens/meeting_screen.dart';
 import 'package:agenda/screens/task_detail_screen.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
+import 'package:agenda/widgets/meeting_banners.dart';
 import 'package:agenda/widgets/search_clear.dart';
 import 'package:agenda/widgets/task_list_picker.dart';
 import 'package:agenda/services/capture_store.dart';
@@ -153,6 +155,8 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     final shownList =
         lists.where((list) => list.id == _listId).firstOrNull;
     final readOnly = shownList != null && !shownList.canEdit;
+    final recording = ref.watch(
+        meetingsProvider.select((meetings) => meetings.recording != null));
     return Scaffold(
       appBar: CustomAppBar(title: context.l10n.notes, isRoot: widget.isRoot),
       body: RefreshIndicator(
@@ -182,6 +186,24 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                       onPressed: () =>
                           Navigator.pushNamed(context, '/captures'),
                       child: Text(context.l10n.checkCaptures))),
+              // A meeting recording, stopped or waiting for its notes.
+              const MeetingBanners(),
+              // Second to Añadir nota, and quieter: a conversation becomes
+              // a note (MN-1). Pro only, as MEETING_NOTES_PLAN.md decides;
+              // without it, the Pro screen. While one
+              // records, its line above opens it.
+              if (!readOnly && !recording)
+                Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: TextButton.icon(
+                        key: const ValueKey('record-meeting'),
+                        icon: const Icon(Icons.record_voice_over_outlined),
+                        label: Text(context.l10n.meetingRecord),
+                        onPressed: () => _add(() => openMeetingRecorder(
+                            context,
+                            projectId: _saveTo)))),
+              if (!readOnly && !recording && hasNotes)
+                const SizedBox(height: 8),
               if (hasNotes) ...[
                 SearchField(
                     key: const ValueKey('note-search'),

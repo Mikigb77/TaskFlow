@@ -18,6 +18,7 @@ import 'package:agenda/widgets/task_interactions.dart';
 import 'package:agenda/widgets/task_assignment_picker.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:agenda/widgets/note_text.dart';
+import 'package:agenda/widgets/note_task.dart';
 
 class TaskDetailScreen extends ConsumerStatefulWidget {
   const TaskDetailScreen({
@@ -556,13 +557,27 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                         top: false,
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-                          child: Center(
-                            heightFactor: 1,
-                            child: FilledButton.icon(
-                              onPressed: edit,
-                              icon: const Icon(Icons.edit_outlined),
-                              label: Text(context.l10n.editNote),
-                            ),
+                          // A note with steps (a meeting's to-dos) can
+                          // become a task with them (MN-22).
+                          child: Wrap(
+                            spacing: 12,
+                            runSpacing: 8,
+                            alignment: WrapAlignment.center,
+                            children: [
+                              FilledButton.icon(
+                                onPressed: edit,
+                                icon: const Icon(Icons.edit_outlined),
+                                label: Text(context.l10n.editNote),
+                              ),
+                              if (noteMakesTask(task))
+                                OutlinedButton.icon(
+                                  key: const ValueKey('note-create-task'),
+                                  onPressed: () =>
+                                      createTaskFromNote(context, task),
+                                  icon: const Icon(Icons.add_task_rounded),
+                                  label: Text(context.l10n.meetingCreateTask),
+                                ),
+                            ],
                           ),
                         ),
                       )

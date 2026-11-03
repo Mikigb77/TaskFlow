@@ -5094,4 +5094,196 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String get billingReasonReminderPlansExample =>
       '«una setmana abans i el dia abans a les 8»';
+
+  @override
+  String get meetingRecord => 'Enregistra una reunió';
+
+  @override
+  String get meetingScreenTitle => 'Reunió';
+
+  @override
+  String get meetingListening => 'S’està enregistrant';
+
+  @override
+  String get meetingListeningHelp =>
+      'Pots bloquejar el telèfon: continua enregistrant.';
+
+  @override
+  String get meetingStop => 'Atura';
+
+  @override
+  String get meetingDiscardQuestion =>
+      'Vols descartar aquest enregistrament? S’esborra del telèfon i no es pot recuperar.';
+
+  @override
+  String get meetingKeepRecording => 'Continua enregistrant';
+
+  @override
+  String get meetingPreparing => 'Preparant les teves notes…';
+
+  @override
+  String get meetingPreparingHelp =>
+      'Triga uns segons. Pots sortir d’aquesta pantalla: t’avisarem quan estiguin a punt.';
+
+  @override
+  String get meetingWaitingConnection => 'Esperant connexió';
+
+  @override
+  String get meetingWaitingConnectionHelp =>
+      'L’enregistrament és segur al telèfon. Les notes es preparen quan tornis a tenir connexió, i t’avisarem.';
+
+  @override
+  String get meetingNothingHeard =>
+      'No s’ha sentit res, així que no hi ha res per desar.';
+
+  @override
+  String meetingStoppedAt(String time) {
+    return 'L’enregistrament es va aturar a $time. Vols continuar, acabar o descartar?';
+  }
+
+  @override
+  String get meetingContinue => 'Continua';
+
+  @override
+  String get meetingFinish => 'Acaba';
+
+  @override
+  String meetingRecordingNow(String time) {
+    return 'Enregistrant una reunió · $time';
+  }
+
+  @override
+  String get meetingOpen => 'Obre';
+
+  @override
+  String get meetingProRequired =>
+      'Les notes de reunions formen part de TaskFlow Pro. L’enregistrament t’espera al telèfon.';
+
+  @override
+  String get meetingAllowanceUsed =>
+      'Has fet servir el temps de reunions d’aquest mes. L’enregistrament t’espera al telèfon fins al mes que ve.';
+
+  @override
+  String get meetingCantMakeNotes =>
+      'Una part d’aquest enregistrament no s’ha pogut enviar, així que no se’n poden fer notes.';
+
+  @override
+  String get meetingMicrophoneBlocked =>
+      'Per enregistrar una reunió, obre Configuració i toca Permisos › Micròfon › Permet.';
+
+  @override
+  String get meetingLowSpace =>
+      'El telèfon és gairebé ple. Allibera espai per enregistrar una reunió.';
+
+  @override
+  String get meetingSpaceLowWarning =>
+      'Queda poc espai: l’enregistrament s’atura sol si el telèfon s’omple.';
+
+  @override
+  String get meetingStartFailed =>
+      'No s’ha pogut començar a enregistrar. Torna-ho a provar.';
+
+  @override
+  String get meetingStoppedNoSpace =>
+      'El telèfon s’ha quedat sense espai, així que l’enregistrament s’ha aturat.';
+
+  @override
+  String get meetingMicrophoneFailed =>
+      'El micròfon ha deixat de funcionar, així que l’enregistrament s’ha aturat.';
+
+  @override
+  String get meetingNoticeTitle => 'Enregistrant una reunió';
+
+  @override
+  String get meetingRecordingChannel => 'Enregistrament de reunions';
+
+  @override
+  String get meetingNotesChannel => 'Notes de reunions';
+
+  @override
+  String get meetingNotesReady => 'Les notes de la reunió ja són a punt';
+
+  @override
+  String get meetingNoteDecisions => 'Decisions';
+
+  @override
+  String get meetingNoteOpenQuestions => 'Preguntes obertes';
+
+  @override
+  String get meetingNoteChapters => 'Parts de la reunió';
+
+  @override
+  String get meetingNoteStartMissing =>
+      'L’inici d’aquest enregistrament va caducar, així que aquestes notes només en cobreixen la resta.';
+
+  @override
+  String get meetingNoteUntitled => 'Notes de la reunió';
+
+  @override
+  String get meetingCreateTask => 'Crea una tasca';
+
+  @override
+  String meetingSignOutQuestion(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Encara no s’han enviat $count enregistraments de reunions. Vols enviar-los abans de tancar la sessió, o descartar-los?',
+      one:
+          'Encara no s’ha enviat un enregistrament de reunió. Vols enviar-lo abans de tancar la sessió, o descartar-lo?',
+    );
+    return '$_temp0 Deixaràs de rebre recordatoris en aquest telèfon fins que tornis a entrar.';
+  }
+
+  @override
+  String get meetingSendFirst => 'Envia primer';
+
+  @override
+  String get meetingDiscardAndSignOut => 'Descarta i tanca la sessió';
+
+  @override
+  String get meetingSending => 'Enviant l’enregistrament…';
+
+  @override
+  String get meetingSendFailed =>
+      'No s’ha pogut enviar tot. Torna-ho a provar amb connexió, o descarta-ho.';
+
+  @override
+  String get meetingNotesExpired =>
+      'Aquest enregistrament ha passat massa temps sense acabar-se, així que no se’n poden fer notes.';
+
+  @override
+  String get meetingSendFailedPro =>
+      'L’enregistrament no es pot enviar sense TaskFlow Pro. Mantén la sessió oberta per conservar-lo, o descarta’l.';
+
+  @override
+  String get meetingSendFailedAllowance =>
+      'Has fet servir el temps de reunions d’aquest mes, així que l’enregistrament no es pot enviar fins al mes que ve. Mantén la sessió oberta per conservar-lo, o descarta’l.';
+
+  @override
+  String get meetingSendFailedLost =>
+      'Un enregistrament ja no es pot convertir en notes. Descarta’l per tancar la sessió.';
+
+  @override
+  String meetingDiscardNamed(String time) {
+    return 'Descarta l’enregistrament de $time';
+  }
+
+  @override
+  String meetingFinishNamed(String time) {
+    return 'Acaba l’enregistrament de $time';
+  }
+
+  @override
+  String meetingContinueNamed(String time) {
+    return 'Continua l’enregistrament de $time';
+  }
+
+  @override
+  String get billingReasonMeetingNotes =>
+      'Amb Pro, enregistra una reunió i rep-ne les notes:';
+
+  @override
+  String get billingReasonMeetingNotesExample =>
+      'un resum, les decisions i les tasques';
 }

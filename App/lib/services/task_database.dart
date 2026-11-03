@@ -14,7 +14,7 @@ import 'package:agenda/services/reminder_copy.dart';
 enum ReminderBlock { archived, muted, notForAccount }
 
 class TaskDatabase {
-  static const schemaVersion = 21;
+  static const schemaVersion = 22;
   static final TaskDatabase _instance = TaskDatabase._internal();
   Database? _database;
   Future<Database>? _opening;
@@ -88,6 +88,7 @@ class TaskDatabase {
           await createListTables(db);
           await createImportTables(db);
           await createAttachmentTables(db);
+          await createMeetingTables(db);
         },
         onUpgrade: upgrade,
       ),
@@ -267,6 +268,37 @@ class TaskDatabase {
         "ALTER TABLE tasks ADD COLUMN completedTimes TEXT NOT NULL DEFAULT '{}'",
       );
     }
+    if (oldVersion < 22 && newVersion >= 22) {
+      // Recorded meetings and their pieces (App/docs/MEETING_NOTES.md).
+      // New tables only: nothing saved before changes.
+      await createMeetingTables(db);
+    }
+  }
+
+  /// A recorded meeting and the numbered pieces it uploads
+  /// (`MeetingStore`); one upload lease per account.
+  static Future<void> createMeetingTables(Database db) async {
+    await db.execute('''CREATE TABLE IF NOT EXISTS meetings(
+      id TEXT PRIMARY KEY, owner_key TEXT NOT NULL, phase TEXT NOT NULL,
+      started_at TEXT NOT NULL, stopped_at TEXT, heartbeat_at TEXT,
+      recorded_ms INTEGER NOT NULL DEFAULT 0, next_index INTEGER NOT NULL DEFAULT 0,
+      last_index INTEGER, language TEXT, format TEXT NOT NULL, project_id TEXT,
+      problem TEXT, attempts INTEGER NOT NULL DEFAULT 0, retry_at TEXT,
+      waits INTEGER NOT NULL DEFAULT 0, asked_at TEXT,
+      note_id INTEGER, title TEXT, seen INTEGER NOT NULL DEFAULT 0)''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS meeting_owner ON meetings(owner_key, phase)',
+    );
+    await db.execute('''CREATE TABLE IF NOT EXISTS meeting_pieces(
+      meeting_id TEXT NOT NULL, owner_key TEXT NOT NULL, idx INTEGER NOT NULL,
+      offset_ms INTEGER NOT NULL, duration_ms INTEGER NOT NULL DEFAULT 0,
+      path TEXT NOT NULL, state TEXT NOT NULL, has_sound INTEGER NOT NULL DEFAULT 1,
+      attempts INTEGER NOT NULL DEFAULT 0, retry_at TEXT,
+      PRIMARY KEY(meeting_id, idx))''');
+    await db.execute('''CREATE INDEX IF NOT EXISTS meeting_piece_owner
+      ON meeting_pieces(owner_key, state)''');
+    await db.execute('''CREATE TABLE IF NOT EXISTS meeting_leases(
+      owner_key TEXT PRIMARY KEY, holder TEXT NOT NULL, expires_at TEXT NOT NULL)''');
   }
 
   static Future<void> createAttachmentTables(Database db) async {
