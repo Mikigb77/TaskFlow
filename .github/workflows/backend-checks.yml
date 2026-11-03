@@ -1,0 +1,42 @@
+# Runs the backend's tests on every pull request into main or dev that touches
+# Backend/. A merge into main then deploys the staging API (deploy-backend.yml).
+name: Backend checks
+
+on:
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "Backend/**"
+      - ".github/workflows/backend-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Django tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: Backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12" # the Docker image's Python
+          cache: pip
+          cache-dependency-path: Backend/requirements.lock
+      - run: pip install -r requirements.lock
+      - name: python manage.py test core
+        run: |
+          # The settings Docker Compose gives the tests, from the tracked .env,
+          # with every key blanked: no test may reach a paid or real service.
+          set -a; . ./.env; set +a
+          export GEMINI_API_KEY= REVENUECAT_API_KEY= POSTGRES_PASSWORD= DJANGO_SECRET_KEY=ci-only-not-a-secret
+          python manage.py test core --settings=config.test_settings
