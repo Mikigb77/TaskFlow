@@ -327,3 +327,44 @@ class FreeDictation(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=["user", "period"], name="free_dictation_month")]
+
+
+class Meeting(models.Model):
+    """A recorded conversation on its way to notes (docs/MEETINGS.md). Text only: audio is never
+    stored. Deleted once the app saved the note, after 30 days, or with the account."""
+    id = models.UUIDField(primary_key=True, editable=False)  # made on the phone
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="meetings")
+    # The lowest piece received. Above 0 the start expired on the server (MN-28): start_missing.
+    first_index = models.PositiveIntegerField(default=0)
+    start_missing = models.BooleanField(default=False)
+    last_index = models.PositiveIntegerField(null=True)  # from the first finish; later ones are ignored
+    language = models.CharField(max_length=35, blank=True)  # the app's hint, for a meeting with no speech
+    result = models.JSONField(null=True)  # the final notes, once written
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_piece_at = models.DateTimeField(db_index=True)  # the 30-day sweep counts from here (MN-27)
+    ready_at = models.DateTimeField(null=True)
+
+
+class MeetingPiece(models.Model):
+    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name="pieces")
+    index = models.PositiveIntegerField()
+    offset_seconds = models.FloatField()
+    duration_seconds = models.FloatField()
+    text = models.TextField(blank=True)  # empty for a silent piece
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["meeting", "index"], name="unique_meeting_piece")]
+
+
+class MeetingChapter(models.Model):
+    # Half hour `index`: pieces 6*index to 6*index + 5.
+    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name="chapters")
+    index = models.PositiveIntegerField()
+    start_minute = models.PositiveIntegerField()
+    end_minute = models.PositiveIntegerField()
+    title = models.CharField(max_length=200, blank=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["meeting", "index"], name="unique_meeting_chapter")]

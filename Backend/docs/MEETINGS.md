@@ -8,12 +8,12 @@ The contract between the server and the app for notes made from a recorded conve
 
 ## Access
 
-Every endpoint needs the normal login token and **TaskFlow Pro**.
+Every endpoint needs the normal login token and **TaskFlow Pro**, except `DELETE`, which needs only the login and the meeting being the person's own: a discard or an acknowledgement always deletes at once, also after Pro lapsed or while RevenueCat is unreachable (MN-24, MN-25).
 
 | Case | Answer |
 |---|---|
-| Not Pro | `402` `{"code": "pro_required"}` |
-| RevenueCat unreachable | `503`, as the existing `BillingUnavailable` (never tell a paying customer they're not Pro) |
+| Not Pro | `402` `{"code": "pro_required"}` (not on `DELETE`) |
+| RevenueCat unreachable | `503`, as the existing `BillingUnavailable` (never tell a paying customer they're not Pro); not on `DELETE` |
 | Monthly allowance used (`AI_MEETING_PIECES_PER_MONTH`, default 240 pieces, about 20 hours) | `402` `{"code": "meeting_allowance_used"}` on a new piece; pieces already saved still answer `200` |
 | Vertex AI not configured | `503` `{"detail": …}` (`AIUnavailable`) |
 | Meeting owned by someone else | `404` |
@@ -35,7 +35,7 @@ Multipart form:
 - A piece already saved answers `200` again without transcribing it again or counting it again.
 - A piece for a meeting whose final notes exist answers `200` if it's already saved, else `409` `{"code": "meeting_finished"}`.
 - The server transcribes the piece with `AI_MEETING_AUDIO_MODEL` on Vertex, giving the last sentence of the piece before as context, saves the text and drops the audio. A silent piece saves empty text.
-- If the piece completes a half hour (chapter `k` = pieces `6k` to `6k+5`, all saved) and that chapter has no notes yet, the same request writes them.
+- If the piece completes a half hour (chapter `k` = pieces `6k` to `6k+5`, all saved) and that chapter has no notes yet, the same request writes them. Chapters are six pieces, not six times five minutes: the app drops silent pieces and gives their number to the next piece, so a chapter can span more than 30 minutes of the meeting. Its times come from the pieces' offsets, so they stay true.
 - If the meeting is finished and this piece completes the set, the same request writes the final notes.
 
 `200` `{"meeting_id": "…", "index": 3, "saved": true, "status": "recording" | "waiting" | "ready"}`
@@ -46,7 +46,9 @@ JSON `{"last_index": 49}`: the last piece's number. Repeating it is safe; a diff
 
 - Every piece from the first one (0, or the first received when `start_missing`) to `last_index` saved: the server writes any missing chapter notes and the final notes (once), and answers `200` `{"status": "ready", "result": {…}}`.
 - Pieces missing: `202` `{"status": "waiting", "missing": [7, 8]}`. The final notes are then written by the piece that completes the set; the app repeats `finish` (or `GET`) until `ready`.
+- `202` `waiting` with an empty `missing` list: every piece is in and the notes are being written; repeat.
 - No meeting yet (no piece ever arrived): `202` `{"status": "waiting", "missing": [0, …, last_index]}`; nothing is stored.
+- The server never leaves out a piece it has saved: the set ends at the higher of `last_index` and the highest piece saved.
 
 ### `GET /api/meetings/<uuid:meeting_id>/`
 
@@ -54,7 +56,9 @@ JSON `{"last_index": 49}`: the last piece's number. Repeating it is safe; a diff
 
 ### `DELETE /api/meetings/<uuid:meeting_id>/`
 
-Discard, or the app's acknowledgement after saving the note. Deletes the meeting, its pieces' text and its chapter notes. `204`, also when nothing exists.
+Discard, or the app's acknowledgement after saving the note. Deletes the meeting, its pieces' text and its chapter notes. `204`, also when nothing exists. Needs no Pro (see Access).
+
+After a `DELETE`, a piece for that meeting id answers `404` for about a day (a piece still in flight never brings the meeting back).
 
 ## The result
 
