@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/main.dart';
@@ -638,7 +639,7 @@ void main() {
   }
 
   List<String> listed(_App app) => [
-    for (final task in app.container.read(taskProvider).valueOrNull ?? [])
+    for (final task in app.container.read(taskProvider).value ?? [])
       task.title,
   ];
 
@@ -706,7 +707,7 @@ void main() {
       app.container.listen(
         taskProvider,
         (_, next) =>
-            seen.add([for (final t in next.valueOrNull ?? []) t.title]),
+            seen.add([for (final t in next.value ?? []) t.title]),
       );
       app.api.found = [
         found(
@@ -759,7 +760,7 @@ void main() {
       app.container.listen(
         taskProvider,
         (_, next) =>
-            seen.add([for (final t in next.valueOrNull ?? []) t.title]),
+            seen.add([for (final t in next.value ?? []) t.title]),
       );
       await tester.tap(find.byKey(const ValueKey('save-drafts')));
       await tester.pumpAndSettle();
@@ -2394,6 +2395,7 @@ class _App {
     final tasks = _Tasks(initial);
     final speech = _Speech();
     final container = ProviderContainer(
+      retry: noRetry,
       overrides: [
         invitationLinkProvider.overrideWith(
           (ref) => InvitationLinks(listen: false),

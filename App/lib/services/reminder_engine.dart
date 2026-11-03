@@ -376,7 +376,7 @@ class ReminderEngine {
       if (snoozedAt != null && snoozedAt.isAfter(now)) {
         if (snooze == null || snoozedAt.isAfter(snooze)) snooze = snoozedAt;
       }
-      for (final moment in [fired, if (snoozedAt != null) snoozedAt]) {
+      for (final moment in [fired, ?snoozedAt]) {
         if (!moment.isAfter(now) && (last == null || moment.isAfter(last))) {
           last = moment;
         }

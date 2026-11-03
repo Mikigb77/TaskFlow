@@ -3,6 +3,7 @@
 // open screens, so what was being typed survives signing back in.
 import 'dart:async';
 
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -65,6 +66,7 @@ void main() {
     addTearDown(tester.view.reset);
     final api = _SessionApi(signedIn: signedIn);
     final container = ProviderContainer(
+      retry: noRetry,
       overrides: [
         invitationLinkProvider.overrideWith(
           (ref) => InvitationLinks(listen: false),

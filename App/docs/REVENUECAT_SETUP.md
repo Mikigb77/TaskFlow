@@ -1,6 +1,6 @@
 # RevenueCat in TaskFlow
 
-Implemented on `dev` with `purchases_flutter` and `purchases_ui_flutter` **10.13.2**. Entry point: **Settings → TaskFlow Pro**. The public Test Store SDK key is used for development and private Android staging. Accounts without Pro get 10 free dictations a month and 100 MB of file space in total; Pro removes both limits. The backend enforces both independently, and typing tasks is never limited (`.claude/ux-review/DECISIONS.md`, free tier).
+Implemented on `dev` with `purchases_flutter` and `purchases_ui_flutter` **11.0.0**. Entry point: **Settings → TaskFlow Pro**. The public Test Store SDK key is used for development and private Android staging. Accounts without Pro get 10 free dictations a month and 100 MB of file space in total; Pro removes both limits. The backend enforces both independently, and typing tasks is never limited (`.claude/ux-review/DECISIONS.md`, free tier).
 
 ## 1. Install with Pub
 
@@ -94,7 +94,7 @@ RevenueCat intentionally shows an API-key warning and terminates a release app
 using a Test Store key. A Dart `APP_ENV=staging` check alone cannot disable that
 native check. The APK from build 4003 uses the Android SDK's documented
 `DangerousSettings.forceAllowTestStoreInReleaseBuilds()` opt-in through
-`StagingBillingBridge`, because Flutter 10.13.2 does not expose it yet.
+`StagingBillingBridge`, because purchases_flutter 11.0.0 does not expose it yet.
 
 The bridge requires all of: the native staging build flag, package
 `com.example.agenda.staging`, and the exact public test key compiled from

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -60,7 +61,7 @@ void main() {
     final store = RegionalPreferenceStore(database);
     await store.write(const RegionalPreferences(
         language: 'en', clock: ClockFormat.twentyFour, weekStart: 1));
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       authProvider.overrideWith((ref) => SignedInFixtureAuth(ref.read(apiClientProvider))),
       apiClientProvider.overrideWith((ref) {
         final api = OfflineApiClient();

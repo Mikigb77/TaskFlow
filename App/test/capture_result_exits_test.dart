@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'dart:ui' show Tristate;
 
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/capture_session.dart';
@@ -858,6 +859,7 @@ class _App {
     final api = _Api();
     final speech = _Speech();
     final container = ProviderContainer(
+      retry: noRetry,
       overrides: [
         invitationLinkProvider.overrideWith(
           (ref) => InvitationLinks(listen: false),

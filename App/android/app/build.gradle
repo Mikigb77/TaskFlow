@@ -29,7 +29,9 @@ if (taskflowStaging) {
 
 android {
     namespace = "com.example.agenda"
-    compileSdk = flutter.compileSdkVersion
+    // permission_handler 13 compiles against Android 17 (API 37); Flutter's
+    // default is 36. targetSdk stays Flutter's, so runtime behaviour is unchanged.
+    compileSdk = Math.max(flutter.compileSdkVersion, 37)
     ndkVersion = flutter.ndkVersion
     buildFeatures {
         resValues = true
@@ -44,7 +46,7 @@ android {
     }
 
     dependencies {
-        coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+        coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
     }
 
     defaultConfig {
@@ -102,13 +104,13 @@ kotlin {
 }
 
 dependencies {
-    // Keep aligned with purchases_flutter 10.13.2. Its Android SDK (10.22.1)
+    // Keep aligned with purchases_flutter 11.0.0. Its Android SDK (v11)
     // exposes the documented internal-release Test Store setting.
-    implementation 'com.revenuecat.purchases:purchases-hybrid-common:19.3.1'
+    implementation 'com.revenuecat.purchases:purchases-hybrid-common:20.0.0'
     androidTestImplementation 'androidx.test.ext:junit:1.3.0'
     androidTestImplementation 'androidx.test:runner:1.7.0'
     androidTestImplementation 'androidx.test:core:1.7.0'
-    androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.3.0'
+    androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.4.0'
 }
 
 flutter {

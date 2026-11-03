@@ -1,0 +1,123 @@
+# Builds the signed staging APK from main and publishes it as a GitHub release,
+# so the newest build is always at
+# https://github.com/Mikigb77/TaskFlow/releases/latest/download/taskflow-staging.apk
+# (linked from README.md). It talks to the staging API on Cloud Run.
+#
+# Same steps and guards as App/scripts/build-staging.ps1, in
+# App/scripts/ci-build-staging.sh. One-time setup: the four secrets that
+# App/scripts/upload-ci-secrets.sh uploads.
+#
+# The checks (app-checks.yml) and the build run at the same time; the release
+# is published only when both pass.
+name: App release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "App/**"
+      - "!App/docs/**"
+      - "!App/**/*.md"
+      - ".github/workflows/app-release.yml"
+      - ".github/workflows/app-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: app-release
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: 3.47.9 # keep in step with App/README.md and app-checks.yml
+  JAVA_VERSION: "26" # App/android/gradle/gradle-daemon-jvm.properties
+
+jobs:
+  checks:
+    name: Checks
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/app-checks.yml
+
+  staging-apk:
+    name: Staging APK
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: App
+    outputs:
+      version: ${{ steps.build.outputs.version }}
+      code: ${{ steps.build.outputs.code }}
+      sha256: ${{ steps.build.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+
+      - name: Build and check the signed staging APK
+        id: build
+        env:
+          APP_STAGING_CONFIG: ${{ secrets.APP_STAGING_CONFIG }}
+          STAGING_KEYSTORE_BASE64: ${{ secrets.STAGING_KEYSTORE_BASE64 }}
+          STAGING_STORE_PASSWORD: ${{ secrets.STAGING_STORE_PASSWORD }}
+          STAGING_KEY_PASSWORD: ${{ secrets.STAGING_KEY_PASSWORD }}
+        run: bash scripts/ci-build-staging.sh
+
+      - name: Remove the signing material
+        if: always()
+        run: rm -rf .credentials config/staging.json
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: staging-apk
+          path: |
+            App/build/releases/taskflow-staging.apk
+            App/build/releases/staging-build.json
+          retention-days: 3
+          if-no-files-found: error
+
+  publish:
+    name: Publish the release
+    needs: [checks, staging-apk]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: staging-apk
+          path: releases
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.staging-apk.outputs.version }}
+          CODE: ${{ needs.staging-apk.outputs.code }}
+          SHA256: ${{ needs.staging-apk.outputs.sha256 }}
+        run: |
+          echo "$SHA256  releases/taskflow-staging.apk" | sha256sum -c -
+          tag="staging-$VERSION-$CODE-${GITHUB_SHA::7}"
+          cp releases/taskflow-staging.apk "releases/taskflow-staging-$VERSION.apk"
+          {
+            echo "Staging build of TaskFlow $VERSION ($CODE), from $GITHUB_SHA on main."
+            echo
+            echo "Installs as **TaskFlow Staging** (com.example.agenda.staging) beside the normal app and talks to the staging API. Purchases use RevenueCat's Test Store."
+            echo
+            echo "SHA-256 of taskflow-staging.apk: \`$SHA256\`"
+          } > "$RUNNER_TEMP/notes.md"
+          files=(releases/taskflow-staging.apk "releases/taskflow-staging-$VERSION.apk" releases/staging-build.json)
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # A re-run of the same commit replaces its files.
+            gh release upload "$tag" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
+          else
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest \
+              --title "TaskFlow Staging $VERSION ($CODE)" --notes-file "$RUNNER_TEMP/notes.md" "${files[@]}"
+          fi

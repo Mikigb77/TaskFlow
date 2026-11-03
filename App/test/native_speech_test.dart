@@ -1,3 +1,4 @@
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/services/app_language.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 import 'dart:async';
@@ -3725,6 +3726,7 @@ Future<ProviderContainer> _open(
   addTearDown(tester.view.resetDevicePixelRatio);
   tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   final container = ProviderContainer(
+    retry: noRetry,
     overrides: [
       invitationLinkProvider.overrideWith(
         (ref) => InvitationLinks(listen: false),
@@ -4052,7 +4054,7 @@ class _Bridge {
   void send(String kind, {String? text}) => _sink?.success({
     'run': run,
     'kind': kind,
-    if (text != null) 'text': text,
+    'text': ?text,
   });
 }
 

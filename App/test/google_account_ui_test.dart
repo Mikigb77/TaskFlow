@@ -1,3 +1,4 @@
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
@@ -44,6 +45,7 @@ void main() {
         final api = ApiClient(url: 'http://10.0.2.2:8088');
         final google = FakeGoogleSignIn();
         final container = ProviderContainer(
+          retry: noRetry,
           overrides: [
             apiClientProvider.overrideWithValue(api),
             googleSignInServiceProvider.overrideWithValue(google),

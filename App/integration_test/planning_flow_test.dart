@@ -1,5 +1,6 @@
 // Real Android UI, SQLite, Docker HTTP sync and notification plugin scheduling.
 // Extraction output and secure credential storage are isolated fixtures.
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/task.dart';
@@ -42,7 +43,7 @@ void main() {
     final repository = CloudTaskRepository(database, api, api.account!.id);
     final owner = repository.ownerKey;
     final store = CaptureStore(database);
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       // The result opens in the capture sheet, which needs Pro.
       hasProProvider.overrideWithValue(true),
       apiClientProvider.overrideWithValue(api),

@@ -40,7 +40,7 @@ Future<TaskListChoice?> chooseTaskList(
   ValueChanged<String>? onRename,
 }) async {
   final creating = newName != null && listId == null;
-  final lists = ref.read(taskListsProvider).valueOrNull ?? <TaskListInfo>[];
+  final lists = ref.read(taskListsProvider).value ?? <TaskListInfo>[];
   final choices = lists
       .where((list) => list.canEdit && (!list.inactive || list.id == listId))
       .toList();
@@ -287,7 +287,7 @@ class TaskListPicker extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final lists = ref.watch(taskListsProvider).valueOrNull ?? <TaskListInfo>[];
+    final lists = ref.watch(taskListsProvider).value ?? <TaskListInfo>[];
     final selected = lists.where((list) => list.id == listId).firstOrNull;
     final locked = lockShared && selected?.shared == true;
     final creating = newName != null && listId == null;

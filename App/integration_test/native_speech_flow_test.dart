@@ -1,4 +1,5 @@
 // Entitlement is a fixture here; real paid access is covered by projects_flow_test.
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 // Real Android capability query + SQLite/UI retention with synthetic recognizer
 // events. This does not measure recognition accuracy or record a microphone.
@@ -32,6 +33,7 @@ void main() {
     final speech = _SpeechFixture();
     const owner = 'native-speech-integration-fixture';
     final container = ProviderContainer(
+      retry: noRetry,
       overrides: [
         hasProProvider.overrideWithValue(true),
         authProvider.overrideWith(

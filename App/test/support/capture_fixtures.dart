@@ -9,6 +9,7 @@ import 'package:agenda/services/task_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:record/record.dart';
 
@@ -194,7 +195,7 @@ class MemoryCaptures extends CaptureStore {
             : draft,
     ];
     final known = {
-      for (final task in tasks?.read(taskProvider).valueOrNull ?? <Task>[])
+      for (final task in tasks?.read(taskProvider).value ?? <Task>[])
         task.id,
     };
     await tasks?.read(taskProvider.notifier).addTasks([
@@ -203,7 +204,7 @@ class MemoryCaptures extends CaptureStore {
     ]);
     // The ids the task list gave them, in the order they were added.
     final added =
-        (tasks?.read(taskProvider).valueOrNull ?? <Task>[])
+        (tasks?.read(taskProvider).value ?? <Task>[])
             .map((task) => task.id)
             .whereType<int>()
             .where((id) => !known.contains(id))

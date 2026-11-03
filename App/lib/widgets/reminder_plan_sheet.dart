@@ -496,7 +496,7 @@ class _ReminderPlanSheetState extends ConsumerState<_ReminderPlanSheet> {
     final l = context.l10n;
     final theme = Theme.of(context);
     final pro = ref.watch(hasProProvider);
-    final settings = ref.watch(reminderPreferencesProvider).valueOrNull;
+    final settings = ref.watch(reminderPreferencesProvider).value;
     final now = ref.watch(calendarClockProvider)();
     final minute = settings?.dateOnlyTime;
     // On a timed day, the day's own reminder of a plan without a time of its

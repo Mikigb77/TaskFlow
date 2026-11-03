@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:agenda/providers/no_retry.dart';
 import 'package:flutter/services.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/region.dart';
@@ -34,7 +35,7 @@ void main() {
     for (final language in ['en', 'es']) {
       for (final dark in [false, true]) {
         final bridge = FakeDeviceCalendars()..access = CalendarAccess.denied;
-        final container = ProviderContainer(overrides: [
+        final container = ProviderContainer(retry: noRetry, overrides: [
           deviceCalendarsProvider.overrideWithValue(bridge),
           calendarPreferenceStoreProvider
               .overrideWithValue(MemoryCalendarPreferences()),
@@ -81,7 +82,7 @@ void main() {
       'a visible event sheet loses its contents when calendar access is revoked',
       (tester) async {
     final bridge = FakeDeviceCalendars();
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       deviceCalendarsProvider.overrideWithValue(bridge),
       calendarPreferenceStoreProvider.overrideWithValue(
           MemoryCalendarPreferences(CalendarPreferences(
@@ -127,7 +128,7 @@ void main() {
       // Four events: the fourth row opens the sheet with every event.
       final bridge = FakeDeviceCalendars()
         ..data = [for (var i = 0; i < 4; i++) calendarEvent(id: '${10 + i}')];
-      final container = ProviderContainer(overrides: [
+      final container = ProviderContainer(retry: noRetry, overrides: [
         deviceCalendarsProvider.overrideWithValue(bridge),
         calendarPreferenceStoreProvider.overrideWithValue(
             MemoryCalendarPreferences(CalendarPreferences(
@@ -203,7 +204,7 @@ void main() {
       tester.view.physicalSize = const Size(360, 800);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
-      final container = ProviderContainer(overrides: [
+      final container = ProviderContainer(retry: noRetry, overrides: [
         deviceCalendarsProvider.overrideWithValue(bridge),
         calendarPreferenceStoreProvider
             .overrideWithValue(MemoryCalendarPreferences()),
@@ -489,7 +490,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       final bridge = FakeDeviceCalendars()..data = events;
-      final container = ProviderContainer(overrides: [
+      final container = ProviderContainer(retry: noRetry, overrides: [
         deviceCalendarsProvider.overrideWithValue(bridge),
         calendarPreferenceStoreProvider.overrideWithValue(
             MemoryCalendarPreferences(CalendarPreferences(
@@ -790,7 +791,7 @@ void main() {
         tester.view.physicalSize = const Size(360, 800);
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
-        final container = ProviderContainer(overrides: [
+        final container = ProviderContainer(retry: noRetry, overrides: [
           deviceCalendarsProvider.overrideWithValue(bridge),
           calendarPreferenceStoreProvider
               .overrideWithValue(MemoryCalendarPreferences()),
@@ -832,7 +833,7 @@ void main() {
         tester.view.physicalSize = const Size(360, 800);
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
-        final container = ProviderContainer(overrides: [
+        final container = ProviderContainer(retry: noRetry, overrides: [
           deviceCalendarsProvider.overrideWithValue(bridge),
           calendarPreferenceStoreProvider
               .overrideWithValue(MemoryCalendarPreferences()),
@@ -886,7 +887,7 @@ void main() {
             ..access = CalendarAccess.denied
             ..sources = [maria, workCalendar];
           addTearDown(bridge.close);
-          final container = ProviderContainer(overrides: [
+          final container = ProviderContainer(retry: noRetry, overrides: [
             deviceCalendarsProvider.overrideWithValue(bridge),
             calendarPreferenceStoreProvider
                 .overrideWithValue(MemoryCalendarPreferences()),

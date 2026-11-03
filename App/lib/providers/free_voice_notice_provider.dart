@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/task_database.dart';
@@ -72,7 +73,7 @@ class FreeVoiceNotice extends StateNotifier<AsyncValue<DateTime?>> {
   /// so it shows once.
   Future<bool> claim(DateTime resetsAt) async {
     await _loaded;
-    final seen = state.valueOrNull;
+    final seen = state.value;
     if (!mounted || (seen != null && seen.isAtSameMomentAs(resetsAt))) {
       return false;
     }

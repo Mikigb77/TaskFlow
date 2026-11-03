@@ -25,6 +25,6 @@ class OccurrenceChange {
 
   Task restore(Task current) => current.copyWith(exceptions: [
         ...current.exceptions.where((change) => change.originalDate != key),
-        if (before != null) before!,
+        ?before,
       ]);
 }

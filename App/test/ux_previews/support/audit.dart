@@ -948,7 +948,7 @@ List<Json> _layoutErrors(List<FlutterErrorDetails> errors) {
     if (!seen.add(key)) continue;
     out.add({
       'message': message,
-      if (where != null) 'where': where,
+      'where': ?where,
       'library': details.library ?? '',
     });
   }

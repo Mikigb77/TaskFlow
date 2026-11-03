@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:agenda/models/reminder_plan.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_schedule_change.dart';
@@ -127,7 +128,7 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
   Future<T> _mutate<T>(Future<T> Function() action) {
     final operation = _mutating.then((_) => action());
     _mutating =
-        operation.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+        operation.then<void>((_) {}, onError: (Object _, StackTrace _) {});
     return operation;
   }
 
@@ -190,7 +191,7 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
                 hasTime: !skip && hasTime);
         await _repository.updateTask(task.copyWith(exceptions: [
           ...task.exceptions.where((change) => change.originalDate != key),
-          if (after != null) after,
+          ?after,
         ]));
         if (mounted) await showLocal();
         return OccurrenceChange(task, key, before, after);

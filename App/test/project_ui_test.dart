@@ -1,3 +1,4 @@
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_list_info.dart';
@@ -63,6 +64,7 @@ void main() {
       addTearDown(api.close);
       await tester.pumpWidget(
         ProviderScope(
+          retry: noRetry,
           overrides: [
             apiClientProvider.overrideWithValue(api),
             authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
@@ -142,6 +144,7 @@ void main() {
           ];
           await tester.pumpWidget(
             ProviderScope(
+              retry: noRetry,
               overrides: overrides,
               child: localized(
                 Scaffold(
@@ -171,6 +174,7 @@ void main() {
           expect(tester.takeException(), isNull);
           await tester.pumpWidget(
             ProviderScope(
+              retry: noRetry,
               overrides: overrides,
               child: localized(
                 const GroupScreen(groupId: 'master'),
@@ -202,6 +206,7 @@ void main() {
       var recorderCreated = false;
       await tester.pumpWidget(
         ProviderScope(
+          retry: noRetry,
           overrides: [
             subscriptionProvider.overrideWith((ref) => controller),
             captureRecorderFactoryProvider.overrideWithValue(() {
@@ -255,6 +260,7 @@ void main() {
       addTearDown(api.close);
       await tester.pumpWidget(
         ProviderScope(
+          retry: noRetry,
           overrides: [
             apiClientProvider.overrideWithValue(api),
             authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
@@ -467,6 +473,7 @@ void main() {
         addTearDown(api.close);
         await tester.pumpWidget(
           ProviderScope(
+            retry: noRetry,
             overrides: [
               apiClientProvider.overrideWithValue(api),
               authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
@@ -525,6 +532,7 @@ void main() {
         addTearDown(api.close);
         await tester.pumpWidget(
           ProviderScope(
+            retry: noRetry,
             overrides: [
               apiClientProvider.overrideWithValue(api),
               authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
@@ -592,6 +600,7 @@ void main() {
       addTearDown(api.close);
       await tester.pumpWidget(
         ProviderScope(
+          retry: noRetry,
           overrides: [
             apiClientProvider.overrideWithValue(api),
             authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
@@ -652,6 +661,7 @@ void main() {
         addTearDown(api.close);
         await tester.pumpWidget(
           ProviderScope(
+            retry: noRetry,
             overrides: [
               apiClientProvider.overrideWithValue(api),
               authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),
@@ -700,6 +710,7 @@ void main() {
       addTearDown(api.close);
       await tester.pumpWidget(
         ProviderScope(
+          retry: noRetry,
           overrides: [
             apiClientProvider.overrideWithValue(api),
             authProvider.overrideWith((ref) => SignedInFixtureAuth(api)),

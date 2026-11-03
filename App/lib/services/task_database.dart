@@ -746,7 +746,7 @@ class TaskDatabase {
       [
         ownerKey,
         id,
-        if (revision != null) revision,
+        ?revision,
         if (!assignmentChanged) ownerKey,
       ],
     );

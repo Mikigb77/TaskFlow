@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
@@ -82,6 +83,7 @@ Future<(ProviderContainer, _Auth)> _open(
   final api = client ?? OfflineApiClient();
   final auth = _Auth(api);
   final container = ProviderContainer(
+    retry: noRetry,
     overrides: [
       apiClientProvider.overrideWithValue(api),
       authProvider.overrideWith((ref) => auth),

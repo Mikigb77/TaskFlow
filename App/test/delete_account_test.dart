@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/archive_diagnostic.dart';
@@ -77,11 +78,11 @@ Map<String, dynamic> previewJson({
     'groups': groups,
   },
   'kept_in_shared': kept,
-  if (keptFiles != null) 'kept_files_in_shared': keptFiles,
+  'kept_files_in_shared': ?keptFiles,
   'handovers': handovers,
   'pro': pro,
   'reauth': reauth,
-  if (plan != null) 'plan': plan,
+  'plan': ?plan,
 };
 
 /// The server's side of deleting: the preview, then the confirmation.
@@ -274,6 +275,7 @@ void main() {
       await phone.subscription.setIdentity('owner', () async => 'owner-id');
     }
     phone.container = ProviderContainer(
+      retry: noRetry,
       overrides: [
         apiClientProvider.overrideWithValue(phone.api),
         googleSignInServiceProvider.overrideWithValue(phone.google),
@@ -1545,6 +1547,7 @@ void main() {
         final api = OfflineApiClient();
         addTearDown(api.close);
         final container = ProviderContainer(
+          retry: noRetry,
           overrides: [
             apiClientProvider.overrideWithValue(api),
             authProvider.overrideWith((ref) => _DeletedAuth(api)),
@@ -1636,6 +1639,7 @@ void main() {
     addTearDown(api.close);
     final google = _Google();
     final container = ProviderContainer(
+      retry: noRetry,
       overrides: [
         apiClientProvider.overrideWithValue(api),
         googleSignInServiceProvider.overrideWithValue(google),
@@ -3584,7 +3588,7 @@ void main() {
         429,
         headers: {
           'content-type': 'application/json',
-          if (retryAfter != null) 'retry-after': retryAfter,
+          'retry-after': ?retryAfter,
         },
       );
 

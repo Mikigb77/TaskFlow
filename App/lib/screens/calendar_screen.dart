@@ -142,12 +142,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     // someone else, widens to show it.
     final scope = ref.read(projectScopeProvider);
     final wider = scopeShowing(
-      (ref.read(taskProvider).valueOrNull ?? const <Task>[]).where(
+      (ref.read(taskProvider).value ?? const <Task>[]).where(
         (task) => focus.taskIds.contains(task.id),
       ),
       scope,
       ref.read(authProvider).account?.id,
-      ref.read(taskListsProvider).valueOrNull ?? const [],
+      ref.read(taskListsProvider).value ?? const [],
     );
     if (!identical(wider, scope)) {
       ref.read(projectScopeProvider.notifier).state = wider;
@@ -713,9 +713,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     final tasksState = ref.watch(taskProvider);
     final hadTask = ref.watch(hadTaskProvider);
     final scope = ref.watch(projectScopeProvider);
-    final projects = ref.watch(taskListsProvider).valueOrNull ?? [];
+    final projects = ref.watch(taskListsProvider).value ?? [];
     final accountId = ref.watch(authProvider).account?.id;
-    final tasks = (tasksState.valueOrNull ?? <Task>[])
+    final tasks = (tasksState.value ?? <Task>[])
         .where((task) => taskInProjectScope(task, scope, accountId, projects))
         .toList();
     String key(Task task) => '${task.id}:${task.occurrenceId}';
@@ -765,11 +765,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     final total = events.length + overdue.length;
     // The day's last open row says so when it's ticked (WD34).
     final lastOpen = total - completed == 1;
-    final hasAny = (tasksState.valueOrNull ?? const []).isNotEmpty;
+    final hasAny = (tasksState.value ?? const []).isNotEmpty;
     // The state in which the empty state shows the instruction, or is still
     // deciding whether to. Its header and empty state drop their decorations
     // so the instruction sits above Añadir tarea at the largest text.
-    final firstRun = total == 0 && !hasAny && hadTask.valueOrNull != true;
+    final firstRun = total == 0 && !hasAny && hadTask.value != true;
     const loading = SliverToBoxAdapter(
       child: Padding(
         padding: EdgeInsets.all(24),
@@ -789,7 +789,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
         .preferences
         .enabled;
     final invitations =
-        ref.watch(pendingInvitationsProvider).valueOrNull ?? const [];
+        ref.watch(pendingInvitationsProvider).value ?? const [];
     return Scaffold(
       key: _page,
       appBar: CustomAppBar(title: context.l10n.calendar, isRoot: true),

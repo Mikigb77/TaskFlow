@@ -1,6 +1,7 @@
 // Real Android notification plugin and SQLite. No user task is deleted.
 // Grant POST_NOTIFICATIONS on the test emulator before running this driver.
 import 'dart:convert';
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -29,7 +30,7 @@ void main() {
     final database = TaskDatabase();
     final store = ReminderPreferenceStore(database);
     final api = ApiClient();
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       authProvider.overrideWith((ref) => _Auth(api)),
       taskRepositoryProvider.overrideWithValue(_Repository(database, owner)),
     ]);

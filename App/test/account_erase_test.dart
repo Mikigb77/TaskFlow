@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
@@ -535,6 +536,7 @@ void main() {
       );
       owner = '${api.baseUrl}/users/1';
       container = ProviderContainer(
+        retry: noRetry,
         overrides: [
           apiClientProvider.overrideWithValue(api),
           taskRepositoryProvider.overrideWithValue(

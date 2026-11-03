@@ -32,7 +32,7 @@ class OtherSettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = Theme.of(context).colorScheme;
-    final version = ref.watch(appVersionProvider).valueOrNull;
+    final version = ref.watch(appVersionProvider).value;
     final speechLanguage = ref.watch(
       regionalProvider.select((p) => p.speechLanguage),
     );

@@ -4,6 +4,7 @@
 // list, and an account with or without Pro.
 import 'dart:async';
 
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -285,6 +286,7 @@ class ListeningApp {
     final speech = PathSpeech(onDevice: !online, log: log);
     late final ListeningApp app;
     final container = ProviderContainer(
+      retry: noRetry,
       overrides: [
         invitationLinkProvider.overrideWith(
           (ref) => InvitationLinks(listen: false),

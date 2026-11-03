@@ -4,6 +4,7 @@
 // Lifecycle return alone cannot prove that an external app displayed the item.
 import 'dart:convert';
 import 'dart:io';
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -50,7 +51,7 @@ void main() {
         priority: 1,
         filePaths: [file.path]);
     final api = OfflineApiClient();
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       apiClientProvider.overrideWithValue(api),
       themeStoreProvider.overrideWithValue(MemoryThemeStore()),
       deviceCalendarsProvider.overrideWithValue(bridge),

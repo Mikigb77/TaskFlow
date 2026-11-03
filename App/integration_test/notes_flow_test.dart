@@ -1,4 +1,5 @@
 // Entitlement is a fixture here; real paid access is covered by projects_flow_test.
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 // Real Android SQLite, HTTP/PostgreSQL and note capture. Typed notes use no AI.
 // Credentials use the same isolated secure-storage fixture as other drivers.
@@ -45,6 +46,7 @@ void main() {
       final importedOwner = 'notes-import-fixture-$stamp';
       final store = CaptureStore(database);
       final container = ProviderContainer(
+        retry: noRetry,
         overrides: [
           hasProProvider.overrideWithValue(true),
           apiClientProvider.overrideWithValue(api),

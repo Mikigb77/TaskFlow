@@ -2,6 +2,7 @@
 // Host automation selects ATTACHMENT_FIXTURE, recreates the API container at the
 // printed marker, then creates the printed app-private resume file with run-as.
 import 'dart:io';
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -45,7 +46,7 @@ void main() {
     final sql = await database.database;
     final resume = File(
         '${(await getApplicationSupportDirectory()).path}/attachment-resume-$stamp');
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       apiClientProvider.overrideWithValue(api),
       authProvider.overrideWith((ref) => _Auth(api)),
       taskRepositoryProvider.overrideWithValue(repository),

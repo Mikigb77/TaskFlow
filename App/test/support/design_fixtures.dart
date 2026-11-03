@@ -1,6 +1,8 @@
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/models/task_schedule_change.dart';
@@ -225,10 +227,12 @@ ProviderContainer designContainer({
   // firstTaskStoreProvider in [overrides] wins over this.
   bool hadTask = false,
 }) => ProviderContainer(
+  retry: noRetry,
   overrides: [
-    firstTaskStoreProvider.overrideWithValue(
-      MemoryFirstTaskStore([if (hadTask) MemoryTasks().ownerKey]),
-    ),
+    if (!overrides.any((o) => o.origin == firstTaskStoreProvider))
+      firstTaskStoreProvider.overrideWithValue(
+        MemoryFirstTaskStore([if (hadTask) MemoryTasks().ownerKey]),
+      ),
     ...overrides,
     invitationLinkProvider.overrideWith(
       (ref) => InvitationLinks(listen: false),
