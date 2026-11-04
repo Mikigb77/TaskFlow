@@ -1,2 +1,9 @@
 # Agents' throwaway worktrees (Claude Code's Agent tool and workflows).
 .claude/worktrees/
+
+# Secrets never go in Git: they live on the PC, in GitHub Actions secrets and
+# in Google Secret Manager. Only the templates are committed.
+.env
+.env.*
+!.env.example
+!.env.ci

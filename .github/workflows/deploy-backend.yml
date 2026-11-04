@@ -51,8 +51,7 @@ jobs:
       - run: pip install -r requirements.lock
       - name: python manage.py test core
         run: |
-          set -a; . ./.env; set +a
-          export GEMINI_API_KEY= REVENUECAT_API_KEY= POSTGRES_PASSWORD= DJANGO_SECRET_KEY=ci-only-not-a-secret
+          set -a; . ./.env.ci; set +a
           python manage.py test core --settings=config.test_settings
 
   staging:

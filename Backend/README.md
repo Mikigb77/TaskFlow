@@ -60,7 +60,7 @@ Plain `docker compose up` uses the base configuration and free-only default;
 use the script whenever the ADC-mounted Vertex route is wanted. Existing volumes
 and accounts are preserved. The optional overlay does not deploy a public API.
 
-`Backend/.env` is intentionally tracked for this private prototype at the owner's request. It contains the Google key, model names, Django secret, and local database credentials. Docker injects these at runtime; `.dockerignore` excludes the environment files from the image build context, and the Flutter APK does not contain the key. `Backend/.env.example` documents the configuration without real credentials.
+`Backend/.env` holds the local secrets (the Google key, the Django secret and the local database credentials) and is never committed: `.gitignore` excludes every `.env` file except `.env.example` and `.env.ci`. On a new machine, copy `Backend/.env.example` to `Backend/.env` and fill it in. Docker injects these at runtime; `.dockerignore` excludes the environment files from the image build context, and the Flutter APK does not contain the key. GitHub Actions runs the tests with the committed `Backend/.env.ci`, which has no real keys, and deploys staging with keyless Google sign-in and the runtime config in Google Secret Manager, so no workflow needs a file from the PC.
 
 The Compose project name stays `taskflow`, so moving the files does not replace the existing PostgreSQL or Redis data volumes. You can also run Compose from the repository root with `docker compose -f Backend/compose.yaml up -d --build`.
 
@@ -105,7 +105,7 @@ The real Android flow can also be checked from `App/` with `flutter test integra
 
 ## Accounts and recovery
 
-For repeat testing, use **Use test account** on the local browser page. In the Android development build, tap **Use test account** on the login screen. The shortcut uses `app-test@taskflow.local` and `TaskFlow-App-Dev-2026!` from `App/config/development.json`; the app saves the normal session in secure storage. The shortcut is absent from profile/release builds and debug builds without the opt-in. Both clients use the same account and tasks. This account starts empty; later tasks are preserved. The earlier `test@taskflow.local` account and its data have been left intact.
+For repeat testing, use **Use test account** on the local browser page. In the Android development build, tap **Use test account** on the login screen. The shortcut uses `app-test@taskflow.local` and the password from `App/config/development.json`, which must match `LOCAL_TEST_ACCOUNT_PASSWORD` in `Backend/.env`; the app saves the normal session in secure storage. The shortcut is absent from profile/release builds and debug builds without the opt-in. Both clients use the same account and tasks. This account starts empty; later tasks are preserved. The earlier `test@taskflow.local` account and its data have been left intact.
 
 The local `.env` enables this with `LOCAL_TEST_ACCOUNT_ENABLED=1`. Docker startup runs `python manage.py seed_test_user`, which creates a regular user once and preserves its password and tasks on subsequent starts. The shortcut uses the normal JWT login endpoint. Test-account seeding and the browser shortcut are disabled by default in `.env.example`; their email and password are configured with `LOCAL_TEST_ACCOUNT_EMAIL` and `LOCAL_TEST_ACCOUNT_PASSWORD`.
 

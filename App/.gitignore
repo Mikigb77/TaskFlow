@@ -44,3 +44,5 @@ app.*.map.json
 
 artifacts/
 .credentials/
+# Local build defines with keys (config/development.json, config/staging.json).
+/config/

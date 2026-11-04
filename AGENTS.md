@@ -126,7 +126,7 @@ How email is sent:
   - Don't use `--split-per-abi` for test installs.
   - After an integration-test build, reinstall the normal app with `adb install -r`.
 - **Evidence.** Say what kind of evidence you have: unit or widget test, emulator, or physical device. Don't present an emulator run as a physical-phone or real-microphone result.
-- **Secrets.** `Backend/.env` is tracked on purpose — this is a private prototype — and it holds real keys. Never print, copy or log its values. Don't add secrets anywhere else. `App/config/` holds local secrets and is never committed.
+- **Secrets.** Never commit a secret: the repo may be made public to run GitHub Actions. Secrets live in three places only: `Backend/.env`, `Backend/.credentials/` and `App/config/` on the PC (all ignored by Git; never print, copy or log their values); GitHub Actions secrets for CI (`App/scripts/upload-ci-secrets.sh`); and Google Secret Manager for the staging API. CI must never need the PC: the backend tests use the committed, key-free `Backend/.env.ci`, and deploys sign in to Google without a key. A new setting goes in `Backend/.env.example` with a placeholder, and in `.env.ci` if the tests need it.
 - **Scripts.** Root `scripts/` is for the essential deployment entry points; the loops' helpers live in their skills.
 
 ## Codex
