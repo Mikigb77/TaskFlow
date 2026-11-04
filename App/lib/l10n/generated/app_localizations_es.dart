@@ -5116,7 +5116,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get meetingListeningHelp =>
-      'Puedes bloquear el teléfono: sigue grabando.';
+      'Puedes salir o bloquear el teléfono: sigue grabando hasta que pulses Parar.';
 
   @override
   String get meetingStop => 'Parar';
@@ -5136,6 +5136,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'Tarda unos segundos. Puedes salir de esta pantalla: te avisaremos cuando estén listas.';
 
   @override
+  String get meetingPreparingHelpNoNotice =>
+      'Tarda unos segundos. Puedes salir de esta pantalla: las notas aparecerán en Notas.';
+
+  @override
   String get meetingWaitingConnection => 'Esperando conexión';
 
   @override
@@ -5143,19 +5147,35 @@ class AppLocalizationsEs extends AppLocalizations {
       'La grabación está a salvo en el teléfono. Las notas se preparan en cuanto vuelvas a tener conexión, y te avisaremos.';
 
   @override
+  String get meetingWaitingConnectionHelpNoNotice =>
+      'La grabación está a salvo en el teléfono. Las notas se preparan en cuanto vuelvas a tener conexión, y aparecerán en Notas.';
+
+  @override
   String get meetingNothingHeard =>
       'No se oyó nada, así que no hay nada que guardar.';
 
   @override
-  String meetingStoppedAt(String time) {
-    return 'Tu grabación se detuvo en $time. ¿Continuar, terminar o descartar?';
+  String meetingRecordingToday(String time) {
+    return 'Grabación de hoy, $time';
   }
 
   @override
-  String get meetingContinue => 'Continuar';
+  String meetingRecordingYesterday(String time) {
+    return 'Grabación de ayer, $time';
+  }
 
   @override
-  String get meetingFinish => 'Terminar';
+  String meetingRecordingOn(String date, String time) {
+    return 'Grabación del $date, $time';
+  }
+
+  @override
+  String meetingStoppedCut(String recording, String length) {
+    return '$recording · $length. Se cortó antes de que pulsaras Parar.';
+  }
+
+  @override
+  String get meetingMakeNotes => 'Hacer las notas';
 
   @override
   String meetingRecordingNow(String time) {
@@ -5166,6 +5186,73 @@ class AppLocalizationsEs extends AppLocalizations {
   String get meetingOpen => 'Abrir';
 
   @override
+  String get meetingOpenNamed => 'Abrir la grabación';
+
+  @override
+  String get meetingLengthUnderMinute => 'menos de 1 min';
+
+  @override
+  String meetingLengthHours(int hours) {
+    return '$hours h';
+  }
+
+  @override
+  String meetingLengthHoursMinutes(int hours, int minutes) {
+    return '$hours h $minutes min';
+  }
+
+  @override
+  String meetingRecordedSeconds(int seconds) {
+    String _temp0 = intl.Intl.pluralLogic(
+      seconds,
+      locale: localeName,
+      other: '$seconds segundos grabados',
+      one: '1 segundo grabado',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String meetingRecordedMinutes(int minutes, int seconds) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: '$minutes minutos',
+      one: '1 minuto',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      seconds,
+      locale: localeName,
+      other: '$seconds segundos',
+      one: '1 segundo',
+    );
+    return '$_temp0 y $_temp1 grabados';
+  }
+
+  @override
+  String meetingRecordedHours(int hours, int minutes, int seconds) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: '$hours horas',
+      one: '1 hora',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: '$minutes minutos',
+      one: '1 minuto',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      seconds,
+      locale: localeName,
+      other: '$seconds segundos',
+      one: '1 segundo',
+    );
+    return '$_temp0, $_temp1 y $_temp2 grabados';
+  }
+
+  @override
   String get meetingProRequired =>
       'Las notas de reuniones son parte de TaskFlow Pro. Tu grabación espera en el teléfono.';
 
@@ -5174,12 +5261,23 @@ class AppLocalizationsEs extends AppLocalizations {
       'Has usado el tiempo de reuniones de este mes. Tu grabación espera en el teléfono hasta el mes que viene.';
 
   @override
+  String get meetingAllowanceUsedStart =>
+      'Has usado el tiempo de reuniones de este mes: puedes grabar, y las notas llegarán el mes que viene.';
+
+  @override
   String get meetingCantMakeNotes =>
       'Una parte de esta grabación no se pudo enviar, así que no se pueden hacer notas con ella.';
 
   @override
   String get meetingMicrophoneBlocked =>
       'Para grabar una reunión, abre Ajustes y toca Permisos › Micrófono › Permitir.';
+
+  @override
+  String get meetingMicrophoneNeeded =>
+      'Para grabar una reunión, TaskFlow necesita el micrófono.';
+
+  @override
+  String get meetingAllowMicrophone => 'Permitir el micrófono';
 
   @override
   String get meetingLowSpace =>
@@ -5205,13 +5303,16 @@ class AppLocalizationsEs extends AppLocalizations {
   String get meetingNoticeTitle => 'Grabando una reunión';
 
   @override
+  String get meetingTypeHere => 'Se está grabando una reunión: escribe aquí.';
+
+  @override
   String get meetingRecordingChannel => 'Grabación de reuniones';
 
   @override
   String get meetingNotesChannel => 'Notas de reuniones';
 
   @override
-  String get meetingNotesReady => 'Las notas de tu reunión están listas';
+  String get meetingNotesReady => 'Las notas de la reunión están listas';
 
   @override
   String get meetingNoteDecisions => 'Decisiones';
@@ -5230,7 +5331,24 @@ class AppLocalizationsEs extends AppLocalizations {
   String get meetingNoteUntitled => 'Notas de la reunión';
 
   @override
+  String meetingNoteHeader(String date, String length) {
+    return 'Reunión del $date · $length';
+  }
+
+  @override
+  String meetingNoteChapterMinutes(int start, int end) {
+    return 'Minutos $start–$end';
+  }
+
+  @override
   String get meetingCreateTask => 'Crear tarea';
+
+  @override
+  String get meetingSignOutTitle => '¿Cerrar sesión?';
+
+  @override
+  String get meetingSignOutRecording =>
+      'Estás grabando una reunión. Se parará y se harán sus notas antes de cerrar sesión.';
 
   @override
   String meetingSignOutQuestion(int count) {
@@ -5238,15 +5356,19 @@ class AppLocalizationsEs extends AppLocalizations {
       count,
       locale: localeName,
       other:
-          '$count grabaciones de reuniones aún no se han enviado. ¿Enviarlas antes de cerrar sesión, o descartarlas?',
+          'Las notas de $count reuniones aún no están listas, y sus grabaciones solo están en este teléfono.',
       one:
-          'Una grabación de reunión aún no se ha enviado. ¿Enviarla antes de cerrar sesión, o descartarla?',
+          'Las notas de una reunión aún no están listas, y su grabación solo está en este teléfono.',
     );
-    return '$_temp0 Dejarás de recibir recordatorios en este teléfono hasta que vuelvas a entrar.';
+    return '$_temp0';
   }
 
   @override
-  String get meetingSendFirst => 'Enviar primero';
+  String get meetingSignOutReminders =>
+      'Dejarás de recibir recordatorios en este teléfono hasta que vuelvas a entrar.';
+
+  @override
+  String get meetingSendFirst => 'Guardar notas y cerrar sesión';
 
   @override
   String get meetingDiscardAndSignOut => 'Descartar y cerrar sesión';
@@ -5255,8 +5377,16 @@ class AppLocalizationsEs extends AppLocalizations {
   String get meetingSending => 'Enviando tu grabación…';
 
   @override
+  String get meetingSavingNotes =>
+      'Guardando las notas de la reunión… Puede tardar unos minutos. Después se cerrará la sesión.';
+
+  @override
   String get meetingSendFailed =>
-      'No se pudo enviar todo. Vuelve a intentarlo con conexión, o descártalo.';
+      'Sin conexión, no se pudieron hacer las notas. Sigues con la sesión abierta; vuelve a tocar Cerrar sesión cuando tengas conexión.';
+
+  @override
+  String get meetingSendSlow =>
+      'Las notas están tardando más de lo normal. Sigues con la sesión abierta; vuelve a probar Cerrar sesión en unos minutos.';
 
   @override
   String get meetingNotesExpired =>
@@ -5275,25 +5405,33 @@ class AppLocalizationsEs extends AppLocalizations {
       'Una grabación ya no puede convertirse en notas. Descártala para cerrar sesión.';
 
   @override
+  String meetingDiscardDeletesAll(int count) {
+    return 'Descartar y cerrar sesión borra las $count grabaciones que esperan.';
+  }
+
+  @override
   String meetingDiscardNamed(String time) {
     return 'Descartar la grabación de $time';
   }
 
   @override
   String meetingFinishNamed(String time) {
-    return 'Terminar la grabación de $time';
+    return 'Hacer las notas de la grabación de $time';
   }
 
   @override
   String meetingContinueNamed(String time) {
-    return 'Continuar la grabación de $time';
+    return 'Seguir grabando, $time hasta ahora';
   }
 
   @override
   String get billingReasonMeetingNotes =>
-      'Con Pro, graba una reunión y recibe sus notas:';
+      'Con Pro, tus reuniones se convierten en notas:';
 
   @override
   String get billingReasonMeetingNotesExample =>
-      'un resumen, las decisiones y las tareas';
+      'un resumen, las decisiones y las cosas por hacer';
+
+  @override
+  String get proBenefitMeetingNotes => 'Notas de las reuniones que grabas';
 }

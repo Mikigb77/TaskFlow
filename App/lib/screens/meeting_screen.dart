@@ -4,10 +4,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/meeting_copy.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/models/meeting.dart';
 import 'package:agenda/providers/regional_provider.dart';
+import 'package:agenda/providers/reminder_provider.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/screens/subscription_screen.dart';
 import 'package:agenda/screens/task_detail_screen.dart';
@@ -19,47 +21,29 @@ import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/meeting_banners.dart';
 
-/// «Grabar una reunión» (MN-1): with Pro, the recording screen; without,
-/// the Pro screen saying what Pro gives here (Pro only is the build plan's
-/// decision, MEETING_NOTES_PLAN.md). [continueId] goes on with a
-/// recording that stopped by itself (MN-12). A recording already running
-/// opens as it is.
+/// «Grabar una reunión» (MN-1): the recording screen, at once. Without
+/// Pro, it shows the Pro screen over it, saying what Pro gives here (Pro
+/// only is the build plan's decision, MEETING_NOTES_PLAN.md). [continueId]
+/// goes on with a recording that stopped by itself (MN-12). A recording
+/// already running opens as it is. A tap while one is open does nothing.
 Future<void> openMeetingRecorder(
   BuildContext context, {
   String? projectId,
   String? continueId,
 }) async {
-  final container = ProviderScope.containerOf(context, listen: false);
-  final navigator = Navigator.of(context);
-  if (container.read(meetingsProvider).recording == null) {
-    // Billing may still be finding out: a paying customer is never sent to
-    // the Pro screen for that.
-    if (container.read(billingLoadingProvider)) {
-      final known = Completer<void>();
-      final watch = container.listen<bool>(billingLoadingProvider, (
-        _,
-        loading,
-      ) {
-        if (!loading && !known.isCompleted) known.complete();
-      });
-      await known.future.timeout(const Duration(seconds: 5), onTimeout: () {});
-      watch.close();
-    }
-    if (!container.read(hasProProvider)) {
-      await navigator.pushNamed(
-        '/subscription',
-        arguments: ProReason.meetingNotes,
-      );
-      return;
-    }
-  }
-  await navigator.push(
-    MaterialPageRoute<void>(
-      builder: (_) =>
-          MeetingScreen(projectId: projectId, continueId: continueId),
+  if (_recorderRoute?.isActive ?? false) return;
+  final route = _recorderRoute = MaterialPageRoute<void>(
+    builder: (_) => MeetingScreen(
+      projectId: projectId,
+      continueId: continueId,
+      proFirst: true,
     ),
   );
+  await Navigator.of(context).push(route);
 }
+
+/// The screen «Grabar una reunión» opened last.
+Route<void>? _recorderRoute;
 
 /// The recording notification's tap, Stop or Discard (MN-1, MN-25): the
 /// recording screen does it, the one open when it's in front, else a new
@@ -99,6 +83,7 @@ class MeetingScreen extends ConsumerStatefulWidget {
     this.projectId,
     this.continueId,
     this.action,
+    this.proFirst = false,
   });
 
   /// The project the note goes to.
@@ -111,12 +96,19 @@ class MeetingScreen extends ConsumerStatefulWidget {
   /// running now: the screen does it once open. It never starts one.
   final MeetingNoticeAction? action;
 
+  /// Without Pro, the Pro screen first: Pro bought there goes straight on
+  /// to recording; without it, this screen closes too.
+  final bool proFirst;
+
   @override
   ConsumerState<MeetingScreen> createState() => _MeetingScreenState();
 }
 
-class _MeetingScreenState extends ConsumerState<MeetingScreen> {
+class _MeetingScreenState extends ConsumerState<MeetingScreen>
+    with WidgetsBindingObserver {
   var _stage = _Stage.starting;
+  // Asking the core to record now: no second start at once.
+  bool _starting = false;
   String? _id;
   MeetingStartProblem? _refused;
   bool _stopping = false;
@@ -139,13 +131,36 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(_start());
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Back from Settings, or from Android's question: records once the
+    // microphone is allowed.
+    if (state == AppLifecycleState.resumed &&
+        _stage == _Stage.refused &&
+        (_refused == MeetingStartProblem.permission ||
+            _refused == MeetingStartProblem.microphoneBlocked)) {
+      unawaited(_recheckMicrophone());
+    }
+  }
+
+  Future<void> _recheckMicrophone() async {
+    try {
+      if (!await _controller.microphoneAllowed()) return;
+    } catch (_) {
+      return;
+    }
+    if (mounted && _stage == _Stage.refused) unawaited(_record());
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (_id != null) TaskReminders.meetingsOnScreen.remove(_id);
     if (identical(_recordingScreen, this)) _recordingScreen = null;
     super.dispose();
@@ -202,6 +217,57 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
       setState(() => _recordingNow(running.meetingId));
       unawaited(_checkSpace());
       return;
+    }
+    if (running == null && widget.proFirst && !await _hasPro()) return;
+    if (mounted) await _record();
+  }
+
+  /// Pro, once billing knows: without it, the Pro screen over this one.
+  /// Pro bought there goes on; leaving it without Pro closes this screen,
+  /// so Back from the Pro screen returns to where it was opened.
+  Future<bool> _hasPro() async {
+    // Billing may still be finding out: a paying customer is never sent to
+    // the Pro screen for that.
+    if (ref.read(billingLoadingProvider)) {
+      final known = Completer<void>();
+      final watch = ref.listenManual<bool>(billingLoadingProvider, (
+        _,
+        loading,
+      ) {
+        if (!loading && !known.isCompleted) known.complete();
+      });
+      await known.future.timeout(const Duration(seconds: 5), onTimeout: () {});
+      watch.close();
+      if (!mounted) return false;
+    }
+    if (ref.read(hasProProvider)) return true;
+    await Navigator.of(
+      context,
+    ).pushNamed('/subscription', arguments: ProReason.meetingNotes);
+    if (!mounted) return false;
+    if (ref.read(hasProProvider)) return true;
+    _leave();
+    return false;
+  }
+
+  /// Starts recording, or goes on with [MeetingScreen.continueId]: also
+  /// «Permitir el micrófono», «Reintentar» and back from Settings.
+  Future<void> _record() async {
+    if (_starting) return;
+    _starting = true;
+    try {
+      await _startRecording();
+    } finally {
+      _starting = false;
+    }
+  }
+
+  Future<void> _startRecording() async {
+    if (_stage != _Stage.starting) {
+      setState(() {
+        _stage = _Stage.starting;
+        _refused = null;
+      });
     }
     final l = context.l10n;
     final notice = meetingNotice(l);
@@ -353,6 +419,16 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
     }
   }
 
+  /// While recording: why its notes will wait, as its Notes line says
+  /// once the server refused a piece; or that this month's meeting time is
+  /// used, from the start (an earlier meeting was refused this month).
+  String? _heldLine(AppLocalizations l, MeetingsState meetings) =>
+      switch (meetings.recordingProblem) {
+        MeetingProblem.allowanceUsed => l.meetingAllowanceUsed,
+        MeetingProblem.proRequired => l.meetingProRequired,
+        _ => meetings.allowanceUsed ? l.meetingAllowanceUsedStart : null,
+      };
+
   @override
   Widget build(BuildContext context) {
     ref.listen<MeetingsState>(meetingsProvider, (_, next) => _follow(next));
@@ -374,8 +450,12 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
       appBar: CustomAppBar(title: l.meetingScreenTitle),
       body: switch (_stage) {
         _Stage.starting => const Center(child: CircularProgressIndicator()),
-        _Stage.recording => _Recording(status: status, spaceLow: _spaceLow),
-        _Stage.refused => _Refused(problem: _refused),
+        _Stage.recording => _Recording(
+          status: status,
+          spaceLow: _spaceLow,
+          warning: _heldLine(l, meetings),
+        ),
+        _Stage.refused => _Refused(problem: _refused, onRetry: _record),
         _Stage.after => _After(meetings: meetings, id: _id, end: end),
       },
       bottomNavigationBar: switch (_stage) {
@@ -431,16 +511,19 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
 
 /// Scrolls when the text is large, centred when it fits.
 class _Centered extends StatelessWidget {
-  const _Centered({required this.children});
+  const _Centered({required this.children, this.vertical = 24});
   final List<Widget> children;
+
+  /// The space above and below.
+  final double vertical;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) => SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      padding: EdgeInsets.symmetric(horizontal: 24, vertical: vertical),
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          minHeight: math.max(0, constraints.maxHeight - 48),
+          minHeight: math.max(0, constraints.maxHeight - 2 * vertical),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -453,11 +536,15 @@ class _Centered extends StatelessWidget {
 }
 
 class _Recording extends StatelessWidget {
-  const _Recording({required this.status, this.spaceLow = false});
+  const _Recording({required this.status, this.spaceLow = false, this.warning});
   final MeetingRecordingStatus? status;
 
   /// Little space left: it says so, and records on (MN-6).
   final bool spaceLow;
+
+  /// Why this recording's notes will wait (Pro, the month's time); it
+  /// records on.
+  final String? warning;
 
   @override
   Widget build(BuildContext context) {
@@ -467,93 +554,148 @@ class _Recording extends StatelessWidget {
     final elapsed = status?.elapsed ?? Duration.zero;
     final level = status?.level ?? 0;
     final instant = MediaQuery.disableAnimationsOf(context);
-    return _Centered(
-      children: [
-        // The level: a ring that grows as it hears. Only for the eyes.
-        ExcludeSemantics(
-          child: SizedBox.square(
-            dimension: 136,
-            child: Center(
-              child: AnimatedContainer(
-                key: const ValueKey('meeting-level'),
-                duration: instant
-                    ? Duration.zero
-                    : const Duration(milliseconds: 120),
-                width: 88 + 48 * level,
-                height: 88 + 48 * level,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: colors.primaryContainer,
-                ),
-                child: Icon(
-                  Icons.mic_rounded,
-                  size: 40,
-                  color: colors.onPrimaryContainer,
-                ),
-              ),
+    // Large text: a smaller ring beside the time, the time's digits held
+    // at 1.3×, closer lines and less space around them leave the line and
+    // any warning whole above Parar.
+    final big = MediaQuery.textScalerOf(context).scale(16) >= 24;
+    final ring = big ? 2 / 3 : 1.0;
+    final leading = big ? 1.3 : null;
+    // The level: a ring that grows as it hears. Only for the eyes.
+    final meter = ExcludeSemantics(
+      child: SizedBox.square(
+        dimension: 136 * ring,
+        child: Center(
+          child: AnimatedContainer(
+            key: const ValueKey('meeting-level'),
+            duration: instant
+                ? Duration.zero
+                : const Duration(milliseconds: 120),
+            width: (88 + 48 * level) * ring,
+            height: (88 + 48 * level) * ring,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: colors.primaryContainer,
+            ),
+            child: Icon(
+              Icons.mic_rounded,
+              size: 40 * ring,
+              color: colors.onPrimaryContainer,
             ),
           ),
         ),
-        const SizedBox(height: 16),
+      ),
+    );
+    // Read on demand, not on every tick: no live region.
+    final time = MediaQuery.withClampedTextScaling(
+      maxScaleFactor: 1.3,
+      child: Text(
+        meetingElapsed(elapsed),
+        key: const ValueKey('meeting-elapsed'),
+        semanticsLabel: meetingElapsedLabel(l, elapsed),
+        textAlign: TextAlign.center,
+        style: theme.textTheme.displayMedium?.copyWith(
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
+      ),
+    );
+    return _Centered(
+      vertical: big ? 16 : 24,
+      children: [
+        if (!big) ...[meter, const SizedBox(height: 16)],
         Text(
           l.meetingListening,
           textAlign: TextAlign.center,
           style: theme.textTheme.titleMedium?.copyWith(color: colors.primary),
         ),
         const SizedBox(height: 4),
-        // Read on demand, not on every tick: no live region.
+        if (big)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              meter,
+              const SizedBox(width: 12),
+              Flexible(
+                child: FittedBox(fit: BoxFit.scaleDown, child: time),
+              ),
+            ],
+          )
+        else
+          time,
+        // Before any warning, so it stays in view above Parar at large
+        // text: leaving doesn't stop the recording.
+        const SizedBox(height: 12),
         Text(
-          meetingElapsed(elapsed),
-          key: const ValueKey('meeting-elapsed'),
+          l.meetingListeningHelp,
+          key: const ValueKey('meeting-help'),
           textAlign: TextAlign.center,
-          style: theme.textTheme.displayMedium?.copyWith(
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
+          style: TextStyle(color: colors.onSurfaceVariant, height: leading),
         ),
+        if (warning != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            warning!,
+            key: const ValueKey('meeting-held'),
+            textAlign: TextAlign.center,
+            style: TextStyle(color: colors.error, height: leading),
+          ),
+        ],
         if (spaceLow) ...[
           const SizedBox(height: 12),
           Text(
             l.meetingSpaceLowWarning,
             key: const ValueKey('meeting-space-low'),
             textAlign: TextAlign.center,
-            style: TextStyle(color: colors.error),
+            style: TextStyle(color: colors.error, height: leading),
           ),
         ],
-        const SizedBox(height: 12),
-        Text(
-          l.meetingListeningHelp,
-          textAlign: TextAlign.center,
-          style: TextStyle(color: colors.onSurfaceVariant),
-        ),
       ],
     );
   }
 }
 
 class _Refused extends StatelessWidget {
-  const _Refused({required this.problem});
+  const _Refused({required this.problem, required this.onRetry});
   final MeetingStartProblem? problem;
+
+  /// Asks for the microphone again, or tries to start again.
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    final permission = problem == MeetingStartProblem.permission;
+    final microphone =
+        problem == MeetingStartProblem.permission ||
+        problem == MeetingStartProblem.microphoneBlocked;
     return _Centered(
       children: [
         EmptyState(
           title: null,
-          icon: permission ? Icons.mic_off_outlined : Icons.info_outline,
+          icon: microphone ? Icons.mic_off_outlined : Icons.info_outline,
           message: switch (problem) {
-            MeetingStartProblem.permission => l.meetingMicrophoneBlocked,
+            // Android still asks: ask again here. Settings only once it
+            // doesn't.
+            MeetingStartProblem.permission => l.meetingMicrophoneNeeded,
+            MeetingStartProblem.microphoneBlocked => l.meetingMicrophoneBlocked,
             MeetingStartProblem.lowSpace => l.meetingLowSpace,
             _ => l.meetingStartFailed,
           },
-          action: permission
-              ? FilledButton(
-                  onPressed: openAppSettings,
-                  child: Text(l.captureOpenSettings),
-                )
-              : null,
+          action: switch (problem) {
+            MeetingStartProblem.permission => FilledButton(
+              key: const ValueKey('meeting-allow-microphone'),
+              onPressed: onRetry,
+              child: Text(l.meetingAllowMicrophone),
+            ),
+            MeetingStartProblem.microphoneBlocked => FilledButton(
+              onPressed: openAppSettings,
+              child: Text(l.captureOpenSettings),
+            ),
+            MeetingStartProblem.lowSpace => null,
+            _ => FilledButton(
+              key: const ValueKey('meeting-retry'),
+              onPressed: onRetry,
+              child: Text(l.tryAgain),
+            ),
+          },
         ),
       ],
     );
@@ -576,7 +718,7 @@ class _After extends StatelessWidget {
     final stopped = meetings.stopped.where((m) => m.id == id).firstOrNull;
     final failed = end == MeetingRecorderEnd.failed;
     if (stopped != null) {
-      // Said why, then the same question as in Notes.
+      // Said why once, then the same choices as in Notes (UX-2703).
       return _Centered(
         children: [
           if (failed) ...[
@@ -585,8 +727,9 @@ class _After extends StatelessWidget {
               icon: Icons.mic_off_outlined,
             ),
             const SizedBox(height: 24),
-          ],
-          MeetingStoppedCard(meeting: stopped),
+            MeetingStoppedActions(meeting: stopped, centered: true),
+          ] else
+            MeetingStoppedCard(meeting: stopped),
         ],
       );
     }
@@ -641,15 +784,84 @@ class _After extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        if (working || offline)
-          Text(
-            offline ? l.meetingWaitingConnectionHelp : l.meetingPreparingHelp,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-          ),
-        if (waiting != null && (lost || problem == MeetingProblem.proRequired))
+        if (working || offline) _AfterHelp(offline: offline),
+        if (waiting != null &&
+            (lost ||
+                problem == MeetingProblem.proRequired ||
+                problem == MeetingProblem.allowanceUsed))
           _AfterActions(meeting: waiting),
       ],
+    );
+  }
+}
+
+/// Under «Preparando tus notas…» or «Esperando conexión»: a notice when
+/// the notes are ready only if the phone lets TaskFlow show one; else that
+/// they'll be in Notas (UX-2801). No permission is asked here. Until the
+/// phone answers, the line is kept blank at its size, so it doesn't change
+/// words under the reader; it asks again when the app comes back, as the
+/// notifications may have been turned on or off meanwhile.
+class _AfterHelp extends ConsumerStatefulWidget {
+  const _AfterHelp({required this.offline});
+  final bool offline;
+
+  @override
+  ConsumerState<_AfterHelp> createState() => _AfterHelpState();
+}
+
+class _AfterHelpState extends ConsumerState<_AfterHelp>
+    with WidgetsBindingObserver {
+  /// Null until the phone answers: no promise until then.
+  bool? _notices;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    unawaited(_check());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_check());
+  }
+
+  Future<void> _check() async {
+    var allowed = false;
+    try {
+      allowed = (await ref.read(reminderAccessProvider).capability()).allowed;
+    } catch (_) {
+      /* Unknown: no promise. */
+    }
+    if (mounted) setState(() => _notices = allowed);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final notices = _notices ?? false;
+    return Visibility(
+      visible: _notices != null,
+      maintainSize: true,
+      maintainAnimation: true,
+      maintainState: true,
+      child: Text(
+        widget.offline
+            ? notices
+                  ? l.meetingWaitingConnectionHelp
+                  : l.meetingWaitingConnectionHelpNoNotice
+            : notices
+            ? l.meetingPreparingHelp
+            : l.meetingPreparingHelpNoNotice,
+        textAlign: TextAlign.center,
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+      ),
     );
   }
 }
@@ -665,6 +877,8 @@ class _AfterActions extends ConsumerWidget {
       padding: const EdgeInsets.only(top: 8),
       child: Wrap(
         alignment: WrapAlignment.center,
+        // «Ver Pro» is taller than «Descartar»: one centre line (UX-2714).
+        crossAxisAlignment: WrapCrossAlignment.center,
         spacing: 8,
         runSpacing: 8,
         children: [

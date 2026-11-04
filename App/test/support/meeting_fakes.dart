@@ -5,6 +5,7 @@ import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/meeting_api.dart';
 import 'package:agenda/services/meeting_background.dart';
 import 'package:agenda/services/meeting_recorder.dart';
+import 'package:agenda/services/native_speech.dart';
 
 /// A clock the test moves.
 class FakeClock {
@@ -44,18 +45,33 @@ class FakeTimer implements Timer {
 class FakeMeetingAudio implements MeetingAudioEngine {
   FakeMeetingAudio({
     this.permitted = true,
+    this.blocked = false,
     this.supported = MeetingAudioFormat.opus,
   });
   bool permitted;
+
+  /// Refused, and Android no longer asks: only Settings can allow it.
+  bool blocked;
+
+  /// How many times the permission was asked for, not only read.
+  int asks = 0;
   MeetingAudioFormat supported;
   final files = <String>[];
   final notices = <MeetingNotice>[];
+
+  /// The notices given with each cut ([next]).
+  final nextNotices = <MeetingNotice>[];
   bool running = false;
   int stops = 0;
   var _levels = StreamController<double>.broadcast();
 
   @override
-  Future<bool> hasPermission() async => permitted;
+  Future<SpeechPermission> permission({bool ask = true}) async {
+    if (permitted) return SpeechPermission.granted;
+    if (!ask) return SpeechPermission.denied;
+    asks++;
+    return blocked ? SpeechPermission.blocked : SpeechPermission.denied;
+  }
 
   @override
   Future<MeetingAudioFormat> format() async => supported;
@@ -79,8 +95,9 @@ class FakeMeetingAudio implements MeetingAudioEngine {
   }
 
   @override
-  Future<void> next(String path) async {
+  Future<void> next(String path, MeetingNotice notice) async {
     if (!running) throw StateError('Not recording.');
+    nextNotices.add(notice);
     _write(path);
   }
 

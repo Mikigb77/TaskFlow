@@ -562,6 +562,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   // Decided when the sheet opens, and again on `Volver a decirlo`; typing
   // alone never creates a recorder.
   late bool _voice = widget.voice;
+  // Opened typing because a meeting records and holds the mic (UX-2704).
+  late final bool _meetingMic;
   AudioRecorder? _recorder;
   final _words = TextEditingController();
   final _wordsFocus = FocusNode();
@@ -666,6 +668,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   @override
   void initState() {
     super.initState();
+    _meetingMic = !_voice && ref.read(meetingHoldsMicProvider);
     if (_voice) _recorder = ref.read(captureRecorderFactoryProvider)();
     _store = ref.read(captureStoreProvider);
     unawaited(CaptureDiagnostics(_store.database).record(CaptureEvent.opened));
@@ -2541,10 +2544,21 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
             style: wordsStyle,
           );
     final banners = <Widget>[
+      // A meeting holds the mic: say why the sheet types, while it still
+      // records.
+      if (_meetingMic && field && ref.watch(meetingHoldsMicProvider))
+        Text(
+          l10n.meetingTypeHere,
+          key: const ValueKey('capture-meeting-types'),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: colors.onSurfaceVariant,
+          ),
+        ),
       // Free dictations used up: say when more come, and where Pro is.
       // Without a free count (an older server), opened to speak without
       // voice: say why it types.
-      if (usedUpLine != null || (widget.askedToSpeak && !_voice)) ...[
+      if (usedUpLine != null ||
+          (widget.askedToSpeak && !_voice && !_meetingMic)) ...[
         Semantics(
           liveRegion: usedUpLine != null,
           child: Text(

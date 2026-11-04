@@ -176,6 +176,8 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                       l10n.proBenefitTyping,
                       if (widget.reason != ProReason.reminderPlans)
                         l10n.proBenefitReminders,
+                      if (widget.reason != ProReason.meetingNotes)
+                        l10n.proBenefitMeetingNotes,
                     ].indexed)
                       Padding(
                         padding: EdgeInsets.only(top: index == 0 ? 0 : 8),

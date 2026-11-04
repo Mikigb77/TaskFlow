@@ -79,7 +79,7 @@ const _notCovered = <String, String>{
   'The home-screen widget:':
       'a native Android widget (`CaptureWidget.kt` and its layout), outside Flutter. Phone only.',
   'Notifications and reminders in the shade:':
-      'Android draws them; their text comes from `lib/services/reminder_copy.dart` and `notification_service.dart` (the meeting\'s «Las notas de tu reunión están listas» there too, and its ongoing «Grabando una reunión» from `meeting_copy.dart`, drawn by the recorder\'s foreground service), a reminder plan\'s too («Faltan 12 días · jue, 12 nov», «Es mañana a las 17:00», «Fecha límite: hoy», «Era para ayer», «Venció ayer»), from `planBody`. Read the copy there; check delivery, actions and grouping on a phone.',
+      'Android draws them; their text comes from `lib/services/reminder_copy.dart` and `notification_service.dart` (the meeting\'s «Las notas de la reunión están listas» there too, under its note\'s title, and its ongoing «Grabando una reunión» from `meeting_copy.dart`, drawn by the recorder\'s foreground service), a reminder plan\'s too («Faltan 12 días · jue, 12 nov», «Es mañana a las 17:00», «Fecha límite: hoy», «Era para ayer», «Venció ayer»), from `planBody`. Read the copy there; check delivery, actions and grouping on a phone.',
   'System permission dialogs:':
       'the microphone, notification, exact-alarm and calendar prompts are Android\'s. The app\'s own explanations before and after them are covered (the reminder question sheet, the blocked-microphone message).',
   'The share sheet:':

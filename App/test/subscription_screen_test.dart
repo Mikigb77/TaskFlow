@@ -1245,6 +1245,256 @@ void main() {
       },
     );
   });
+
+  // ---- UX loop 2026-11-03-screens, round 1 · P326 (UX-2807, UX-2809): the
+  // Pro screen for meetings: one heading for both ways in, meeting notes as
+  // a benefit ----
+  group('P326 · the Pro screen for meetings', () {
+    final heading = find.byKey(const ValueKey('subscription-reason'));
+    final example = find.byKey(const ValueKey('subscription-reason-example'));
+    final status = find.byKey(const ValueKey('subscription-status'));
+    final offer = find.byKey(const ValueKey('subscription-paywall'));
+
+    Future<void> openFree(
+      WidgetTester tester,
+      String language,
+      double scale, {
+      ProReason? reason,
+    }) async {
+      await loadManrope();
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await openPro(
+        tester,
+        sdk: _CountingRevenueCat(),
+        language: language,
+        user: freeUser,
+        textScale: scale,
+        reason: reason,
+      );
+    }
+
+    /// [finder]'s text is drawn whole: inside 360 dp, no ellipsis or cut.
+    void expectWhole(WidgetTester tester, Finder finder, String text) {
+      expect(finder, findsOneWidget, reason: text);
+      final rect = tester.getRect(finder);
+      expect(rect.left, greaterThanOrEqualTo(0), reason: text);
+      expect(rect.right, lessThanOrEqualTo(360.5), reason: text);
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: finder, matching: find.byType(RichText)),
+      );
+      expect(paragraph.didExceedMaxLines, isFalse, reason: text);
+      expect(paragraph.text.toPlainText(), text, reason: 'drawn whole');
+      expect(
+        paragraph.size.height,
+        greaterThanOrEqualTo(
+          paragraph.getMaxIntrinsicHeight(paragraph.size.width) - 0.5,
+        ),
+        reason: '$text: not clipped',
+      );
+    }
+
+    test(
+      'UX-2807, UX-2809: the copy in EN, ES and CA: one heading for both ways in, the to-dos example, and the new benefit line',
+      () {
+        final en = lookupAppLocalizations(const Locale('en'));
+        final es = lookupAppLocalizations(const Locale('es'));
+        final ca = lookupAppLocalizations(const Locale('ca'));
+        expect(
+          [
+            es.billingReasonMeetingNotes,
+            es.billingReasonMeetingNotesExample,
+            es.proBenefitMeetingNotes,
+          ],
+          [
+            'Con Pro, tus reuniones se convierten en notas:',
+            'un resumen, las decisiones y las cosas por hacer',
+            'Notas de las reuniones que grabas',
+          ],
+        );
+        expect(
+          [
+            en.billingReasonMeetingNotes,
+            en.billingReasonMeetingNotesExample,
+            en.proBenefitMeetingNotes,
+          ],
+          [
+            'With Pro, your meetings become notes:',
+            'a summary, the decisions and the to-dos',
+            'Notes from your recorded meetings',
+          ],
+        );
+        expect(
+          [
+            ca.billingReasonMeetingNotes,
+            ca.billingReasonMeetingNotesExample,
+            ca.proBenefitMeetingNotes,
+          ],
+          [
+            'Amb Pro, les teves reunions es converteixen en notes:',
+            'un resum, les decisions i les coses per fer',
+            'Notes de les reunions que enregistres',
+          ],
+        );
+        // It never asks to record a meeting already recorded, and the notes
+        // give to-dos, not tasks.
+        for (final l in [en, es, ca]) {
+          expect(
+            l.billingReasonMeetingNotes.toLowerCase(),
+            isNot(
+              anyOf(
+                contains('graba'),
+                contains('record a'),
+                contains('enregistra'),
+              ),
+            ),
+          );
+        }
+        expect(es.billingReasonMeetingNotesExample, isNot(contains('tareas')));
+        expect(ca.billingReasonMeetingNotesExample, isNot(contains('tasques')));
+      },
+    );
+
+    testWidgets(
+      'UX-2807: reason meetingNotes, ES 1× with the priced store: the reason box reads «Con Pro, tus reuniones se convierten en notas:» then «un resumen, las decisiones y las cosas por hacer», then the plan, with the price and the pinned «Ver suscripción»',
+      (tester) async {
+        await openFree(tester, 'es', 1, reason: ProReason.meetingNotes);
+        final l = lookupAppLocalizations(const Locale('es'));
+        expect(tester.widget<Text>(heading).data, l.billingReasonMeetingNotes);
+        expect(
+          tester.widget<Text>(example).data,
+          l.billingReasonMeetingNotesExample,
+        );
+        final order = [heading, example, status];
+        for (var i = 1; i < order.length; i++) {
+          expect(
+            tester.getRect(order[i]).top,
+            greaterThanOrEqualTo(tester.getRect(order[i - 1]).bottom),
+            reason: '${order[i]} under ${order[i - 1]}',
+          );
+        }
+        // Read as a heading.
+        final node = tester.getSemantics(heading).getSemanticsData();
+        expect(node.label, l.billingReasonMeetingNotes);
+        expect(node.flagsCollection.isHeader, isTrue);
+        expect(find.text(l.billingMonthlyPrice('€4.99')), findsOneWidget);
+        expect(offer, findsOneWidget);
+        expect(find.byKey(const ValueKey('subscription-error')), findsNothing);
+        expect(find.text(l.billingStatus('unknown')), findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+
+    testWidgets(
+      'UX-2807: reason meetingNotes, CA 2× on 360×800: «Amb Pro, les teves reunions es converteixen en notes:» and its example, nothing cut',
+      (tester) async {
+        await openFree(tester, 'ca', 2, reason: ProReason.meetingNotes);
+        final l = lookupAppLocalizations(const Locale('ca'));
+        expectWhole(tester, heading, l.billingReasonMeetingNotes);
+        expectWhole(tester, example, l.billingReasonMeetingNotesExample);
+        expect(
+          tester.getRect(example).top,
+          greaterThanOrEqualTo(tester.getRect(heading).bottom),
+        );
+        // Both in view above the pinned «Ver suscripción», before scrolling.
+        for (final finder in [heading, example]) {
+          expect(
+            tester.getRect(finder).bottom,
+            lessThanOrEqualTo(tester.getRect(offer).top),
+          );
+        }
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+
+    for (final (language, scale) in [('es', 1.0), ('ca', 2.0)]) {
+      testWidgets(
+        'UX-2809: from Ajustes (no reason), $language ${scale.toInt()}× on 360×800: the benefits include «Notas de las reuniones que grabas», last and whole; the first benefit is still above the pinned «Ver suscripción»',
+        (tester) async {
+          await openFree(tester, language, scale);
+          final l = lookupAppLocalizations(Locale(language));
+          final lines = [
+            l.proBenefitDictation,
+            l.proBenefitTyping,
+            l.proBenefitReminders,
+            l.proBenefitMeetingNotes,
+          ];
+          // The first benefit in view above «Ver suscripción», unscrolled
+          // (UX-2640).
+          final first = tester.getRect(find.text(l.proBenefitDictation));
+          expect(
+            first.bottom,
+            lessThanOrEqualTo(tester.getRect(offer).top),
+            reason: 'first benefit above «Ver suscripción»',
+          );
+          expect(first.top, greaterThanOrEqualTo(0));
+          for (var i = 1; i < lines.length; i++) {
+            expect(
+              tester.getRect(find.text(lines[i])).top,
+              greaterThanOrEqualTo(
+                tester.getRect(find.text(lines[i - 1])).bottom,
+              ),
+              reason: '«${lines[i]}» under «${lines[i - 1]}»',
+            );
+          }
+          final meeting = find.text(l.proBenefitMeetingNotes);
+          await tester.ensureVisible(meeting);
+          await tester.pumpAndSettle();
+          expectWhole(tester, meeting, l.proBenefitMeetingNotes);
+          // With its own check, as every benefit.
+          final row = find
+              .ancestor(of: meeting, matching: find.byType(Row))
+              .first;
+          expect(
+            find.descendant(
+              of: row,
+              matching: find.byIcon(Icons.check_rounded),
+            ),
+            findsOneWidget,
+          );
+          // The file space line still follows the benefits.
+          expect(
+            tester.getRect(find.text(l.storageUsage(42, 100))).top,
+            greaterThan(tester.getRect(meeting).top),
+          );
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+        },
+      );
+    }
+
+    testWidgets(
+      'UX-2809: with reason meetingNotes the meeting line is hidden; with reminderPlans the reminders line is hidden as before and the meeting line shows (ES 1×)',
+      (tester) async {
+        final l = lookupAppLocalizations(const Locale('es'));
+        await openFree(tester, 'es', 1, reason: ProReason.meetingNotes);
+        expect(find.text(l.proBenefitMeetingNotes), findsNothing);
+        for (final line in [
+          l.proBenefitDictation,
+          l.proBenefitTyping,
+          l.proBenefitReminders,
+        ]) {
+          expect(find.text(line), findsOneWidget, reason: line);
+        }
+        await tester.pumpWidget(const SizedBox());
+
+        await openFree(tester, 'es', 1, reason: ProReason.reminderPlans);
+        expect(find.text(l.proBenefitReminders), findsNothing);
+        for (final line in [
+          l.proBenefitDictation,
+          l.proBenefitTyping,
+          l.proBenefitMeetingNotes,
+        ]) {
+          expect(find.text(line), findsOneWidget, reason: line);
+        }
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+  });
 }
 
 class _UserAuth extends AuthNotifier {

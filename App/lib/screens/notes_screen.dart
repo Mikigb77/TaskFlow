@@ -188,22 +188,6 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                       child: Text(context.l10n.checkCaptures))),
               // A meeting recording, stopped or waiting for its notes.
               const MeetingBanners(),
-              // Second to Añadir nota, and quieter: a conversation becomes
-              // a note (MN-1). Pro only, as MEETING_NOTES_PLAN.md decides;
-              // without it, the Pro screen. While one
-              // records, its line above opens it.
-              if (!readOnly && !recording)
-                Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: TextButton.icon(
-                        key: const ValueKey('record-meeting'),
-                        icon: const Icon(Icons.record_voice_over_outlined),
-                        label: Text(context.l10n.meetingRecord),
-                        onPressed: () => _add(() => openMeetingRecorder(
-                            context,
-                            projectId: _saveTo)))),
-              if (!readOnly && !recording && hasNotes)
-                const SizedBox(height: 8),
               if (hasNotes) ...[
                 SearchField(
                     key: const ValueKey('note-search'),
@@ -288,6 +272,23 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                       ],
                   error: (_, __) =>
                       <Widget>[Text(context.l10n.notesSavedOnDevice)]),
+              // Second to Añadir nota, and quieter: after the notes, just
+              // above it (UX-2707), a conversation becomes a note (MN-1).
+              // Pro only, as MEETING_NOTES_PLAN.md decides; without it, the
+              // Pro screen. While one records, its line above opens it.
+              if (!readOnly && !recording)
+                Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: TextButton.icon(
+                        key: const ValueKey('record-meeting'),
+                        // Grows with the text, up to the notes' own icons.
+                        icon: Icon(Icons.record_voice_over_outlined,
+                            size: math.min(24.0,
+                                MediaQuery.textScalerOf(context).scale(18))),
+                        label: Text(context.l10n.meetingRecord),
+                        onPressed: () => _add(() => openMeetingRecorder(
+                            context,
+                            projectId: _saveTo)))),
             ]),
       ),
       // One button, as on Calendar and Tareas: the mic while it is

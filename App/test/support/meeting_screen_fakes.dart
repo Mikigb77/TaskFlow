@@ -100,6 +100,12 @@ class ScriptedMeetings extends MeetingController {
   /// Upload first reaches the server.
   bool uploaded;
 
+  /// How upload first ends when it doesn't reach the server.
+  MeetingSendResult unsent = MeetingSendResult.offline;
+
+  /// Upload first waits for this, as a slow server does.
+  Completer<void>? uploadGate;
+
   /// The first read of the meetings waits for this, as right after launch.
   final Completer<void>? loading;
 
@@ -120,6 +126,12 @@ class ScriptedMeetings extends MeetingController {
     await loading?.future;
     if (mounted && !state.loaded) state = initial;
   }
+
+  /// Allowed once start no longer refuses it, as back from Settings.
+  @override
+  Future<bool> microphoneAllowed() async =>
+      refuse != MeetingStartProblem.permission &&
+      refuse != MeetingStartProblem.microphoneBlocked;
 
   @override
   Future<Meeting> start({
@@ -222,12 +234,13 @@ class ScriptedMeetings extends MeetingController {
   );
 
   @override
-  Future<bool> uploadNow() async {
+  Future<MeetingSendResult> uploadNow() async {
     calls.uploads++;
     calls.order.add('upload');
-    if (!uploaded) return false;
-    state = state.copyWith(stopped: const [], waiting: const []);
-    return true;
+    await uploadGate?.future;
+    if (!uploaded) return unsent;
+    if (mounted) state = state.copyWith(stopped: const [], waiting: const []);
+    return MeetingSendResult.done;
   }
 
   @override

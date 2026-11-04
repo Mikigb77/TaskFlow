@@ -10,6 +10,7 @@ import 'package:agenda/services/meeting_note.dart';
 import 'package:agenda/services/meeting_recorder.dart';
 import 'package:agenda/services/meeting_store.dart';
 import 'package:agenda/services/meeting_uploader.dart';
+import 'package:agenda/services/notification_service.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -474,7 +475,7 @@ void main() {
       expect(note.notes, contains('We agreed the pilot. Pricing comes next.'));
       expect(note.notes, contains('• Start the pilot in December'));
       expect(note.notes, contains('• Who signs for Acme?'));
-      expect(note.notes, contains('0:00–0:30 Introductions and scope\nScope is the warehouse.'));
+      expect(note.notes, contains('Introductions and scope\nScope is the warehouse.'));
       expect(note.checklist.map((item) => item.title), [
         'Send the pilot quote · Miki · Friday',
         'Book the room',
@@ -791,13 +792,12 @@ void main() {
       expect(
         note.notes,
         'The start of this recording expired.\n\nShort. Then more.\n\n'
-        'Decisions\n• Yes\n\nOpen questions\n• Who?\n\nChapters\n\n0:30–1:00 Pricing',
+        'Decisions\n• Yes\n\nOpen questions\n• Who?\n\nChapters\n\nPricing',
       );
       expect(note.checklist, isEmpty);
       final bare = meetingNote(const MeetingResult(summary: 'Short. Then more.'), labels: MeetingNoteLabels.none);
       expect(bare.title, 'Short.');
       expect(bare.notes, 'Short. Then more.');
-      expect(meetingClock(245), '4:05');
     });
 
     test('a note for a project that went is saved outside it', () async {
@@ -989,11 +989,11 @@ void main() {
       addTearDown(controller.dispose);
       api.onPiece = (_) async => throw offline();
       await controller.ready;
-      expect(await controller.uploadNow(), isFalse);
+      expect(await controller.uploadNow(), MeetingSendResult.offline);
       expect((await controller.backlog()).pieces, 2);
       api.onPiece = null;
       clock.advance(const Duration(hours: 1));
-      expect(await controller.uploadNow(), isTrue);
+      expect(await controller.uploadNow(), MeetingSendResult.done);
       expect((await database.getTasks(ownerKey: owner)), hasLength(1));
     });
   });
@@ -1207,5 +1207,222 @@ void main() {
     expect(after.map((row) => row['name']), containsAll(['meetings', 'meeting_pieces', 'meeting_leases']));
     expect((await old.query('tasks')).single['title'], 'Kept');
     expect(TaskDatabase.schemaVersion, 22);
+  });
+
+  group('P325 · meeting notifications', () {
+    test('UX-2810: the recording’s clock starts as it starts, and keeps time through a cut', () async {
+      final started = clock.now;
+      await recorder.start(owner, notice: notice);
+      expect(audio.notices.single.since, started);
+      expect(audio.notices.single.title, notice.title);
+      // 5 minutes and more, then a pause: the piece is cut.
+      await hear(recorder, speech, const Duration(minutes: 5, seconds: 10));
+      await hear(recorder, silence, const Duration(seconds: 2));
+      final cut = audio.nextNotices.single;
+      expect(cut.since, started);
+      expect(cut.title, notice.title);
+      final android = meetingRecordingNotificationDetails(cut).android!;
+      expect(android.usesChronometer, isTrue);
+      expect(android.showWhen, isTrue);
+      expect(android.when, started.millisecondsSinceEpoch);
+      await recorder.stop();
+    });
+
+    test('UX-2810: «Seguir grabando» counts on from the 42 minutes already recorded', () async {
+      final meeting = await recorder.start(owner, notice: notice);
+      await hear(recorder, speech, const Duration(minutes: 42), step: const Duration(seconds: 10));
+      // The process dies; the meeting is found stopped later.
+      audio.reset();
+      clock.advance(const Duration(hours: 1));
+      final restarted = newRecorder();
+      final stopped = (await store.recoverInterrupted(owner, active: restarted.meetingId)).single;
+      expect(stopped.recorded, const Duration(minutes: 42));
+
+      await restarted.resume(meeting.id, owner, notice: notice);
+      final resumedAt = clock.now;
+      final continued = audio.notices.last;
+      expect(continued.since, resumedAt.subtract(const Duration(minutes: 42)));
+      final android = meetingRecordingNotificationDetails(continued).android!;
+      expect(android.usesChronometer, isTrue);
+      expect(android.showWhen, isTrue);
+      expect(
+        android.when,
+        resumedAt.millisecondsSinceEpoch - const Duration(minutes: 42).inMilliseconds,
+      );
+      // And through the next cut, at 6 minutes, the same start.
+      await hear(restarted, speech, const Duration(minutes: 6, seconds: 1));
+      expect(audio.nextNotices.last.since, continued.since);
+      await restarted.stop();
+    });
+
+    test('UX-2811: markSeen removes that meeting’s "notes ready"', () async {
+      final seen = <String>[];
+      final hook = MeetingHooks.notesSeen;
+      MeetingHooks.notesSeen = (id) async => seen.add(id);
+      addTearDown(() => MeetingHooks.notesSeen = hook);
+      final meeting = await stoppedMeeting();
+      final controller = MeetingController(
+        store: store,
+        engine: audio,
+        ownerKey: owner,
+        api: api,
+        scheduler: FakeMeetingScheduler(),
+        clock: clock.call,
+      );
+      addTearDown(controller.dispose);
+      await controller.ready;
+      await controller.markSeen(meeting.id);
+      expect(seen, [meeting.id]);
+    });
+  });
+
+  group('P320 · Save notes and sign out says how it ended', () {
+    MeetingController controller() {
+      final controller = MeetingController(
+        store: store,
+        engine: audio,
+        ownerKey: owner,
+        api: api,
+        scheduler: FakeMeetingScheduler(),
+        clock: clock.call,
+        retryFloor: const Duration(milliseconds: 10),
+      );
+      addTearDown(controller.dispose);
+      return controller;
+    }
+
+    test('UX-2806, MN-13: no connection: offline, and the recording stays', () async {
+      final meeting = await stoppedMeeting();
+      api.onPiece = (_) async => throw offline();
+      final meetings = controller();
+      await meetings.ready;
+      expect(await meetings.uploadNow(), MeetingSendResult.offline);
+      expect(await store.meeting(meeting.id, owner), isNotNull);
+      expect((await meetings.backlog()).meetings, 1);
+    });
+
+    test('UX-2806, MN-13: online but not done within the 2-minute cap: slow, and the recording stays', () async {
+      final meeting = await stoppedMeeting();
+      // The server is busy and asks for 3 minutes: past the cap.
+      api.onPiece = (_) async =>
+          throw ApiException(503, 'busy', null, const Duration(minutes: 3));
+      final meetings = controller();
+      await meetings.ready;
+      final waited = Stopwatch()..start();
+      expect(await meetings.uploadNow(), MeetingSendResult.slow);
+      expect(waited.elapsed, lessThan(const Duration(seconds: 30)));
+      expect(await store.meeting(meeting.id, owner), isNotNull);
+      expect((await meetings.backlog()).meetings, 1);
+    });
+
+    test('UX-2806, MN-13: held back for Pro: blocked, and the recording stays', () async {
+      final meeting = await stoppedMeeting();
+      api.onPiece = (_) async =>
+          throw ApiException(402, 'pro', {'code': MeetingProblem.proRequired});
+      final meetings = controller();
+      await meetings.ready;
+      expect(await meetings.uploadNow(), MeetingSendResult.blocked);
+      expect(await store.meeting(meeting.id, owner), isNotNull);
+    });
+
+    test('UX-2806: everything sent: done', () async {
+      await stoppedMeeting();
+      final meetings = controller();
+      await meetings.ready;
+      expect(await meetings.uploadNow(), MeetingSendResult.done);
+      expect((await meetings.backlog()).isEmpty, isTrue);
+    });
+  });
+
+  group('P323 · starting a recording: the microphone, and what keeps the notes waiting', () {
+    MeetingController controllerFor({MeetingApi? withApi, FakeClock? at}) {
+      final controller = MeetingController(
+        store: store,
+        engine: audio,
+        ownerKey: owner,
+        api: withApi,
+        scheduler: FakeMeetingScheduler(),
+        clock: (at ?? clock).call,
+        rules: const MeetingPieceRules(target: Duration(seconds: 10), cap: Duration(seconds: 12)),
+      );
+      addTearDown(controller.dispose);
+      return controller;
+    }
+
+    Matcher refused(MeetingStartProblem problem) =>
+        throwsA(isA<MeetingStartRefused>().having((e) => e.problem, 'problem', problem));
+
+    test('UX-2712: refused but Android still asks, refused for good, and allowed: each says which', () async {
+      final controller = controllerFor(withApi: api);
+      await controller.ready;
+      audio.permitted = false;
+      await expectLater(controller.start(notice: notice), refused(MeetingStartProblem.permission));
+      expect(audio.asks, 1, reason: 'starting asks Android');
+      await expectLater(controller.start(notice: notice), refused(MeetingStartProblem.permission));
+      expect(audio.asks, 2, reason: '«Permitir el micrófono» asks again');
+      // Back from Settings: only read, never asked.
+      expect(await controller.microphoneAllowed(), isFalse);
+      expect(audio.asks, 2);
+      audio.blocked = true;
+      await expectLater(controller.start(notice: notice), refused(MeetingStartProblem.microphoneBlocked));
+      expect(controller.state.recording, isNull);
+      audio.permitted = true;
+      expect(await controller.microphoneAllowed(), isTrue);
+      final meeting = await controller.start(notice: notice);
+      expect(controller.state.recording?.meetingId, meeting.id);
+      await controller.discardRecording();
+    });
+
+    test('UX-2711: a piece refused for the month’s time while recording: the state says so, and recording goes on', () async {
+      api.onPiece = (_) async => throw ApiException(402, 'allowance', {'code': 'meeting_allowance_used'});
+      final controller = controllerFor(withApi: api);
+      await controller.ready;
+      expect(controller.state.recordingProblem, isNull);
+      expect(controller.state.allowanceUsed, isFalse);
+      final meeting = await controller.start(notice: notice);
+      await hear(controller.recorder, speech, const Duration(seconds: 12));
+      for (var i = 0; i < 100 && controller.state.recordingProblem == null; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(api.kinds(), contains('piece'));
+      expect(controller.state.recordingProblem, MeetingProblem.allowanceUsed);
+      expect(controller.state.recording?.meetingId, meeting.id);
+      await hear(controller.recorder, speech, const Duration(seconds: 3));
+      expect(controller.state.recording?.meetingId, meeting.id);
+      expect(controller.state.recording!.elapsed, greaterThanOrEqualTo(const Duration(seconds: 15)));
+      await controller.stop();
+    });
+
+    test('UX-2711: a piece refused for Pro while recording: the state says so', () async {
+      api.onPiece = (_) async => throw ApiException(402, 'pro', {'code': 'pro_required'});
+      final controller = controllerFor(withApi: api);
+      await controller.ready;
+      final meeting = await controller.start(notice: notice);
+      await hear(controller.recorder, speech, const Duration(seconds: 12));
+      for (var i = 0; i < 100 && controller.state.recordingProblem == null; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(controller.state.recordingProblem, MeetingProblem.proRequired);
+      expect(controller.state.recording?.meetingId, meeting.id);
+      await controller.stop();
+    });
+
+    test('UX-2711: a meeting refused for the month’s time this month says so before the next starts; next month it doesn’t', () async {
+      final earlier = await stoppedMeeting();
+      api.onPiece = (_) async => throw ApiException(402, 'allowance', {'code': 'meeting_allowance_used'});
+      await uploader().run();
+      expect((await store.meeting(earlier.id, owner))!.problem, MeetingProblem.allowanceUsed);
+      api.onPiece = null;
+
+      // No uploader: the refusal stays as the server left it.
+      final now = controllerFor();
+      await now.ready;
+      expect(now.state.allowanceUsed, isTrue);
+      expect(now.state.recordingProblem, isNull, reason: 'nothing records yet');
+
+      final nextMonth = controllerFor(at: FakeClock(DateTime.utc(2026, 12, 2, 10)));
+      await nextMonth.ready;
+      expect(nextMonth.state.allowanceUsed, isFalse);
+    });
   });
 }

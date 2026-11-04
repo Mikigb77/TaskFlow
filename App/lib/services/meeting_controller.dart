@@ -11,6 +11,7 @@ import 'package:agenda/services/meeting_note.dart';
 import 'package:agenda/services/meeting_recorder.dart';
 import 'package:agenda/services/meeting_store.dart';
 import 'package:agenda/services/meeting_uploader.dart';
+import 'package:agenda/services/native_speech.dart';
 import 'package:agenda/services/task_database.dart';
 
 /// What the meeting screens show.
@@ -21,6 +22,8 @@ class MeetingsState {
     this.waiting = const [],
     this.ready = const [],
     this.loaded = false,
+    this.recordingProblem,
+    this.allowanceUsed = false,
   });
 
   /// The meeting being recorded now: elapsed time and level (MN-7).
@@ -40,6 +43,15 @@ class MeetingsState {
   /// Whether the meetings on this phone have been read once.
   final bool loaded;
 
+  /// Why the server holds back the meeting being recorded now, once it
+  /// refused a piece: [MeetingProblem.proRequired] or
+  /// [MeetingProblem.allowanceUsed]. Recording goes on.
+  final String? recordingProblem;
+
+  /// A meeting on this phone was refused for this month's meeting time
+  /// during this calendar month: a new one's notes wait for the next.
+  final bool allowanceUsed;
+
   MeetingsState copyWith({
     MeetingRecordingStatus? recording,
     bool clearRecording = false,
@@ -47,12 +59,19 @@ class MeetingsState {
     List<Meeting>? waiting,
     List<Meeting>? ready,
     bool? loaded,
+    String? recordingProblem,
+    bool clearRecordingProblem = false,
+    bool? allowanceUsed,
   }) => MeetingsState(
     recording: clearRecording ? null : recording ?? this.recording,
     stopped: stopped ?? this.stopped,
     waiting: waiting ?? this.waiting,
     ready: ready ?? this.ready,
     loaded: loaded ?? this.loaded,
+    recordingProblem: clearRecordingProblem
+        ? null
+        : recordingProblem ?? this.recordingProblem,
+    allowanceUsed: allowanceUsed ?? this.allowanceUsed,
   );
 }
 
@@ -61,8 +80,12 @@ enum MeetingStartProblem {
   /// Meetings need an account (and Pro, which the server checks).
   signedOut,
 
-  /// The microphone permission was refused.
+  /// The microphone permission was refused; Android still asks again.
   permission,
+
+  /// The microphone permission was refused, and Android no longer asks:
+  /// only the phone's Settings can allow it.
+  microphoneBlocked,
 
   /// Under about 100 MB free (MN-6).
   lowSpace,
@@ -76,6 +99,22 @@ class MeetingStartRefused implements Exception {
   final MeetingStartProblem problem;
   @override
   String toString() => 'Meeting not started: ${problem.name}';
+}
+
+/// How «Save notes and sign out» ended ([MeetingController.uploadNow]).
+enum MeetingSendResult {
+  /// Nothing is left for this account: it can sign out.
+  done,
+
+  /// The server couldn't be reached.
+  offline,
+
+  /// Still not done after two minutes of retries.
+  slow,
+
+  /// What's left can't be sent now: a recording is lost or expired, Pro or
+  /// the month's time holds one back, or the login was refused.
+  blocked,
 }
 
 /// The app's meetings for one account: recording, recovery and uploads
@@ -171,8 +210,16 @@ class MeetingController extends StateNotifier<MeetingsState> {
     await store.markAsked(ownerKey, clock());
     final all = await store.meetings(ownerKey);
     if (!mounted) return;
+    final active = recorder.meetingId;
+    final held = all
+        .where((m) => m.id == active && MeetingProblem.blocksUploads(m.problem))
+        .firstOrNull
+        ?.problem;
     state = state.copyWith(
       loaded: true,
+      recordingProblem: held,
+      clearRecordingProblem: held == null,
+      allowanceUsed: all.any(_allowanceUsedThisMonth),
       stopped: [
         for (final meeting in all)
           if (meeting.phase == MeetingPhase.interrupted) meeting,
@@ -190,6 +237,20 @@ class MeetingController extends StateNotifier<MeetingsState> {
             meeting,
       ],
     );
+  }
+
+  /// [meeting] was refused for the month's meeting time this calendar
+  /// month. The refusal set its next try [MeetingUploader.blockedPause]
+  /// later.
+  bool _allowanceUsedThisMonth(Meeting meeting) {
+    if (meeting.problem != MeetingProblem.allowanceUsed) return false;
+    final refused =
+        (meeting.retryAt?.subtract(MeetingUploader.blockedPause) ??
+                meeting.stoppedAt ??
+                meeting.startedAt)
+            .toLocal();
+    final now = clock().toLocal();
+    return refused.year == now.year && refused.month == now.month;
   }
 
   // ---- Recording ----
@@ -231,10 +292,20 @@ class MeetingController extends StateNotifier<MeetingsState> {
     if (!await recorder.hasRoom()) {
       throw const MeetingStartRefused(MeetingStartProblem.lowSpace);
     }
-    if (!await recorder.engine.hasPermission()) {
-      throw const MeetingStartRefused(MeetingStartProblem.permission);
+    switch (await recorder.engine.permission()) {
+      case SpeechPermission.granted:
+        return;
+      case SpeechPermission.denied:
+        throw const MeetingStartRefused(MeetingStartProblem.permission);
+      case SpeechPermission.blocked:
+        throw const MeetingStartRefused(MeetingStartProblem.microphoneBlocked);
     }
   }
+
+  /// Whether the microphone is allowed now, without asking: back from the
+  /// phone's Settings.
+  Future<bool> microphoneAllowed() async =>
+      await recorder.engine.permission(ask: false) == SpeechPermission.granted;
 
   /// Stop: the meeting waits for its notes. Null when only silence was
   /// recorded, and nothing is kept.
@@ -285,6 +356,7 @@ class MeetingController extends StateNotifier<MeetingsState> {
   /// The screens showed that [id]'s notes are ready.
   Future<void> markSeen(String id) async {
     await store.markSeen(id, ownerKey);
+    await MeetingHooks.notesSeen(id);
     await refresh();
   }
 
@@ -295,17 +367,23 @@ class MeetingController extends StateNotifier<MeetingsState> {
   Future<MeetingBacklog> backlog() => store.backlog(ownerKey);
 
   /// Upload first: runs uploads now until nothing waits or the server can't
-  /// be reached. True when nothing is left for this account.
-  Future<bool> uploadNow() async {
+  /// be reached, and says how it ended: [MeetingSendResult.done] when
+  /// nothing is left for this account.
+  Future<MeetingSendResult> uploadNow() async {
     await ready;
-    if (uploader == null) return (await backlog()).isEmpty;
+    if (uploader == null) {
+      return (await backlog()).isEmpty
+          ? MeetingSendResult.done
+          : MeetingSendResult.offline;
+    }
     await _upload;
     // Asked for now: no waiting out the pauses after earlier failures.
     await store.retryNow(ownerKey);
     final waited = Stopwatch()..start();
+    MeetingPass pass;
     while (true) {
       await _upload;
-      final pass = await uploader!.run();
+      pass = await uploader!.run();
       await _passed(pass);
       if (pass.idle || pass.offline || pass.stopped) break;
       var due = pass.nextDue!.difference(clock());
@@ -313,7 +391,19 @@ class MeetingController extends StateNotifier<MeetingsState> {
       if (waited.elapsed + due > const Duration(minutes: 2)) break;
       await Future<void>.delayed(due);
     }
-    return (await backlog()).isEmpty;
+    if ((await backlog()).isEmpty) return MeetingSendResult.done;
+    if (pass.offline) return MeetingSendResult.offline;
+    final left = [...state.stopped, ...state.waiting];
+    final heldBack =
+        left.isNotEmpty &&
+        left.every(
+          (m) =>
+              MeetingProblem.blocksUploads(m.problem) ||
+              m.problem == MeetingProblem.pieceFailed ||
+              m.problem == MeetingProblem.expired,
+        );
+    if (pass.stopped || heldBack) return MeetingSendResult.blocked;
+    return MeetingSendResult.slow;
   }
 
   /// Discard: every meeting still waiting for this account goes (MN-13).

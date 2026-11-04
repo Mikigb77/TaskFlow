@@ -76,20 +76,45 @@ bool meetingLost(Meeting meeting) =>
     meeting.problem == MeetingProblem.pieceFailed ||
     meeting.problem == MeetingProblem.expired;
 
-/// Why «Send first» left recordings behind (MN-13), from what's left in
-/// [meetings]: one that can only be discarded, Pro or the month's time
-/// holding one back, or else no connection.
-String meetingSendFailure(AppLocalizations l, MeetingsState meetings) {
+/// Whether [meeting] can't be sent now: lost, or held back by Pro or the
+/// month's time.
+bool meetingHeldBack(Meeting meeting) =>
+    meetingLost(meeting) || MeetingProblem.blocksUploads(meeting.problem);
+
+/// Why the recordings left in [meetings] can't be sent (MN-13): one that
+/// can only be discarded (with how many Discard deletes, when more than one
+/// waits), or Pro or the month's time holding one back. Null when none is
+/// known to be held back.
+String? meetingHeldBackReason(AppLocalizations l, MeetingsState meetings) {
   final left = [...meetings.stopped, ...meetings.waiting];
-  if (left.any(meetingLost)) return l.meetingSendFailedLost;
+  if (left.any(meetingLost)) {
+    return left.length > 1
+        ? '${l.meetingSendFailedLost} ${l.meetingDiscardDeletesAll(left.length)}'
+        : l.meetingSendFailedLost;
+  }
   if (left.any((m) => m.problem == MeetingProblem.proRequired)) {
     return l.meetingSendFailedPro;
   }
   if (left.any((m) => m.problem == MeetingProblem.allowanceUsed)) {
     return l.meetingSendFailedAllowance;
   }
-  return l.meetingSendFailed;
+  return null;
 }
+
+/// Why «Save notes and sign out» left recordings behind (MN-13): what holds
+/// them back, else no connection, a refused login (uploads stop until it
+/// signs in again), or notes taking longer than usual.
+String meetingSendFailure(
+  AppLocalizations l,
+  MeetingsState meetings,
+  MeetingSendResult result,
+) =>
+    meetingHeldBackReason(l, meetings) ??
+    switch (result) {
+      MeetingSendResult.offline => l.meetingSendFailed,
+      MeetingSendResult.blocked => l.requestError('session'),
+      _ => l.meetingSendSlow,
+    };
 
 /// Before signing out: the server hears of every meeting discarded or saved
 /// here while this account's token still works, so a discard deletes the
@@ -109,8 +134,8 @@ Future<void> tellServerBeforeSignOut(
 
 /// The Notes tab's lines for meetings (MN-12, MN-26): the one recording
 /// (when its screen was left), each recording that stopped by itself with
-/// «Continuar», «Terminar» and «Descartar», and each waiting for its notes.
-/// Nothing when there are none.
+/// «Hacer las notas», «Seguir grabando» and «Descartar», and each waiting
+/// for its notes. Nothing when there are none.
 class MeetingBanners extends ConsumerWidget {
   const MeetingBanners({super.key});
 
@@ -147,6 +172,7 @@ class MeetingBanners extends ConsumerWidget {
 /// several lines opening Notes don't talk over each other.
 /// [actions] are in reading order with the main one last: in a row it sits
 /// at the end, and when they don't fit (large text) it comes first.
+/// [alignment] places them in a row; stacked, they start at the left.
 class _Card extends StatefulWidget {
   const _Card({
     super.key,
@@ -155,12 +181,14 @@ class _Card extends StatefulWidget {
     required this.actions,
     this.state,
     this.error = false,
+    this.alignment = MainAxisAlignment.end,
   });
   final IconData icon;
   final String text;
   final List<Widget> actions;
   final Object? state;
   final bool error;
+  final MainAxisAlignment alignment;
 
   @override
   State<_Card> createState() => _CardState();
@@ -183,7 +211,7 @@ class _CardState extends State<_Card> {
         : colors.onPrimaryContainer;
     return AppSurface(
       color: widget.error ? colors.errorContainer : colors.primaryContainer,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, widget.actions.isEmpty ? 16 : 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -202,19 +230,21 @@ class _CardState extends State<_Card> {
               ],
             ),
           ),
-          const SizedBox(height: 4),
-          SizedBox(
-            width: double.infinity,
-            child: OverflowBar(
-              spacing: 8,
-              overflowSpacing: 8,
-              alignment: MainAxisAlignment.end,
-              overflowAlignment: OverflowBarAlignment.start,
-              // Stacked, the main action (the last) is on top.
-              overflowDirection: VerticalDirection.up,
-              children: widget.actions,
+          if (widget.actions.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            SizedBox(
+              width: double.infinity,
+              child: OverflowBar(
+                spacing: 8,
+                overflowSpacing: 8,
+                alignment: widget.alignment,
+                overflowAlignment: OverflowBarAlignment.start,
+                // Stacked, the main action (the last) is on top.
+                overflowDirection: VerticalDirection.up,
+                children: widget.actions,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -228,6 +258,56 @@ Widget _action(String text, String label, VoidCallback onPressed) => TextButton(
   child: Text(text, semanticsLabel: label),
 );
 
+/// «Descartar» on a meeting, in the error colour as everywhere (UX-2714);
+/// on an [onError] card, the darker one that card's text uses, so it keeps
+/// its contrast on the red. It asks first (MN-25).
+class _DiscardButton extends ConsumerWidget {
+  const _DiscardButton(this.meeting, {this.onError = false});
+  final Meeting meeting;
+  final bool onError;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = context.l10n;
+    final colors = Theme.of(context).colorScheme;
+    return TextButton(
+      style: TextButton.styleFrom(
+        foregroundColor: onError ? colors.onErrorContainer : colors.error,
+      ),
+      onPressed: () async {
+        if (await confirmMeetingDiscard(context)) {
+          await ref
+              .read(meetingControllerProvider.notifier)
+              .discardMeeting(meeting.id);
+        }
+      },
+      child: Text(
+        l.discard,
+        semanticsLabel: l.meetingDiscardNamed(
+          meetingLength(l, meeting.recorded),
+        ),
+      ),
+    );
+  }
+}
+
+/// Which recording [meeting] is, from when it started: «Grabación de hoy,
+/// 10:15», «Grabación de ayer, 10:15» or «Grabación del martes 3 nov, 10:15»
+/// (the weekday in full, as in the note's title: «mar» reads as "sea").
+String meetingWhich(BuildContext context, Meeting meeting) {
+  final l = context.l10n;
+  final started = meeting.startedAt.toLocal();
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(started.year, started.month, started.day);
+  final time = context.clockTime(started);
+  if (day == today) return l.meetingRecordingToday(time);
+  if (day == DateTime(today.year, today.month, today.day - 1)) {
+    return l.meetingRecordingYesterday(time);
+  }
+  return l.meetingRecordingOn(meetingDay(context.localeName, l, started), time);
+}
+
 class _RecordingCard extends StatelessWidget {
   const _RecordingCard(this.status);
   final MeetingRecordingStatus status;
@@ -238,61 +318,104 @@ class _RecordingCard extends StatelessWidget {
     return _Card(
       key: const ValueKey('meeting-recording'),
       icon: Icons.mic_rounded,
-      text: l.meetingRecordingNow(meetingElapsed(status.elapsed)),
+      text: l.meetingRecordingNow(meetingLength(l, status.elapsed)),
       actions: [
-        TextButton(
-          onPressed: () => openMeetingRecorder(context),
-          child: Text(l.meetingOpen),
+        _action(
+          l.meetingOpen,
+          l.meetingOpenNamed,
+          () => openMeetingRecorder(context),
         ),
       ],
     );
   }
 }
 
-/// A recording that stopped without Stop (MN-12): «Your recording stopped
-/// at 1:42. Continue, finish or discard?».
-class MeetingStoppedCard extends ConsumerWidget {
+/// A recording that stopped without Stop (MN-12): «Grabación de hoy, 10:15
+/// · 1 h 42 min. Se cortó antes de que pulsaras Parar.», then its choices.
+class MeetingStoppedCard extends StatelessWidget {
   const MeetingStoppedCard({super.key, required this.meeting});
   final Meeting meeting;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l = context.l10n;
-    final controller = ref.read(meetingControllerProvider.notifier);
-    final time = meetingElapsed(meeting.recorded);
     return _Card(
       icon: Icons.pause_circle_outline_rounded,
-      text: l.meetingStoppedAt(time),
-      actions: [
-        _action(l.discard, l.meetingDiscardNamed(time), () async {
-          if (await confirmMeetingDiscard(context)) {
-            await controller.discardMeeting(meeting.id);
-          }
-        }),
-        _action(
-          l.meetingFinish,
-          l.meetingFinishNamed(time),
-          () => unawaited(controller.finishMeeting(meeting.id)),
-        ),
-        _action(
-          l.meetingContinue,
-          l.meetingContinueNamed(time),
-          () => openMeetingRecorder(context, continueId: meeting.id),
-        ),
-      ],
+      text: l.meetingStoppedCut(
+        meetingWhich(context, meeting),
+        meetingLength(l, meeting.recorded),
+      ),
+      actions: [MeetingStoppedActions(meeting: meeting)],
     );
   }
 }
 
-class _WaitingCard extends ConsumerWidget {
-  const _WaitingCard({super.key, required this.meeting});
+/// A stopped recording's choices (UX-2703): «Hacer las notas», the main
+/// one; «Seguir grabando»; and «Descartar» apart on its own line. The
+/// meeting screen shows them [centered] under why it stopped.
+class MeetingStoppedActions extends ConsumerWidget {
+  const MeetingStoppedActions({
+    super.key,
+    required this.meeting,
+    this.centered = false,
+  });
   final Meeting meeting;
+  final bool centered;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = context.l10n;
     final controller = ref.read(meetingControllerProvider.notifier);
+    final time = meetingLength(l, meeting.recorded);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: centered
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
+      children: [
+        OverflowBar(
+          spacing: 8,
+          overflowSpacing: 8,
+          alignment: centered
+              ? MainAxisAlignment.center
+              : MainAxisAlignment.start,
+          overflowAlignment: centered
+              ? OverflowBarAlignment.center
+              : OverflowBarAlignment.start,
+          children: [
+            FilledButton(
+              onPressed: () => unawaited(controller.finishMeeting(meeting.id)),
+              child: Text(
+                l.meetingMakeNotes,
+                semanticsLabel: l.meetingFinishNamed(time),
+              ),
+            ),
+            _action(
+              l.meetingKeepRecording,
+              l.meetingContinueNamed(time),
+              () => openMeetingRecorder(context, continueId: meeting.id),
+            ),
+          ],
+        ),
+        // Apart from the others, so it isn't tapped for one of them.
+        const SizedBox(height: 12),
+        _DiscardButton(meeting),
+      ],
+    );
+  }
+}
+
+/// A meeting waiting for its notes. «Preparando tus notas…» lasts seconds,
+/// so it has no button; held back, it offers «Descartar» (UX-2714).
+class _WaitingCard extends StatelessWidget {
+  const _WaitingCard({super.key, required this.meeting});
+  final Meeting meeting;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
     final lost = meetingLost(meeting);
+    final preparing = meeting.problem == null;
     return _Card(
       icon: switch (meeting.problem) {
         MeetingProblem.offline => Icons.cloud_off_outlined,
@@ -301,17 +424,11 @@ class _WaitingCard extends ConsumerWidget {
       },
       error: lost,
       state: meeting.problem,
+      // «Descartar» at the start, as on the stopped lines (R1-P322-4).
+      alignment: MainAxisAlignment.start,
       text: meetingWaitingLine(context, meeting),
       actions: [
-        _action(
-          l.discard,
-          l.meetingDiscardNamed(meetingElapsed(meeting.recorded)),
-          () async {
-            if (await confirmMeetingDiscard(context)) {
-              await controller.discardMeeting(meeting.id);
-            }
-          },
-        ),
+        if (!preparing) _DiscardButton(meeting, onError: lost),
         if (meeting.problem == MeetingProblem.proRequired)
           TextButton(
             onPressed: () => Navigator.of(

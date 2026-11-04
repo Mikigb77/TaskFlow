@@ -6,6 +6,7 @@ import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/revenuecat_service.dart';
+import 'package:agenda/widgets/meeting_banners.dart';
 
 final billingConfigurationProvider = Provider(
   (ref) => BillingConfiguration.environment(),
@@ -55,10 +56,18 @@ final hasProProvider = Provider<bool>(
 /// The mic: with Pro, or while free dictations are left this month. Read
 /// from the saved account, so it never waits on the network; a saved count
 /// from before the reset counts as the whole new month. A server that sends
-/// no count leaves the mic to Pro.
+/// no count leaves the mic to Pro. Never while a meeting records: the
+/// meeting holds the mic, and every entry types (UX-2704).
 final voiceAvailableProvider = Provider<bool>(
   (ref) =>
-      ref.watch(hasProProvider) || (ref.watch(freeVoiceLeftProvider) ?? 0) > 0,
+      !ref.watch(meetingHoldsMicProvider) &&
+      (ref.watch(hasProProvider) ||
+          (ref.watch(freeVoiceLeftProvider) ?? 0) > 0),
+);
+
+/// A meeting records on this phone for the signed-in account.
+final meetingHoldsMicProvider = Provider<bool>(
+  (ref) => ref.watch(meetingsProvider.select((m) => m.recording != null)),
 );
 
 /// Free dictations left now, for an account without Pro; null with Pro or

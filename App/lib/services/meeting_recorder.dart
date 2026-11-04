@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'package:agenda/models/meeting.dart';
 import 'package:agenda/services/meeting_store.dart';
+import 'package:agenda/services/native_speech.dart';
 
 /// The words of the recording's ongoing notification (MN-1). The screens'
 /// package gives them, in the app's language.
@@ -12,9 +13,25 @@ class MeetingNotice {
     this.channelName,
     this.stopLabel,
     this.discardLabel,
+    this.since,
   });
   final String title;
   final String? text;
+
+  /// When recording would have started for the time recorded so far: the
+  /// notification's running clock counts from it (UX-2810). The recorder
+  /// sets it each time the notice is shown ([at]).
+  final DateTime? since;
+
+  /// This notice, its clock counting from [since].
+  MeetingNotice at(DateTime since) => MeetingNotice(
+    title: title,
+    text: text,
+    channelName: channelName,
+    stopLabel: stopLabel,
+    discardLabel: discardLabel,
+    since: since,
+  );
 
   /// The name Android's notification settings give the recording's
   /// channel. The recorder's own is English only ("Audio Capture").
@@ -30,7 +47,10 @@ class MeetingNotice {
 /// `RecordMeetingAudio` (the `record` package, in a foreground service);
 /// tests give a fake.
 abstract class MeetingAudioEngine {
-  Future<bool> hasPermission();
+  /// The microphone permission, asking Android first when [ask] and it
+  /// still asks; `blocked` when only the phone's Settings can allow it.
+  /// Without [ask], only whether it's granted: never `blocked`.
+  Future<SpeechPermission> permission({bool ask = true});
 
   /// Ogg Opus when this phone can write it, else AAC in ADTS frames.
   Future<MeetingAudioFormat> format();
@@ -44,8 +64,9 @@ abstract class MeetingAudioEngine {
   );
 
   /// Goes on in a new file [path], losing as little as possible between
-  /// the two: the previous file is complete once this returns.
-  Future<void> next(String path);
+  /// the two: the previous file is complete once this returns. [notice]
+  /// is shown from then on.
+  Future<void> next(String path, MeetingNotice notice);
 
   Future<void> stop();
 
@@ -176,6 +197,9 @@ class MeetingRecorder {
   final Timer Function(Duration after, void Function() then) timer;
 
   _Session? _session;
+
+  /// The recording notification's words, given at start or Continue.
+  MeetingNotice? _notice;
   Timer? _capTimer;
   StreamSubscription<double>? _levels;
   Future<void> _chain = Future.value();
@@ -276,8 +300,14 @@ class MeetingRecorder {
       meeting.recorded,
       clock(),
     );
+    _notice = notice;
     try {
-      await engine.start(path, meeting.format, notice);
+      // Its clock counts on from the time already recorded (Continue).
+      await engine.start(
+        path,
+        meeting.format,
+        notice.at(clock().subtract(meeting.recorded)),
+      );
     } catch (_) {
       _session = null;
       rethrow;
@@ -391,7 +421,7 @@ class MeetingRecorder {
       offset,
       session.meeting.format,
     );
-    await engine.next(path);
+    await engine.next(path, _notice!.at(clock().subtract(offset)));
     final started = clock();
     await store.closePiece(
       session.meeting,

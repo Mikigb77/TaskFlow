@@ -806,6 +806,8 @@ class MeetingStore {
         result,
         labels: labels,
         projectId: current.projectId,
+        startedAt: current.startedAt.toLocal(),
+        length: current.recorded,
       );
       Task normalized;
       try {

@@ -13,6 +13,8 @@ class MeetingNoteLabels {
     this.chapters,
     this.startMissing,
     this.untitled,
+    this.chapterRange,
+    this.meetingLine,
   });
 
   /// The heading over the decisions.
@@ -30,6 +32,13 @@ class MeetingNoteLabels {
   /// The title of a meeting the server gave none (no speech).
   final String? untitled;
 
+  /// A chapter's minutes, as its line starts: «Minutos 0–30».
+  final String Function(int startMinute, int endMinute)? chapterRange;
+
+  /// The line that opens the note: when the meeting was and how long, as
+  /// «Reunión del martes 3 nov, 10:15 · 52 min» (UX-2710).
+  final String Function(DateTime startedAt, Duration length)? meetingLine;
+
   /// No words of the app's own: the note holds only the server's text.
   static const none = MeetingNoteLabels();
 }
@@ -46,6 +55,16 @@ abstract final class MeetingHooks {
   /// isolate: the "notes ready" notification (MN-11).
   static Future<void> Function(SavedMeetingNote saved) notesReady =
       TaskReminders.showMeetingNotesReady;
+
+  /// Meeting [meetingId]'s notes were shown in the app: its "notes ready"
+  /// notification goes (UX-2811).
+  static Future<void> Function(String meetingId) notesSeen =
+      TaskReminders.clearMeetingNotesReady;
+
+  /// Note [noteId]'s page opened: the "notes ready" that opens it goes
+  /// (UX-2811).
+  static Future<void> Function(int noteId) noteOpened =
+      TaskReminders.clearMeetingNoteReady;
 }
 
 /// A meeting whose notes were just saved as a note.
@@ -64,27 +83,27 @@ class SavedMeetingNote {
   final String? language;
 }
 
-/// `0:30` for 30 minutes, `1:00` for 60.
-String meetingClock(int minutes) {
-  final value = minutes < 0 ? 0 : minutes;
-  return '${value ~/ 60}:${(value % 60).toString().padLeft(2, '0')}';
-}
-
 /// A to-do as a checklist line: its words, then who and when if they were
 /// said (`Send the pilot quote · Miki · Friday`).
 String meetingTodoLine(MeetingTodo todo) =>
     [todo.text, ?todo.who, ?todo.when].join(' · ');
 
 /// The meeting's notes as an ordinary note (MN-21): the title the server
-/// wrote, a body of the summary, decisions, open questions and one line
-/// per chapter with its notes, and the to-dos as its checklist, so one tap
-/// can turn them into a task (MN-22).
+/// wrote, a body of the meeting's date and length (from [startedAt], local,
+/// and [length]), the summary, decisions, open questions and one line per
+/// chapter with its notes, and the to-dos as its checklist, so one tap can
+/// turn them into a task (MN-22).
 Task meetingNote(
   MeetingResult result, {
   required MeetingNoteLabels labels,
   String? projectId,
+  DateTime? startedAt,
+  Duration length = Duration.zero,
 }) {
   final sections = <String>[];
+  if (startedAt != null && labels.meetingLine != null) {
+    sections.add(labels.meetingLine!(startedAt, length));
+  }
   if (result.startMissing && labels.startMissing != null) {
     sections.add(labels.startMissing!);
   }
@@ -100,9 +119,10 @@ Task meetingNote(
   final chapters = [
     for (final chapter in result.chapters)
       [
-        '${meetingClock(chapter.startMinute)}–${meetingClock(chapter.endMinute)}'
-                ' ${chapter.title}'
-            .trim(),
+        [
+          ?labels.chapterRange?.call(chapter.startMinute, chapter.endMinute),
+          if (chapter.title.trim().isNotEmpty) chapter.title.trim(),
+        ].join(' · '),
         if (chapter.notes.isNotEmpty) chapter.notes,
       ].join('\n'),
   ];

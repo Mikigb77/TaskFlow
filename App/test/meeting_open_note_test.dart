@@ -7,6 +7,7 @@ import 'package:agenda/main.dart';
 import 'package:agenda/screens/calendar_screen.dart';
 import 'package:agenda/screens/task_detail_screen.dart';
 import 'package:agenda/services/capture_store.dart';
+import 'package:agenda/services/meeting_note.dart';
 import 'package:agenda/services/notification_service.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:flutter/services.dart';
@@ -82,5 +83,29 @@ void main() {
     expect(find.byType(CalendarScreen), findsOneWidget);
     expect(meetings.calls.seen, isEmpty);
     expect(TaskReminders.openNote.value, isNull);
+  });
+
+  group('P325 · meeting notifications', () {
+    testWidgets('UX-2811: the note the notification opens removes it', (
+      tester,
+    ) async {
+      final opened = <int>[];
+      final hook = MeetingHooks.noteOpened;
+      MeetingHooks.noteOpened = (id) async => opened.add(id);
+      addTearDown(() => MeetingHooks.noteOpened = hook);
+      final (container, meetings) = await app(tester);
+      TaskReminders.openNote.value = MeetingNoteReference(
+        90,
+        container.read(captureOwnerProvider),
+        'meeting-1',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<TaskDetailScreen>(find.byType(TaskDetailScreen)).taskId,
+        90,
+      );
+      expect(opened, [90]);
+      expect(meetings.calls.seen, ['meeting-1']);
+    });
   });
 }

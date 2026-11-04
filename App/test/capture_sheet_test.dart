@@ -37,10 +37,13 @@ import 'package:agenda/services/capture_entries.dart';
 import 'package:agenda/services/capture_problem.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/invitation_links.dart';
+import 'package:agenda/services/meeting_controller.dart';
+import 'package:agenda/services/meeting_recorder.dart';
 import 'package:agenda/services/native_speech.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
+import 'package:agenda/widgets/meeting_banners.dart';
 import 'package:agenda/widgets/task_actions.dart';
 import 'package:agenda/widgets/task_editor.dart';
 import 'package:agenda/widgets/task_tile.dart';
@@ -55,6 +58,7 @@ import 'package:record/record.dart';
 import 'support/button_label.dart';
 import 'support/capture_fixtures.dart' show SilentRecorder;
 import 'support/design_fixtures.dart';
+import 'support/meeting_screen_fakes.dart';
 
 final en = lookupAppLocalizations(const Locale('en'));
 final es = lookupAppLocalizations(const Locale('es'));
@@ -4390,6 +4394,183 @@ void main() {
       },
     );
   });
+
+  group('P319 · a meeting holds the mic', () {
+    /// A meeting records on this phone for the signed-in account.
+    ScriptedMeetings recordingMeeting() => ScriptedMeetings(
+      initial: const MeetingsState(
+        loaded: true,
+        recording: MeetingRecordingStatus(
+          meetingId: 'meeting-1',
+          elapsed: Duration(minutes: 12, seconds: 3),
+          level: 0.6,
+        ),
+      ),
+    );
+
+    Future<_App> openRecording(
+      WidgetTester tester,
+      ScriptedMeetings meetings,
+    ) async {
+      final app = await _App.open(
+        tester,
+        pro: true,
+        record: true,
+        meetings: meetings,
+      );
+      expect(
+        app.container.read(meetingsProvider).recording,
+        isNotNull,
+        reason: 'a meeting records',
+      );
+      return app;
+    }
+
+    Finder notesButton() =>
+        find.widgetWithText(FilledButton, es.addNote).hitTestable();
+    Finder notesIcon(IconData icon) =>
+        find.descendant(of: notesButton(), matching: find.byIcon(icon));
+    Finder calendarIcon(IconData icon) => find.descendant(
+      of: find.byType(TaskActions).hitTestable(),
+      matching: find.byIcon(icon),
+    );
+
+    Future<void> toNotes(WidgetTester tester) async {
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text(es.notes),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> toCalendar(WidgetTester tester) async {
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text(es.calendar),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    /// The sheet types, says why above the field, and never listened.
+    void expectTypingForMeeting(WidgetTester tester, _App app) {
+      expect(inSheet(find.byType(VoiceTaskScreen)), findsOneWidget);
+      expect(words(), findsOneWidget, reason: 'a field to type in');
+      expect(
+        tester.widget<TextField>(words()).focusNode!.hasFocus,
+        isTrue,
+        reason: 'the keyboard is up',
+      );
+      final line = inSheet(find.text(es.meetingTypeHere));
+      expect(line.hitTestable(), findsOneWidget, reason: 'the meeting line');
+      expect(
+        tester.getRect(line).bottom,
+        lessThanOrEqualTo(tester.getRect(words()).top),
+        reason: 'the line sits above the field',
+      );
+      expect(app.speech.starts, 0, reason: 'the recognizer never starts');
+      expect(
+        [for (final recorder in app.recorders) recorder.starts],
+        everyElement(0),
+        reason: "the sheet's own recorder never starts",
+      );
+    }
+
+    /// No free-dictation or Pro notice: a Pro account during a meeting.
+    void expectNoNotice() {
+      expect(find.text(es.captureSpeakingIsPro), findsNothing);
+      expect(find.text(es.voiceProAction), findsNothing);
+      expect(find.byKey(const ValueKey('free-voice-used-up')), findsNothing);
+    }
+
+    testWidgets(
+      'UX-2704: Pro, a meeting recording, ES 1×: Notas’ «Añadir nota» shows +, not the mic; it opens the capture sheet typing with «Se está grabando una reunión: escribe aquí.» above the field, and the recognizer and recorder never start',
+      (tester) async {
+        final meetings = recordingMeeting();
+        final app = await openRecording(tester, meetings);
+        await toNotes(tester);
+        expect(notesButton(), findsOneWidget);
+        expect(notesIcon(Icons.add_rounded), findsOneWidget);
+        expect(notesIcon(Icons.mic_none_rounded), findsNothing);
+
+        await tester.tap(notesButton());
+        await tester.pumpAndSettle();
+        expectTypingForMeeting(tester, app);
+        expectNoNotice();
+        expect(meetings.calls.stops, 0, reason: 'the meeting keeps recording');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2704: Pro, a meeting recording, ES 1×: Calendar’s «Añadir tarea» shows + and opens the sheet typing with the meeting line, no listening, and no free-dictation or Pro notice',
+      (tester) async {
+        final app = await openRecording(tester, recordingMeeting());
+        expect(calendarIcon(Icons.add_rounded), findsOneWidget);
+        expect(calendarIcon(Icons.mic_none_rounded), findsNothing);
+
+        await tester.tap(find.text(es.addTask).hitTestable());
+        await tester.pumpAndSettle();
+        expectTypingForMeeting(tester, app);
+        expectNoNotice();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2704: Pro, a meeting recording, ES 1×: a widget or shortcut VOICE entry (asks to speak) opens the sheet typing with the meeting line, no listening, and no free-dictation or Pro notice',
+      (tester) async {
+        final app = await openRecording(tester, recordingMeeting());
+        app.entries.queue.add(_entry('voice'));
+        app.entries.changed();
+        await tester.pumpAndSettle();
+        expect(app.entries.acknowledged, hasLength(1));
+        expectTypingForMeeting(tester, app);
+        expectNoNotice();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'UX-2704: Pro, ES 1×: when the meeting stops recording, Notas and Calendar show the mic again, and «Añadir tarea» opens the sheet listening, with no meeting line',
+      (tester) async {
+        final meetings = recordingMeeting();
+        final app = await openRecording(tester, meetings);
+        expect(calendarIcon(Icons.add_rounded), findsOneWidget);
+
+        meetings.emit(
+          app.container.read(meetingsProvider).copyWith(clearRecording: true),
+        );
+        await tester.pumpAndSettle();
+        expect(app.container.read(meetingsProvider).recording, isNull);
+        expect(calendarIcon(Icons.mic_none_rounded), findsOneWidget);
+        expect(calendarIcon(Icons.add_rounded), findsNothing);
+        await toNotes(tester);
+        expect(notesIcon(Icons.mic_none_rounded), findsOneWidget);
+        expect(notesIcon(Icons.add_rounded), findsNothing);
+        await toCalendar(tester);
+
+        await tester.tap(find.text(es.addTask).hitTestable());
+        await tester.pumpAndSettle();
+        expect(words(), findsNothing, reason: 'listening, not typing');
+        expect(
+          inSheet(find.widgetWithText(FilledButton, es.done)),
+          findsOneWidget,
+          reason: '«Listo» shows',
+        );
+        expect(
+          app.speech.starts + app.recorders.where((r) => r.starts > 0).length,
+          greaterThan(0),
+          reason: 'the mic listens',
+        );
+        expect(find.text(es.meetingTypeHere), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
 }
 
 Map<String, dynamic> _found(String title) => {
@@ -4451,6 +4632,7 @@ class _App {
     Size size = const Size(390, 844),
     bool record = false,
     Object? speechStartError,
+    ScriptedMeetings? meetings,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -4501,6 +4683,7 @@ class _App {
         ),
         captureEntriesProvider.overrideWithValue(outside.entries),
         if (clock != null) calendarClockProvider.overrideWithValue(() => clock),
+        if (meetings != null) meetingsOverride(meetings),
       ],
     );
     store.tasks = tasks;

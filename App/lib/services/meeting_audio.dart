@@ -3,9 +3,11 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:agenda/models/meeting.dart';
 import 'package:agenda/services/meeting_recorder.dart';
+import 'package:agenda/services/native_speech.dart';
 import 'package:agenda/services/notification_service.dart';
 
 /// [MeetingAudioEngine] on the `record` package, recording in Android's
@@ -98,7 +100,23 @@ class RecordMeetingAudio implements MeetingAudioEngine {
   }
 
   @override
-  Future<bool> hasPermission() => _recorder.hasPermission();
+  Future<SpeechPermission> permission({bool ask = true}) async {
+    if (await _recorder.hasPermission(request: false)) {
+      return SpeechPermission.granted;
+    }
+    if (!ask) return SpeechPermission.denied;
+    if (!Platform.isAndroid) {
+      return await _recorder.hasPermission()
+          ? SpeechPermission.granted
+          : SpeechPermission.denied;
+    }
+    // Android says, once asked, whether it would ask again.
+    final status = await Permission.microphone.request();
+    if (status.isGranted) return SpeechPermission.granted;
+    return status.isPermanentlyDenied || status.isRestricted
+        ? SpeechPermission.blocked
+        : SpeechPermission.denied;
+  }
 
   @override
   Future<MeetingAudioFormat> format() async {
@@ -168,10 +186,10 @@ class RecordMeetingAudio implements MeetingAudioEngine {
   }
 
   @override
-  Future<void> next(String path) async {
+  Future<void> next(String path, MeetingNotice notice) async {
     final format = _format;
-    final notice = _notice;
-    if (format == null || notice == null) throw StateError('Not recording.');
+    if (format == null || _notice == null) throw StateError('Not recording.');
+    _notice = notice;
     if (format == MeetingAudioFormat.opus) {
       // Android stops the current file, completing it, and starts the next
       // without stopping the foreground service, which posts its plain

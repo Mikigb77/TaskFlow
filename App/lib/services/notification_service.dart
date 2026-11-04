@@ -129,23 +129,73 @@ int reminderOfNotification(int id) => id == _rowOneNotification ? 1 : id;
 
 const _rowOneNotification = 0x7fffffff;
 
-/// The "your meeting notes are ready" notification's id: one at a time, a
-/// later one replacing it. No reminder row or the recorder's foreground
-/// service (id 1) uses it.
+/// The "your meeting notes are ready" notification's id. Each meeting's
+/// shows under it with its own [meetingNotesTag], so each keeps its own.
+/// No reminder row or the recorder's foreground service (id 1) uses it.
 const meetingNotesNotificationId = 0x7ffffffe;
 
-/// "Your meeting notes are ready", in the app's language [l], on its own
-/// channel so it can be silenced apart from reminders (MN-11).
+/// Meeting [meetingId]'s "notes ready" tag, which also names its note
+/// [noteId]: Android gives back a showing notification's tag but not its
+/// payload, so the tag is how it's found from either (UX-2811).
 @visibleForTesting
-NotificationDetails meetingNotesNotificationDetails(AppLocalizations l) =>
+String meetingNotesTag(String meetingId, int noteId) => '$meetingId#$noteId';
+
+/// "Your meeting notes are ready", in the app's language [l], on its own
+/// channel so it can be silenced apart from reminders (MN-11), tagged with
+/// its meeting's [meetingNotesTag].
+@visibleForTesting
+NotificationDetails meetingNotesNotificationDetails(AppLocalizations l,
+        {String? tag}) =>
     NotificationDetails(
         android: AndroidNotificationDetails(
             'taskflow_meeting_notes', l.meetingNotesChannel,
             importance: Importance.defaultImportance,
             priority: Priority.defaultPriority,
             icon: 'app_notifications_icon',
-            category: AndroidNotificationCategory.status),
+            category: AndroidNotificationCategory.status,
+            tag: tag),
         iOS: const DarwinNotificationDetails());
+
+/// Posts [saved]'s "notes ready" with [plugin]: the note's title first and
+/// "Your meeting notes are ready" under it, or that line alone when the
+/// note has no title; under [meetingNotesNotificationId], tagged with the
+/// meeting's [meetingNotesTag]. A tap opens the note.
+@visibleForTesting
+Future<void> postMeetingNotesReady(FlutterLocalNotificationsPlugin plugin,
+    SavedMeetingNote saved, AppLocalizations l) {
+  final title = saved.title.trim();
+  return plugin.show(
+      meetingNotesNotificationId,
+      title.isEmpty ? l.meetingNotesReady : title,
+      title.isEmpty ? null : l.meetingNotesReady,
+      meetingNotesNotificationDetails(l,
+          tag: meetingNotesTag(saved.meetingId, saved.noteId)),
+      payload: jsonEncode({
+        'meeting_note': saved.noteId,
+        'owner': saved.ownerKey,
+        'meeting': saved.meetingId,
+      }));
+}
+
+/// Removes the "notes ready" notifications showing: every meeting's, or
+/// only meeting [meetingId]'s, or only the one that opens note [noteId],
+/// found by their [meetingNotesTag].
+@visibleForTesting
+Future<void> cancelMeetingNotesReady(FlutterLocalNotificationsPlugin plugin,
+    {String? meetingId, int? noteId}) async {
+  for (final shown in await plugin.getActiveNotifications()) {
+    if (shown.id != meetingNotesNotificationId) continue;
+    final tag = shown.tag ?? '';
+    final mark = tag.lastIndexOf('#');
+    if (meetingId != null && (mark < 0 || tag.substring(0, mark) != meetingId)) {
+      continue;
+    }
+    if (noteId != null && (mark < 0 || tag.substring(mark + 1) != '$noteId')) {
+      continue;
+    }
+    await plugin.cancel(meetingNotesNotificationId, tag: shown.tag);
+  }
+}
 
 /// The recording's ongoing notification (MN-1): the meeting recorder's
 /// foreground service (`record`'s `AudioRecordingService`) shows it under
@@ -180,7 +230,11 @@ NotificationDetails meetingRecordingNotificationDetails(MeetingNotice notice) =>
             playSound: false,
             enableVibration: false,
             channelShowBadge: false,
-            showWhen: false,
+            // Android's own running clock, from the moment the time
+            // recorded so far began (UX-2810).
+            showWhen: notice.since != null,
+            when: notice.since?.millisecondsSinceEpoch,
+            usesChronometer: notice.since != null,
             visibility: NotificationVisibility.public,
             category: AndroidNotificationCategory.service,
             actions: [
@@ -548,17 +602,29 @@ class TaskReminders {
       return;
     }
     await _initializing;
-    final strings = await readReminderStrings(TaskDatabase());
-    await plugin.show(
-        meetingNotesNotificationId,
-        strings.meetingNotesReady,
-        saved.title.trim().isEmpty ? null : saved.title,
-        meetingNotesNotificationDetails(strings),
-        payload: jsonEncode({
-          'meeting_note': saved.noteId,
-          'owner': saved.ownerKey,
-          'meeting': saved.meetingId,
-        }));
+    await postMeetingNotesReady(
+        plugin, saved, await readReminderStrings(TaskDatabase()));
+  }
+
+  /// Removes meeting [meetingId]'s "notes ready" once its notes were shown
+  /// in the app (UX-2811). Nothing where notifications aren't supported.
+  static Future<void> clearMeetingNotesReady(String meetingId) async {
+    if (!supported || _initializing == null) return;
+    try {
+      await _initializing;
+      await cancelMeetingNotesReady(plugin, meetingId: meetingId);
+    } catch (_) {/* It stays until it's tapped or swiped away. */}
+  }
+
+  /// Removes the "notes ready" that opens note [noteId], as its page opens
+  /// (UX-2811): nothing when none shows, or where notifications aren't
+  /// supported.
+  static Future<void> clearMeetingNoteReady(int noteId) async {
+    if (!supported || _initializing == null) return;
+    try {
+      await _initializing;
+      await cancelMeetingNotesReady(plugin, noteId: noteId);
+    } catch (_) {/* It stays until it's tapped or swiped away. */}
   }
 
   static Future<void> recordError(String message) async {
@@ -577,8 +643,17 @@ class TaskReminders {
       await recordError('setup_failed');
     }
     try {
+      final previous = await engine.activeOwner();
       // Persist ownership even if notification initialization failed.
       await engine.activate(owner);
+      // The old account's "notes ready" goes with its reminders: it shows
+      // a meeting's title, and its tap opens nothing for another account
+      // (UX-2811).
+      if (previous != owner) {
+        try {
+          await cancelMeetingNotesReady(plugin);
+        } catch (_) {/* It stays until it's swiped away. */}
+      }
       await engine.reconcile(owner);
     } catch (_) {
       await recordError('account_refresh_failed');
