@@ -7,9 +7,7 @@ import 'package:agenda/services/meeting_controller.dart';
 import 'package:agenda/services/meeting_recorder.dart';
 import 'package:agenda/services/meeting_store.dart';
 import 'package:agenda/services/task_database.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
-import 'package:flutter_riverpod/legacy.dart';
 
 import 'meeting_fakes.dart';
 
