@@ -1,6 +1,7 @@
 // P44 (UX-408), round 1 of 2026-10-13-app: Account in one line, sign-out
 // asked first, connection details only in debug builds.
 // P96 (UX-508), round 2: sign-out shows progress in its button.
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
@@ -28,7 +29,7 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(320, 568));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final api = _RecoveryApi();
-      final container = ProviderContainer(overrides: [
+      final container = ProviderContainer(retry: noRetry, overrides: [
         apiClientProvider.overrideWithValue(api),
         authProvider.overrideWith((ref) => _GuestAuth(api)),
         taskRepositoryProvider.overrideWithValue(MemoryTasks()),
@@ -118,7 +119,7 @@ void main() {
     final api = OfflineApiClient();
     late _SignOutAuth auth;
     final repository = _LocalItems(localItems)..syncError = syncError;
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       apiClientProvider.overrideWithValue(api),
       authProvider.overrideWith((ref) => auth = _SignOutAuth(api)),
       taskRepositoryProvider.overrideWithValue(repository),
@@ -448,7 +449,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       final api = OfflineApiClient();
-      final container = ProviderContainer(overrides: [
+      final container = ProviderContainer(retry: noRetry, overrides: [
         apiClientProvider.overrideWithValue(api),
         authProvider.overrideWith(
             (ref) => _NamedAuth(api, firstName: firstName, email: email)),

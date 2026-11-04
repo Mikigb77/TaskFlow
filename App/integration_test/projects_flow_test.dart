@@ -4,6 +4,7 @@
 // project/task persistence uses Android SQLite and all requests are real.
 import 'dart:convert';
 import 'dart:io';
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/groups_provider.dart';
@@ -66,6 +67,7 @@ void main() {
     FlutterSecureStorage.setMockInitialValues({});
     final api = _ConnectionApi();
     final container = ProviderContainer(
+      retry: noRetry,
       overrides: [
         apiClientProvider.overrideWithValue(api),
         regionalStoreProvider.overrideWithValue(MemoryRegionalStore()),

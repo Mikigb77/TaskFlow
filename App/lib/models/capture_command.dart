@@ -45,7 +45,7 @@ int? _int(Object? value) => value is int ? value : null;
 List<String> _words(Object? value) => value is List
     ? [
         for (final item in value)
-          if (_text(item, max: 60) case final word?) word,
+          ?_text(item, max: 60),
       ].take(8).toList()
     : const [];
 

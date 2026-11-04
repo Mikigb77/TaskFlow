@@ -65,7 +65,7 @@ class _CompletedTasksScreenState extends ConsumerState<CompletedTasksScreen> {
     final person = widget.person;
     // The page is covered by another screen: the person has left it.
     if (!TickerMode.valuesOf(context).enabled) _doneHere.clear();
-    final projects = ref.watch(taskListsProvider).valueOrNull ?? [];
+    final projects = ref.watch(taskListsProvider).value ?? [];
     final accountId = ref.watch(authProvider).account?.id;
     final project = projects.where((p) => p.id == listId).firstOrNull;
     final scope = ProjectScope(projectId: listId, team: team);
@@ -144,7 +144,7 @@ class _CompletedTasksScreenState extends ConsumerState<CompletedTasksScreen> {
                     ]);
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => EmptyState(
+              error: (_, _) => EmptyState(
                   title: context.l10n.completedLoadError,
                   message: context.l10n.tryLater),
             ),

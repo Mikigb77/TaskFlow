@@ -66,7 +66,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final email = ref.watch(authProvider).account?.email;
-    final reminders = ref.watch(reminderPreferencesProvider).valueOrNull;
+    final reminders = ref.watch(reminderPreferencesProvider).value;
     // The plan, as the other rows show their value: Pro, or the free
     // dictations left; nothing until billing and the account answer.
     final freeLeft = ref.watch(freeVoiceLeftProvider);

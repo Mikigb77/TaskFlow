@@ -19,6 +19,7 @@ import 'package:agenda/services/native_speech.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/services/task_list_store.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite/sqflite.dart' show Database;
 import 'package:uuid/uuid.dart';

@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -86,21 +87,15 @@ class AppLocalizationsCa extends AppLocalizations {
     String _temp0 = intl.Intl.selectLogic(reason, {
       'alreadyMember':
           'Aquesta persona ja hi té accés. Gestiona’n el rol a Membres.',
-      'memberLimit':
-          'Aquest projecte admet fins a 20 membres i 20 invitacions pendents. Primer elimina algú o anul·la una invitació.',
-      'accepted':
-          'Aquesta invitació ja s’ha acceptat. Gestiona l’accés de la persona a Membres.',
-      'owner':
-          'El propietari no pot sortir. Pots suprimir el projecte si ja no el necessites.',
-      'expired':
-          'Aquesta invitació ja no està disponible. Demana’n una de nova al propietari.',
+      'memberLimit': 'Aquest projecte admet fins a 20 membres i 20 invitacions pendents. Primer elimina algú o anul·la una invitació.',
+      'accepted': 'Aquesta invitació ja s’ha acceptat. Gestiona l’accés de la persona a Membres.',
+      'owner': 'El propietari no pot sortir. Pots suprimir el projecte si ja no el necessites.',
+      'expired': 'Aquesta invitació ja no està disponible. Demana’n una de nova al propietari.',
       'code': 'Demana al propietari del projecte el codi d’invitació actual.',
       'refresh':
           'Aquest projecte ha canviat. Actualitza’l abans de suprimir-lo.',
-      'ownerOnly':
-          'Només el propietari pot gestionar els detalls i l’accés al projecte.',
-      'other':
-          'Només tens accés de lectura a aquest projecte. Demana al propietari permís per editar.',
+      'ownerOnly': 'Només el propietari pot gestionar els detalls i l’accés al projecte.',
+      'other': 'Només tens accés de lectura a aquest projecte. Demana al propietari permís per editar.',
     });
     return '$_temp0';
   }
@@ -108,20 +103,13 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String syncProblem(String reason) {
     String _temp0 = intl.Intl.selectLogic(reason, {
-      'assignmentChanged':
-          'La persona responsable ha canviat. La teva edició pendent s’ha desat com a còpia personal.',
-      'listConflict':
-          'Un projecte ha canviat en un altre dispositiu. Tria quina versió vols conservar a Projectes.',
-      'readOnly':
-          'Aquest projecte ara és de només lectura. El canvi pendent s’ha conservat com a còpia personal.',
-      'accessChanged':
-          'L’accés a un projecte compartit ha canviat. Actualitza per acabar de sincronitzar els canvis permesos.',
-      'taskConflict':
-          'Una tasca ha canviat en un altre dispositiu. El teu canvi s’ha conservat com a còpia local i s’ha cancel·lat una supressió en conflicte.',
-      'serverUpdate':
-          'Actualitza aquest servidor abans de sincronitzar notes. Les notes es conserven en aquest telèfon.',
-      'other':
-          'El servidor no ha conservat aquest tipus de contingut. La còpia local es conserva.',
+      'assignmentChanged': 'La persona responsable ha canviat. La teva edició pendent s’ha desat com a còpia personal.',
+      'listConflict': 'Un projecte ha canviat en un altre dispositiu. Tria quina versió vols conservar a Projectes.',
+      'readOnly': 'Aquest projecte ara és de només lectura. El canvi pendent s’ha conservat com a còpia personal.',
+      'accessChanged': 'L’accés a un projecte compartit ha canviat. Actualitza per acabar de sincronitzar els canvis permesos.',
+      'taskConflict': 'Una tasca ha canviat en un altre dispositiu. El teu canvi s’ha conservat com a còpia local i s’ha cancel·lat una supressió en conflicte.',
+      'serverUpdate': 'Actualitza aquest servidor abans de sincronitzar notes. Les notes es conserven en aquest telèfon.',
+      'other': 'El servidor no ha conservat aquest tipus de contingut. La còpia local es conserva.',
     });
     return '$_temp0';
   }
@@ -131,37 +119,27 @@ class AppLocalizationsCa extends AppLocalizations {
     String _temp0 = intl.Intl.selectLogic(reason, {
       'signOutFirst': 'Tanca la sessió abans de canviar de servidor.',
       'https': 'Utilitza una adreça de servidor HTTPS en aquesta versió.',
-      'serverAddress':
-          'Introdueix una adreça de servidor vàlida, com ara https://el-teu-servidor.example.',
+      'serverAddress': 'Introdueix una adreça de servidor vàlida, com ara https://el-teu-servidor.example.',
       'emailUsed': 'Aquest correu ja té un compte.',
       'email': 'Introdueix una adreça de correu vàlida.',
       'credentials': 'No trobem aquest compte o la contrasenya no és correcta.',
-      'session':
-          'Torna a iniciar la sessió per continuar. Les tasques locals es conserven.',
-      'accountChanged':
-          'El compte ha canviat. Torna a obrir aquesta pantalla i prova-ho de nou.',
-      'password':
-          'Tria una contrasenya de 12 a 128 caràcters que no sigui habitual, només numèrica ni semblant al teu correu.',
-      'recoveryCode':
-          'El codi de recuperació no és vàlid o ha caducat. Demana’n un de nou.',
+      'session': 'Torna a iniciar la sessió per continuar. Les tasques locals es conserven.',
+      'accountChanged': 'El compte ha canviat. Torna a obrir aquesta pantalla i prova-ho de nou.',
+      'password': 'Tria una contrasenya de 12 a 128 caràcters que no sigui habitual, només numèrica ni semblant al teu correu.',
+      'recoveryCode': 'El codi de recuperació no és vàlid o ha caducat. Demana’n un de nou.',
       'forbidden':
           'Aquest compte no pot fer aquesta acció. Revisa els permisos.',
       'rateLimit':
           'Hi ha massa peticions. Espera una mica abans de tornar-ho a provar.',
       'fileLimit': 'Tria un fitxer no buit de fins a 6 MB.',
-      'fileChanged':
-          'El fitxer ha canviat o no s’ha pogut verificar. Tria’l de nou o torna’l a baixar.',
-      'network':
-          'No hi ha connexió. Revisa la wifi o les dades mòbils i torna-ho a provar.',
-      'networkKept':
-          'No hi ha connexió. Revisa la wifi o les dades mòbils i torna-ho a provar. Les tasques continuen desades en aquest telèfon.',
+      'fileChanged': 'El fitxer ha canviat o no s’ha pogut verificar. Tria’l de nou o torna’l a baixar.',
+      'network': 'No hi ha connexió. Revisa la wifi o les dades mòbils i torna-ho a provar.',
+      'networkKept': 'No hi ha connexió. Revisa la wifi o les dades mòbils i torna-ho a provar. Les tasques continuen desades en aquest telèfon.',
       'unavailable':
           'El servei no està disponible. Torna-ho a provar més endavant.',
-      'validation':
-          'No s’han acceptat algunes dades. Revisa la informació i torna-ho a provar.',
+      'validation': 'No s’han acceptat algunes dades. Revisa la informació i torna-ho a provar.',
       'other': 'No s’ha pogut completar la petició. Torna-ho a provar.',
-      'otherKept':
-          'No s’ha pogut completar la petició. Torna-ho a provar. Les tasques continuen desades en aquest telèfon.',
+      'otherKept': 'No s’ha pogut completar la petició. Torna-ho a provar. Les tasques continuen desades en aquest telèfon.',
     });
     return '$_temp0';
   }
@@ -3315,16 +3293,11 @@ class AppLocalizationsCa extends AppLocalizations {
     String _temp0 = intl.Intl.selectLogic(reason, {
       'unsupportedPlatform':
           'Les subscripcions estan disponibles a l’aplicació d’Android.',
-      'configuration':
-          'Les subscripcions encara no estan disponibles. Torna-ho a provar més endavant.',
-      'accountUnavailable':
-          'No s’ha pogut connectar amb el teu compte de TaskFlow. Revisa la connexió i torna a obrir aquesta pantalla.',
-      'network':
-          'No s’ha pogut comprovar la subscripció. Revisa la connexió i torna a obrir aquesta pantalla.',
-      'notAllowed':
-          'Les compres estan restringides per a aquest compte de la botiga o dispositiu.',
-      'otherAccount':
-          'Aquesta compra pertany a un altre compte. Inicia la sessió amb el compte original per restaurar-la.',
+      'configuration': 'Les subscripcions encara no estan disponibles. Torna-ho a provar més endavant.',
+      'accountUnavailable': 'No s’ha pogut connectar amb el teu compte de TaskFlow. Revisa la connexió i torna a obrir aquesta pantalla.',
+      'network': 'No s’ha pogut comprovar la subscripció. Revisa la connexió i torna a obrir aquesta pantalla.',
+      'notAllowed': 'Les compres estan restringides per a aquest compte de la botiga o dispositiu.',
+      'otherAccount': 'Aquesta compra pertany a un altre compte. Inicia la sessió amb el compte original per restaurar-la.',
       'store': 'La botiga no ha respost. Torna a obrir aquesta pantalla.',
       'other': 'La botiga no ha respost. Torna a obrir aquesta pantalla.',
     });
@@ -3338,14 +3311,11 @@ class AppLocalizationsCa extends AppLocalizations {
       'restored': 'S’ha restaurat la subscripció Pro.',
       'noPurchases':
           'No s’ha trobat cap compra Pro activa per a aquest compte.',
-      'awaitingEntitlement':
-          'Compra rebuda. Pro s’activarà d’aquí a uns moments; si no, toca Restaura les compres.',
+      'awaitingEntitlement': 'Compra rebuda. Pro s’activarà d’aquí a uns moments; si no, toca Restaura les compres.',
       'updated': 'Estat de subscripció actualitzat.',
-      'pending':
-          'El pagament està pendent. Pro s’activarà quan la botiga el confirmi.',
+      'pending': 'El pagament està pendent. Pro s’activarà quan la botiga el confirmi.',
       'busy': 'Espera que acabi l’operació actual.',
-      'accountChanged':
-          'El compte ha canviat. Consulta la subscripció al compte que va fer la compra.',
+      'accountChanged': 'El compte ha canviat. Consulta la subscripció al compte que va fer la compra.',
       'other': 'No s’ha pogut completar la petició. Torna-ho a provar.',
     });
     return '$_temp0';
@@ -3378,22 +3348,17 @@ class AppLocalizationsCa extends AppLocalizations {
   @override
   String googleSignInError(String code) {
     String _temp0 = intl.Intl.selectLogic(code, {
-      'google_not_configured':
-          'L’accés amb Google encara no està disponible. Fes servir el correu i la contrasenya.',
-      'google_link_required':
-          'Aquest correu ja té un compte de TaskFlow. Accedeix-hi amb la contrasenya i tria Vincula el compte de Google.',
+      'google_not_configured': 'L’accés amb Google encara no està disponible. Fes servir el correu i la contrasenya.',
+      'google_link_required': 'Aquest correu ja té un compte de TaskFlow. Accedeix-hi amb la contrasenya i tria Vincula el compte de Google.',
       'google_password_required':
           'Introdueix la contrasenya actual de TaskFlow per vincular Google.',
-      'google_email_mismatch':
-          'Tria el compte de Google amb el mateix correu que el compte de TaskFlow.',
-      'google_already_linked':
-          'Aquest compte de Google ja està vinculat. Accedeix al compte original de TaskFlow.',
+      'google_email_mismatch': 'Tria el compte de Google amb el mateix correu que el compte de TaskFlow.',
+      'google_already_linked': 'Aquest compte de Google ja està vinculat. Accedeix al compte original de TaskFlow.',
       'google_account_changed':
           'El compte ha canviat durant l’accés. Torna-ho a provar.',
       'google_invalid_token':
           'Google no ha pogut verificar l’accés. Torna-ho a provar.',
-      'other':
-          'No s’ha pogut completar l’accés amb Google. Comprova la connexió i torna-ho a provar.',
+      'other': 'No s’ha pogut completar l’accés amb Google. Comprova la connexió i torna-ho a provar.',
     });
     return '$_temp0';
   }
@@ -5371,8 +5336,7 @@ class AppLocalizationsCa extends AppLocalizations {
       locale: localeName,
       other:
           'Les notes de $count reunions encara no estan a punt, i els enregistraments només són en aquest telèfon.',
-      one:
-          'Les notes d’una reunió encara no estan a punt, i l’enregistrament només és en aquest telèfon.',
+      one: 'Les notes d’una reunió encara no estan a punt, i l’enregistrament només és en aquest telèfon.',
     );
     return '$_temp0';
   }

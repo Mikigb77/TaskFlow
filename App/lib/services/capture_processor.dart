@@ -101,7 +101,7 @@ class CaptureProcessor {
     unawaited(
       api
           .request('DELETE', 'ai/drafts/$id/', accountId: account)
-          .then<void>((_) {}, onError: (Object _, StackTrace __) {}),
+          .then<void>((_) {}, onError: (Object _, StackTrace _) {}),
     );
   }
 
@@ -208,7 +208,7 @@ class CaptureProcessor {
         );
       }
       // Dropped, or saved as written, before the request went out.
-      if (_written.contains(key)) return _latest(existing);
+      if (_written.contains(key)) return await _latest(existing);
       // The capture's own ID, so the server can tell a retry from new words
       // and a cancel can find the request.
       final captureId = _renewed[key] ?? existing.id;
@@ -288,7 +288,7 @@ class CaptureProcessor {
         commands: commands,
       );
       // Saved as written meanwhile: the answer is too late.
-      if (_written.contains(key)) return _latest(existing);
+      if (_written.contains(key)) return await _latest(existing);
       await store.update(next);
       unawaited(
         diagnostics.record(

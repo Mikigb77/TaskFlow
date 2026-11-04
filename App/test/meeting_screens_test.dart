@@ -46,6 +46,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/billing_fixtures.dart';
@@ -2073,11 +2075,14 @@ void main() {
       expect(auth.signedOut, 0);
       meetings.uploadGate!.complete();
       await tester.pumpAndSettle();
-      // Signed out: the app's gate shows sign-in (here behind Cuenta, which
-      // the harness keeps pushed), and the line has gone.
+      // Signed out, and the line has gone. The harness keeps Cuenta pushed,
+      // and Riverpod 3 holds back the gate's rebuild while it's covered:
+      // once Cuenta closes, the gate shows sign-in.
       expect(auth.signedOut, 1);
-      expect(find.text('SIGN-IN', skipOffstage: false), findsOneWidget);
       expect(find.text(l.meetingSavingNotes), findsNothing);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('SIGN-IN'), findsOneWidget);
       semantics.dispose();
     });
 
@@ -3859,7 +3864,7 @@ void main() {
       matching: find.byWidgetPredicate((widget) => widget is OutlinedButton),
     );
     List<Task> tasks(ProviderContainer container) =>
-        container.read(taskProvider).valueOrNull ?? const [];
+        container.read(taskProvider).value ?? const [];
     Task? made(ProviderContainer container) =>
         tasks(container).where((task) => !task.isNote).firstOrNull;
     // The page in front: the one TaskDetailScreen whose route is current.

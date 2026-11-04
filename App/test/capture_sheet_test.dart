@@ -14,6 +14,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/capture_messages.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/region.dart';
@@ -4644,6 +4645,7 @@ class _App {
     final recorders = <_Recorder>[];
     final outside = _Entries(tester, [...entries]);
     final container = ProviderContainer(
+      retry: noRetry,
       overrides: [
         invitationLinkProvider.overrideWith(
           (ref) => InvitationLinks(listen: false),

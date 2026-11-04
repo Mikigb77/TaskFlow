@@ -1,3 +1,4 @@
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/models/task.dart';
@@ -236,6 +237,7 @@ Future<_MemoryTaskRepository> _pumpApp(WidgetTester tester) async {
   final repository = _MemoryTaskRepository();
   await tester.pumpWidget(
     ProviderScope(
+      retry: noRetry,
       overrides: [
         authProvider.overrideWith(
           (ref) => SignedInFixtureAuth(ref.read(apiClientProvider)),

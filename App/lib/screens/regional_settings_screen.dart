@@ -43,7 +43,7 @@ class RegionalSettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final p = ref.watch(regionalProvider);
     final s = context.l10n;
-    final zone = ref.watch(_timezoneProvider).valueOrNull;
+    final zone = ref.watch(_timezoneProvider).value;
     return Scaffold(
       appBar: CustomAppBar(title: s.regionalFormats),
       body: ListView(
@@ -189,8 +189,31 @@ class _TimezonePicker extends StatefulWidget {
 /// twice; a zone already stored under one still shows as the current one.
 const _legacyAreas = {'US', 'Canada', 'Brazil', 'Chile', 'Mexico', 'Etc'};
 
+/// The same for single old names, such as `Asia/Calcutta` for
+/// `Asia/Kolkata`, and for the names of zones IANA renamed, such as
+/// `America/Godthab`, now `America/Nuuk`.
+const _legacyNames = {
+  'Africa/Asmera', 'Africa/Timbuktu', 'America/Argentina/ComodRivadavia',
+  'America/Atka', 'America/Buenos_Aires', 'America/Catamarca',
+  'America/Coral_Harbour', 'America/Cordoba', 'America/Ensenada',
+  'America/Fort_Wayne', 'America/Godthab', 'America/Indianapolis',
+  'America/Jujuy', 'America/Knox_IN', 'America/Louisville', 'America/Mendoza',
+  'America/Porto_Acre', 'America/Rosario', 'America/Shiprock',
+  'America/Virgin', 'Antarctica/South_Pole', 'Asia/Ashkhabad',
+  'Asia/Calcutta', 'Asia/Chongqing', 'Asia/Chungking', 'Asia/Dacca',
+  'Asia/Harbin', 'Asia/Istanbul', 'Asia/Kashgar', 'Asia/Katmandu',
+  'Asia/Macao', 'Asia/Rangoon', 'Asia/Saigon', 'Asia/Tel_Aviv',
+  'Asia/Thimbu', 'Asia/Ujung_Pandang', 'Asia/Ulan_Bator', 'Atlantic/Faeroe',
+  'Atlantic/Jan_Mayen', 'Australia/ACT', 'Australia/Canberra',
+  'Australia/LHI', 'Australia/NSW', 'Australia/North', 'Australia/Queensland',
+  'Australia/South', 'Australia/Tasmania', 'Australia/Victoria',
+  'Australia/West', 'Australia/Yancowinna', 'Europe/Belfast', 'Europe/Kiev',
+  'Europe/Nicosia', 'Europe/Tiraspol', 'Pacific/Enderbury', 'Pacific/Ponape',
+  'Pacific/Samoa', 'Pacific/Truk', 'Pacific/Yap',
+};
+
 bool _listedZone(String id) => id.contains('/')
-    ? !_legacyAreas.contains(id.split('/').first)
+    ? !_legacyAreas.contains(id.split('/').first) && !_legacyNames.contains(id)
     : id == 'UTC';
 
 /// Spanish and Catalan names of commonly searched cities, so `Londres` or

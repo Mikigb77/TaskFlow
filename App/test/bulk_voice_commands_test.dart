@@ -6,6 +6,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/capture_command.dart';
@@ -801,6 +802,7 @@ class _App {
     final lists = _Lists(projects);
     final api = OfflineApiClient();
     final container = ProviderContainer(
+      retry: noRetry,
       overrides: [
         ...captureSheetOverrides(),
         invitationLinkProvider.overrideWith(
@@ -3219,7 +3221,7 @@ void _round20261021() {
 
       List<String> listed(_App app) => [
         for (final task
-            in app.container.read(taskProvider).valueOrNull ?? <Task>[])
+            in app.container.read(taskProvider).value ?? <Task>[])
           task.title,
       ];
 

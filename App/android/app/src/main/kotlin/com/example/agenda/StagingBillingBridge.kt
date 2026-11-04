@@ -12,7 +12,7 @@ import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 
 /**
- * Flutter 10.13.2 does not yet expose forceAllowTestStoreInReleaseBuilds.
+ * purchases_flutter 11.0.0 does not yet expose forceAllowTestStoreInReleaseBuilds.
  * Use the native SDK's documented opt-in for our private staging package only.
  * All checkout, receipts and entitlements still use the real RevenueCat SDK.
  */
@@ -42,7 +42,7 @@ class StagingBillingBridge(context: Context, messenger: BinaryMessenger) {
                         context = context.applicationContext,
                         apiKey = BuildConfig.TASKFLOW_TEST_STORE_KEY,
                         appUserID = call.argument<String>("appUserId"),
-                        platformInfo = PlatformInfo("flutter", "10.13.2"),
+                        platformInfo = PlatformInfo("flutter", "11.0.0"),
                         dangerousSettings = DangerousSettings().apply {
                             forceAllowTestStoreInReleaseBuilds()
                         },

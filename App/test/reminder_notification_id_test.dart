@@ -178,13 +178,11 @@ Future<_Plugin> _showing() async {
     );
   }
   await plugin.show(
-    reminderNotificationId(5),
-    'Dentista',
-    null,
-    null,
+    id: reminderNotificationId(5),
+    title: 'Dentista',
     payload: jsonEncode({'id': 5, 'token': 't'}),
   );
-  await plugin.show(meetingRecordingNotificationId, 'Grabando', null, null);
+  await plugin.show(id: meetingRecordingNotificationId, title: 'Grabando');
   plugin.posted.clear();
   return plugin;
 }
@@ -205,11 +203,11 @@ class _Plugin extends Fake implements FlutterLocalNotificationsPlugin {
   final active = <ActiveNotification>[];
 
   @override
-  Future<void> show(
-    int id,
+  Future<void> show({
+    required int id,
     String? title,
     String? body,
-    NotificationDetails? notificationDetails, {
+    NotificationDetails? notificationDetails,
     String? payload,
   }) async {
     final tag = notificationDetails?.android?.tag;
@@ -233,7 +231,7 @@ class _Plugin extends Fake implements FlutterLocalNotificationsPlugin {
   }
 
   @override
-  Future<void> cancel(int id, {String? tag}) async {
+  Future<void> cancel({required int id, String? tag}) async {
     cancelled.add((id, tag));
     active.removeWhere((n) => n.id == id && n.tag == tag);
   }

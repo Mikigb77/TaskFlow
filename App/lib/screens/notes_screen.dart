@@ -63,12 +63,12 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
       .fold(0, (newest, note) => math.max(newest, note.id ?? 0));
 
   Future<void> _add(Future<void> Function() open) async {
-    _newerThan = _newestNoteId(ref.read(taskProvider).valueOrNull);
+    _newerThan = _newestNoteId(ref.read(taskProvider).value);
     _settling = false;
     await open();
     if (!mounted || _newerThan == null) return;
     // The list may still be reloading; its next load decides.
-    if (!_land(ref.read(taskProvider).valueOrNull)) _settling = true;
+    if (!_land(ref.read(taskProvider).value)) _settling = true;
   }
 
   bool _land(List<Task>? all) {
@@ -144,11 +144,11 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
       if (!_land(next.value) && _settling) _newerThan = null;
     });
     final loadedLists = ref.watch(taskListsProvider);
-    final lists = loadedLists.valueOrNull ?? [];
+    final lists = loadedLists.value ?? [];
     final content = ref.watch(taskProvider);
     // The search waits for a first note.
     final hasNotes =
-        content.valueOrNull?.any((item) => item.isNote) ?? false;
+        content.value?.any((item) => item.isNote) ?? false;
     // Only a project the account can see but not edit gets the project
     // page's read-only bar. A gone one has nobody to ask, so «Añadir nota»
     // shows and the note is saved with no project.
@@ -182,7 +182,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                                 Navigator.pushNamed(context, '/captures'));
                   },
                   loading: () => const SizedBox.shrink(),
-                  error: (_, __) => TextButton(
+                  error: (_, _) => TextButton(
                       onPressed: () =>
                           Navigator.pushNamed(context, '/captures'),
                       child: Text(context.l10n.checkCaptures))),
@@ -270,7 +270,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                   loading: () => <Widget>[
                         const Center(child: CircularProgressIndicator())
                       ],
-                  error: (_, __) =>
+                  error: (_, _) =>
                       <Widget>[Text(context.l10n.notesSavedOnDevice)]),
               // Second to Añadir nota, and quieter: after the notes, just
               // above it (UX-2707), a conversation becomes a note (MN-1).

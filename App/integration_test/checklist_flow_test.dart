@@ -1,5 +1,6 @@
 // Real Android SQLite, UI and Docker HTTP sync. Only extraction output and
 // credential storage are fixtures; the user's persisted session is untouched.
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/task.dart';
@@ -48,7 +49,7 @@ void main() {
     final personal = TaskListInfo(name: 'Personal', color: 'violet');
     await lists.create(work);
     await lists.create(personal);
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       // The result opens in the capture sheet, which needs Pro.
       hasProProvider.overrideWithValue(true),
       apiClientProvider.overrideWithValue(api),

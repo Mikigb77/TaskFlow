@@ -8,7 +8,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:workmanager/workmanager.dart';
-import 'package:timezone/data/latest.dart' as tzdata;
+import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:sqflite/sqflite.dart';
 import 'package:agenda/models/task.dart';
@@ -115,8 +115,8 @@ NotificationDetails undoNotificationDetails(
 }
 
 /// The notification id of reminder [id] (a `reminder_state` row). Row 1
-/// would share id 1 with the meeting recorder's foreground-service
-/// notification (`record`'s `AudioRecordingService`, no tag): a reminder
+/// would share id 1 with the meeting recording's foreground-service
+/// notification ([meetingRecordingNotificationId], no tag): a reminder
 /// shown then would replace the "recording" notification, or become it and
 /// be wiped when recording stops. So row 1 shows under an id no row
 /// reaches.
@@ -131,7 +131,7 @@ const _rowOneNotification = 0x7fffffff;
 
 /// The "your meeting notes are ready" notification's id. Each meeting's
 /// shows under it with its own [meetingNotesTag], so each keeps its own.
-/// No reminder row or the recorder's foreground service (id 1) uses it.
+/// No reminder row or the recording's foreground service (id 1) uses it.
 const meetingNotesNotificationId = 0x7ffffffe;
 
 /// Meeting [meetingId]'s "notes ready" tag, which also names its note
@@ -165,10 +165,10 @@ Future<void> postMeetingNotesReady(FlutterLocalNotificationsPlugin plugin,
     SavedMeetingNote saved, AppLocalizations l) {
   final title = saved.title.trim();
   return plugin.show(
-      meetingNotesNotificationId,
-      title.isEmpty ? l.meetingNotesReady : title,
-      title.isEmpty ? null : l.meetingNotesReady,
-      meetingNotesNotificationDetails(l,
+      id: meetingNotesNotificationId,
+      title: title.isEmpty ? l.meetingNotesReady : title,
+      body: title.isEmpty ? null : l.meetingNotesReady,
+      notificationDetails: meetingNotesNotificationDetails(l,
           tag: meetingNotesTag(saved.meetingId, saved.noteId)),
       payload: jsonEncode({
         'meeting_note': saved.noteId,
@@ -193,17 +193,17 @@ Future<void> cancelMeetingNotesReady(FlutterLocalNotificationsPlugin plugin,
     if (noteId != null && (mark < 0 || tag.substring(mark + 1) != '$noteId')) {
       continue;
     }
-    await plugin.cancel(meetingNotesNotificationId, tag: shown.tag);
+    await plugin.cancel(id: meetingNotesNotificationId, tag: shown.tag);
   }
 }
 
-/// The recording's ongoing notification (MN-1): the meeting recorder's
-/// foreground service (`record`'s `AudioRecordingService`) shows it under
-/// this id, with no tag, on [meetingRecordingChannel]. Its own has no
-/// buttons and opens nothing, so the app posts its own over it, with
-/// **Stop** and **Discard** ([meetingRecordingNotificationDetails]).
+/// The recording's ongoing notification (MN-1): the notification of the
+/// foreground service that keeps a meeting recording going
+/// (`flutter_local_notifications`' `ForegroundService`, microphone type),
+/// under this id, with no tag, on [meetingRecordingChannel], with **Stop**
+/// and **Discard** ([meetingRecordingNotificationDetails]).
 const meetingRecordingNotificationId = 1;
-const meetingRecordingChannel = 'AudioRecordingChannel';
+const meetingRecordingChannel = 'taskflow_meeting_recording';
 const meetingStopAction = 'meeting_stop';
 const meetingDiscardAction = 'meeting_discard';
 
@@ -211,7 +211,7 @@ const meetingDiscardAction = 'meeting_discard';
 /// or its **Stop** or **Discard** (MN-1, MN-25), which open it too.
 enum MeetingNoticeAction { open, stop, discard }
 
-/// The recording notification: ongoing and silent, like the recorder's; a
+/// The recording notification: ongoing and silent; a
 /// tap opens the recording, and its buttons open the app to stop it or to
 /// ask whether to discard it. The buttons leave the notification for the
 /// recording to remove: a Discard the person takes back keeps recording.
@@ -282,24 +282,30 @@ class _NotificationDriver implements ReminderDriver {
           .toSet();
   @override
   Future<void> cancel(int id) async {
-    await plugin.cancel(reminderNotificationId(id));
+    await plugin.cancel(id: reminderNotificationId(id));
     // Row 1's, scheduled under id 1 before it moved.
-    if (id == 1) await plugin.cancel(1);
+    if (id == 1) await plugin.cancel(id: 1);
   }
 
   @override
   Future<void> show(int id, PlannedReminder reminder,
           {required String token}) =>
-      plugin.show(reminderNotificationId(id), reminder.title, reminder.body,
-          reminderNotificationDetails(reminder, silent: true),
+      plugin.show(
+          id: reminderNotificationId(id),
+          title: reminder.title,
+          body: reminder.body,
+          notificationDetails:
+              reminderNotificationDetails(reminder, silent: true),
           payload: jsonEncode({'id': id, 'token': token}));
 
   @override
   Future<void> showUndo(int id, String text,
       {required String languageCode, required String token}) async {
     final timeout = await TaskReminders.undoTimeout();
-    return plugin.show(reminderNotificationId(id), text, null,
-        undoNotificationDetails(languageCode, timeout),
+    return plugin.show(
+        id: reminderNotificationId(id),
+        title: text,
+        notificationDetails: undoNotificationDetails(languageCode, timeout),
         payload: jsonEncode({'id': id, 'token': token}));
   }
 
@@ -307,17 +313,15 @@ class _NotificationDriver implements ReminderDriver {
   Future<void> schedule(int id, PlannedReminder reminder,
       {required bool exact, required String token}) async {
     await plugin.zonedSchedule(
-        reminderNotificationId(id),
-        reminder.title,
-        reminder.body,
-        tz.TZDateTime.from(reminder.when, tz.local),
-        reminderNotificationDetails(reminder),
+        id: reminderNotificationId(id),
+        title: reminder.title,
+        body: reminder.body,
+        scheduledDate: tz.TZDateTime.from(reminder.when, tz.local),
+        notificationDetails: reminderNotificationDetails(reminder),
         payload: jsonEncode({'id': id, 'token': token}),
         androidScheduleMode: exact
             ? AndroidScheduleMode.exactAllowWhileIdle
             : AndroidScheduleMode.inexactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents:
             reminder.daily ? DateTimeComponents.time : null);
   }
@@ -400,7 +404,7 @@ class TaskReminders {
     await TaskDatabase().database;
     final strings = await readReminderStrings(TaskDatabase());
     await plugin.initialize(
-        InitializationSettings(
+        settings: InitializationSettings(
             android: const AndroidInitializationSettings('app_notifications_icon'),
             iOS: DarwinInitializationSettings(
                 requestAlertPermission: false,
@@ -565,22 +569,53 @@ class TaskReminders {
     }
   }
 
-  /// Posts the recording notification ([meetingRecordingNotificationDetails])
-  /// over the recorder's own, on Android while it records.
+  /// Starts the foreground service that keeps a meeting recording going
+  /// (MN-1), on Android, with the recording notification
+  /// ([meetingRecordingNotificationDetails]) as its own. Not sticky: a
+  /// service Android brings back by itself would have nothing recording.
+  static Future<void> startMeetingRecording(MeetingNotice notice) async {
+    if (!Platform.isAndroid) return;
+    await initialize();
+    final android = plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    await android?.startForegroundService(
+        id: meetingRecordingNotificationId,
+        title: notice.title,
+        body: notice.text,
+        notificationDetails: meetingRecordingNotificationDetails(notice).android,
+        payload: _meetingRecordingPayload,
+        startType: AndroidServiceStartType.startNotSticky,
+        foregroundServiceTypes: {
+          AndroidServiceForegroundType.foregroundServiceTypeMicrophone
+        });
+  }
+
+  /// Updates the running service's recording notification, as at each
+  /// cut: a notification under the service's id replaces its own.
   static Future<void> showMeetingRecording(MeetingNotice notice) async {
     if (!Platform.isAndroid) return;
     await initialize();
-    await plugin.show(meetingRecordingNotificationId, notice.title, notice.text,
-        meetingRecordingNotificationDetails(notice),
-        payload: jsonEncode({'meeting_recording': 1}));
+    await plugin.show(
+        id: meetingRecordingNotificationId,
+        title: notice.title,
+        body: notice.text,
+        notificationDetails: meetingRecordingNotificationDetails(notice),
+        payload: _meetingRecordingPayload);
   }
 
-  /// Removes the recording notification once recording stops: one posted
-  /// as it stopped would otherwise stay.
+  static final _meetingRecordingPayload = jsonEncode({'meeting_recording': 1});
+
+  /// Stops the recording's foreground service once recording stops, which
+  /// removes its notification; and removes a notification posted as it
+  /// stopped, which would otherwise stay.
   static Future<void> clearMeetingRecording() async {
     if (!Platform.isAndroid || _initializing == null) return;
     await _initializing;
-    await plugin.cancel(meetingRecordingNotificationId);
+    await plugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.stopForegroundService();
+    await plugin.cancel(id: meetingRecordingNotificationId);
   }
 
   /// Whether "notes ready" is shown for [meetingId] with the app in [state]:

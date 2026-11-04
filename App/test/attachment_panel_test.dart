@@ -2,6 +2,7 @@
 // refused-file messages.
 import 'dart:math' as math;
 
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/request_locale.dart';
 import 'package:agenda/main.dart';
@@ -24,6 +25,7 @@ import 'package:agenda/widgets/task_editor.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/design_fixtures.dart';
 
@@ -55,6 +57,7 @@ void main() {
     for (final language in ['en', 'es']) {
       for (final dark in [false, true]) {
         await tester.pumpWidget(ProviderScope(
+            retry: noRetry,
             key: ValueKey('$language-$dark'),
             overrides: [
               taskRepositoryProvider.overrideWithValue(repo),
@@ -106,7 +109,7 @@ void main() {
       (tester) async {
     final repository = _Repository();
     String? opened;
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       taskRepositoryProvider.overrideWithValue(repository),
       taskProvider.overrideWith((ref) => DesignTaskNotifier()),
       attachmentEntriesProvider.overrideWith((ref, id) async =>
@@ -172,6 +175,7 @@ void main() {
     final api = OfflineApiClient();
     addTearDown(api.close);
     await tester.pumpWidget(ProviderScope(
+        retry: noRetry,
         key: UniqueKey(),
         overrides: [
           apiClientProvider.overrideWithValue(api),
@@ -272,7 +276,7 @@ void main() {
     final repository = _Repository();
     final pro = StateProvider<bool>((ref) => false);
     final api = _BillingApi();
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       invitationLinkProvider
           .overrideWith((ref) => InvitationLinks(listen: false)),
       hasProProvider.overrideWith((ref) => ref.watch(pro)),
@@ -439,7 +443,7 @@ void main() {
     addTearDown(tester.view.reset);
     final es = lookupAppLocalizations(const Locale('es'));
     final api = OfflineApiClient();
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       invitationLinkProvider
           .overrideWith((ref) => InvitationLinks(listen: false)),
       hasProProvider.overrideWithValue(false),
@@ -560,7 +564,7 @@ void main() {
       addTearDown(tester.view.reset);
       final es = lookupAppLocalizations(const Locale('es'));
       final api = OfflineApiClient();
-      final container = ProviderContainer(overrides: [
+      final container = ProviderContainer(retry: noRetry, overrides: [
         hasProProvider.overrideWithValue(false),
         billingLoadingProvider.overrideWithValue(false),
         apiClientProvider.overrideWithValue(api),
@@ -771,7 +775,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       final api = OfflineApiClient();
-      final container = ProviderContainer(overrides: [
+      final container = ProviderContainer(retry: noRetry, overrides: [
         hasProProvider.overrideWithValue(false),
         billingLoadingProvider.overrideWithValue(false),
         apiClientProvider.overrideWithValue(api),

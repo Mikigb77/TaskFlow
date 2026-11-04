@@ -307,7 +307,7 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
             name: name,
             enabled: widget.enabled,
             projects: editableProjects(
-              ref.watch(taskListsProvider).valueOrNull ?? const [],
+              ref.watch(taskListsProvider).value ?? const [],
             ),
             onCreate: () => widget.onChanged(
               widget.draft.copyWith(

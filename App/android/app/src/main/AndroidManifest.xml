@@ -8,7 +8,7 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <!-- Meeting recording goes on in the background in record's foreground service (MN-1). -->
+    <!-- Meeting recording goes on in the background in a microphone foreground service (MN-1). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
@@ -63,10 +63,13 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/capture_widget_info" />
         </receiver>
 
-        <!-- The record package's foreground service, which its own manifest doesn't declare. -->
+        <!-- flutter_local_notifications' foreground service, which keeps a meeting
+             recording going (record 7 has none of its own). It stops with the app's
+             task: the recording can't go on without the app. -->
         <service
-            android:name="com.llfbandit.record.service.AudioRecordingService"
+            android:name="com.dexterous.flutterlocalnotifications.ForegroundService"
             android:exported="false"
+            android:stopWithTask="true"
             android:foregroundServiceType="microphone" />
 
         <!-- Don't delete the meta-data below. This is used by the Flutter tool to generate

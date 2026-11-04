@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:agenda/models/meeting.dart';
@@ -10,9 +10,12 @@ import 'package:agenda/services/meeting_recorder.dart';
 import 'package:agenda/services/native_speech.dart';
 import 'package:agenda/services/notification_service.dart';
 
-/// [MeetingAudioEngine] on the `record` package, recording in Android's
-/// foreground service with the microphone type, so it goes on with the
-/// screen off or the app in the background (MN-1).
+/// [MeetingAudioEngine] on the `record` package. Recording goes on with
+/// the screen off or the app in the background (MN-1) because the app
+/// holds a foreground service with the microphone type for the whole
+/// recording: `flutter_local_notifications`' own service, whose
+/// notification is the recording's, with Stop and Discard. `record` 7
+/// has no service of its own.
 ///
 /// Mono, 16 kHz, about 24 kbps (MN-2), written to disk as it's recorded in
 /// a container that survives a sudden stop (MN-3):
@@ -33,69 +36,32 @@ class RecordMeetingAudio implements MeetingAudioEngine {
   Completer<void>? _streamDone;
   RandomAccessFile? _file;
 
-  /// Counts the recordings and their files: a notification posted late,
-  /// for a recording that has since stopped, isn't posted.
-  int _noticeTurn = 0;
-
   static const bitRate = 24000;
   static const sampleRate = 16000;
 
-  /// The channel of the recorder's foreground-service notification.
-  static const channelId = 'AudioRecordingChannel';
-
-  /// Gives the recorder's channel [MeetingNotice.channelName], in the
-  /// app's language (MN-33). The recorder's service creates the channel
-  /// with its English name as it starts, which may be just after [start]
-  /// returns, so it's named again a moment later. Creating a channel that
-  /// exists only renames it.
-  void _nameChannel(MeetingNotice notice) {
-    final name = notice.channelName;
-    if (name == null || name.trim().isEmpty || !Platform.isAndroid) return;
-    Future<void> rename() async {
-      try {
-        await FlutterLocalNotificationsPlugin()
-            .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin
-            >()
-            ?.createNotificationChannel(
-              AndroidNotificationChannel(
-                channelId,
-                name,
-                importance: Importance.low,
-                playSound: false,
-                enableVibration: false,
-                showBadge: false,
-              ),
-            );
-      } catch (_) {
-        /* The channel keeps the recorder's name. */
-      }
+  /// Starts the foreground service with the recording's notification,
+  /// before the microphone opens: Android 14 lets a microphone service
+  /// start only while the app is in front, which it is when the person
+  /// taps record or Continue. If the service can't start, recording goes
+  /// on while the app is in front.
+  Future<void> _startService(MeetingNotice notice) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await TaskReminders.startMeetingRecording(notice);
+    } catch (_) {
+      /* Recording goes on without the service. */
     }
-
-    unawaited(rename());
-    unawaited(Future<void>.delayed(const Duration(seconds: 2), rename));
   }
 
-  /// Posts the app's recording notification, with Stop and Discard
-  /// (MN-1, MN-25), over the recorder's plain one. The recorder's service
-  /// posts its own as it starts, which may be just after [start] returns,
-  /// and again on every start ([next] with Opus): so it's posted again a
-  /// moment later, until the recording stops.
-  void _showNotice(MeetingNotice notice) {
+  /// Updates the running service's notification, as at each cut: posting
+  /// under the service's id replaces its notification without starting
+  /// the service again, which Android may refuse from the background.
+  Future<void> _updateNotice(MeetingNotice notice) async {
     if (!Platform.isAndroid) return;
-    final turn = ++_noticeTurn;
-    Future<void> show() async {
-      if (turn != _noticeTurn || _format == null) return;
-      try {
-        await TaskReminders.showMeetingRecording(notice);
-      } catch (_) {
-        /* The recorder's own notification stays. */
-      }
-    }
-
-    unawaited(show());
-    for (final wait in const [400, 1500, 4000]) {
-      unawaited(Future<void>.delayed(Duration(milliseconds: wait), show));
+    try {
+      await TaskReminders.showMeetingRecording(notice);
+    } catch (_) {
+      /* The notification keeps its earlier text. */
     }
   }
 
@@ -140,12 +106,6 @@ class RecordMeetingAudio implements MeetingAudioEngine {
         bitRate: bitRate,
         sampleRate: sampleRate,
         numChannels: 1,
-        androidConfig: AndroidRecordConfig(
-          // The recorder's own foreground service; its replacement package
-          // isn't needed while this one is kept.
-          // ignore: deprecated_member_use
-          service: AndroidService(title: notice.title, content: notice.text),
-        ),
       );
 
   @override
@@ -157,16 +117,28 @@ class RecordMeetingAudio implements MeetingAudioEngine {
     _format = format;
     _notice = notice;
     final config = _config(format, notice);
-    if (format == MeetingAudioFormat.opus) {
-      await _recorder.start(config, path: path);
-      _nameChannel(notice);
-      _showNotice(notice);
-      return;
+    await _startService(notice);
+    try {
+      if (format == MeetingAudioFormat.opus) {
+        await _recorder.start(config, path: path);
+        return;
+      }
+      _file = await File(path).open(mode: FileMode.writeOnlyAppend);
+    } catch (_) {
+      _format = null;
+      await _stopService();
+      rethrow;
     }
-    _file = await File(path).open(mode: FileMode.writeOnlyAppend);
-    final stream = await _recorder.startStream(config);
-    _nameChannel(notice);
-    _showNotice(notice);
+    final Stream<Uint8List> stream;
+    try {
+      stream = await _recorder.startStream(config);
+    } catch (_) {
+      _format = null;
+      await _file?.close();
+      _file = null;
+      await _stopService();
+      rethrow;
+    }
     final done = _streamDone = Completer<void>();
     _stream = stream.listen(
       _write,
@@ -191,11 +163,10 @@ class RecordMeetingAudio implements MeetingAudioEngine {
     if (format == null || _notice == null) throw StateError('Not recording.');
     _notice = notice;
     if (format == MeetingAudioFormat.opus) {
-      // Android stops the current file, completing it, and starts the next
-      // without stopping the foreground service, which posts its plain
-      // notification again.
+      // Android stops the current file, completing it, and starts the
+      // next; the app's foreground service goes on through the cut.
       await _recorder.start(_config(format, notice), path: path);
-      _showNotice(notice);
+      await _updateNotice(notice);
       return;
     }
     // The stream goes on; only the file it's written to changes, between
@@ -204,11 +175,11 @@ class RecordMeetingAudio implements MeetingAudioEngine {
     final previous = _file;
     _file = next;
     await previous?.close();
+    await _updateNotice(notice);
   }
 
   @override
   Future<void> stop() async {
-    _noticeTurn++;
     try {
       await _recorder.stop();
       // The last frames arrive before the stream closes.
@@ -223,11 +194,17 @@ class RecordMeetingAudio implements MeetingAudioEngine {
       await _file?.close();
       _file = null;
       _format = null;
-      try {
-        await TaskReminders.clearMeetingRecording();
-      } catch (_) {
-        /* The recorder's service removes its notification as it stops. */
-      }
+      await _stopService();
+    }
+  }
+
+  /// Stops the foreground service, which removes its notification.
+  Future<void> _stopService() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await TaskReminders.clearMeetingRecording();
+    } catch (_) {
+      /* Android removes the service's notification with the app. */
     }
   }
 

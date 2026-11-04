@@ -49,7 +49,7 @@ class TaskListStore {
         'task_lists',
         {
           if (pinned != null) 'pinned': pinned ? 1 : 0,
-          if (notifications != null) 'notifications': notifications,
+          'notifications': ?notifications,
           'preference_pending': owner == 'local' ? 0 : 1,
         },
         where: 'id = ? AND owner_key = ?',

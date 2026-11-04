@@ -3,7 +3,7 @@ import 'package:agenda/services/notification_service.dart';
 import 'package:agenda/services/reminder_engine.dart';
 import 'package:agenda/services/reminder_preferences.dart';
 import 'package:agenda/services/task_database.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 
 /// Reminder preferences kept in memory: no database, no real alerts.
 class MemoryReminderStore extends ReminderPreferenceStore {

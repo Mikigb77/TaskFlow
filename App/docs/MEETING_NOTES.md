@@ -1,6 +1,6 @@
 **Meeting notes from a recording — functional requirements**
 
-Status: planned, not built. Agreed with the owner on 2026-11-03. Nothing here is implemented yet; prices were checked on that date.
+Status: built on 2026-11-04 (server and app), checked with tests and rendered previews only; not yet checked on an emulator or phone, or against real Vertex AI calls ([MEETING_NOTES_PLAN.md](MEETING_NOTES_PLAN.md), "Not proven here"). Agreed with the owner on 2026-11-03; prices were checked on that date.
 
 **What it is.** The person taps once to record a conversation, such as a meeting with a client, and taps again to stop. A few seconds later they get notes: a short summary, the decisions, the to-dos, and one line per half hour. One more tap turns the to-dos into a task with a checklist. Recording has no length limit, and works through hours without signal.
 

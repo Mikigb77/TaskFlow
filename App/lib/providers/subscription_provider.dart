@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -211,7 +212,7 @@ class SubscriptionController extends StateNotifier<SubscriptionState> {
 
   Future<T> _serialized<T>(Future<T> Function() operation) {
     final future = _queue.then((_) => operation());
-    _queue = future.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    _queue = future.then<void>((_) {}, onError: (Object _, StackTrace _) {});
     return future;
   }
 

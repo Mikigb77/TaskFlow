@@ -23,11 +23,11 @@ bool noteMakesTask(Task note) =>
 /// The task «Crear tarea» made from [note] on this phone, while it exists
 /// (done or not): the note then offers «Ver tarea» (UX-2702).
 Task? noteMadeTask(WidgetRef ref, Task note) {
-  final id = ref.watch(noteTasksProvider).valueOrNull?[note.id];
+  final id = ref.watch(noteTasksProvider).value?[note.id];
   if (id == null) return null;
   return ref
       .watch(taskProvider)
-      .valueOrNull
+      .value
       ?.firstWhereOrNull((task) => task.id == id);
 }
 

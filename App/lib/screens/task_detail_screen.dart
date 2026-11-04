@@ -84,7 +84,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     // (UX-2811). Not for a task; nothing when none shows.
     final task = ref
         .read(taskProvider)
-        .valueOrNull
+        .value
         ?.firstWhereOrNull((item) => item.id == taskId);
     if (task?.isNote ?? true) {
       unawaited(MeetingHooks.noteOpened(taskId).catchError((Object _) {}));
@@ -156,7 +156,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     // The stored task, not an occurrence, is what Undo puts back.
     final saved = ref
         .read(taskProvider)
-        .valueOrNull
+        .value
         ?.firstWhereOrNull((item) => item.id == taskId);
     try {
       // Sent once Undo is no longer offered.
@@ -248,7 +248,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
               );
             }
             final canEdit = ref.watch(listCanEditProvider(task.listId));
-            final projects = ref.watch(taskListsProvider).valueOrNull;
+            final projects = ref.watch(taskListsProvider).value;
             final hasProjects = projects?.isNotEmpty == true;
             // Who created it, in a shared project only. No name: the
             // account has left the project or been deleted. The signed-in
@@ -648,7 +648,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           },
           loading: () =>
               const Scaffold(body: Center(child: CircularProgressIndicator())),
-          error: (_, __) => Scaffold(
+          error: (_, _) => Scaffold(
             appBar: CustomAppBar(title: context.l10n.taskScreenTitle),
             body: EmptyState(
               title: context.l10n.loadTaskError,

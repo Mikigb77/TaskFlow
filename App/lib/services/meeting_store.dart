@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -101,19 +102,18 @@ class MeetingStore {
     waitingPieces: row['waiting'] as int? ?? 0,
   );
 
-  static MeetingPiece _piece(Map<String, Object?> row) =>
-      MeetingPiece(
-        meetingId: row['meeting_id'] as String,
-        ownerKey: row['owner_key'] as String,
-        index: row['idx'] as int,
-        offset: Duration(milliseconds: row['offset_ms'] as int),
-        duration: Duration(milliseconds: row['duration_ms'] as int),
-        path: row['path'] as String,
-        state: row['state'] as String,
-        hasSound: row['has_sound'] == 1,
-        attempts: row['attempts'] as int? ?? 0,
-        retryAt: _time(row['retry_at']),
-      );
+  static MeetingPiece _piece(Map<String, Object?> row) => MeetingPiece(
+    meetingId: row['meeting_id'] as String,
+    ownerKey: row['owner_key'] as String,
+    index: row['idx'] as int,
+    offset: Duration(milliseconds: row['offset_ms'] as int),
+    duration: Duration(milliseconds: row['duration_ms'] as int),
+    path: row['path'] as String,
+    state: row['state'] as String,
+    hasSound: row['has_sound'] == 1,
+    attempts: row['attempts'] as int? ?? 0,
+    retryAt: _time(row['retry_at']),
+  );
 
   Future<Meeting?> meeting(String id, String ownerKey) async {
     final rows = await (await _db).rawQuery(
@@ -137,10 +137,7 @@ class MeetingStore {
     return rows.map(_meeting).toList();
   }
 
-  Future<List<MeetingPiece>> pieces(
-    String meetingId,
-    String ownerKey,
-  ) async {
+  Future<List<MeetingPiece>> pieces(String meetingId, String ownerKey) async {
     final rows = await (await _db).query(
       'meeting_pieces',
       where: 'meeting_id = ? AND owner_key = ?',
@@ -153,10 +150,7 @@ class MeetingStore {
   /// Pieces due to upload now, oldest meeting first: of a meeting that
   /// isn't discarded, held back for Pro or the allowance, or left with a
   /// piece that can never be sent.
-  Future<List<MeetingPiece>> duePieces(
-    String ownerKey,
-    DateTime now,
-  ) async {
+  Future<List<MeetingPiece>> duePieces(String ownerKey, DateTime now) async {
     final at = now.toUtc().toIso8601String();
     final rows = await (await _db).rawQuery(
       '''SELECT x.* FROM meeting_pieces x JOIN meetings m
@@ -339,7 +333,8 @@ class MeetingStore {
       where: 'id = ? AND owner_key = ?',
       whereArgs: [meeting.id, meeting.ownerKey],
     );
-    if (rows.isEmpty || !phases.contains(MeetingPhase.parse(rows.single['phase']))) {
+    if (rows.isEmpty ||
+        !phases.contains(MeetingPhase.parse(rows.single['phase']))) {
       throw StateError('This meeting is no longer recording.');
     }
   }
@@ -523,9 +518,10 @@ class MeetingStore {
     )).where((meeting) => meeting.id != active).toList();
     final drop = <String>[];
     for (final meeting in stuck) {
-      final open = (await pieces(meeting.id, ownerKey))
-          .where((piece) => piece.state == MeetingPiece.recording)
-          .toList();
+      final open = (await pieces(
+        meeting.id,
+        ownerKey,
+      )).where((piece) => piece.state == MeetingPiece.recording).toList();
       await db.transaction((tx) async {
         var next = meeting.nextIndex;
         var recorded = meeting.recorded;
@@ -575,9 +571,7 @@ class MeetingStore {
       await _deleteFile(path);
     }
     return [
-      for (final meeting in stuck)
-        if (await this.meeting(meeting.id, ownerKey) case final recovered?)
-          recovered,
+      for (final meeting in stuck) ?await this.meeting(meeting.id, ownerKey),
     ];
   }
 
@@ -1104,7 +1098,8 @@ class MeetingStore {
       );
       if (rows.isNotEmpty &&
           rows.single['holder'] != holder &&
-          DateTime.parse(rows.single['expires_at'] as String).isAfter(now.toUtc())) {
+          DateTime.parse(rows.single['expires_at'] as String)
+              .isAfter(now.toUtc())) {
         return false;
       }
       await tx.insert('meeting_leases', {

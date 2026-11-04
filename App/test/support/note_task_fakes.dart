@@ -6,6 +6,7 @@ import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/note_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 
 import 'design_fixtures.dart';
 

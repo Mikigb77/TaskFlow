@@ -2,7 +2,7 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
-## 2026-11-03 — Meeting notes from a recording (planned, not built)
+## 2026-11-03 — Meeting notes from a recording (built 2026-11-04; device checks owed)
 The owner asked for notes from a recorded conversation, then a task with a checklist in one tap. Requirements: `App/docs/MEETING_NOTES.md`.
 - Record on the phone and send pieces of about 5 minutes while recording; no live streaming. "As cheap as we can while maintaining some quality", in any common language.
 - All AI on Vertex AI: "I wouldn't turn credits on AI Studio. I would rather use simply the Vertex AI, since we're already paying for it anyway."

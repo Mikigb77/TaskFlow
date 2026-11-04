@@ -87,7 +87,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (person == null || widget.listId == null) return;
     if (person == ref.read(authProvider).account?.id) {
       // `Para mí` only where its chip shows: on a shared project.
-      _team = !(ref.read(taskListsProvider).valueOrNull ?? []).any(
+      _team = !(ref.read(taskListsProvider).value ?? []).any(
         (p) => p.id == widget.listId && p.shared,
       );
     } else {
@@ -108,7 +108,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   /// The person behind [_personShown], whose name their chip shows.
   ProjectMember? get _personChip {
-    final project = (ref.read(taskListsProvider).valueOrNull ?? [])
+    final project = (ref.read(taskListsProvider).value ?? [])
         .where((p) => p.id == widget.listId)
         .firstOrNull;
     final people = projectPeopleToFilter(
@@ -132,7 +132,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ? ProjectScope(projectId: widget.listId, team: true)
         : _scope(global ?? ref.read(projectScopeProvider));
     final person = everyone ? null : _personShown;
-    final projects = ref.read(taskListsProvider).valueOrNull ?? [];
+    final projects = ref.read(taskListsProvider).value ?? [];
     final accountId = ref.read(authProvider).account?.id;
     final now = DateTime.now();
     final overdue = filter == 1
@@ -226,7 +226,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// for a task put in another one) sends them to Calendar, as the Día view
   /// does.
   void _land(CalendarFocus focus) {
-    final all = ref.read(taskProvider).valueOrNull ?? [];
+    final all = ref.read(taskProvider).value ?? [];
     bool lists(List<Task> tasks) =>
         tasks.any((task) => focus.taskIds.contains(task.id));
     final global = ref.read(projectScopeProvider);
@@ -236,7 +236,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             all.where((task) => focus.taskIds.contains(task.id)),
             global,
             ref.read(authProvider).account?.id,
-            ref.read(taskListsProvider).valueOrNull ?? [],
+            ref.read(taskListsProvider).value ?? [],
           );
     // The first of these that lists them: as it is, then each wider step.
     final step =
@@ -472,10 +472,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (focus != null && identical(focus.page, this)) _land(focus);
     });
     // Another tab, or another project chosen: a row ticked before goes.
-    ref.listen<int>(shellTabSwitchesProvider, (_, __) {
+    ref.listen<int>(shellTabSwitchesProvider, (_, _) {
       setState(_openHere.clear);
     });
-    ref.listen<ProjectScope>(projectScopeProvider, (_, __) {
+    ref.listen<ProjectScope>(projectScopeProvider, (_, _) {
       setState(_openHere.clear);
     });
     // The page is covered by another screen: the person has left it.
@@ -486,7 +486,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ref.watch(authProvider);
     final colors = Theme.of(context).colorScheme;
     final lists = ref.watch(taskListsProvider);
-    final list = (lists.valueOrNull ?? [])
+    final list = (lists.value ?? [])
         .where((list) => list.id == widget.listId)
         .firstOrNull;
     final title = widget.listId != null
@@ -495,9 +495,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ? context.l10n.tasks
         : context.l10n.inbox;
     final labels =
-        (tasks.valueOrNull ?? []).expand((task) => task.labels).toSet().toList()
+        (tasks.value ?? []).expand((task) => task.labels).toSet().toList()
           ..sort();
-    final all = tasks.valueOrNull;
+    final all = tasks.value;
     final rows = all == null
         ? null
         : _rows(
@@ -868,7 +868,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => EmptyState(
+          error: (_, _) => EmptyState(
             title: context.l10n.loadTasksError,
             message: context.l10n.savedOnDevice,
             action: TextButton(

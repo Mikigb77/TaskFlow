@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/main.dart';
@@ -1986,6 +1987,7 @@ class _App {
         },
     };
     final container = ProviderContainer(
+      retry: noRetry,
       overrides: [
         invitationLinkProvider.overrideWith(
           (ref) => InvitationLinks(listen: false),
@@ -5931,6 +5933,7 @@ void _commandsRound3b() {
     }) async {
       await tester.pumpWidget(
         ProviderScope(
+          retry: noRetry,
           overrides: [
             taskListsProvider.overrideWith((ref) async => [physics]),
           ],

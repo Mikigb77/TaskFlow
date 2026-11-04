@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/task.dart';
@@ -1178,6 +1179,7 @@ class _NameApp {
     });
     final names = asked ?? _Asked();
     final container = ProviderContainer(
+      retry: noRetry,
       overrides: [
         firstTaskStoreProvider.overrideWithValue(MemoryFirstTaskStore()),
         invitationLinkProvider.overrideWith(

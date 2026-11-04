@@ -1,3 +1,4 @@
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 // Uses the local Docker backend with explicit fixture AI. Real paid AI is covered by projects_flow_test.
@@ -16,7 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:timezone/data/latest.dart' as tzdata;
+import 'package:timezone/data/latest_all.dart' as tzdata;
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -33,6 +34,7 @@ void main() {
       FlutterSecureStorage.setMockInitialValues({});
       tzdata.initializeTimeZones();
       final container = ProviderContainer(
+        retry: noRetry,
         overrides: [
           hasProProvider.overrideWithValue(true),
           if (const bool.fromEnvironment('FIXTURE_AI'))
@@ -145,7 +147,7 @@ void main() {
       expect(captureDrafts.every((draft) => !draft.hasTime), isTrue);
       await binding.takeScreenshot('flexible-inbox-review');
       final beforeCapture =
-          (container.read(taskProvider).valueOrNull ?? <Task>[])
+          (container.read(taskProvider).value ?? <Task>[])
               .map((t) => t.id)
               .toSet();
       await tester.tap(find.byKey(const ValueKey('save-drafts')));

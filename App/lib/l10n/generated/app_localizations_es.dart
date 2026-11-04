@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -86,21 +87,15 @@ class AppLocalizationsEs extends AppLocalizations {
     String _temp0 = intl.Intl.selectLogic(reason, {
       'alreadyMember':
           'Esta persona ya tiene acceso. Gestiona su rol en Miembros.',
-      'memberLimit':
-          'Este proyecto admite hasta 20 miembros y 20 invitaciones pendientes. Primero elimina a alguien o anula una invitación.',
-      'accepted':
-          'Esta invitación ya se ha aceptado. Gestiona el acceso de la persona en Miembros.',
-      'owner':
-          'El propietario no puede salir. Puedes eliminar el proyecto si ya no lo necesitas.',
-      'expired':
-          'Esta invitación ya no está disponible. Pide una nueva al propietario.',
+      'memberLimit': 'Este proyecto admite hasta 20 miembros y 20 invitaciones pendientes. Primero elimina a alguien o anula una invitación.',
+      'accepted': 'Esta invitación ya se ha aceptado. Gestiona el acceso de la persona en Miembros.',
+      'owner': 'El propietario no puede salir. Puedes eliminar el proyecto si ya no lo necesitas.',
+      'expired': 'Esta invitación ya no está disponible. Pide una nueva al propietario.',
       'code':
           'Pide al propietario del proyecto el código de invitación actual.',
       'refresh': 'Este proyecto ha cambiado. Actualízalo antes de eliminarlo.',
-      'ownerOnly':
-          'Solo el propietario puede gestionar los detalles y el acceso al proyecto.',
-      'other':
-          'Solo tienes acceso de lectura a este proyecto. Pide al propietario permiso para editar.',
+      'ownerOnly': 'Solo el propietario puede gestionar los detalles y el acceso al proyecto.',
+      'other': 'Solo tienes acceso de lectura a este proyecto. Pide al propietario permiso para editar.',
     });
     return '$_temp0';
   }
@@ -108,20 +103,13 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String syncProblem(String reason) {
     String _temp0 = intl.Intl.selectLogic(reason, {
-      'assignmentChanged':
-          'La persona responsable ha cambiado. Tu edición pendiente se ha guardado como copia personal.',
-      'listConflict':
-          'Un proyecto ha cambiado en otro dispositivo. Elige qué versión conservar en Proyectos.',
-      'readOnly':
-          'Este proyecto ahora es de solo lectura. Tu cambio pendiente se ha conservado como copia personal.',
-      'accessChanged':
-          'El acceso a un proyecto compartido ha cambiado. Actualiza para terminar de sincronizar los cambios permitidos.',
-      'taskConflict':
-          'Una tarea ha cambiado en otro dispositivo. Tu cambio se ha conservado como copia local y se ha cancelado una eliminación en conflicto.',
-      'serverUpdate':
-          'Actualiza este servidor antes de sincronizar notas. Tus notas se conservan en este teléfono.',
-      'other':
-          'El servidor no ha conservado este tipo de contenido. Tu copia local se conserva.',
+      'assignmentChanged': 'La persona responsable ha cambiado. Tu edición pendiente se ha guardado como copia personal.',
+      'listConflict': 'Un proyecto ha cambiado en otro dispositivo. Elige qué versión conservar en Proyectos.',
+      'readOnly': 'Este proyecto ahora es de solo lectura. Tu cambio pendiente se ha conservado como copia personal.',
+      'accessChanged': 'El acceso a un proyecto compartido ha cambiado. Actualiza para terminar de sincronizar los cambios permitidos.',
+      'taskConflict': 'Una tarea ha cambiado en otro dispositivo. Tu cambio se ha conservado como copia local y se ha cancelado una eliminación en conflicto.',
+      'serverUpdate': 'Actualiza este servidor antes de sincronizar notas. Tus notas se conservan en este teléfono.',
+      'other': 'El servidor no ha conservado este tipo de contenido. Tu copia local se conserva.',
     });
     return '$_temp0';
   }
@@ -131,37 +119,26 @@ class AppLocalizationsEs extends AppLocalizations {
     String _temp0 = intl.Intl.selectLogic(reason, {
       'signOutFirst': 'Cierra sesión antes de cambiar de servidor.',
       'https': 'Usa una dirección de servidor HTTPS en esta versión.',
-      'serverAddress':
-          'Introduce una dirección de servidor válida, como https://tu-servidor.example.',
+      'serverAddress': 'Introduce una dirección de servidor válida, como https://tu-servidor.example.',
       'emailUsed': 'Este correo ya tiene una cuenta.',
       'email': 'Introduce una dirección de correo válida.',
       'credentials':
           'No encontramos esa cuenta o la contraseña no es correcta.',
-      'session':
-          'Vuelve a iniciar sesión para continuar. Tus tareas locales se conservan.',
-      'accountChanged':
-          'La cuenta ha cambiado. Vuelve a abrir esta pantalla e inténtalo de nuevo.',
-      'password':
-          'Elige una contraseña de 12 a 128 caracteres que no sea común, solo numérica ni similar a tu correo.',
-      'recoveryCode':
-          'El código de recuperación no es válido o ha caducado. Solicita uno nuevo.',
+      'session': 'Vuelve a iniciar sesión para continuar. Tus tareas locales se conservan.',
+      'accountChanged': 'La cuenta ha cambiado. Vuelve a abrir esta pantalla e inténtalo de nuevo.',
+      'password': 'Elige una contraseña de 12 a 128 caracteres que no sea común, solo numérica ni similar a tu correo.',
+      'recoveryCode': 'El código de recuperación no es válido o ha caducado. Solicita uno nuevo.',
       'forbidden':
           'Esta cuenta no puede realizar esa acción. Revisa tus permisos.',
-      'rateLimit':
-          'Demasiadas solicitudes. Espera un poco antes de volver a intentarlo.',
+      'rateLimit': 'Demasiadas solicitudes. Espera un poco antes de volver a intentarlo.',
       'fileLimit': 'Elige un archivo no vacío de hasta 6 MB.',
-      'fileChanged':
-          'El archivo ha cambiado o no se ha podido verificar. Selecciónalo de nuevo o vuelve a descargarlo.',
-      'network':
-          'No hay conexión. Revisa el wifi o los datos móviles e inténtalo de nuevo.',
-      'networkKept':
-          'No hay conexión. Revisa el wifi o los datos móviles e inténtalo de nuevo. Tus tareas siguen guardadas en este teléfono.',
+      'fileChanged': 'El archivo ha cambiado o no se ha podido verificar. Selecciónalo de nuevo o vuelve a descargarlo.',
+      'network': 'No hay conexión. Revisa el wifi o los datos móviles e inténtalo de nuevo.',
+      'networkKept': 'No hay conexión. Revisa el wifi o los datos móviles e inténtalo de nuevo. Tus tareas siguen guardadas en este teléfono.',
       'unavailable': 'El servicio no está disponible. Inténtalo más tarde.',
-      'validation':
-          'No se han aceptado algunos datos. Revisa la información e inténtalo de nuevo.',
+      'validation': 'No se han aceptado algunos datos. Revisa la información e inténtalo de nuevo.',
       'other': 'No se ha podido completar la solicitud. Inténtalo de nuevo.',
-      'otherKept':
-          'No se ha podido completar la solicitud. Inténtalo de nuevo. Tus tareas siguen guardadas en este teléfono.',
+      'otherKept': 'No se ha podido completar la solicitud. Inténtalo de nuevo. Tus tareas siguen guardadas en este teléfono.',
     });
     return '$_temp0';
   }
@@ -3328,14 +3305,11 @@ class AppLocalizationsEs extends AppLocalizations {
           'Las suscripciones están disponibles en la app para Android.',
       'configuration':
           'Las suscripciones aún no están disponibles. Inténtalo más tarde.',
-      'accountUnavailable':
-          'No se pudo conectar con tu cuenta de TaskFlow. Revisa tu conexión y vuelve a abrir esta pantalla.',
-      'network':
-          'No se pudo comprobar tu suscripción. Revisa tu conexión y vuelve a abrir esta pantalla.',
+      'accountUnavailable': 'No se pudo conectar con tu cuenta de TaskFlow. Revisa tu conexión y vuelve a abrir esta pantalla.',
+      'network': 'No se pudo comprobar tu suscripción. Revisa tu conexión y vuelve a abrir esta pantalla.',
       'notAllowed':
           'Las compras están restringidas para esta cuenta o dispositivo.',
-      'otherAccount':
-          'Esta compra pertenece a otra cuenta. Inicia sesión en la cuenta original para restaurarla.',
+      'otherAccount': 'Esta compra pertenece a otra cuenta. Inicia sesión en la cuenta original para restaurarla.',
       'store': 'La tienda no respondió. Vuelve a abrir esta pantalla.',
       'other': 'La tienda no respondió. Vuelve a abrir esta pantalla.',
     });
@@ -3348,14 +3322,11 @@ class AppLocalizationsEs extends AppLocalizations {
       'active': 'TaskFlow Pro está activo.',
       'restored': 'Se ha restaurado tu suscripción Pro.',
       'noPurchases': 'No se encontró una compra Pro activa para esta cuenta.',
-      'awaitingEntitlement':
-          'Compra recibida. Pro se activará en unos momentos; si no, pulsa Restaurar compras.',
+      'awaitingEntitlement': 'Compra recibida. Pro se activará en unos momentos; si no, pulsa Restaurar compras.',
       'updated': 'Estado de la suscripción actualizado.',
-      'pending':
-          'El pago está pendiente. Pro se activará cuando la tienda lo confirme.',
+      'pending': 'El pago está pendiente. Pro se activará cuando la tienda lo confirme.',
       'busy': 'Espera a que termine la operación actual.',
-      'accountChanged':
-          'La cuenta ha cambiado. Revisa la suscripción en la cuenta de la compra.',
+      'accountChanged': 'La cuenta ha cambiado. Revisa la suscripción en la cuenta de la compra.',
       'other': 'No se pudo completar la solicitud. Inténtalo de nuevo.',
     });
     return '$_temp0';
@@ -3388,22 +3359,17 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String googleSignInError(String code) {
     String _temp0 = intl.Intl.selectLogic(code, {
-      'google_not_configured':
-          'El acceso con Google aún no está disponible. Usa tu correo y contraseña.',
-      'google_link_required':
-          'Este correo ya tiene una cuenta de TaskFlow. Accede con tu contraseña y elige Vincular cuenta de Google.',
+      'google_not_configured': 'El acceso con Google aún no está disponible. Usa tu correo y contraseña.',
+      'google_link_required': 'Este correo ya tiene una cuenta de TaskFlow. Accede con tu contraseña y elige Vincular cuenta de Google.',
       'google_password_required':
           'Introduce tu contraseña actual de TaskFlow para vincular Google.',
-      'google_email_mismatch':
-          'Elige la cuenta de Google con el mismo correo que tu cuenta de TaskFlow.',
-      'google_already_linked':
-          'Esta cuenta de Google ya está vinculada. Accede a la cuenta original de TaskFlow.',
+      'google_email_mismatch': 'Elige la cuenta de Google con el mismo correo que tu cuenta de TaskFlow.',
+      'google_already_linked': 'Esta cuenta de Google ya está vinculada. Accede a la cuenta original de TaskFlow.',
       'google_account_changed':
           'Tu cuenta cambió durante el acceso. Inténtalo de nuevo.',
       'google_invalid_token':
           'Google no ha podido verificar el acceso. Inténtalo de nuevo.',
-      'other':
-          'No se ha podido completar el acceso con Google. Comprueba la conexión e inténtalo de nuevo.',
+      'other': 'No se ha podido completar el acceso con Google. Comprueba la conexión e inténtalo de nuevo.',
     });
     return '$_temp0';
   }
@@ -5381,8 +5347,7 @@ class AppLocalizationsEs extends AppLocalizations {
       locale: localeName,
       other:
           'Las notas de $count reuniones aún no están listas, y sus grabaciones solo están en este teléfono.',
-      one:
-          'Las notas de una reunión aún no están listas, y su grabación solo está en este teléfono.',
+      one: 'Las notas de una reunión aún no están listas, y su grabación solo está en este teléfono.',
     );
     return '$_temp0';
   }

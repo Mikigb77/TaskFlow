@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/services/api_client.dart';
@@ -49,6 +50,7 @@ void main() {
       );
       await tester.pumpWidget(
         ProviderScope(
+          retry: noRetry,
           overrides: [
             apiClientProvider.overrideWithValue(OfflineApiClient()),
             authProvider.overrideWith(
@@ -100,6 +102,7 @@ void main() {
         await controller.setIdentity('guest', () async => null);
         await tester.pumpWidget(
           ProviderScope(
+            retry: noRetry,
             overrides: [
               apiClientProvider.overrideWithValue(OfflineApiClient()),
               subscriptionProvider.overrideWith((_) => controller),
@@ -167,6 +170,7 @@ void main() {
     addTearDown(api.close);
     await tester.pumpWidget(
       ProviderScope(
+        retry: noRetry,
         key: UniqueKey(),
         overrides: [
           apiClientProvider.overrideWithValue(api),

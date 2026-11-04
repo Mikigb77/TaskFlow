@@ -94,7 +94,7 @@ class ReminderLanguageRecovery {
     final reminders = await sql
         .query('reminder_state', where: 'owner_key = ?', whereArgs: [owner]);
     for (final row in reminders) {
-      await TaskReminders.plugin.cancel(row['id'] as int);
+      await TaskReminders.plugin.cancel(id: row['id'] as int);
     }
     await sql.transaction((tx) async {
       for (final table in ['reminder_snoozes', 'reminder_state', 'tasks']) {

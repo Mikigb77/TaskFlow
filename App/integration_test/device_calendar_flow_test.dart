@@ -3,6 +3,7 @@
 // The host denies/allows the printed OS dialogs, then toggles READ_CALENDAR
 // AppOps at the printed markers. No provider or permission channel is mocked.
 import 'dart:convert';
+import 'package:agenda/providers/no_retry.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -48,7 +49,7 @@ void main() {
     final before = jsonEncode(
         await sql.query('tasks', where: 'owner_key = ?', whereArgs: [owner]));
     final store = CalendarPreferenceStore(owner, database);
-    final container = ProviderContainer(overrides: [
+    final container = ProviderContainer(retry: noRetry, overrides: [
       authProvider.overrideWith((ref) => SignedInFixtureAuth(ref.read(apiClientProvider))),
       apiClientProvider.overrideWith((ref) {
         final api = OfflineApiClient();

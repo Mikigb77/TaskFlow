@@ -250,7 +250,7 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
   @override
   Widget build(BuildContext context) {
     // A project this phone hasn't synced yet doesn't exist on the server.
-    final local = (ref.watch(taskListsProvider).valueOrNull ?? [])
+    final local = (ref.watch(taskListsProvider).value ?? [])
         .where((project) => project.id == widget.listId)
         .firstOrNull;
     if (local != null && local.version == 0) {
@@ -504,7 +504,7 @@ class _ListSharingScreenState extends ConsumerState<ListSharingScreen> {
                             }),
                     ),
                   ),
-                if (updates != null) updates,
+                ?updates,
                 ExpansionTile(
                   title: Text(context.l10n.howSharingWorks),
                   tilePadding: EdgeInsets.zero,

@@ -568,11 +568,7 @@ class Task {
     return copyWith(
       completedTimes: {
         for (final date in completedDates)
-          if (completedTimes[date] ??
-                  kept[date] ??
-                  (already.contains(date) ? null : now)
-              case final time?)
-            date: time,
+          date: ?completedTimes[date] ?? kept[date] ?? (already.contains(date) ? null : now),
       },
     );
   }
@@ -597,7 +593,7 @@ class Task {
     return {
       for (final entry in value.entries)
         if (entry.key is String)
-          if (_instant(entry.value) case final time?) entry.key as String: time,
+          entry.key as String: ?_instant(entry.value),
     };
   }
 

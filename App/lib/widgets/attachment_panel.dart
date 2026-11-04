@@ -27,7 +27,7 @@ final attachmentEntriesProvider = FutureProvider.autoDispose
     .family<List<AttachmentEntry>, int>((ref, taskId) async {
       final repository = ref.watch(taskRepositoryProvider);
       final tasks =
-          ref.watch(taskProvider).valueOrNull ?? await repository.getAllTasks();
+          ref.watch(taskProvider).value ?? await repository.getAllTasks();
       final task = tasks.where((task) => task.id == taskId).firstOrNull;
       if (task == null) return [];
       final items = await repository.attachments.forTask(taskId);
@@ -225,15 +225,15 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
     final local = repository.ownerKey == 'local';
     final colors = Theme.of(context).colorScheme;
     final attachments = ref.watch(attachmentEntriesProvider(widget.task.id!));
-    final usage = attachments.valueOrNull?.isNotEmpty == true ? _usage() : null;
+    final usage = attachments.value?.isNotEmpty == true ? _usage() : null;
     // A task without files shows no Attachments section at all.
     if (!_busy &&
         _error == null &&
         !attachments.hasError &&
-        (attachments.valueOrNull?.isEmpty ?? true)) {
+        (attachments.value?.isEmpty ?? true)) {
       return const SizedBox.shrink();
     }
-    if (attachments.valueOrNull?.isNotEmpty == true) _reveal();
+    if (attachments.value?.isNotEmpty == true) _reveal();
     final canEdit = ref.watch(listCanEditProvider(widget.task.listId));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -257,7 +257,7 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
           // A sync reloads the list; keep the cards so the screen doesn't jump.
           skipLoadingOnReload: true,
           loading: () => const LinearProgressIndicator(),
-          error: (_, __) => Column(
+          error: (_, _) => Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(context.l10n.fileLoadError),
