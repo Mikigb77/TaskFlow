@@ -158,6 +158,11 @@ class Meeting {
 
   /// No piece was kept: everything recorded was silence.
   bool get empty => nextIndex == 0;
+
+  /// Kept no piece with sound, but holds its silent pieces on the phone
+  /// ([MeetingPiece.held]): a quiet recording, as Stop keeps one to ask
+  /// about (UX-2717). An empty meeting's pieces still there are held ones.
+  bool get quiet => empty && waitingPieces > 0;
 }
 
 /// One numbered piece of about 5 minutes (MN-4, MN-5).
@@ -184,7 +189,9 @@ class MeetingPiece {
 
   /// `recording` while the recorder writes it, `pending` until the server
   /// confirms it, `saved` after (its file is then deleted); `failed` when
-  /// it can never be sent ([MeetingProblem.pieceFailed]).
+  /// it can never be sent ([MeetingProblem.pieceFailed]); `held` for a
+  /// silent piece kept on the phone, never sent, while its meeting has no
+  /// piece with sound yet (UX-2717).
   final String state;
   final bool hasSound;
   final int attempts;
@@ -194,6 +201,7 @@ class MeetingPiece {
   static const pending = 'pending';
   static const saved = 'saved';
   static const failed = 'failed';
+  static const held = 'held';
 }
 
 class MeetingTodo {

@@ -5145,6 +5145,14 @@ class AppLocalizationsCa extends AppLocalizations {
       'No s’ha sentit res, així que no hi ha res per desar.';
 
   @override
+  String get meetingStopFailed =>
+      'No s’ha pogut acabar d’aturar. El que s’ha enregistrat és segur: torna a prémer Atura.';
+
+  @override
+  String get meetingQuietQuestion =>
+      'Gairebé no s’ha sentit res. Vols fer notes igualment?';
+
+  @override
   String meetingRecordingToday(String time) {
     return 'Enregistrament d’avui, $time';
   }
@@ -5165,11 +5173,21 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
+  String meetingStoppedQuiet(String recording, String length) {
+    return '$recording · $length. Gairebé no s’ha sentit res.';
+  }
+
+  @override
   String get meetingMakeNotes => 'Fes les notes';
 
   @override
   String meetingRecordingNow(String time) {
     return 'Enregistrant una reunió · $time';
+  }
+
+  @override
+  String meetingRecordingUnstopped(String length) {
+    return 'Enregistrament sense acabar d’aturar · $length. Obre’l i prem Atura.';
   }
 
   @override

@@ -5052,6 +5052,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Nothing was heard, so there’s nothing to save.';
 
   @override
+  String get meetingStopFailed =>
+      'Couldn’t finish stopping. What was recorded is safe: press Stop again.';
+
+  @override
+  String get meetingQuietQuestion =>
+      'Almost nothing was heard. Make notes anyway?';
+
+  @override
   String meetingRecordingToday(String time) {
     return 'Recording from today, $time';
   }
@@ -5072,11 +5080,21 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String meetingStoppedQuiet(String recording, String length) {
+    return '$recording · $length. Almost nothing was heard.';
+  }
+
+  @override
   String get meetingMakeNotes => 'Make the notes';
 
   @override
   String meetingRecordingNow(String time) {
     return 'Recording a meeting · $time';
+  }
+
+  @override
+  String meetingRecordingUnstopped(String length) {
+    return 'Recording not fully stopped · $length. Open it and press Stop.';
   }
 
   @override

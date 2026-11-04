@@ -194,10 +194,12 @@ void main() {
       final meeting = await recorder.start(owner, notice: notice);
       await hear(recorder, silence, const Duration(minutes: 5, seconds: 2));
       var pieces = await piecesOf(meeting.id);
-      expect(pieces, hasLength(1));
-      expect(pieces.single.index, 0);
-      expect(pieces.single.offset, const Duration(minutes: 5));
-      expect(File(audio.files.first).existsSync(), isFalse, reason: 'dropped');
+      // Held on the phone, never sent, until a piece with sound (UX-2717).
+      expect(pieces, hasLength(2));
+      expect(pieces.first.state, MeetingPiece.held);
+      expect(pieces.last.index, 0);
+      expect(pieces.last.offset, const Duration(minutes: 5));
+      expect(File(audio.files.first).existsSync(), isTrue, reason: 'held');
       await hear(recorder, speech, const Duration(seconds: 30));
       final stopped = await recorder.stop();
       expect(stopped!.phase, MeetingPhase.finishing);
@@ -206,6 +208,7 @@ void main() {
       expect(pieces.single.state, MeetingPiece.pending);
       expect(pieces.single.offset, const Duration(minutes: 5));
       expect(pieces.single.duration, const Duration(seconds: 32));
+      expect(File(audio.files.first).existsSync(), isFalse, reason: 'left out');
     });
 
     test('a meeting of only silence keeps nothing at Stop', () async {
@@ -1425,4 +1428,241 @@ void main() {
       expect(nextMonth.state.allowanceUsed, isFalse);
     });
   });
+
+  group('P324 · Stop: a quiet recording, and a Stop that fails', () {
+    // Under −42 dBFS all along: never a loud sample.
+    const quiet = -60.0;
+
+    MeetingController controllerFor() {
+      final controller = MeetingController(
+        store: store,
+        engine: audio,
+        ownerKey: owner,
+        api: api,
+        scheduler: FakeMeetingScheduler(),
+        clock: clock.call,
+      );
+      addTearDown(controller.dispose);
+      return controller;
+    }
+
+    /// Lets the controller's uploads run on real time for a moment.
+    Future<void> letUploadsRun([bool Function()? until]) async {
+      for (var i = 0; i < 100 && !(until?.call() ?? false); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+    }
+
+    Iterable<MeetingCall> piecesSent(String id) =>
+        api.calls.where((call) => call.kind == 'piece' && call.meetingId == id);
+
+    group('a quiet recording (UX-2717)', () {
+      test('UX-2717: ten minutes that never pass −42 dBFS are kept at Stop, '
+          'stopped, with their pieces on the phone: nothing is deleted or sent '
+          'before the answer', () async {
+        final controller = controllerFor();
+        await controller.ready;
+        final started = await controller.start(notice: notice);
+        await hear(controller.recorder, quiet, const Duration(minutes: 10));
+        final stopped = await controller.stop();
+        await letUploadsRun();
+
+        expect(stopped, isNotNull, reason: 'not dropped as silence');
+        expect(stopped!.id, started.id);
+        expect(stopped.phase, MeetingPhase.interrupted);
+        expect(stopped.recorded, const Duration(minutes: 10));
+        // The screen's choices: it's a stopped meeting, as in Notes.
+        expect(controller.state.recording, isNull);
+        expect(controller.state.stopped.single.id, started.id);
+        final pieces = await piecesOf(started.id);
+        expect(pieces, isNotEmpty);
+        expect(pieces.every((piece) => piece.state == MeetingPiece.held), isTrue);
+        expect(audio.files, isNotEmpty);
+        expect(
+          audio.files.every((path) => File(path).existsSync()),
+          isTrue,
+          reason: 'every recorded file is still on the phone',
+        );
+        expect(piecesSent(started.id), isEmpty, reason: 'held, never sent');
+        expect(api.kinds(), isNot(contains('finish')));
+        expect(api.kinds(), isNot(contains('delete')));
+      });
+
+      test('UX-2717: «Hacer las notas» sends the held pieces like any '
+          'recording and asks for the notes', () async {
+        final controller = controllerFor();
+        await controller.ready;
+        final meeting = await controller.start(notice: notice);
+        await hear(controller.recorder, quiet, const Duration(minutes: 10));
+        await controller.stop();
+        final held = (await piecesOf(meeting.id)).length;
+
+        await controller.finishMeeting(meeting.id);
+        await letUploadsRun(() => api.kinds().contains('finish'));
+        expect(
+          [for (final call in piecesSent(meeting.id)) call.index],
+          unorderedEquals([for (var i = 0; i < held; i++) i]),
+          reason: 'every held piece reaches the server, numbered from 0',
+        );
+        final finish = api.calls.firstWhere((call) => call.kind == 'finish');
+        expect(finish.meetingId, meeting.id);
+        expect(finish.lastIndex, held - 1);
+        expect(controller.state.stopped, isEmpty);
+      });
+
+      test('UX-2717: «Descartar» deletes the held pieces and their files '
+          '(MN-25), and sends none', () async {
+        final controller = controllerFor();
+        await controller.ready;
+        final meeting = await controller.start(notice: notice);
+        await hear(controller.recorder, quiet, const Duration(minutes: 10));
+        await controller.stop();
+        expect(await piecesOf(meeting.id), isNotEmpty);
+
+        await controller.discardMeeting(meeting.id);
+        await letUploadsRun();
+        expect(await piecesOf(meeting.id), isEmpty);
+        expect(audio.files.every((path) => !File(path).existsSync()), isTrue);
+        expect(piecesSent(meeting.id), isEmpty);
+        expect(controller.state.stopped, isEmpty);
+        expect(controller.state.waiting, isEmpty);
+      });
+
+      test('UX-2717: thirty silent seconds are still dropped at Stop, as '
+          'before', () async {
+        final recorder = newRecorder();
+        final meeting = await recorder.start(owner, notice: notice);
+        await hear(recorder, quiet, const Duration(seconds: 30));
+        expect(await recorder.stop(), isNull);
+        expect(await piecesOf(meeting.id), isEmpty);
+        expect(audio.files.every((path) => !File(path).existsSync()), isTrue);
+        expect(
+          (await store.meeting(meeting.id, owner))?.phase,
+          anyOf(isNull, MeetingPhase.discarding),
+        );
+      });
+
+      test('UX-2717: sound in the third piece keeps that piece and the later '
+          'ones, and leaves out the silent pieces before it (MN-4)', () async {
+        final recorder = newRecorder(
+          rules: const MeetingPieceRules(
+            target: Duration(seconds: 10),
+            cap: Duration(seconds: 12),
+          ),
+        );
+        final meeting = await recorder.start(owner, notice: notice);
+        // Two silent pieces, held while nothing with sound is kept.
+        await hear(recorder, quiet, const Duration(seconds: 12));
+        await hear(recorder, quiet, const Duration(seconds: 12));
+        var pieces = await piecesOf(meeting.id);
+        expect(pieces, hasLength(3));
+        expect(pieces[0].state, MeetingPiece.held);
+        expect(pieces[1].state, MeetingPiece.held);
+        expect(pieces[2].state, MeetingPiece.recording);
+        final silentFiles = [pieces[0].path, pieces[1].path];
+        final third = pieces[2];
+
+        // The third piece has sound, and so does the fourth.
+        await hear(recorder, speech, const Duration(seconds: 12));
+        await hear(recorder, speech, const Duration(seconds: 5));
+        final stopped = await recorder.stop();
+        expect(stopped!.phase, MeetingPhase.finishing);
+        pieces = await piecesOf(meeting.id);
+        expect(pieces, hasLength(2));
+        expect([for (final piece in pieces) piece.index], [0, 1]);
+        expect(
+          pieces.every((piece) => piece.state == MeetingPiece.pending),
+          isTrue,
+        );
+        expect(pieces.first.path, third.path);
+        expect(pieces.first.offset, third.offset);
+        expect(stopped.lastIndex, 1);
+        expect(File(pieces.first.path).existsSync(), isTrue);
+        expect(File(pieces.last.path).existsSync(), isTrue);
+        for (final path in silentFiles) {
+          expect(File(path).existsSync(), isFalse, reason: 'left out');
+        }
+      });
+    });
+
+    group('a Stop that fails in the store (UX-2713)', () {
+      test('UX-2713: the microphone has stopped and what was recorded is '
+          'kept; its time stays where it stopped; the next Stop finishes it '
+          'and nothing is on show as recording', () async {
+        store = _P324FailingLastPiece(
+          database,
+          directory: Directory(p.join(directory.path, 'audio')),
+        )..failures = 2;
+        final controller = controllerFor();
+        await controller.ready;
+        final meeting = await controller.start(notice: notice);
+        await hear(controller.recorder, speech, const Duration(seconds: 30));
+
+        await expectLater(controller.stop(), throwsA(isA<StateError>()));
+        await Future<void>.delayed(Duration.zero);
+        // Stop had stopped the microphone before the store failed: nothing
+        // is being recorded, and nothing recorded was lost.
+        expect(audio.running, isFalse);
+        expect(audio.stops, 1);
+        expect(audio.files.every((path) => File(path).existsSync()), isTrue);
+        final status = controller.state.recording;
+        expect(status?.meetingId, meeting.id, reason: 'Stop again, on screen');
+        expect(status?.elapsed, const Duration(seconds: 30));
+        expect(status?.level, 0);
+
+        // A minute on, a Stop that fails again doesn't move the time on.
+        clock.advance(const Duration(minutes: 1));
+        await expectLater(controller.stop(), throwsA(isA<StateError>()));
+        await Future<void>.delayed(Duration.zero);
+        expect(controller.state.recording?.elapsed, const Duration(seconds: 30));
+
+        final stopped = await controller.stop();
+        await Future<void>.delayed(Duration.zero);
+        expect(stopped?.id, meeting.id);
+        expect(stopped?.phase, MeetingPhase.finishing);
+        expect(stopped?.lastIndex, 0);
+        expect(controller.recorder.recording, isFalse);
+        expect(controller.recorder.current, isNull);
+        expect(controller.state.recording, isNull);
+        expect(audio.stops, 1, reason: 'the microphone was stopped once');
+        final pieces = await piecesOf(meeting.id);
+        expect(pieces.single.state, MeetingPiece.pending);
+        // It ends where the microphone stopped, not at the Stop that worked.
+        expect(pieces.single.duration, const Duration(seconds: 30));
+        expect(stopped?.recorded, const Duration(seconds: 30));
+      });
+    });
+  });
+}
+
+/// A store whose closing of the last piece (at Stop) fails [failures]
+/// times, as a full disk or a busy database might.
+class _P324FailingLastPiece extends MeetingStore {
+  _P324FailingLastPiece(super.database, {super.directory});
+  int failures = 0;
+
+  @override
+  Future<bool> closePiece(
+    Meeting meeting, {
+    required int index,
+    required Duration duration,
+    required bool hasSound,
+    required DateTime now,
+    String? nextPath,
+    bool hold = false,
+  }) async {
+    if (nextPath == null && failures > 0) {
+      failures--;
+      throw StateError('The database is busy.');
+    }
+    return super.closePiece(
+      meeting,
+      index: index,
+      duration: duration,
+      hasSound: hasSound,
+      now: now,
+      nextPath: nextPath,
+      hold: hold,
+    );
+  }
 }

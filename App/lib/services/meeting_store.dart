@@ -355,9 +355,11 @@ class MeetingStore {
     required bool hasSound,
     required DateTime now,
     String? nextPath,
+    bool hold = false,
   }) async {
     final db = await _db;
     String? dropped;
+    final leftOut = <String>[];
     final kept = await db.transaction((tx) async {
       await _requirePhase(tx, meeting, {MeetingPhase.recording});
       final rows = await tx.query(
@@ -380,6 +382,27 @@ class MeetingStore {
             'state': MeetingPiece.pending,
             'duration_ms': duration.inMilliseconds,
             'has_sound': 1,
+          },
+          where: 'meeting_id = ? AND owner_key = ? AND idx = ?',
+          whereArgs: [meeting.id, meeting.ownerKey, index],
+        );
+        leftOut.addAll(await _dropHeld(tx, meeting.id, meeting.ownerKey));
+      } else if (hold) {
+        // Held under a number below 0, out of the way of the pieces sent.
+        final lowest = Sqflite.firstIntValue(
+          await tx.rawQuery(
+            'SELECT MIN(idx) FROM meeting_pieces '
+            'WHERE meeting_id = ? AND owner_key = ?',
+            [meeting.id, meeting.ownerKey],
+          ),
+        );
+        await tx.update(
+          'meeting_pieces',
+          {
+            'idx': (lowest == null || lowest > 0 ? 0 : lowest) - 1,
+            'state': MeetingPiece.held,
+            'duration_ms': duration.inMilliseconds,
+            'has_sound': 0,
           },
           where: 'meeting_id = ? AND owner_key = ? AND idx = ?',
           whereArgs: [meeting.id, meeting.ownerKey, index],
@@ -409,7 +432,45 @@ class MeetingStore {
       return hasSound;
     });
     if (dropped != null) await _deleteFile(dropped!);
+    for (final path in leftOut) {
+      await _deleteFile(path);
+    }
     return kept;
+  }
+
+  /// Leaves out [id]'s held silent pieces (MN-4): a piece with sound was
+  /// kept. Returns their files, to delete once
+  /// the transaction is done.
+  Future<List<String>> _dropHeld(
+    DatabaseExecutor tx,
+    String id,
+    String ownerKey,
+  ) async {
+    final rows = await tx.query(
+      'meeting_pieces',
+      columns: ['path'],
+      where: 'meeting_id = ? AND owner_key = ? AND state = ?',
+      whereArgs: [id, ownerKey, MeetingPiece.held],
+    );
+    if (rows.isEmpty) return const [];
+    await tx.delete(
+      'meeting_pieces',
+      where: 'meeting_id = ? AND owner_key = ? AND state = ?',
+      whereArgs: [id, ownerKey, MeetingPiece.held],
+    );
+    return [for (final row in rows) row['path'] as String];
+  }
+
+  /// Whether [id] holds silent pieces on the phone ([MeetingPiece.held]).
+  Future<bool> hasHeld(String id, String ownerKey) async {
+    final count = Sqflite.firstIntValue(
+      await (await _db).rawQuery(
+        'SELECT COUNT(*) FROM meeting_pieces '
+        'WHERE meeting_id = ? AND owner_key = ? AND state = ?',
+        [id, ownerKey, MeetingPiece.held],
+      ),
+    );
+    return (count ?? 0) > 0;
   }
 
   /// Saved every few seconds while recording, so an interrupted recording
@@ -545,9 +606,16 @@ class MeetingStore {
   }
 
   /// Stop or Finish: the meeting waits for its notes, its last piece
-  /// being the last one kept. A meeting that kept no piece holds nothing
-  /// to make notes from and is discarded; null then.
-  Future<Meeting?> finish(String id, String ownerKey, DateTime now) async {
+  /// being the last one kept. A meeting that kept no piece with sound is
+  /// made from its held silent pieces (UX-2717), sent like any piece;
+  /// without them, or with [keepHeld] false, it holds nothing to make
+  /// notes from and is discarded; null then.
+  Future<Meeting?> finish(
+    String id,
+    String ownerKey,
+    DateTime now, {
+    bool keepHeld = true,
+  }) async {
     final current = await meeting(id, ownerKey);
     if (current == null) return null;
     if (![
@@ -556,22 +624,65 @@ class MeetingStore {
     ].contains(current.phase)) {
       return current;
     }
-    if (current.empty) {
+    final held = [
+      for (final piece in await pieces(id, ownerKey))
+        if (piece.state == MeetingPiece.held) piece,
+    ]..sort((a, b) => a.offset.compareTo(b.offset));
+    if (current.empty && (!keepHeld || held.isEmpty)) {
       await discard(id, ownerKey);
       return null;
     }
+    final db = await _db;
+    final leftOut = <String>[];
+    await db.transaction((tx) async {
+      var next = current.nextIndex;
+      if (current.empty) {
+        // Numbered 0, 1, 2… in the order they were recorded.
+        for (final (i, piece) in held.indexed) {
+          await tx.update(
+            'meeting_pieces',
+            {'idx': i, 'state': MeetingPiece.pending},
+            where: 'meeting_id = ? AND owner_key = ? AND idx = ?',
+            whereArgs: [id, ownerKey, piece.index],
+          );
+        }
+        next = held.length;
+      } else {
+        leftOut.addAll(await _dropHeld(tx, id, ownerKey));
+      }
+      await tx.update(
+        'meetings',
+        {
+          'phase': MeetingPhase.finishing.name,
+          'next_index': next,
+          'last_index': next - 1,
+          'stopped_at': (current.stoppedAt ?? now).toUtc().toIso8601String(),
+          'retry_at': null,
+          'attempts': 0,
+          'waits': 0,
+        },
+        where: 'id = ? AND owner_key = ? AND phase = ?',
+        whereArgs: [id, ownerKey, current.phase.name],
+      );
+    });
+    for (final path in leftOut) {
+      await _deleteFile(path);
+    }
+    return meeting(id, ownerKey);
+  }
+
+  /// Stop on a recording judged all silence (UX-2717): kept, as a stopped
+  /// meeting with its held pieces, until the person says whether to make
+  /// notes from it or discard it.
+  Future<Meeting?> stopQuiet(String id, String ownerKey, DateTime now) async {
     await (await _db).update(
       'meetings',
       {
-        'phase': MeetingPhase.finishing.name,
-        'last_index': current.nextIndex - 1,
-        'stopped_at': (current.stoppedAt ?? now).toUtc().toIso8601String(),
-        'retry_at': null,
-        'attempts': 0,
-        'waits': 0,
+        'phase': MeetingPhase.interrupted.name,
+        'stopped_at': now.toUtc().toIso8601String(),
       },
       where: 'id = ? AND owner_key = ? AND phase = ?',
-      whereArgs: [id, ownerKey, current.phase.name],
+      whereArgs: [id, ownerKey, MeetingPhase.recording.name],
     );
     return meeting(id, ownerKey);
   }

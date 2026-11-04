@@ -3565,6 +3565,208 @@ void main() {
       }
     });
   });
+
+  group('P324 · Parar: a failed Stop and a quiet recording', () {
+    final es = lookupAppLocalizations(const Locale('es'));
+    Finder inDialog(Finder finder) =>
+        find.descendant(of: find.byType(AlertDialog), matching: finder);
+
+    /// Notes in Spanish on a small phone, then «Grabar una reunión».
+    Future<void> recording(WidgetTester tester, ScriptedMeetings meetings) async {
+      await _notes(tester, _container(meetings), language: 'es');
+      await tester.tap(find.byKey(const ValueKey('record-meeting')));
+      await tester.pumpAndSettle();
+      expect(find.byType(MeetingScreen), findsOneWidget);
+      expect(find.byKey(const ValueKey('meeting-stop')), findsOneWidget);
+    }
+
+    testWidgets('UX-2713: a Stop that fails says so with its own words, the '
+        'recording screen stays without «Grabando», and a second Parar that '
+        'works stops it', (tester) async {
+      final meetings = _P324StopFails();
+      await recording(tester, meetings);
+      expect(find.text(es.meetingListening), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('meeting-stop')));
+      await tester.pumpAndSettle();
+      expect(meetings.calls.stops, 1);
+      expect(find.text(es.meetingStopFailed), findsOneWidget);
+      expect(find.text(es.meetingStartFailed), findsNothing);
+      // Still the recording screen, no longer claiming to record.
+      expect(find.byType(MeetingScreen), findsOneWidget);
+      expect(find.text(es.meetingPreparing), findsNothing);
+      expect(find.text(es.meetingListening), findsNothing);
+      expect(find.text(es.meetingListeningHelp), findsNothing);
+      final stop = find.byKey(const ValueKey('meeting-stop'));
+      expect(stop.hitTestable(), findsOneWidget);
+      expect(
+        tester.widget<ButtonStyleButton>(stop).onPressed,
+        isNotNull,
+        reason: 'Parar works again',
+      );
+
+      await tester.tap(stop.hitTestable());
+      await _pumpSpinning(tester);
+      expect(meetings.calls.stops, 2);
+      expect(find.byKey(const ValueKey('meeting-stop')), findsNothing);
+      expect(find.text(es.meetingPreparing), findsOneWidget);
+    });
+
+    testWidgets('UX-2713: after a failed Stop, the time stays in the middle '
+        'of the screen, above Parar, as while recording', (tester) async {
+      final meetings = _P324StopFails();
+      await recording(tester, meetings);
+      final elapsed = find.byKey(const ValueKey('meeting-elapsed'));
+      final screen = tester.getRect(find.byType(MeetingScreen)).center.dx;
+      expect(tester.getRect(elapsed).center.dx, moreOrLessEquals(screen, epsilon: 1));
+
+      await tester.tap(find.byKey(const ValueKey('meeting-stop')));
+      await tester.pumpAndSettle();
+      expect(find.text(es.meetingStopFailed), findsOneWidget);
+      final stop = tester.getRect(find.byKey(const ValueKey('meeting-stop')));
+      expect(
+        tester.getRect(elapsed).center.dx,
+        moreOrLessEquals(screen, epsilon: 1),
+        reason: 'centred, not pushed to the left once «Grabando» goes',
+      );
+      expect(stop.center.dx, moreOrLessEquals(screen, epsilon: 1));
+    });
+
+    testWidgets('UX-2713: after a failed Stop, Notas doesn’t say it’s '
+        'recording; Abrir opens a screen without «Grabando», and Parar there '
+        'finishes it', (tester) async {
+      final meetings = _P324StopFails();
+      await recording(tester, meetings);
+      await tester.tap(find.byKey(const ValueKey('meeting-stop')));
+      await tester.pumpAndSettle();
+      // Back, as Android's: leaving doesn't stop anything.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(MeetingScreen), findsNothing);
+
+      final card = find.byKey(const ValueKey('meeting-recording'));
+      expect(card, findsOneWidget);
+      final length = meetingLength(es, const Duration(minutes: 12, seconds: 3));
+      expect(find.text(es.meetingRecordingNow(length)), findsNothing);
+      expect(find.text(es.meetingRecordingUnstopped(length)), findsOneWidget);
+      expect(
+        find.descendant(of: card, matching: find.byIcon(Icons.mic_rounded)),
+        findsNothing,
+      );
+
+      await tester.tap(
+        find.descendant(of: card, matching: find.text(es.meetingOpen)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(MeetingScreen), findsOneWidget);
+      expect(find.text(es.meetingListening), findsNothing);
+      expect(find.text(es.meetingListeningHelp), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('meeting-stop')).hitTestable());
+      await _pumpSpinning(tester);
+      expect(meetings.calls.stops, 2);
+      expect(find.text(es.meetingPreparing), findsOneWidget);
+    });
+
+    testWidgets('UX-2717: Parar on ten quiet minutes asks «Casi no se oyó '
+        'nada…», with «Hacer las notas» filled and «Descartar» in red, and '
+        'nothing is deleted before the answer', (tester) async {
+      final meetings = _P324QuietStop();
+      await recording(tester, meetings);
+
+      await tester.tap(find.byKey(const ValueKey('meeting-stop')));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(inDialog(find.text(es.meetingQuietQuestion)), findsOneWidget);
+      expect(
+        inDialog(find.widgetWithText(FilledButton, es.meetingMakeNotes)),
+        findsOneWidget,
+      );
+      final discard = inDialog(find.widgetWithText(TextButton, es.discard));
+      expect(discard, findsOneWidget);
+      final error = Theme.of(tester.element(discard)).colorScheme.error;
+      final style = tester.widget<TextButton>(discard).style!;
+      expect(style.foregroundColor!.resolve(<WidgetState>{}), error);
+      // Not the dropped recording's snackbar: it's kept.
+      expect(find.text(es.meetingNothingHeard), findsNothing);
+      // Nothing deleted, nothing sent yet.
+      expect(meetings.calls.discarded, isEmpty);
+      expect(meetings.calls.discardedRecordings, 0);
+      expect(meetings.calls.finished, isEmpty);
+      expect(meetings.state.stopped.single.id, 'meeting-1');
+      expect(find.byType(MeetingScreen), findsOneWidget);
+    });
+
+    testWidgets('UX-2717: «Hacer las notas» keeps the recording and goes on to '
+        '«Preparando tus notas…»', (tester) async {
+      final meetings = _P324QuietStop();
+      await recording(tester, meetings);
+      await tester.tap(find.byKey(const ValueKey('meeting-stop')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(inDialog(find.text(es.meetingMakeNotes)));
+      await _pumpSpinning(tester);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(meetings.calls.finished, ['meeting-1']);
+      expect(meetings.calls.discarded, isEmpty);
+      expect(meetings.state.waiting.single.id, 'meeting-1');
+      expect(find.byType(MeetingScreen), findsOneWidget);
+      expect(find.text(es.meetingPreparing), findsOneWidget);
+    });
+
+    testWidgets('UX-2717: «Descartar» deletes the recording and closes the '
+        'screen, back to Notas', (tester) async {
+      final meetings = _P324QuietStop();
+      await recording(tester, meetings);
+      await tester.tap(find.byKey(const ValueKey('meeting-stop')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(inDialog(find.text(es.discard)));
+      await tester.pumpAndSettle();
+      expect(meetings.calls.discarded, ['meeting-1']);
+      expect(meetings.calls.finished, isEmpty);
+      expect(meetings.state.stopped, isEmpty);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(MeetingScreen), findsNothing);
+      expect(find.byType(NotesScreen), findsOneWidget);
+    });
+
+    testWidgets('UX-2717: dismissed, the question is neither: the stopped '
+        'meeting stays, saying almost nothing was heard, with the same '
+        'choices', (tester) async {
+      final meetings = _P324QuietStop();
+      await recording(tester, meetings);
+      await tester.tap(find.byKey(const ValueKey('meeting-stop')));
+      await tester.pumpAndSettle();
+
+      await tester.tapAt(const Offset(8, 8));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(meetings.calls.finished, isEmpty);
+      expect(meetings.calls.discarded, isEmpty);
+      expect(find.byType(MeetingScreen), findsOneWidget);
+      String tail(String line) => line.split('{length}').last;
+      final quiet = es.meetingStoppedQuiet('{recording}', '{length}');
+      final cut = es.meetingStoppedCut('{recording}', '{length}');
+      expect(find.textContaining(tail(quiet)), findsOneWidget);
+      expect(find.textContaining(tail(cut)), findsNothing);
+      expect(find.text(es.meetingMakeNotes), findsOneWidget);
+    });
+
+    testWidgets('UX-2717: thirty silent seconds are still dropped at Parar, '
+        'with «No se oyó nada…», as before', (tester) async {
+      final meetings = ScriptedMeetings(silent: true);
+      await recording(tester, meetings);
+
+      await tester.tap(find.byKey(const ValueKey('meeting-stop')));
+      await tester.pumpAndSettle();
+      expect(meetings.calls.stops, 1);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text(es.meetingQuietQuestion), findsNothing);
+      expect(find.text(es.meetingNothingHeard), findsOneWidget);
+      expect(find.byType(MeetingScreen), findsNothing);
+      expect(find.byType(NotesScreen), findsOneWidget);
+    });
+  });
 }
 
 /// Signs out as the app does: sign-in shows once its state has no account.
@@ -3618,5 +3820,52 @@ class _Auth extends SignedInFixtureAuth {
   Future<void> signOut() async {
     signedOut++;
     onSignOut?.call();
+  }
+}
+
+/// Parar's first press fails once the microphone has stopped (UX-2713): the
+/// status stays at the time it reached, with no level, marked as not
+/// stopped, as the recorder publishes it.
+class _P324StopFails extends ScriptedMeetings {
+  int failures = 1;
+
+  @override
+  Future<Meeting?> stop() async {
+    if (failures == 0) return super.stop();
+    failures--;
+    calls.stops++;
+    final status = state.recording!;
+    state = state.copyWith(
+      recording: MeetingRecordingStatus(
+        meetingId: status.meetingId,
+        elapsed: status.elapsed,
+        level: 0,
+        stopFailed: true,
+      ),
+    );
+    throw StateError('The store failed.');
+  }
+}
+
+/// Parar on ten minutes judged all silence (UX-2717): kept as a stopped
+/// meeting with no piece with sound and two silent pieces held.
+class _P324QuietStop extends ScriptedMeetings {
+  @override
+  Future<Meeting?> stop() async {
+    calls.stops++;
+    final meeting = Meeting(
+      id: state.recording!.meetingId,
+      ownerKey: meetingOwner,
+      phase: MeetingPhase.interrupted,
+      startedAt: DateTime.utc(2026, 11, 3, 9),
+      format: MeetingAudioFormat.opus,
+      recorded: const Duration(minutes: 10),
+      waitingPieces: 2,
+    );
+    state = state.copyWith(
+      clearRecording: true,
+      stopped: [...state.stopped, meeting],
+    );
+    return meeting;
   }
 }

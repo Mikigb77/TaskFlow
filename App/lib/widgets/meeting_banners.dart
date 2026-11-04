@@ -315,10 +315,17 @@ class _RecordingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
+    final length = meetingLength(l, status.elapsed);
     return _Card(
       key: const ValueKey('meeting-recording'),
-      icon: Icons.mic_rounded,
-      text: l.meetingRecordingNow(meetingLength(l, status.elapsed)),
+      // Stop failed once the microphone had stopped (UX-2713): it isn't
+      // recording, and Stop on its screen finishes it.
+      icon: status.stopFailed
+          ? Icons.pause_circle_outline_rounded
+          : Icons.mic_rounded,
+      text: status.stopFailed
+          ? l.meetingRecordingUnstopped(length)
+          : l.meetingRecordingNow(length),
       actions: [
         _action(
           l.meetingOpen,
@@ -332,6 +339,7 @@ class _RecordingCard extends StatelessWidget {
 
 /// A recording that stopped without Stop (MN-12): «Grabación de hoy, 10:15
 /// · 1 h 42 min. Se cortó antes de que pulsaras Parar.», then its choices.
+/// A quiet one kept at Stop says «Casi no se oyó nada.» instead (UX-2717).
 class MeetingStoppedCard extends StatelessWidget {
   const MeetingStoppedCard({super.key, required this.meeting});
   final Meeting meeting;
@@ -341,7 +349,7 @@ class MeetingStoppedCard extends StatelessWidget {
     final l = context.l10n;
     return _Card(
       icon: Icons.pause_circle_outline_rounded,
-      text: l.meetingStoppedCut(
+      text: (meeting.quiet ? l.meetingStoppedQuiet : l.meetingStoppedCut)(
         meetingWhich(context, meeting),
         meetingLength(l, meeting.recorded),
       ),

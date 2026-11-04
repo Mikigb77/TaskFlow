@@ -112,6 +112,9 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen>
   String? _id;
   MeetingStartProblem? _refused;
   bool _stopping = false;
+  // Stop failed once the microphone had stopped: the recording screen
+  // stays until Stop works (UX-2713).
+  bool _stopFailed = false;
   // Discard confirmed: the recording going is not it ending by itself.
   bool _discarding = false;
   // The recording ended by itself (out of space, the microphone failed).
@@ -318,23 +321,79 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen>
       meeting = await _controller.stop();
     } catch (_) {
       if (mounted) {
-        setState(() => _stopping = false);
-        unawaited(showFeedback(messenger, l.meetingStartFailed));
+        setState(() {
+          _stopping = false;
+          _stopFailed = true;
+        });
+        unawaited(showFeedback(messenger, l.meetingStopFailed));
       }
       return;
     }
+    _stopFailed = false;
     if (!mounted) return;
     if (meeting == null) {
-      // Only silence: nothing is kept.
+      // Only silence, under a minute: nothing is kept.
       unawaited(showFeedback(messenger, l.meetingNothingHeard));
       Navigator.of(context).pop();
       return;
     }
+    // A minute or more judged all silence: kept, as a stopped meeting, to
+    // ask first (UX-2717).
+    final quiet = meeting.phase == MeetingPhase.interrupted;
     setState(() {
       _show(meeting!.id);
       _stage = _Stage.after;
     });
     _follow(ref.read(meetingsProvider));
+    if (quiet) unawaited(_askQuiet(meeting.id));
+  }
+
+  /// «Casi no se oyó nada. ¿Hacer notas igualmente?» (UX-2717): «Hacer las
+  /// notas» sends what it held, like any recording; «Descartar» deletes it
+  /// (MN-25) and closes the screen. Dismissed, it's neither: the screen
+  /// shows the stopped meeting's same choices, as Notes does.
+  Future<void> _askQuiet(String id) async {
+    final l = context.l10n;
+    final makeNotes = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        key: const ValueKey('meeting-quiet-question'),
+        scrollable: true,
+        actionsOverflowButtonSpacing: 8,
+        content: Text(l.meetingQuietQuestion),
+        actions: [
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l.discard),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(l.meetingMakeNotes),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || makeNotes == null) return;
+    if (makeNotes) {
+      try {
+        // «Preparando tus notas…» follows, as after any Stop.
+        await _controller.finishMeeting(id);
+      } catch (_) {
+        /* Still stopped: its choices stay on the screen. */
+      }
+      return;
+    }
+    _opened = true;
+    try {
+      await _controller.discardMeeting(id);
+    } catch (_) {
+      if (mounted) _opened = false;
+      return;
+    }
+    if (mounted) _leave();
   }
 
   Future<void> _discard() async {
@@ -362,6 +421,8 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen>
       if (_stopping || _discarding || meetings.recording?.meetingId == id) {
         return;
       }
+      // Stop failed: Stop again, unless it has ended by itself since.
+      if (_stopFailed && _controller.endOf(id) == null) return;
       setState(() {
         _ended = true;
         _stage = _Stage.after;
@@ -454,6 +515,7 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen>
           status: status,
           spaceLow: _spaceLow,
           warning: _heldLine(l, meetings),
+          stopFailed: _stopFailed || (status?.stopFailed ?? false),
         ),
         _Stage.refused => _Refused(problem: _refused, onRetry: _record),
         _Stage.after => _After(meetings: meetings, id: _id, end: end),
@@ -523,6 +585,8 @@ class _Centered extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: 24, vertical: vertical),
       child: ConstrainedBox(
         constraints: BoxConstraints(
+          // The full width, so what's narrow stays centred (R1-P324-3).
+          minWidth: math.max(0, constraints.maxWidth - 48),
           minHeight: math.max(0, constraints.maxHeight - 2 * vertical),
         ),
         child: Column(
@@ -536,7 +600,12 @@ class _Centered extends StatelessWidget {
 }
 
 class _Recording extends StatelessWidget {
-  const _Recording({required this.status, this.spaceLow = false, this.warning});
+  const _Recording({
+    required this.status,
+    this.spaceLow = false,
+    this.warning,
+    this.stopFailed = false,
+  });
   final MeetingRecordingStatus? status;
 
   /// Little space left: it says so, and records on (MN-6).
@@ -545,6 +614,10 @@ class _Recording extends StatelessWidget {
   /// Why this recording's notes will wait (Pro, the month's time); it
   /// records on.
   final String? warning;
+
+  /// Stop failed once the microphone had stopped (UX-2713): it no longer
+  /// says it's recording, only how much was recorded, until Stop works.
+  final bool stopFailed;
 
   @override
   Widget build(BuildContext context) {
@@ -602,12 +675,14 @@ class _Recording extends StatelessWidget {
       vertical: big ? 16 : 24,
       children: [
         if (!big) ...[meter, const SizedBox(height: 16)],
-        Text(
-          l.meetingListening,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.titleMedium?.copyWith(color: colors.primary),
-        ),
-        const SizedBox(height: 4),
+        if (!stopFailed) ...[
+          Text(
+            l.meetingListening,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium?.copyWith(color: colors.primary),
+          ),
+          const SizedBox(height: 4),
+        ],
         if (big)
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -623,13 +698,15 @@ class _Recording extends StatelessWidget {
           time,
         // Before any warning, so it stays in view above Parar at large
         // text: leaving doesn't stop the recording.
-        const SizedBox(height: 12),
-        Text(
-          l.meetingListeningHelp,
-          key: const ValueKey('meeting-help'),
-          textAlign: TextAlign.center,
-          style: TextStyle(color: colors.onSurfaceVariant, height: leading),
-        ),
+        if (!stopFailed) ...[
+          const SizedBox(height: 12),
+          Text(
+            l.meetingListeningHelp,
+            key: const ValueKey('meeting-help'),
+            textAlign: TextAlign.center,
+            style: TextStyle(color: colors.onSurfaceVariant, height: leading),
+          ),
+        ],
         if (warning != null) ...[
           const SizedBox(height: 12),
           Text(

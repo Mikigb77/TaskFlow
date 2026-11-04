@@ -33,7 +33,7 @@ const meetingRecording = Screen(
 const meetingAfter = Screen(
   'meetings',
   'after-stop',
-  'After Parar: the notes being prepared, waiting for signal, or held back',
+  'After Parar: the notes being prepared, waiting for signal, held back, or a quiet recording asked about',
   sources: [
     'lib/screens/meeting_screen.dart',
     'lib/widgets/meeting_banners.dart',
@@ -43,7 +43,7 @@ const meetingAfter = Screen(
 const meetingLines = Screen(
   'meetings',
   'notes-lines',
-  'Notas with meeting lines: a recording that stopped by itself, meetings waiting for their notes, one recording',
+  'Notas with meeting lines: a recording that stopped by itself, a quiet one kept at Parar, meetings waiting for their notes, one recording',
   sources: [
     'lib/screens/notes_screen.dart',
     'lib/widgets/meeting_banners.dart',
@@ -154,6 +154,52 @@ Future<PreviewApp> _record(
   return app;
 }
 
+/// Parar on ten minutes judged all silence (UX-2717): kept as a stopped
+/// meeting, to ask first.
+class _QuietMeetings extends ScriptedMeetings {
+  @override
+  Future<Meeting?> stop() async {
+    calls.stops++;
+    final meeting = _quietMeeting(state.recording!.meetingId);
+    state = state.copyWith(
+      clearRecording: true,
+      stopped: [...state.stopped, meeting],
+    );
+    return meeting;
+  }
+}
+
+/// Ten quiet minutes kept at Parar: no piece with sound, its two silent
+/// pieces held on the phone (UX-2717).
+Meeting _quietMeeting(String id) => Meeting(
+  id: id,
+  ownerKey: meetingOwner,
+  phase: MeetingPhase.interrupted,
+  startedAt: DateTime.utc(2026, 11, 3, 9),
+  format: MeetingAudioFormat.opus,
+  recorded: const Duration(minutes: 10),
+  waitingPieces: 2,
+);
+
+/// Parar fails once the microphone has stopped (UX-2713): the status
+/// stays at the time it reached, with no level, marked as not stopped.
+class _StopFails extends ScriptedMeetings {
+  @override
+  Future<Meeting?> stop() async {
+    calls.stops++;
+    final status = state.recording!;
+    state = state.copyWith(
+      recording: MeetingRecordingStatus(
+        meetingId: status.meetingId,
+        elapsed: status.elapsed,
+        level: 0,
+        stopFailed: true,
+      ),
+    );
+    throw StateError('The store failed.');
+  }
+}
+
 /// After Parar: the spinner never settles.
 Future<void> _stop(Preview p) async {
   await p.tester.tap(find.text(p.l.meetingStop).hitTestable());
@@ -177,6 +223,19 @@ void meetingPreviews() {
       then: {
         'discard-question':
             'Descartar asks first; «Seguir grabando» is the safe choice.',
+      },
+    );
+
+    preview(
+      meetingRecording,
+      'stop-failed',
+      'Parar failed once the microphone had stopped: the time stays where it stopped, «Grabando» and the line about leaving are gone, and «No se pudo terminar de parar. Lo grabado está a salvo: vuelve a pulsar Parar.»; Parar works again.',
+      [es1, ca2],
+      (p) async {
+        await _record(p, _StopFails());
+        await p.tester.tap(find.text(p.l.meetingStop).hitTestable());
+        await p.tester.pumpAndSettle();
+        await p.shoot();
       },
     );
 
@@ -410,6 +469,27 @@ void meetingPreviews() {
     }
 
     preview(
+      meetingAfter,
+      'quiet-question',
+      'Parar on ten minutes judged almost all silence: «Casi no se oyó nada. ¿Hacer notas igualmente?», with Hacer las notas filled and Descartar in red; nothing is deleted before the answer.',
+      [es1],
+      (p) async {
+        await _record(p, _QuietMeetings());
+        await p.tester.tap(find.text(p.l.meetingStop).hitTestable());
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+        // Closed by tapping outside it: neither answer.
+        await p.tester.tapAt(const Offset(8, 8));
+        await p.tester.pumpAndSettle();
+        await p.shoot('quiet-dismissed');
+      },
+      then: {
+        'quiet-dismissed':
+            'The question closed without an answer: the stopped meeting says which recording (its day and start time), «· 10 min. Casi no se oyó nada.», with Hacer las notas, Seguir grabando and Descartar.',
+      },
+    );
+
+    preview(
       meetingLines,
       'held-back',
       'Notas with meetings held back: one needs Pro (Descubrir Pro), one waits for next month’s time, one can’t become notes.',
@@ -482,6 +562,41 @@ void meetingPreviews() {
       [es1, es2],
       (p) async {
         final app = await _record(p, ScriptedMeetings());
+        app.navigator.pop();
+        await p.tester.pumpAndSettle();
+        await p.shoot();
+      },
+    );
+
+    preview(
+      meetingLines,
+      'quiet-stopped',
+      'Notas with a quiet recording kept at Parar and not yet answered: which recording (its day and start time), «· 10 min. Casi no se oyó nada.», with Hacer las notas (filled), Seguir grabando and Descartar apart in red.',
+      [es1, ca2],
+      (p) async {
+        final app = await _open(
+          p,
+          ScriptedMeetings(
+            initial: MeetingsState(
+              loaded: true,
+              stopped: [_quietMeeting('quiet')],
+            ),
+          ),
+        );
+        await app.tab(p.l.notes);
+        await p.shoot();
+      },
+    );
+
+    preview(
+      meetingLines,
+      'stop-failed',
+      'Parar failed and the recording screen was left: Notas says «Grabación sin terminar de parar · 12 min. Ábrela y pulsa Parar.», with a paused icon, not the microphone, and Abrir.',
+      [es1, ca2],
+      (p) async {
+        final app = await _record(p, _StopFails());
+        await p.tester.tap(find.text(p.l.meetingStop).hitTestable());
+        await p.tester.pumpAndSettle();
         app.navigator.pop();
         await p.tester.pumpAndSettle();
         await p.shoot();

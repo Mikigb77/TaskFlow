@@ -307,11 +307,19 @@ class MeetingController extends StateNotifier<MeetingsState> {
   Future<bool> microphoneAllowed() async =>
       await recorder.engine.permission(ask: false) == SpeechPermission.granted;
 
-  /// Stop: the meeting waits for its notes. Null when only silence was
-  /// recorded, and nothing is kept.
+  /// Stop: the meeting waits for its notes. A recording of a minute or
+  /// more judged all silence comes back stopped
+  /// ([MeetingPhase.interrupted]), kept, to ask whether to make notes anyway
+  /// ([finishMeeting]) or discard it ([discardMeeting]) (UX-2717). Null
+  /// when a shorter one heard only silence, and nothing is kept. When it
+  /// throws, what was recorded is kept, and Stop works again (UX-2713).
   Future<Meeting?> stop() async {
     final meeting = await recorder.stop();
-    await refresh();
+    try {
+      await refresh();
+    } catch (_) {
+      /* It has stopped: the next refresh shows it. */
+    }
     _kick();
     return meeting;
   }

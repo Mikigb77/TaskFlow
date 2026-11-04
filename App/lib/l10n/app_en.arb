@@ -4069,6 +4069,14 @@
   "@meetingNothingHeard": {
     "description": "A short message after Stop when the recording was only silence."
   },
+  "meetingStopFailed": "Couldn’t finish stopping. What was recorded is safe: press Stop again.",
+  "@meetingStopFailed": {
+    "description": "A short message on the meeting recording screen when Stop failed after the microphone had stopped: what was recorded is kept, and Stop (meetingStop) can be pressed again to finish."
+  },
+  "meetingQuietQuestion": "Almost nothing was heard. Make notes anyway?",
+  "@meetingQuietQuestion": {
+    "description": "Asked after Stop when a meeting recording of a minute or more was judged nearly all silence. Its buttons are meetingMakeNotes (keeps the recording and makes the notes) and discard (deletes it)."
+  },
   "meetingRecordingToday": "Recording from today, {time}",
   "@meetingRecordingToday": {
     "description": "Which recording a stopped meeting’s line is about, when it started today. time is the time of day it started, as 10:15.",
@@ -4117,6 +4125,20 @@
       }
     }
   },
+  "meetingStoppedQuiet": "{recording} · {length}. Almost nothing was heard.",
+  "@meetingStoppedQuiet": {
+    "description": "Instead of meetingStoppedCut, in the Notes tab and on the meeting screen, for a stopped meeting recording judged nearly all silence (as after Stop and meetingQuietQuestion), waiting to be made into notes or discarded. recording is meetingRecordingToday, meetingRecordingYesterday or meetingRecordingOn; length is how much was recorded, in words.",
+    "placeholders": {
+      "recording": {
+        "type": "String",
+        "example": "Recording from today, 10:15"
+      },
+      "length": {
+        "type": "String",
+        "example": "10 min"
+      }
+    }
+  },
   "meetingMakeNotes": "Make the notes",
   "@meetingMakeNotes": {
     "description": "The main button on a recording that stopped by itself: makes the notes from what was recorded."
@@ -4126,6 +4148,16 @@
     "description": "In the Notes tab while a meeting records and its screen was left. time is the recorded length in words (meetingLengthHoursMinutes and the like), as 12 min.",
     "placeholders": {
       "time": {
+        "type": "String",
+        "example": "12 min"
+      }
+    }
+  },
+  "meetingRecordingUnstopped": "Recording not fully stopped · {length}. Open it and press Stop.",
+  "@meetingRecordingUnstopped": {
+    "description": "Instead of meetingRecordingNow, in the Notes tab, when Stop failed after the microphone had stopped (meetingStopFailed): nothing is recording, and Stop (meetingStop) on its screen finishes it. length is the recorded length in words, as 12 min.",
+    "placeholders": {
+      "length": {
         "type": "String",
         "example": "12 min"
       }

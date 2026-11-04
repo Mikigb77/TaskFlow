@@ -5155,6 +5155,14 @@ class AppLocalizationsEs extends AppLocalizations {
       'No se oyó nada, así que no hay nada que guardar.';
 
   @override
+  String get meetingStopFailed =>
+      'No se pudo terminar de parar. Lo grabado está a salvo: vuelve a pulsar Parar.';
+
+  @override
+  String get meetingQuietQuestion =>
+      'Casi no se oyó nada. ¿Hacer notas igualmente?';
+
+  @override
   String meetingRecordingToday(String time) {
     return 'Grabación de hoy, $time';
   }
@@ -5175,11 +5183,21 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String meetingStoppedQuiet(String recording, String length) {
+    return '$recording · $length. Casi no se oyó nada.';
+  }
+
+  @override
   String get meetingMakeNotes => 'Hacer las notas';
 
   @override
   String meetingRecordingNow(String time) {
     return 'Grabando una reunión · $time';
+  }
+
+  @override
+  String meetingRecordingUnstopped(String length) {
+    return 'Grabación sin terminar de parar · $length. Ábrela y pulsa Parar.';
   }
 
   @override

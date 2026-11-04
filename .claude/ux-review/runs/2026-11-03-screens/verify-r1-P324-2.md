@@ -1,38 +1,37 @@
-## UX verify — P324 (Stopping: failed Stop, quiet recording) — round 1, check 2 — 2026-11-03
-**Verdict:** Ship after one small fix. Both findings meet their acceptance checks, and R1-P324-1 is fixed. One new regression: after a failed Stop, leaving the screen brings back the false «Grabando» claim, on the Notes tab and on the reopened screen (R1-P324-2).
-**Evidence:** I read the worktree `.claude/worktrees/wf_b7a20ea0-e5f-23` and the package diff (waves.py). I read the tester's tests but didn't run them. I looked at the renders `recording.stop-failed` (es 1×, ca 2×), `after-stop.quiet-dismissed.es.light.1x`, `notes-lines.quiet-stopped.es.light.1x`, and their AUDIT entries. All renders are newer than the lib files they show. All of this is code, widget-test and preview evidence. None of it comes from a device.
+## UX verify — P324 (Stopping: failed Stop, quiet recording) — round 1, check 2 (after the R1-P324-3 fix) — 2026-11-03
+**Verdict:** Ship. Both findings now meet their acceptance checks, and R1-P324-3 is fixed. R1-P324-1 and R1-P324-2 were fixed at check 1 of this attempt and still hold, because the fix touched only `_Centered`. No new regressions.
+**Evidence:** I read the worktree `.claude/worktrees/wf_ffe605e9-07e-3`: `_Centered` (`App/lib/screens/meeting_screen.dart:573-598`), the other places that use it (`:674`, `:746`, `:799`, `:821`), and the tester's centring test (`App/test/meeting_screens_test.dart:3615-3633`). I read the tests but didn't run them. I looked at these renders: `recording.stop-failed` (es 1×, ca 2×), `recording.microphone-refused.es.light.1x`, `after-stop.preparing.es.light.1x` and `after-stop.quiet-dismissed.es.light.1x`. They were rendered at 01:04, after `meeting_screen.dart` changed at 01:03, and `find -newer` lists no lib or asset file changed since. All of this is code, widget-test and preview evidence. None of it comes from a device.
+
+(This file replaces an earlier check 2 note in this name, which was written for the package's first worktree, `wf_b7a20ea0-e5f-23`.)
 
 ### Findings
 **UX-2713 · fixed**
-- The snackbar now says what's true: `meetingStopFailed` ES «No se pudo terminar de parar. Lo grabado está a salvo: vuelve a pulsar Parar.», with EN and CA matching the check 1 fix, in all three ARBs (`app_es.arb:1442`). It's shown at `App/lib/screens/meeting_screen.dart:256-264`.
-- While `_stopFailed` holds, `_Recording` hides «Grabando» and «Puedes bloquear el teléfono: sigue grabando.» (`meeting_screen.dart:572-608`). The render `recording.stop-failed.es.light.1x` shows only the ring, the frozen 12:03, the snackbar, «Parar» and «Descartar». TalkBack reads «12 minutos y 3 segundos grabados», then the snackbar as a live region. AUDIT found nothing beyond the intended Label ≠ text on the clock.
-- The real recorder keeps the stopped session as `_unstopped`, so the second Stop finishes it (`App/lib/services/meeting_recorder.dart` `stop()`). The last piece ends at `stoppedAt`, not at the Stop that worked. Discard and suspend take the session over (`_takeUnstopped`).
-- The recorder test I asked for at check 1 is now there: `meeting_stop_recorder_test.dart`, group «P324 · a Stop that fails in the store», using `_FailingLastPiece`. It shows the mic is stopped once and every file is kept. The time stays at 30 s across a second failure, the third Stop finishes with a duration of 30 s, and afterwards nothing is shown as recording. The widget test covers the string, the screen staying, and the retry.
-- Still owed: no widget test asserts that «Grabando» and the help line are hidden. Only the render shows it.
+- The message is still right. `meetingStopFailed` reads, in all three ARBs, ES «No se pudo terminar de parar. Lo grabado está a salvo: vuelve a pulsar Parar.». The screen stays, «Parar» works again, and a second «Parar» goes on to «Preparando tus notas…». «Grabando» and the help line are hidden, whether the flag comes from this screen or from the status. All of this is as it was at check 1.
+- The layout part that was missing is done. `_Centered` now sets `minWidth: math.max(0, constraints.maxWidth - 48)` beside `minHeight` (`meeting_screen.dart:585-591`), so the Column is always as wide as the screen. With the Column still at `crossAxisAlignment.center`, narrow children sit in the middle.
+- The render `recording.stop-failed.es.light.1x` shows the ring and «12:03» centred at x = 360 of 720 px, straight above «Parar», as they are while recording. At 2× (`recording.stop-failed.ca.light.2x`) the big-text row still fills the width, so nothing changed there.
+- The tester's test checks the time's centre at the screen's centre, within 1 dp, both before and after the failed Stop, and it checks «Parar»'s centre too. It passed in the implementer's check.py run (109 passed).
 
 **UX-2717 · fixed** (unchanged since check 1)
-- Silent pieces are held while no piece with sound is kept. At Stop, a recording of 60 s or more with only held pieces becomes a stopped meeting, and the dialog asks «Casi no se oyó nada. ¿Hacer notas igualmente?», with a filled «Hacer las notas» and «Descartar» in red (`meeting_screen.dart` `_askQuiet`). A recording under 60 s is still dropped with «No se oyó nada…». The tests run the real controller, recorder, store and uploader over fakes, and match the acceptance checks.
-- Dismissing the dialog leaves the stopped card, which now says the true thing (see R1-P324-1).
+- `meeting_screen.dart`'s `_askQuiet` dialog, the held pieces in the recorder and store, the 60 s threshold and the 30-second drop are untouched by this fix. The render `after-stop.quiet-question.es.light.1x` was already checked at check 1. The dialog is outside `_Centered`.
 - Owed: the plan's phone check, a quiet real room 2–3 m away.
 
 ### Regressions
-**R1-P324-1 · fixed**
-- `MeetingStoppedCard` now uses `meeting.quiet ? meetingStoppedQuiet : meetingStoppedCut` (`App/lib/widgets/meeting_banners.dart:345`), with `Meeting.quiet => empty && waitingPieces > 0` (`App/lib/models/meeting.dart:165`). `waiting` counts every piece that isn't `saved`, so held pieces count.
-- The renders `after-stop.quiet-dismissed.es.light.1x` and `notes-lines.quiet-stopped.es.light.1x` both read «Grabación de ayer, 09:00 · 10 min. Casi no se oyó nada.». Neither shows «Se cortó…». Both surfaces use the same card.
-- Accepted edge case, as the implementer notes: a recording the phone cut off while it was still all silence also reads «Casi no se oyó nada.». That's true, and the card still offers continue, make notes or discard (MN-12). It isn't a regression.
+**R1-P324-1 · fixed** (still holds). `MeetingStoppedCard` picks `meetingStoppedQuiet` (`App/lib/widgets/meeting_banners.dart`). The re-rendered `after-stop.quiet-dismissed.es.light.1x` reads «Grabación de ayer, 09:00 · 10 min. Casi no se oyó nada.». The card spans the width, as before.
 
-**R1-P324-2 · Severity 2 · After a failed Stop, leaving the screen says «Grabando» again**
-- Where: `_stopFailed` is local to `_MeetingScreenState` (`meeting_screen.dart:126`). Meanwhile the recorder keeps publishing the unstopped session as the recording status (`meeting_recorder.dart` `stop()` catch: `current = MeetingRecordingStatus(...)`; `recording` is true while `_unstopped != null`). The Notes tab's `_RecordingCard` (`meeting_banners.dart:312-330`) shows it as «Grabando una reunión · 12 min» with «Abrir». «Abrir» → `openMeetingRecorder` → a new `MeetingScreen` whose `_start` attaches to `recording` (`meeting_screen.dart:213-216`) with `_stopFailed = false`, so it shows «Grabando» and «Puedes bloquear el teléfono: sigue grabando.» under a clock that doesn't move.
-- The moment: Stop fails. They read the snackbar, press Back, and see «Grabando una reunión» on Notas. "Oh, it's still recording after all." They leave the phone on the table for the rest of the meeting, and nothing is recorded. The recording notification has already gone. «Grabar una reunión» is also refused as busy.
-- Why it fails: UN-1 and Nielsen's visibility of system status. It's the same false state claim UX-2713 removed, now on the other surfaces that show this recording (recurring problem: a state flag kept on one screen when the state lives in the service).
-- Fix: make the recorder status carry the state, for example `MeetingRecordingStatus.stopFailed` (true from the catch in `stop()`), and derive the screen's `_stopFailed` from it instead of local state. The reopened screen then hides «Grabando» too. On Notas, when it's set, `_RecordingCard` reads ES «Grabación sin terminar de parar · {length}. Ábrela y pulsa Parar.» / EN “Recording not fully stopped · {length}. Open it and press Stop.” / CA «Enregistrament sense acabar d’aturar · {length}. Obre’l i prem Atura.», keeps «Abrir», and uses a non-mic icon (for example `Icons.pause_circle_outline_rounded`).
-- Verify: a widget test where Stop throws, Back is pressed, and Notas doesn't show `meetingRecordingNow`; then «Abrir» opens a screen without «Grabando» or `meetingListeningHelp`, and «Parar» finishes the meeting.
-- Evidence: verified in code. Inferred, not covered by any render or test. Rare in practice: it needs a store failure at Stop.
+**R1-P324-2 · fixed** (still holds). The status carries `stopFailed`. Notas shows `meetingRecordingUnstopped` with the pause icon, and a reopened screen hides «Grabando». The fix didn't touch any of these files or lines.
+
+**R1-P324-3 · fixed**
+- `_Centered` gives its Column the full width (`meeting_screen.dart:585-591`). The failed-Stop screen is centred at 1× (render and test above).
+- Other screens using `_Centered`: the refused or failed start (`_Problem`, `:746`), the stopped meeting after Stop (`:799`), and the preparing and waiting stage (`:821`).
+  - Before the fix, each of them already had a full-width child: a wrapping message, the card or banner, or a two-line help text. The extra width moves nothing in them.
+  - Their re-rendered previews look the same and are centred: `recording.microphone-refused.es.light.1x`, `after-stop.preparing.es.light.1x` and `after-stop.quiet-dismissed.es.light.1x`.
+  - Where a child is narrower than the screen, it is now centred on the screen, not on the widest child. Every text in these stages already uses `TextAlign.center`, so nothing reads off-centre.
+
+No new regressions.
 
 ### Observations (not findings)
-- Catalan at 2× (`recording.stop-failed.ca.light.2x`): the four-line snackbar covers the lower half of the clock until it goes. That's a standard snackbar overlay and it's temporary. Once it goes, nothing on the screen says Stop hasn't finished, only the still mic and the frozen time. «Parar» stays the obvious next step, so I'm not raising it.
-- The space-low line «Queda poco espacio: la grabación se detiene sola si el teléfono se llena.» can still show while `_stopFailed` holds. It's an edge case and isn't raised.
+- The failed-Stop ring still shows the mic glyph, while Notas uses the pause icon for the same state. This was raised as an observation at check 1 and isn't a finding: without «Grabando», the frozen time and the snackbar carry the state, and «Parar» is still the next step.
+- After the snackbar goes, nothing on the failed-Stop screen says Stop hasn't finished, apart from the frozen time. This is unchanged from check 1 and isn't raised.
 
 ### Memory notes
-- Recurring type, **a screen-local flag for a service-level state**: `_stopFailed` lives in one screen's State. The recorder still publishes the session as a recording, so the Notes line and a reopened screen contradict it. When a fix hides a false claim on one screen, check every other surface that reads the same provider (here the `MeetingBanners` `_RecordingCard` and `openMeetingRecorder`).
-- Meeting Stop failure: the recorder now has `_unstopped` and `stoppedAt`. A failed Stop republishes the status at level 0 with a frozen elapsed time, and the next Stop finishes it. `Meeting.quiet` = `empty && waitingPieces > 0`, and it selects `meetingStoppedQuiet` on the stopped card.
+- `_Centered` (meeting screen) now has `minWidth` for the full width. A shrink-wrapped Column in a `SingleChildScrollView` is fixed by a `ConstrainedBox` with `minWidth = maxWidth − horizontal padding`. When checking that kind of fix, re-check every other user of the helper, and whether any child relied on start alignment (here, none did).

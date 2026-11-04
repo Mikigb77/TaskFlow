@@ -6958,6 +6958,18 @@ abstract class AppLocalizations {
   /// **'Nothing was heard, so there’s nothing to save.'**
   String get meetingNothingHeard;
 
+  /// A short message on the meeting recording screen when Stop failed after the microphone had stopped: what was recorded is kept, and Stop (meetingStop) can be pressed again to finish.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t finish stopping. What was recorded is safe: press Stop again.'**
+  String get meetingStopFailed;
+
+  /// Asked after Stop when a meeting recording of a minute or more was judged nearly all silence. Its buttons are meetingMakeNotes (keeps the recording and makes the notes) and discard (deletes it).
+  ///
+  /// In en, this message translates to:
+  /// **'Almost nothing was heard. Make notes anyway?'**
+  String get meetingQuietQuestion;
+
   /// Which recording a stopped meeting’s line is about, when it started today. time is the time of day it started, as 10:15.
   ///
   /// In en, this message translates to:
@@ -6982,6 +6994,12 @@ abstract class AppLocalizations {
   /// **'{recording} · {length}. It stopped before you pressed Stop.'**
   String meetingStoppedCut(String recording, String length);
 
+  /// Instead of meetingStoppedCut, in the Notes tab and on the meeting screen, for a stopped meeting recording judged nearly all silence (as after Stop and meetingQuietQuestion), waiting to be made into notes or discarded. recording is meetingRecordingToday, meetingRecordingYesterday or meetingRecordingOn; length is how much was recorded, in words.
+  ///
+  /// In en, this message translates to:
+  /// **'{recording} · {length}. Almost nothing was heard.'**
+  String meetingStoppedQuiet(String recording, String length);
+
   /// The main button on a recording that stopped by itself: makes the notes from what was recorded.
   ///
   /// In en, this message translates to:
@@ -6993,6 +7011,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Recording a meeting · {time}'**
   String meetingRecordingNow(String time);
+
+  /// Instead of meetingRecordingNow, in the Notes tab, when Stop failed after the microphone had stopped (meetingStopFailed): nothing is recording, and Stop (meetingStop) on its screen finishes it. length is the recorded length in words, as 12 min.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording not fully stopped · {length}. Open it and press Stop.'**
+  String meetingRecordingUnstopped(String length);
 
   /// On meetingRecordingNow: opens the recording screen.
   ///

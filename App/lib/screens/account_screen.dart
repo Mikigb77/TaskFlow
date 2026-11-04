@@ -230,7 +230,14 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
         pending.state = true;
         final MeetingSendResult result;
         try {
-          if (now.recording != null) await controller.stop();
+          if (now.recording != null) {
+            final stopped = await controller.stop();
+            // A quiet recording kept at Stop (UX-2717): its notes are
+            // made too, as the question said.
+            if (stopped?.phase == MeetingPhase.interrupted) {
+              await controller.finishMeeting(stopped!.id);
+            }
+          }
           for (final meeting in now.stopped) {
             await controller.finishMeeting(meeting.id);
           }

@@ -87,6 +87,7 @@ class MeetingPieceRules {
     this.floorWindow = const Duration(seconds: 10),
     this.minFreeBytes = 100 * 1024 * 1024,
     this.lowFreeBytes = 300 * 1024 * 1024,
+    this.askWhenSilent = const Duration(seconds: 60),
   });
 
   /// A piece is cut at the first pause after this long…
@@ -116,6 +117,10 @@ class MeetingPieceRules {
   /// Below this much, recording warns that space is low and goes on: at
   /// about 1 MB every 5 minutes, a few hours before [minFreeBytes].
   final int lowFreeBytes;
+
+  /// A recording judged all silence this long or longer isn't dropped at
+  /// Stop: it's kept, to ask whether to make notes anyway (UX-2717).
+  final Duration askWhenSilent;
 }
 
 /// What the recording screen shows (MN-7).
@@ -124,6 +129,7 @@ class MeetingRecordingStatus {
     required this.meetingId,
     required this.elapsed,
     required this.level,
+    this.stopFailed = false,
   });
   final String meetingId;
 
@@ -132,6 +138,10 @@ class MeetingRecordingStatus {
 
   /// The input level from 0 (silence) to 1 (loud).
   final double level;
+
+  /// Stop failed once the microphone had stopped (UX-2713): nothing is
+  /// recording, and Stop again finishes it.
+  final bool stopFailed;
 
   static double levelOf(double db) => ((db + 60) / 60).clamp(0.0, 1.0);
 }
@@ -157,15 +167,21 @@ class _Session {
   DateTime? lastBeat;
   int loud = 0;
   DateTime? quietSince;
+
+  /// When Stop stopped the microphone, for a Stop that failed after
+  /// (UX-2713): its last piece ends there, however late Stop works.
+  DateTime? stoppedAt;
   final window = ListQueue<(DateTime, double)>();
 }
 
 /// Records one meeting at a time into numbered pieces in [store]
 /// (MN-1 to MN-5): each piece is cut at a pause after about 5 minutes
 /// ([MeetingPieceRules]), with its offset and duration; a piece of only
-/// silence is left out and its number used by the next. Every few seconds
-/// it saves how far it got, so a recording that stops under it can be
-/// recovered ([MeetingStore.recoverInterrupted]).
+/// silence is left out and its number used by the next. Until a piece with
+/// sound is kept, silent pieces are held on the phone instead, never sent,
+/// so a quiet meeting can still be asked about at Stop (UX-2717). Every
+/// few seconds it saves how far it got, so a recording that stops under it
+/// can be recovered ([MeetingStore.recoverInterrupted]).
 class MeetingRecorder {
   MeetingRecorder({
     required this.store,
@@ -212,17 +228,24 @@ class MeetingRecorder {
   /// An end the recorder began itself ([_end]), with its meeting.
   Future<Meeting>? _ending;
 
+  /// A Stop that failed once the microphone had stopped (UX-2713): its
+  /// status stays, at the time it reached, and the next Stop finishes it.
+  _Session? _unstopped;
+
+  /// Whether [_unstopped]'s last piece is still to be closed.
+  bool _lastOpen = false;
+
   final _status = StreamController<MeetingRecordingStatus?>.broadcast();
 
   /// The recording's elapsed time and level; null once it ends.
   Stream<MeetingRecordingStatus?> get status => _status.stream;
   MeetingRecordingStatus? current;
 
-  bool get recording => _session != null;
+  bool get recording => _session != null || _unstopped != null;
 
   /// Done once every level heard so far has been handled.
   Future<void> settle() => _chain;
-  String? get meetingId => _session?.meeting.id;
+  String? get meetingId => (_session ?? _unstopped)?.meeting.id;
 
   /// Whether the phone has room to record (MN-6); true when unknown.
   Future<bool> hasRoom() async {
@@ -245,7 +268,7 @@ class MeetingRecorder {
     String? projectId,
   }) async {
     await _ending;
-    if (_session != null) throw StateError('A meeting is already recording.');
+    if (recording) throw StateError('A meeting is already recording.');
     final meeting = await store.create(
       ownerKey,
       format: await engine.format(),
@@ -270,7 +293,7 @@ class MeetingRecorder {
     required MeetingNotice notice,
   }) async {
     await _ending;
-    if (_session != null) throw StateError('A meeting is already recording.');
+    if (recording) throw StateError('A meeting is already recording.');
     final meeting = await store.resume(id, ownerKey, clock());
     try {
       await _begin(meeting, notice);
@@ -430,6 +453,7 @@ class MeetingRecorder {
       hasSound: hasSound,
       now: now,
       nextPath: path,
+      hold: _holds(session),
     );
     session
       ..index = hasSound ? session.index + 1 : session.index
@@ -474,37 +498,111 @@ class MeetingRecorder {
     return session;
   }
 
+  /// Whether [session]'s meeting has kept no piece with sound yet: its
+  /// silent pieces are held then (UX-2717).
+  bool _holds(_Session session) => session.index == 0;
+
   Future<void> _closePiece(_Session session) async {
-    final now = clock();
+    final now = session.stoppedAt ?? clock();
     await store.closePiece(
       session.meeting,
       index: session.index,
       duration: now.difference(session.started),
       hasSound: session.loud >= rules.soundSamples,
       now: now,
+      hold: _holds(session),
     );
   }
 
   /// Stop (MN-1): the last piece is kept and the meeting waits for its
-  /// notes. Null when nothing but silence was recorded: the meeting is
-  /// discarded then.
+  /// notes. A recording of [MeetingPieceRules.askWhenSilent] or more with
+  /// no piece with sound is kept as a stopped meeting
+  /// ([MeetingPhase.interrupted]) with its silent pieces, to ask whether to
+  /// make notes anyway (UX-2717). Null when a shorter one heard nothing but
+  /// silence: the meeting is discarded then. When it throws, the
+  /// microphone has stopped, what was recorded is kept, its status stays
+  /// at the time it reached, and Stop again finishes it (UX-2713).
   Future<Meeting?> stop() async {
     // Stop pressed while the recorder was ending by itself (the microphone
     // failed, or space ran out): what it kept is finished all the same.
     final ended = await _ending;
     if (ended != null) return store.finish(ended.id, ended.ownerKey, clock());
-    final session = await _close();
+    var session = _unstopped;
+    if (session == null) {
+      session = await _close();
+      if (session == null) return null;
+      session.stoppedAt = clock();
+      _unstopped = session;
+      _lastOpen = true;
+    }
+    try {
+      if (_lastOpen) {
+        await _closePiece(session);
+        _lastOpen = false;
+      }
+      final meeting = session.meeting;
+      final kept = await store.meeting(meeting.id, meeting.ownerKey);
+      final Meeting? stopped;
+      if (kept != null &&
+          kept.phase == MeetingPhase.recording &&
+          kept.empty &&
+          kept.recorded >= rules.askWhenSilent &&
+          await store.hasHeld(meeting.id, meeting.ownerKey)) {
+        stopped = await store.stopQuiet(meeting.id, meeting.ownerKey, clock());
+      } else {
+        stopped = await store.finish(
+          meeting.id,
+          meeting.ownerKey,
+          clock(),
+          keepHeld: false,
+        );
+      }
+      _unstopped = null;
+      if (current != null) {
+        // A Stop tried again: no longer on show as recording.
+        current = null;
+        if (!_status.isClosed) _status.add(null);
+      }
+      return stopped;
+    } catch (_) {
+      // The recording screen stays, at the time it reached, for Stop again.
+      current = MeetingRecordingStatus(
+        meetingId: session.meeting.id,
+        elapsed:
+            session.offset +
+            (session.stoppedAt ?? clock()).difference(session.started),
+        level: 0,
+        stopFailed: true,
+      );
+      if (!_status.isClosed) _status.add(current);
+      rethrow;
+    }
+  }
+
+  /// The recording of a Stop that failed ([_unstopped]), taken for Discard
+  /// or for the app closing: no longer on show as recording.
+  Future<_Session?> _takeUnstopped() async {
+    final session = _unstopped;
     if (session == null) return null;
-    final meeting = session.meeting;
-    await _closePiece(session);
-    return store.finish(meeting.id, meeting.ownerKey, clock());
+    _unstopped = null;
+    current = null;
+    if (!_status.isClosed) _status.add(null);
+    if (_lastOpen) {
+      _lastOpen = false;
+      try {
+        await _closePiece(session);
+      } catch (_) {
+        /* Recovery keeps it as far as the last heartbeat. */
+      }
+    }
+    return session;
   }
 
   /// Discard (MN-25): stops and deletes everything recorded.
   Future<void> discard() async {
     final ended = await _ending;
     if (ended != null) return store.discard(ended.id, ended.ownerKey);
-    final session = await _close();
+    final session = await _takeUnstopped() ?? await _close();
     if (session == null) return;
     await store.discard(session.meeting.id, session.meeting.ownerKey);
   }
@@ -513,6 +611,11 @@ class MeetingRecorder {
   /// app is closing under it.
   Future<void> suspend() async {
     if (await _ending != null) return;
+    final unstopped = await _takeUnstopped();
+    if (unstopped != null) {
+      await store.recoverInterrupted(unstopped.meeting.ownerKey);
+      return;
+    }
     final session = await _close();
     if (session == null) return;
     await _closePiece(session);
@@ -540,6 +643,7 @@ class MeetingRecorder {
             meeting.id,
             meeting.ownerKey,
             clock(),
+            keepHeld: false,
           );
           // Only silence: discarded, and no notes will follow.
           if (kept == null) reason = MeetingRecorderEnd.empty;
