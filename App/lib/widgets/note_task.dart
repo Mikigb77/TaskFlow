@@ -1,5 +1,8 @@
+import 'dart:convert';
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/checklist_item.dart';
@@ -7,19 +10,96 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
+import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/services/capture_store.dart';
+import 'package:agenda/services/task_database.dart';
 
 /// Whether [note] offers «Crear tarea»: a note with steps still open, as a
 /// meeting's note has its to-dos (MN-22).
 bool noteMakesTask(Task note) =>
     note.isNote && note.checklist.any((step) => !step.done());
 
+/// The task «Crear tarea» made from [note] on this phone, while it exists
+/// (done or not): the note then offers «Ver tarea» (UX-2702).
+Task? noteMadeTask(WidgetRef ref, Task note) {
+  final id = ref.watch(noteTasksProvider).valueOrNull?[note.id];
+  if (id == null) return null;
+  return ref
+      .watch(taskProvider)
+      .valueOrNull
+      ?.firstWhereOrNull((task) => task.id == id);
+}
+
+/// Remembers, on this phone only, the task each note made with «Crear
+/// tarea». Never synced or sent: on another phone the note offers «Crear
+/// tarea» again.
+class NoteTaskLinks {
+  NoteTaskLinks(this.database);
+  final TaskDatabase database;
+
+  // Per-account preferences are scoped `<kind>:<owner>`, so deleting the
+  // account erases this too.
+  static String _scope(String owner) => 'noteTasks:$owner';
+
+  /// Each note's id, with the id of the task it made.
+  Future<Map<int, int>> read(String owner) async {
+    final rows = await (await database.database).query(
+      'app_preferences',
+      where: 'scope = ?',
+      whereArgs: [_scope(owner)],
+    );
+    if (rows.isEmpty) return const {};
+    final data = jsonDecode(rows.single['data'] as String);
+    if (data is! Map) return const {};
+    return {
+      for (final entry in data.entries)
+        if (int.tryParse('${entry.key}') case final note?)
+          if (entry.value is int) note: entry.value as int,
+    };
+  }
+
+  Future<void> link(String owner, int noteId, int taskId) async {
+    final db = await database.database;
+    await db.transaction((tx) async {
+      final rows = await tx.query(
+        'app_preferences',
+        where: 'scope = ?',
+        whereArgs: [_scope(owner)],
+      );
+      final data = rows.isEmpty
+          ? null
+          : jsonDecode(rows.single['data'] as String);
+      await tx.insert('app_preferences', {
+        'scope': _scope(owner),
+        'data': jsonEncode({if (data is Map) ...data, '$noteId': taskId}),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    });
+  }
+}
+
+final noteTaskLinksProvider = Provider((ref) => NoteTaskLinks(TaskDatabase()));
+
+/// The signed-in account's note → task links on this phone.
+final noteTasksProvider = FutureProvider<Map<int, int>>((ref) async {
+  try {
+    return await ref
+        .watch(noteTaskLinksProvider)
+        .read(ref.watch(captureOwnerProvider));
+  } catch (_) {
+    // Unread: the notes offer «Crear tarea».
+    return const {};
+  }
+});
+
 /// «Crear tarea» (MN-22): the capture's review, with one task titled like
-/// [note] and its open steps as the checklist, so the person can drop the
-/// ones they don't want and set a day before saving. Nothing is saved
-/// until they confirm there. Leaving the review asks, as for any capture,
-/// whether to keep it in `Sin guardar` or discard it.
+/// [note] and its open steps as the checklist, all ticked to go in, so the
+/// person unticks the ones they don't want and can set a day before
+/// saving. Nothing is saved until they confirm there. Leaving the review
+/// closes it with no question: the note still holds everything, and the
+/// capture never waits in `Sin guardar` (source 'note', UX-2706). Once
+/// saved, the new task's page opens over the note, which then offers «Ver
+/// tarea».
 Future<void> createTaskFromNote(BuildContext context, Task note) async {
   final container = ProviderScope.containerOf(context, listen: false);
   final store = container.read(captureStoreProvider);
@@ -38,7 +118,7 @@ Future<void> createTaskFromNote(BuildContext context, Task note) async {
     _zone(container),
     text: note.title,
     projectId: projectId,
-    source: 'typed',
+    source: 'note',
   );
   final drafts = [
     CaptureDraft(
@@ -49,7 +129,8 @@ Future<void> createTaskFromNote(BuildContext context, Task note) async {
         listId: projectId,
         checklist: [
           for (final step in note.checklist)
-            if (!step.done()) ChecklistItem(title: step.title),
+            // Ticked: chosen to go in. Saved as steps still to do.
+            if (!step.done()) ChecklistItem(title: step.title, completed: true),
         ],
       ),
     ),
@@ -64,7 +145,6 @@ Future<void> createTaskFromNote(BuildContext context, Task note) async {
       drafts: drafts,
     ),
   );
-  container.invalidate(pendingCapturesProvider);
   if (!context.mounted) return;
   await showCaptureSheet(
     context,
@@ -72,6 +152,20 @@ Future<void> createTaskFromNote(BuildContext context, Task note) async {
     startListening: false,
     useScope: false,
   );
+  // Saved: the note remembers its task.
+  final noteId = note.id;
+  if (noteId == null) return;
+  try {
+    final saved = await store.read(session.id, owner);
+    final taskId = saved?.status == 'saved'
+        ? saved!.drafts.map((d) => d.savedTaskId).nonNulls.firstOrNull
+        : null;
+    if (taskId == null) return;
+    await container.read(noteTaskLinksProvider).link(owner, noteId, taskId);
+    container.invalidate(noteTasksProvider);
+  } catch (_) {
+    /* The note offers «Crear tarea» again. */
+  }
 }
 
 /// The capture's zone, as the task form picks it: the one chosen in

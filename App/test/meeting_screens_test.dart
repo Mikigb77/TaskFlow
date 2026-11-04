@@ -9,10 +9,12 @@ import 'dart:convert';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/meeting_copy.dart';
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/meeting.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/first_task_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/services/invitation_links.dart';
@@ -23,6 +25,7 @@ import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/reminder_provider.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/screens/account_screen.dart';
+import 'package:agenda/screens/edit_task_screen.dart';
 import 'package:agenda/screens/meeting_screen.dart';
 import 'package:agenda/screens/notes_screen.dart';
 import 'package:agenda/screens/subscription_screen.dart';
@@ -36,6 +39,7 @@ import 'package:agenda/services/notification_service.dart';
 import 'package:agenda/services/revenuecat_service.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/capture_review_editor.dart';
+import 'package:agenda/widgets/checklist_editor.dart';
 import 'package:agenda/widgets/meeting_banners.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -49,6 +53,7 @@ import 'support/capture_fixtures.dart';
 import 'support/design_fixtures.dart';
 import 'support/button_label.dart';
 import 'support/meeting_screen_fakes.dart';
+import 'support/note_task_fakes.dart';
 import 'support/reminder_fixtures.dart';
 
 Widget _app(
@@ -73,6 +78,9 @@ Widget _app(
     routes: {
       '/subscription': (context) => SubscriptionScreen(
         reason: ModalRoute.of(context)?.settings.arguments as ProReason?,
+      ),
+      '/editTask': (context) => EditTaskScreen(
+        taskId: ModalRoute.of(context)!.settings.arguments as int,
       ),
     },
   ),
@@ -920,22 +928,18 @@ void main() {
         'Send the pilot quote · Miki · Friday',
         'Book the room',
       ]);
-      expect(draft.task.checklist.every((s) => !s.completed), isTrue);
+      // Ticked: each one chosen to go into the task (UX-2701).
+      expect(draft.task.checklist.every((s) => s.completed), isTrue);
+      expect(captures.current!.source, 'note');
       expect(find.text('Send the pilot quote · Miki · Friday'), findsWidgets);
       // The zone chosen in Settings, as the task form uses.
       expect(captures.current!.timezone, 'America/New_York');
 
-      // Leaving asks, as for any capture: Discard leaves nothing in
-      // Unsaved.
+      // Leaving closes at once, with no question: the note keeps it all,
+      // and nothing waits in Unsaved (UX-2706).
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.descendant(
-          of: find.byType(AlertDialog),
-          matching: find.text('Discard'),
-        ),
-      );
-      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
       expect(find.byType(CaptureReviewEditor), findsNothing);
       expect(captures.current!.status, 'discarded');
     });
@@ -3765,6 +3769,499 @@ void main() {
       expect(find.text(es.meetingNothingHeard), findsOneWidget);
       expect(find.byType(MeetingScreen), findsNothing);
       expect(find.byType(NotesScreen), findsOneWidget);
+    });
+  });
+
+  // ---- UX loop 2026-11-03-screens, round 1 · P318 ----
+  group('P318 · «Crear tarea» from a note: choose the steps, land on the '
+      'new task, leave without a question, the main button', () {
+    final es = lookupAppLocalizations(const Locale('es'));
+    const steps = [
+      'Enviar el presupuesto',
+      'Reservar la sala',
+      'Pedir el contacto de compras',
+    ];
+    Task note({bool withSteps = true}) => Task(
+      id: 95,
+      kind: 'note',
+      title: 'Precio del piloto con Acme',
+      notes: 'Acordamos el piloto.',
+      priority: 1,
+      checklist: [
+        if (withSteps)
+          for (var i = 0; i < steps.length; i++)
+            ChecklistItem(id: 'p$i', title: steps[i]),
+      ],
+    );
+    // Something said earlier and kept in «Sin guardar».
+    final kept = CaptureSession(
+      id: 'kept-earlier',
+      ownerKey: 'local',
+      capturedAt: DateTime.utc(2026, 11, 1, 9),
+      timezone: 'Europe/Madrid',
+      text: 'Llamar al fontanero',
+    );
+
+    /// The note's page, Pro, on 360×800, with saving in memory.
+    Future<
+      ({
+        ProviderContainer container,
+        MemoryCaptures captures,
+        MemoryNoteTaskLinks links,
+      })
+    >
+    open(
+      WidgetTester tester, {
+      Task? shown,
+      String language = 'es',
+      double scale = 1,
+    }) async {
+      final captures = MemoryCaptures();
+      final links = MemoryNoteTaskLinks();
+      final container = designContainer(
+        tasks: () => NoteTaskList([shown ?? note()]),
+        pendingCaptures: [kept],
+        overrides: [
+          meetingsOverride(ScriptedMeetings()),
+          captureStoreProvider.overrideWithValue(captures),
+          ...captureSheetOverrides(),
+          ...noteTaskOverrides(links),
+        ],
+      );
+      addTearDown(container.dispose);
+      captures.tasks = container;
+      final messenger = tester.binding.defaultBinaryMessenger;
+      const timezone = MethodChannel('flutter_timezone');
+      messenger.setMockMethodCallHandler(
+        timezone,
+        (_) async => 'Europe/Madrid',
+      );
+      addTearDown(() => messenger.setMockMethodCallHandler(timezone, null));
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        _app(
+          container,
+          TaskDetailScreen(taskId: (shown ?? note()).id!),
+          language: language,
+          scale: scale,
+        ),
+      );
+      await tester.pumpAndSettle();
+      return (container: container, captures: captures, links: links);
+    }
+
+    Finder stepBox(String title) => find.byWidgetPredicate(
+      (widget) => widget is Checkbox && widget.semanticLabel == title,
+    );
+    Finder outlinedButtonWithText(String label) => find.ancestor(
+      of: find.text(label),
+      matching: find.byWidgetPredicate((widget) => widget is OutlinedButton),
+    );
+    List<Task> tasks(ProviderContainer container) =>
+        container.read(taskProvider).valueOrNull ?? const [];
+    Task? made(ProviderContainer container) =>
+        tasks(container).where((task) => !task.isNote).firstOrNull;
+    // The page in front: the one TaskDetailScreen whose route is current.
+    int? front(WidgetTester tester) {
+      for (final element in find.byType(TaskDetailScreen).evaluate()) {
+        if (ModalRoute.of(element)?.isCurrent == true) {
+          return (element.widget as TaskDetailScreen).taskId;
+        }
+      }
+      return null;
+    }
+
+    Future<void> createTask(WidgetTester tester) async {
+      await tester.tap(find.byKey(const ValueKey('note-create-task')));
+      await tester.pumpAndSettle();
+      expect(find.byType(CaptureResult), findsOneWidget);
+    }
+
+    Future<void> untick(WidgetTester tester, String title) async {
+      await tester.ensureVisible(stepBox(title));
+      await tester.pumpAndSettle();
+      await tester.tap(stepBox(title));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> addTask(WidgetTester tester) async {
+      await tester.ensureVisible(find.byKey(const ValueKey('save-drafts')));
+      await tester.pumpAndSettle();
+      await saveCapture(tester);
+    }
+
+    testWidgets('UX-2701: the review shows «Pasos que se añaden», every step '
+        'ticked, and no ⋮ on any step', (tester) async {
+      await open(tester);
+      await createTask(tester);
+      final editor = find.descendant(
+        of: find.byType(CaptureResult),
+        matching: find.byType(ChecklistEditor),
+      );
+      expect(editor, findsOneWidget);
+      expect(
+        find.descendant(of: editor, matching: find.text(es.meetingStepsToAdd)),
+        findsOneWidget,
+      );
+      // Not «Pasos · n/N» there.
+      for (var done = 0; done <= steps.length; done++) {
+        expect(find.text(es.checklistCount(done, steps.length)), findsNothing);
+      }
+      for (final title in steps) {
+        // Each checkbox is read by its step's title.
+        expect(stepBox(title), findsOneWidget, reason: title);
+        expect(tester.widget<Checkbox>(stepBox(title)).value, isTrue);
+      }
+      expect(
+        find.descendant(
+          of: editor,
+          matching: find.byWidgetPredicate((w) => w is PopupMenuButton),
+        ),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('UX-2701: unticking the second step leaves it out; the task '
+        'has steps 1 and 3, in order, neither done', (tester) async {
+      final app = await open(tester);
+      await createTask(tester);
+      await untick(tester, steps[1]);
+      expect(tester.widget<Checkbox>(stepBox(steps[1])).value, isFalse);
+      await addTask(tester);
+      final task = made(app.container);
+      expect(task, isNotNull);
+      expect(task!.title, 'Precio del piloto con Acme');
+      expect(task.checklist.map((step) => step.title), [steps[0], steps[2]]);
+      expect(task.checklist.any((step) => step.done()), isFalse);
+      expect(task.checklist.any((step) => step.completed), isFalse);
+      // The note keeps its three steps, all open.
+      final kept = tasks(app.container).firstWhere((t) => t.id == 95);
+      expect(kept.checklist.map((step) => step.title), steps);
+      expect(kept.checklist.any((step) => step.done()), isFalse);
+    });
+
+    testWidgets('UX-2701: a step typed in the review starts ticked and is '
+        'saved as an open step', (tester) async {
+      final app = await open(tester);
+      await createTask(tester);
+      final field = find.descendant(
+        of: find.byType(ChecklistEditor),
+        matching: find.byKey(const ValueKey('add-checklist-item')),
+      );
+      await tester.ensureVisible(field);
+      await tester.pumpAndSettle();
+      await tester.enterText(field, 'Llamar a Ana');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(stepBox('Llamar a Ana'), findsOneWidget);
+      expect(tester.widget<Checkbox>(stepBox('Llamar a Ana')).value, isTrue);
+      await addTask(tester);
+      final task = made(app.container)!;
+      expect(task.checklist.map((step) => step.title), [
+        ...steps,
+        'Llamar a Ana',
+      ]);
+      expect(task.checklist.any((step) => step.done()), isFalse);
+    });
+
+    testWidgets('UX-2701: a dictated capture’s review keeps «Pasos · n/N», '
+        'the ⋮ and a tick that marks the step done', (tester) async {
+      final captures = MemoryCaptures();
+      final container = designContainer(
+        overrides: [
+          captureStoreProvider.overrideWithValue(captures),
+          ...captureSheetOverrides(),
+        ],
+      );
+      addTearDown(container.dispose);
+      captures.tasks = container;
+      final session = await captures.create(
+        'local',
+        'Europe/Madrid',
+        text: 'Preparar la mudanza',
+        source: 'speech',
+      );
+      await captures.update(
+        session.copyWith(
+          status: 'ready',
+          transcript: 'Preparar la mudanza',
+          drafts: [
+            CaptureDraft(
+              id: 'dictated',
+              task: Task(
+                title: 'Preparar la mudanza',
+                priority: 1,
+                checklist: [
+                  ChecklistItem(id: 'd1', title: 'Pedir cajas'),
+                  ChecklistItem(id: 'd2', title: 'Avisar al casero'),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        _app(container, const Scaffold(body: SizedBox()), language: 'es'),
+      );
+      await tester.pumpAndSettle();
+      await openCaptureResult(tester, session.id);
+      final editor = find.descendant(
+        of: find.byType(CaptureResult),
+        matching: find.byType(ChecklistEditor),
+      );
+      expect(editor, findsOneWidget);
+      expect(find.text(es.checklistCount(0, 2)), findsOneWidget);
+      expect(find.text(es.meetingStepsToAdd), findsNothing);
+      expect(
+        find.descendant(
+          of: editor,
+          matching: find.byWidgetPredicate((w) => w is PopupMenuButton),
+        ),
+        findsNWidgets(2),
+      );
+      expect(tester.widget<Checkbox>(stepBox('Pedir cajas')).value, isFalse);
+      await tester.ensureVisible(stepBox('Pedir cajas'));
+      await tester.pumpAndSettle();
+      await tester.tap(stepBox('Pedir cajas'));
+      await tester.pumpAndSettle();
+      expect(find.text(es.checklistCount(1, 2)), findsOneWidget);
+      expect(
+        captures.current!.drafts.single.task.checklist.first.done(),
+        isTrue,
+      );
+    });
+
+    testWidgets('UX-2702: «Añadir tarea» lands on the new task’s page; one '
+        'Back shows the note; Calendar’s focus is not set', (tester) async {
+      final app = await open(tester);
+      await createTask(tester);
+      await addTask(tester);
+      final task = made(app.container);
+      expect(task, isNotNull);
+      expect(find.byType(CaptureResult), findsNothing);
+      expect(front(tester), task!.id);
+      expect(app.container.read(calendarFocusProvider), isNull);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(TaskDetailScreen), findsOneWidget);
+      expect(front(tester), 95);
+      expect(app.container.read(calendarFocusProvider), isNull);
+    });
+
+    testWidgets('UX-2702: back on the note, «Ver tarea» and no «Crear tarea»; '
+        'it opens that same task, and no task is added', (tester) async {
+      final app = await open(tester);
+      await createTask(tester);
+      await addTask(tester);
+      final task = made(app.container)!;
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(front(tester), 95);
+      expect(filledButtonWithText(es.meetingViewTask), findsOneWidget);
+      expect(find.text(es.meetingCreateTask), findsNothing);
+      final count = tasks(app.container).length;
+      await tester.tap(filledButtonWithText(es.meetingViewTask));
+      await tester.pumpAndSettle();
+      expect(front(tester), task.id);
+      expect(find.byType(CaptureResult), findsNothing);
+      expect(tasks(app.container).length, count);
+    });
+
+    testWidgets('UX-2702: «Deshacer» deletes the new task and closes its '
+        'page; the note offers «Crear tarea» again', (tester) async {
+      final app = await open(tester);
+      await createTask(tester);
+      await addTask(tester);
+      final task = made(app.container)!;
+      expect(front(tester), task.id);
+      await tester.tap(find.text(es.undo).last);
+      await tester.pumpAndSettle();
+      expect(made(app.container), isNull);
+      expect(front(tester), 95);
+      expect(find.byType(TaskDetailScreen), findsOneWidget);
+      expect(filledButtonWithText(es.meetingCreateTask), findsOneWidget);
+      expect(find.text(es.meetingViewTask), findsNothing);
+      // Nothing waits in «Sin guardar» for it.
+      expect(app.captures.current!.status, 'discarded');
+    });
+
+    testWidgets('R1-P318-3: Back › «Editar nota» › a word › «Deshacer»: the '
+        'task goes, the note’s form stays open with the word, and its Back '
+        'saves it', (tester) async {
+      final app = await open(tester);
+      await createTask(tester);
+      await addTask(tester);
+      expect(made(app.container), isNotNull);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(front(tester), 95);
+      await tester.tap(outlinedButtonWithText(es.editNote));
+      await tester.pumpAndSettle();
+      expect(find.byType(EditTaskScreen), findsOneWidget);
+      const words = 'Acordamos el piloto. Valencia primero.';
+      await tester.enterText(find.byKey(const ValueKey('note-body')), words);
+      await tester.pump();
+      await tester.tap(find.text(es.undo).last);
+      await tester.pumpAndSettle();
+      expect(made(app.container), isNull);
+      // The note's form is still open, with the word typed.
+      expect(find.byType(EditTaskScreen), findsOneWidget);
+      expect(find.text(words), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(EditTaskScreen), findsNothing);
+      expect(front(tester), 95);
+      final saved = tasks(app.container).singleWhere((task) => task.id == 95);
+      expect(saved.notes, words);
+      expect(filledButtonWithText(es.meetingCreateTask), findsOneWidget);
+    });
+
+    testWidgets('R1-P318-3: «Ver tarea» from the note opened again, then '
+        '«Deshacer»: that page closes too, back on the note', (tester) async {
+      final app = await open(tester);
+      await createTask(tester);
+      await addTask(tester);
+      final task = made(app.container)!;
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.tap(filledButtonWithText(es.meetingViewTask));
+      await tester.pumpAndSettle();
+      expect(front(tester), task.id);
+      await tester.tap(find.text(es.undo).last);
+      await tester.pumpAndSettle();
+      expect(made(app.container), isNull);
+      expect(find.byType(TaskDetailScreen), findsOneWidget);
+      expect(front(tester), 95);
+      expect(find.text(es.taskUnavailable), findsNothing);
+    });
+
+    testWidgets('UX-2702: deleting the made task from its page: the note '
+        'offers «Crear tarea» again', (tester) async {
+      final app = await open(tester);
+      await createTask(tester);
+      await addTask(tester);
+      final task = made(app.container)!;
+      expect(front(tester), task.id);
+      ScaffoldMessenger.of(
+        tester.element(find.byType(TaskDetailScreen).last),
+      ).removeCurrentSnackBar();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip(es.deleteTask));
+      await tester.pumpAndSettle();
+      expect(made(app.container), isNull);
+      expect(front(tester), 95);
+      expect(filledButtonWithText(es.meetingCreateTask), findsOneWidget);
+      expect(find.text(es.meetingViewTask), findsNothing);
+    });
+
+    testWidgets('UX-2706: Cancelar and Back close a note’s review with no '
+        'question; the capture goes, and «Sin guardar» is as before', (
+      tester,
+    ) async {
+      final app = await open(tester);
+      final before = await app.container.read(pendingCapturesProvider.future);
+      for (final leave in ['Cancelar', 'Back']) {
+        await createTask(tester);
+        expect(app.captures.current!.source, 'note');
+        if (leave == 'Cancelar') {
+          final cancel = find.descendant(
+            of: find.byType(CaptureResult),
+            matching: find.widgetWithText(TextButton, es.cancel),
+          );
+          await tester.ensureVisible(cancel);
+          await tester.pumpAndSettle();
+          await tester.tap(cancel);
+        } else {
+          await tester.binding.handlePopRoute();
+        }
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsNothing, reason: leave);
+        expect(find.text(es.captureKeepTextQuestion), findsNothing);
+        expect(find.byType(CaptureResult), findsNothing, reason: leave);
+        expect(app.captures.current!.status, 'discarded', reason: leave);
+        expect(front(tester), 95, reason: leave);
+        final after = await app.container.read(pendingCapturesProvider.future);
+        expect(
+          after.map((capture) => capture.id),
+          before.map((capture) => capture.id),
+          reason: leave,
+        );
+        // Nothing was made, and the note is as it was.
+        expect(made(app.container), isNull, reason: leave);
+        expect(filledButtonWithText(es.meetingCreateTask), findsOneWidget);
+      }
+    });
+
+    group('UX-2709 with Manrope', () {
+      setUpAll(loadManrope);
+
+      testWidgets('UX-2709: on a note with open steps, «Crear tarea» is the '
+          'filled button, first, and «Editar nota» outlined, as tall', (
+        tester,
+      ) async {
+        for (final (language, scale) in [
+          ('es', 1.0),
+          ('es', 2.0),
+          ('ca', 2.0),
+        ]) {
+          final l = lookupAppLocalizations(Locale(language));
+          final why = '$language ${scale}x';
+          await open(tester, language: language, scale: scale);
+          final create = filledButtonWithText(l.meetingCreateTask);
+          final edit = outlinedButtonWithText(l.editNote);
+          expect(create, findsOneWidget, reason: why);
+          expect(edit, findsOneWidget, reason: why);
+          expect(filledButtonWithText(l.editNote), findsNothing, reason: why);
+          final a = tester.getRect(create);
+          final b = tester.getRect(edit);
+          // First: on an earlier line, or to the left on the same one.
+          final sameLine = (a.top - b.top).abs() < 1;
+          expect(
+            sameLine ? a.left < b.left : a.top < b.top,
+            isTrue,
+            reason: '$why: $a before $b',
+          );
+          expect(
+            (a.height - b.height).abs(),
+            lessThanOrEqualTo(1),
+            reason: '$why: ${a.height} vs ${b.height}',
+          );
+          // Both whole on screen.
+          for (final rect in [a, b]) {
+            expect(rect.left, greaterThanOrEqualTo(0), reason: why);
+            expect(rect.right, lessThanOrEqualTo(360), reason: why);
+            expect(rect.bottom, lessThanOrEqualTo(800), reason: why);
+          }
+          expect(tester.takeException(), isNull, reason: why);
+          await tester.pumpWidget(const SizedBox.shrink());
+        }
+      });
+
+      testWidgets('UX-2709: a note with no steps keeps a filled «Editar nota» '
+          'alone', (tester) async {
+        await open(tester, shown: note(withSteps: false));
+        expect(filledButtonWithText(es.editNote), findsOneWidget);
+        expect(outlinedButtonWithText(es.editNote), findsNothing);
+        expect(find.text(es.meetingCreateTask), findsNothing);
+        expect(find.text(es.meetingViewTask), findsNothing);
+      });
+    });
+
+    test('The new copy exists in English, Spanish and Catalan', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(en.meetingStepsToAdd, 'Steps to add');
+      expect(es.meetingStepsToAdd, 'Pasos que se añaden');
+      expect(ca.meetingStepsToAdd, 'Passos que s’afegeixen');
+      expect(en.meetingViewTask, 'View task');
+      expect(es.meetingViewTask, 'Ver tarea');
+      expect(ca.meetingViewTask, 'Mostra la tasca');
+      // «Crear tarea» itself is unchanged.
+      expect(es.meetingCreateTask, 'Crear tarea');
     });
   });
 }

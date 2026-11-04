@@ -32,6 +32,11 @@ class CaptureStore {
   final Directory? directory;
   CaptureStore(this.database, {this.directory});
 
+  /// The reviews «Crear tarea» opened from a note in this run of the app
+  /// (source 'note'). Any other such capture was left by an app closed
+  /// during its review: the note still holds it all, so it goes.
+  static final _openFromNotes = <String>{};
+
   Future<Directory> _directory() async {
     final root =
         directory ??
@@ -71,6 +76,7 @@ class CaptureStore {
       day: day,
       language: language,
     );
+    if (source == 'note') _openFromNotes.add(id);
     await (await database.database).insert('captures', {
       'id': id,
       'owner_key': ownerKey,
@@ -167,8 +173,16 @@ class CaptureStore {
       orderBy: 'captured_at DESC',
     );
     final sessions = rows.map(_decode).toList();
-    // Opened and left without a word: nothing to come back to.
-    final empty = sessions.where(isEmpty).map((s) => s.id).toList();
+    // Opened and left without a word, or a note's review left open when the
+    // app closed: nothing to come back to. A note's review open now is
+    // never listed, nor in «Sin guardar».
+    bool fromNote(CaptureSession s) => s.source == 'note';
+    final empty = sessions
+        .where(
+          (s) => isEmpty(s) || (fromNote(s) && !_openFromNotes.contains(s.id)),
+        )
+        .map((s) => s.id)
+        .toList();
     if (empty.isNotEmpty) {
       await (await database.database).delete(
         'captures',
@@ -177,7 +191,7 @@ class CaptureStore {
         whereArgs: [ownerKey, ...empty],
       );
     }
-    return sessions.where((s) => !isEmpty(s)).toList();
+    return sessions.where((s) => !isEmpty(s) && !fromNote(s)).toList();
   }
 
   Future<void> update(CaptureSession session) async {

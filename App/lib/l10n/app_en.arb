@@ -4350,6 +4350,14 @@
   "@meetingCreateTask": {
     "description": "On a note with steps (a meeting’s to-dos): opens the review with a task titled like the note and its steps as the checklist."
   },
+  "meetingStepsToAdd": "Steps to add",
+  "@meetingStepsToAdd": {
+    "description": "Heading over the steps in the review «Create task» opens from a note: each ticked step goes into the task, unticked ones are left out."
+  },
+  "meetingViewTask": "View task",
+  "@meetingViewTask": {
+    "description": "On a note that already made a task with «Create task»: opens that task."
+  },
   "meetingSignOutTitle": "Sign out?",
   "@meetingSignOutTitle": {
     "description": "Title of the question on Sign out when meeting recordings still wait on this phone."

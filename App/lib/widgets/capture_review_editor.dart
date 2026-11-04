@@ -30,6 +30,7 @@ class CaptureReviewEditor extends ConsumerStatefulWidget {
     required this.onRemove,
     this.enabled = true,
     this.onRenameProject,
+    this.choosingSteps = false,
   });
   final CaptureDraft draft;
   final bool compact;
@@ -42,6 +43,10 @@ class CaptureReviewEditor extends ConsumerStatefulWidget {
   /// The project this task's confirming tap creates, renamed from its chip:
   /// the name it had, and the one typed. Nothing is created yet.
   final void Function(String from, String to)? onRenameProject;
+
+  /// A task «Crear tarea» makes from a note: its steps are chosen, ticked to
+  /// go in ([ChecklistEditor.choosing]).
+  final bool choosingSteps;
   @override
   ConsumerState<CaptureReviewEditor> createState() =>
       _CaptureReviewEditorState();
@@ -813,6 +818,7 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
               key: _steps,
               items: task.checklist,
               recurring: task.isRecurring,
+              choosing: widget.choosingSteps,
               onChanged: !widget.enabled
                   ? null
                   : (items) => _change(task.copyWith(checklist: items)),
@@ -934,6 +940,7 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
                 key: _steps,
                 items: task.checklist,
                 recurring: task.isRecurring,
+                choosing: widget.choosingSteps,
                 onChanged: !widget.enabled
                     ? null
                     : (items) => _change(task.copyWith(checklist: items)),

@@ -7216,6 +7216,18 @@ abstract class AppLocalizations {
   /// **'Create task'**
   String get meetingCreateTask;
 
+  /// Heading over the steps in the review «Create task» opens from a note: each ticked step goes into the task, unticked ones are left out.
+  ///
+  /// In en, this message translates to:
+  /// **'Steps to add'**
+  String get meetingStepsToAdd;
+
+  /// On a note that already made a task with «Create task»: opens that task.
+  ///
+  /// In en, this message translates to:
+  /// **'View task'**
+  String get meetingViewTask;
+
   /// Title of the question on Sign out when meeting recordings still wait on this phone.
   ///
   /// In en, this message translates to:

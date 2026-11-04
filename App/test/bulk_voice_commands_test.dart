@@ -6978,7 +6978,9 @@ void _p274AfterTheTap() {
 
     testWidgets('UX-2202: a change («Cambia el dentista al viernes»): '
         'Deshacer puts the day back, with no sheet', (tester) async {
-      final friday = day(_ahead(DateTime.friday));
+      // A Friday three days away or more: never the dentist's own day 2,
+      // which is the coming Friday on a Wednesday.
+      final friday = day(_ahead(DateTime.friday, min: 3));
       final app = await _App.open(tester, tasks: [dentist()]);
       await app.showResult(tester, [
         dentistCommand('update', {'date': key(friday)}),

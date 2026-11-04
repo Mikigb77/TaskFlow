@@ -16,6 +16,7 @@ import 'package:agenda/l10n/generated/app_localizations_en.dart';
 import 'package:agenda/l10n/generated/app_localizations_es.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/task_database.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -952,6 +953,100 @@ void main() {
     );
     expect(plain.language, isNull);
   });
+
+  // ---- UX loop 2026-11-03-screens, round 1 · P318 ----
+  group(
+    'P318 · a note’s «Crear tarea» review never waits in «Sin guardar»',
+    () {
+      /// A note's review as a run of the app that was killed left it: written
+      /// straight to the table, never opened in this run.
+      Future<CaptureSession> leftByAnEarlierRun() async {
+        final session = CaptureSession(
+          id: 'note-left-open',
+          ownerKey: 'local',
+          capturedAt: DateTime.utc(2026, 11, 2, 18),
+          timezone: 'Europe/Madrid',
+          text: 'Precio del piloto con Acme',
+          transcript: 'Acordamos el piloto.',
+          source: 'note',
+          status: 'ready',
+          drafts: [
+            CaptureDraft(
+              id: 'draft-1',
+              task: Task(title: 'Precio del piloto con Acme', priority: 1),
+            ),
+          ],
+        );
+        await (await database.database).insert('captures', {
+          'id': session.id,
+          'owner_key': session.ownerKey,
+          'status': session.status,
+          'captured_at': session.capturedAt.toIso8601String(),
+          'data': jsonEncode(session.toJson()),
+        });
+        return session;
+      }
+
+      test('UX-2706: a note’s session left in the store is not returned by '
+          'pending, and is gone after a restart', () async {
+        final typed = await store.create(
+          'local',
+          'Europe/Madrid',
+          text: 'Llamar al fontanero',
+          source: 'typed',
+        );
+        final left = await leftByAnEarlierRun();
+        expect((await store.pending('local')).map((s) => s.id), [typed.id]);
+        // It went: the note still holds it all.
+        expect(await store.read(left.id, 'local'), isNull);
+        await database.close();
+        await reopen();
+        expect((await store.pending('local')).map((s) => s.id), [typed.id]);
+      });
+
+      test('UX-2706: a note’s review open now is not listed either', () async {
+        final open = await store.create(
+          'local',
+          'Europe/Madrid',
+          text: 'Precio del piloto con Acme',
+          source: 'note',
+        );
+        await store.update(
+          open.copyWith(
+            status: 'ready',
+            drafts: [
+              CaptureDraft(
+                id: 'draft-1',
+                task: Task(title: 'Precio del piloto con Acme', priority: 1),
+              ),
+            ],
+          ),
+        );
+        expect(await store.pending('local'), isEmpty);
+      });
+
+      test('UX-2706: «Sin guardar» (pendingCapturesProvider) never shows a '
+          'note’s session', () async {
+        final typed = await store.create(
+          'local',
+          'Europe/Madrid',
+          text: 'Llamar al fontanero',
+          source: 'typed',
+        );
+        await leftByAnEarlierRun();
+        final container = ProviderContainer(
+          overrides: [
+            captureOwnerProvider.overrideWithValue('local'),
+            captureStoreProvider.overrideWithValue(store),
+          ],
+        );
+        addTearDown(container.dispose);
+        final listed = await container.read(pendingCapturesProvider.future);
+        expect(listed.map((s) => s.id), [typed.id]);
+        expect(listed.any((s) => s.source == 'note'), isFalse);
+      });
+    },
+  );
 }
 
 Uint8List _wav() {

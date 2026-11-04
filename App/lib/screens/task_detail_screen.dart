@@ -21,6 +21,23 @@ import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:agenda/widgets/note_text.dart';
 import 'package:agenda/widgets/note_task.dart';
 
+/// A task's page as a route named `/task` with the task's id, so the pages
+/// that show a task can be told apart from others on the stack: Deshacer
+/// after «Crear tarea» closes those of the task it deletes, and only those
+/// (R1-P318-3).
+MaterialPageRoute<void> taskPageRoute(int taskId) => MaterialPageRoute<void>(
+  settings: RouteSettings(name: '/task', arguments: taskId),
+  builder: (_) => TaskDetailScreen(taskId: taskId),
+);
+
+/// The names of the routes that show one task, by its id.
+const _taskRoutes = {'/task', '/taskDetails', '/editTask'};
+
+/// Whether [route] shows the task [taskId]: its page or its edit form.
+bool routeShowsTask(Route<dynamic> route, int taskId) =>
+    _taskRoutes.contains(route.settings.name) &&
+    route.settings.arguments == taskId;
+
 class TaskDetailScreen extends ConsumerStatefulWidget {
   const TaskDetailScreen({
     super.key,
@@ -261,6 +278,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                 Navigator.pushNamed(context, '/editTask', arguments: taskId);
             void reschedule() =>
                 TaskInteractions.reschedule(context, ref, task);
+            // The task this note made with «Crear tarea», while it exists.
+            final made = task.isNote ? noteMadeTask(ref, task) : null;
+            // Until this phone's note → task links are read, the main
+            // button can't know its label (R1-P318-1).
+            final linksRead =
+                !task.isNote || ref.watch(noteTasksProvider).hasValue;
             // Inert while Completar closes it: nothing on the page opens in
             // the hold (UX-2633).
             return AbsorbPointer(
@@ -523,24 +546,65 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
                           // A note with steps (a meeting's to-dos) can
-                          // become a task with them (MN-22).
+                          // become a task with them (MN-22): the main
+                          // button, which opens that task once made
+                          // (UX-2702, UX-2709).
                           child: Wrap(
                             spacing: 12,
                             runSpacing: 8,
                             alignment: WrapAlignment.center,
                             children: [
-                              FilledButton.icon(
-                                onPressed: edit,
-                                icon: const Icon(Icons.edit_outlined),
-                                label: Text(context.l10n.editNote),
-                              ),
-                              if (noteMakesTask(task))
-                                OutlinedButton.icon(
+                              if (!linksRead && noteMakesTask(task))
+                                // Holds the main button's place, unseen and
+                                // untappable, so «Crear tarea» never turns
+                                // into «Ver tarea» under a finger.
+                                Visibility(
+                                  visible: false,
+                                  maintainSize: true,
+                                  maintainAnimation: true,
+                                  maintainState: true,
+                                  child: FilledButton.icon(
+                                    onPressed: null,
+                                    icon: const Icon(Icons.add_task_rounded),
+                                    label: Text(context.l10n.meetingCreateTask),
+                                  ),
+                                )
+                              else if (made != null)
+                                FilledButton.icon(
+                                  key: const ValueKey('note-view-task'),
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    taskPageRoute(made.id!),
+                                  ),
+                                  icon: const Icon(Icons.task_alt_rounded),
+                                  label: Text(context.l10n.meetingViewTask),
+                                )
+                              else if (noteMakesTask(task))
+                                FilledButton.icon(
                                   key: const ValueKey('note-create-task'),
                                   onPressed: () =>
                                       createTaskFromNote(context, task),
                                   icon: const Icon(Icons.add_task_rounded),
                                   label: Text(context.l10n.meetingCreateTask),
+                                ),
+                              if (made != null || noteMakesTask(task))
+                                OutlinedButton.icon(
+                                  // As tall as the filled button beside it.
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize: const Size(48, 48),
+                                    visualDensity: const VisualDensity(
+                                      vertical: 3,
+                                    ),
+                                  ),
+                                  onPressed: edit,
+                                  icon: const Icon(Icons.edit_outlined),
+                                  label: Text(context.l10n.editNote),
+                                )
+                              else
+                                FilledButton.icon(
+                                  onPressed: edit,
+                                  icon: const Icon(Icons.edit_outlined),
+                                  label: Text(context.l10n.editNote),
                                 ),
                             ],
                           ),

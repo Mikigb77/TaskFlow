@@ -1482,6 +1482,8 @@
   "meetingNoteHeader": "Reunión del {date} · {length}",
   "meetingNoteChapterMinutes": "Minutos {start}–{end}",
   "meetingCreateTask": "Crear tarea",
+  "meetingStepsToAdd": "Pasos que se añaden",
+  "meetingViewTask": "Ver tarea",
   "meetingSignOutTitle": "¿Cerrar sesión?",
   "meetingSignOutRecording": "Estás grabando una reunión. Se parará y se harán sus notas antes de cerrar sesión.",
   "meetingSignOutQuestion": "{count, plural, =1{Las notas de una reunión aún no están listas, y su grabación solo está en este teléfono.} other{Las notas de {count} reuniones aún no están listas, y sus grabaciones solo están en este teléfono.}}",

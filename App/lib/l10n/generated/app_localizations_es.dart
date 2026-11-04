@@ -5362,6 +5362,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get meetingCreateTask => 'Crear tarea';
 
   @override
+  String get meetingStepsToAdd => 'Pasos que se añaden';
+
+  @override
+  String get meetingViewTask => 'Ver tarea';
+
+  @override
   String get meetingSignOutTitle => '¿Cerrar sesión?';
 
   @override

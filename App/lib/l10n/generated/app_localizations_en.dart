@@ -5258,6 +5258,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get meetingCreateTask => 'Create task';
 
   @override
+  String get meetingStepsToAdd => 'Steps to add';
+
+  @override
+  String get meetingViewTask => 'View task';
+
+  @override
   String get meetingSignOutTitle => 'Sign out?';
 
   @override

@@ -1186,6 +1186,8 @@
   "meetingNoteHeader": "Reunió del {date} · {length}",
   "meetingNoteChapterMinutes": "Minuts {start}–{end}",
   "meetingCreateTask": "Crea una tasca",
+  "meetingStepsToAdd": "Passos que s’afegeixen",
+  "meetingViewTask": "Mostra la tasca",
   "meetingSignOutTitle": "Vols tancar la sessió?",
   "meetingSignOutRecording": "Estàs enregistrant una reunió. S’aturarà i se’n faran les notes abans de tancar la sessió.",
   "meetingSignOutQuestion": "{count, plural, =1{Les notes d’una reunió encara no estan a punt, i l’enregistrament només és en aquest telèfon.} other{Les notes de {count} reunions encara no estan a punt, i els enregistraments només són en aquest telèfon.}}",

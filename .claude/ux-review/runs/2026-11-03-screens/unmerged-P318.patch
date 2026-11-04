@@ -1,41 +1,21 @@
-diff --git a/App/analysis_options.yaml b/App/analysis_options.yaml
-index 0d29021..bf8d421 100644
---- a/App/analysis_options.yaml
-+++ b/App/analysis_options.yaml
-@@ -7,6 +7,15 @@
- 
- # The following line activates a set of recommended lints for Flutter apps,
- # packages, and plugins designed to encourage good coding practices.
-+analyzer:
-+  exclude:
-+    - build/**
-+    - android/**
-+    - ios/**
-+    - web/**
-+    - windows/**
-+    - macos/**
-+    - linux/**
- include: package:flutter_lints/flutter.yaml
- 
- linter:
 diff --git a/App/lib/l10n/app_ca.arb b/App/lib/l10n/app_ca.arb
-index 48ddc4f..3fe8b6b 100644
+index 3752ce4..19a8489 100644
 --- a/App/lib/l10n/app_ca.arb
 +++ b/App/lib/l10n/app_ca.arb
-@@ -1165,6 +1165,8 @@
-   "meetingNoteStartMissing": "L’inici d’aquest enregistrament va caducar, així que aquestes notes només en cobreixen la resta.",
-   "meetingNoteUntitled": "Notes de la reunió",
+@@ -1182,6 +1182,8 @@
+   "meetingNoteHeader": "Reunió del {date} · {length}",
+   "meetingNoteChapterMinutes": "Minuts {start}–{end}",
    "meetingCreateTask": "Crea una tasca",
 +  "meetingStepsToAdd": "Passos que s’afegeixen",
 +  "meetingViewTask": "Mostra la tasca",
-   "meetingSignOutQuestion": "{count, plural, =1{Encara no s’ha enviat un enregistrament de reunió. Vols enviar-lo abans de tancar la sessió, o descartar-lo?} other{Encara no s’han enviat {count} enregistraments de reunions. Vols enviar-los abans de tancar la sessió, o descartar-los?}} Deixaràs de rebre recordatoris en aquest telèfon fins que tornis a entrar.",
-   "meetingSendFirst": "Envia primer",
-   "meetingDiscardAndSignOut": "Descarta i tanca la sessió",
+   "meetingSignOutTitle": "Vols tancar la sessió?",
+   "meetingSignOutRecording": "Estàs enregistrant una reunió. S’aturarà i se’n faran les notes abans de tancar la sessió.",
+   "meetingSignOutQuestion": "{count, plural, =1{Les notes d’una reunió encara no estan a punt, i l’enregistrament només és en aquest telèfon.} other{Les notes de {count} reunions encara no estan a punt, i els enregistraments només són en aquest telèfon.}}",
 diff --git a/App/lib/l10n/app_en.arb b/App/lib/l10n/app_en.arb
-index 0c269b5..f028683 100644
+index 870e833..9331ef3 100644
 --- a/App/lib/l10n/app_en.arb
 +++ b/App/lib/l10n/app_en.arb
-@@ -4169,6 +4169,14 @@
+@@ -4318,6 +4318,14 @@
    "@meetingCreateTask": {
      "description": "On a note with steps (a meeting’s to-dos): opens the review with a task titled like the note and its steps as the checklist."
    },
@@ -47,22 +27,22 @@ index 0c269b5..f028683 100644
 +  "@meetingViewTask": {
 +    "description": "On a note that already made a task with «Create task»: opens that task."
 +  },
-   "meetingSignOutQuestion": "{count, plural, =1{A meeting recording hasn’t been sent yet. Send it before signing out, or discard it?} other{{count} meeting recordings haven’t been sent yet. Send them before signing out, or discard them?}} Reminders on this phone stop until you sign in again.",
-   "@meetingSignOutQuestion": {
-     "description": "Asked on Sign out when meeting recordings still wait on this phone: they belong to this account and can’t be sent after signing out.",
+   "meetingSignOutTitle": "Sign out?",
+   "@meetingSignOutTitle": {
+     "description": "Title of the question on Sign out when meeting recordings still wait on this phone."
 diff --git a/App/lib/l10n/app_es.arb b/App/lib/l10n/app_es.arb
-index e1adb63..e488965 100644
+index d9b93c5..ebe4bf2 100644
 --- a/App/lib/l10n/app_es.arb
 +++ b/App/lib/l10n/app_es.arb
-@@ -1461,6 +1461,8 @@
-   "meetingNoteStartMissing": "El principio de esta grabación caducó, así que estas notas cubren solo el resto.",
-   "meetingNoteUntitled": "Notas de la reunión",
+@@ -1478,6 +1478,8 @@
+   "meetingNoteHeader": "Reunión del {date} · {length}",
+   "meetingNoteChapterMinutes": "Minutos {start}–{end}",
    "meetingCreateTask": "Crear tarea",
 +  "meetingStepsToAdd": "Pasos que se añaden",
 +  "meetingViewTask": "Ver tarea",
-   "meetingSignOutQuestion": "{count, plural, =1{Una grabación de reunión aún no se ha enviado. ¿Enviarla antes de cerrar sesión, o descartarla?} other{{count} grabaciones de reuniones aún no se han enviado. ¿Enviarlas antes de cerrar sesión, o descartarlas?}} Dejarás de recibir recordatorios en este teléfono hasta que vuelvas a entrar.",
-   "meetingSendFirst": "Enviar primero",
-   "meetingDiscardAndSignOut": "Descartar y cerrar sesión",
+   "meetingSignOutTitle": "¿Cerrar sesión?",
+   "meetingSignOutRecording": "Estás grabando una reunión. Se parará y se harán sus notas antes de cerrar sesión.",
+   "meetingSignOutQuestion": "{count, plural, =1{Las notas de una reunión aún no están listas, y su grabación solo está en este teléfono.} other{Las notas de {count} reuniones aún no están listas, y sus grabaciones solo están en este teléfono.}}",
 diff --git a/App/lib/screens/main_shell.dart b/App/lib/screens/main_shell.dart
 index f6c59f9..72c74ad 100644
 --- a/App/lib/screens/main_shell.dart
@@ -86,10 +66,10 @@ index f6c59f9..72c74ad 100644
      ref.listen<CalendarFocus?>(calendarFocusProvider, (_, focus) {
        if (focus?.showCalendar == true && _index != 0) {
 diff --git a/App/lib/screens/task_detail_screen.dart b/App/lib/screens/task_detail_screen.dart
-index b0ed80c..245e300 100644
+index 6e01a0e..efe9f33 100644
 --- a/App/lib/screens/task_detail_screen.dart
 +++ b/App/lib/screens/task_detail_screen.dart
-@@ -246,6 +246,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
+@@ -261,6 +261,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                  Navigator.pushNamed(context, '/editTask', arguments: taskId);
              void reschedule() =>
                  TaskInteractions.reschedule(context, ref, task);
@@ -102,7 +82,7 @@ index b0ed80c..245e300 100644
              // Inert while Completar closes it: nothing on the page opens in
              // the hold (UX-2633).
              return AbsorbPointer(
-@@ -558,25 +564,69 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
+@@ -523,25 +529,69 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                          child: Padding(
                            padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
                            // A note with steps (a meeting's to-dos) can
@@ -181,7 +161,7 @@ index b0ed80c..245e300 100644
                            ),
                          ),
 diff --git a/App/lib/screens/voice_task_screen.dart b/App/lib/screens/voice_task_screen.dart
-index 9793a47..5c66816 100644
+index 72ebea0..ba7c60c 100644
 --- a/App/lib/screens/voice_task_screen.dart
 +++ b/App/lib/screens/voice_task_screen.dart
 @@ -5,6 +5,7 @@ import 'package:flutter/semantics.dart';
@@ -200,7 +180,7 @@ index 9793a47..5c66816 100644
  import 'package:agenda/providers/task_provider.dart';
  import 'package:agenda/services/capture_store.dart';
  import 'package:agenda/services/capture_processor.dart';
-@@ -2867,6 +2869,9 @@ class CaptureResult extends ConsumerStatefulWidget {
+@@ -2881,6 +2883,9 @@ class CaptureResult extends ConsumerStatefulWidget {
  
  class _CaptureResultState extends ConsumerState<CaptureResult> {
    late CaptureSession _session = widget.session;
@@ -210,7 +190,7 @@ index 9793a47..5c66816 100644
    late List<CaptureDraft> _items = _session.drafts;
    // Create a project, find, change or delete a task: each its own card.
    late List<CaptureCommand> _commands = _session.commands;
-@@ -3393,10 +3398,37 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
+@@ -3407,10 +3412,39 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
      final sheetMessages = ScaffoldMessenger.of(context);
      final appMessages = ScaffoldMessenger.of(navigator.context);
      final origin = context.getInheritedWidgetOfExactType<_CaptureOrigin>();
@@ -238,8 +218,10 @@ index 9793a47..5c66816 100644
 +        : null;
 +    final before = chosen ?? _session;
      final undoIds = <String, int>{};
-+    // The task page a save from a note opens, for `Deshacer` to close.
++    // The task page a save from a note opens, and the note's page under it,
++    // for `Deshacer` to go back to.
 +    Route<void>? taskPage;
++    Route<dynamic>? notePage;
      try {
        await _writes;
 +      if (chosen != null) {
@@ -249,7 +231,7 @@ index 9793a47..5c66816 100644
        final result = await _store.saveReady(
          _session.id,
          _session.ownerKey,
-@@ -3503,7 +3535,18 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
+@@ -3517,7 +3551,23 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
            : added;
        // The landing Deshacer takes back, if any.
        CalendarFocus? focus;
@@ -258,6 +240,11 @@ index 9793a47..5c66816 100644
 +        // From a note, the new task's page opens over it, so Back returns
 +        // to the note (UX-2702).
 +        Navigator.pop(context);
++        // The route the sheet opened over, now on top: the note's page.
++        navigator.popUntil((route) {
++          notePage = route;
++          return true;
++        });
 +        final id = undoIds.values.firstOrNull;
 +        if (id != null) {
 +          taskPage = MaterialPageRoute<void>(
@@ -269,7 +256,7 @@ index 9793a47..5c66816 100644
          // From the pending list, back to Calendar, where the tasks land.
          if (origin?.showCalendar == true) {
            navigator.popUntil((route) => route.isFirst);
-@@ -3561,7 +3604,17 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
+@@ -3575,7 +3625,22 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
              // The filter the landing widened comes back with the tasks gone.
              narrowAfterUndo(container, focus);
              container.invalidate(pendingCapturesProvider);
@@ -280,15 +267,20 @@ index 9793a47..5c66816 100644
 +              await _store
 +                  .discard(restored.id, restored.ownerKey)
 +                  .catchError((Object _) {});
++              // Back on the note, whatever opened over it since: the task's
++              // page again, or its edit form (R1-P318-2).
++              final note = notePage;
 +              final page = taskPage;
-+              if (page != null && page.isActive && navigator.mounted) {
++              if (note != null && note.isActive && navigator.mounted) {
++                navigator.popUntil((route) => route == note);
++              } else if (page != null && page.isActive && navigator.mounted) {
 +                page.isCurrent ? navigator.pop() : navigator.removeRoute(page);
 +              }
 +            } else if (mounted) {
                setState(() {
                  _session = restored;
                  _items = restored.drafts;
-@@ -4401,6 +4454,11 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
+@@ -4415,6 +4480,11 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
    /// does. While saving, nothing happens.
    Future<void> _leave() async {
      if (_saving || _asking || !mounted) return;
@@ -300,7 +292,7 @@ index 9793a47..5c66816 100644
      // Nothing waits (a search, a task not found): it only closes.
      if (!_worthKeeping()) {
        await _finishEmpty();
-@@ -4782,6 +4840,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
+@@ -4796,6 +4866,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                            onRemove: () => _remove(item),
                            onRenameProject: (from, to) =>
                                unawaited(_renameProject(from, to)),
@@ -361,7 +353,7 @@ index 6e93ff4..8bb93e8 100644
  
    Future<void> update(CaptureSession session) async {
 diff --git a/App/lib/widgets/capture_review_editor.dart b/App/lib/widgets/capture_review_editor.dart
-index 1e6e2d7..e47013f 100644
+index 1e6e2d7..d316b19 100644
 --- a/App/lib/widgets/capture_review_editor.dart
 +++ b/App/lib/widgets/capture_review_editor.dart
 @@ -30,6 +30,7 @@ class CaptureReviewEditor extends ConsumerStatefulWidget {
@@ -383,17 +375,7 @@ index 1e6e2d7..e47013f 100644
    @override
    ConsumerState<CaptureReviewEditor> createState() =>
        _CaptureReviewEditorState();
-@@ -631,8 +636,7 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
-       },
-     );
-     final optionsSummary = [
--      if (task.priority > 1)
--        context.priorityPhrase(task.priority),
-+      if (task.priority > 1) context.priorityPhrase(task.priority),
-       if (task.isRecurring) context.repeatLabel(task),
-     ];
-     final repair = [
-@@ -813,6 +817,7 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
+@@ -813,6 +818,7 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
                key: _steps,
                items: task.checklist,
                recurring: task.isRecurring,
@@ -401,20 +383,7 @@ index 1e6e2d7..e47013f 100644
                onChanged: !widget.enabled
                    ? null
                    : (items) => _change(task.copyWith(checklist: items)),
-@@ -822,11 +827,7 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
-               spacing: 8,
-               children: [
-                 if (task.priority > 1)
--                  Chip(
--                    label: Text(
--                      context.priorityPhrase(task.priority),
--                    ),
--                  ),
-+                  Chip(label: Text(context.priorityPhrase(task.priority))),
-                 if (task.isRecurring)
-                   ActionChip(
-                     label: Text(context.repeatLabel(task)),
-@@ -934,6 +935,7 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
+@@ -934,6 +940,7 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
                  key: _steps,
                  items: task.checklist,
                  recurring: task.isRecurring,
@@ -766,177 +735,153 @@ index 4051edd..b346fa6 100644
  }
  
  /// The capture's zone, as the task form picks it: the one chosen in
-diff --git a/App/pubspec.lock b/App/pubspec.lock
-index 4eb5d53..a0ef32e 100644
---- a/App/pubspec.lock
-+++ b/App/pubspec.lock
-@@ -496,10 +496,10 @@ packages:
-     dependency: "direct main"
-     description:
-       name: intl
--      sha256: "3df61194eb431efc39c4ceba583b95633a403f46c9fd341e550ce0bfa50e9aa5"
-+      sha256: "1ca20c894b1717686a2319b8548763d812bc0aabdac580420a44c5178c57a867"
-       url: "https://pub.dev"
-     source: hosted
--    version: "0.20.2"
-+    version: "0.20.3"
-   jni:
-     dependency: transitive
-     description:
-@@ -576,10 +576,10 @@ packages:
-     dependency: transitive
-     description:
-       name: matcher
--      sha256: dc0b7dc7651697ea4ff3e69ef44b0407ea32c487a39fff6a4004fa585e901861
-+      sha256: "31bd099b47c10cd1aeb55146a2d46ce0277630ecef3f7dae54ad7873f36696cd"
-       url: "https://pub.dev"
-     source: hosted
--    version: "0.12.19"
-+    version: "0.12.20"
-   material_color_utilities:
-     dependency: transitive
-     description:
-@@ -592,10 +592,10 @@ packages:
-     dependency: transitive
-     description:
-       name: meta
--      sha256: "1741988757a65eb6b36abe716829688cf01910bbf91c34354ff7ec1c3de2b349"
-+      sha256: "307249ce4ff29d58a18e97f6345f539382eb9c9c29ecda628900f31de0443dd9"
-       url: "https://pub.dev"
-     source: hosted
--    version: "1.18.0"
-+    version: "1.19.0"
-   mime:
-     dependency: transitive
-     description:
-@@ -1085,10 +1085,10 @@ packages:
-     dependency: transitive
-     description:
-       name: test_api
--      sha256: "949a932224383300f01be9221c39180316445ecb8e7547f70a41a35bf421fb9e"
-+      sha256: "2a122cbe059f8b610d3a5415f42e255b6c17b1f21eee1d960f31080237fb4f11"
-       url: "https://pub.dev"
-     source: hosted
--    version: "0.7.11"
-+    version: "0.7.12"
-   timezone:
-     dependency: "direct main"
-     description:
-@@ -1181,10 +1181,10 @@ packages:
-     dependency: transitive
-     description:
-       name: vector_math
--      sha256: d530bd74fea330e6e364cda7a85019c434070188383e1cd8d9777ee586914c5b
-+      sha256: fa49e1674cb84acb900141714e6c6e1f9ae099827c24d141430ff6819db4e1bc
-       url: "https://pub.dev"
-     source: hosted
--    version: "2.2.0"
-+    version: "2.4.4"
-   vm_service:
-     dependency: transitive
-     description:
 diff --git a/App/test/capture_recovery_test.dart b/App/test/capture_recovery_test.dart
-index 3f2a5a8..9d30653 100644
+index 3f2a5a8..bacbc59 100644
 --- a/App/test/capture_recovery_test.dart
 +++ b/App/test/capture_recovery_test.dart
-@@ -952,6 +952,71 @@ void main() {
+@@ -16,6 +16,7 @@ import 'package:agenda/l10n/generated/app_localizations_en.dart';
+ import 'package:agenda/l10n/generated/app_localizations_es.dart';
+ import 'package:agenda/services/capture_store.dart';
+ import 'package:agenda/services/task_database.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import 'package:flutter_test/flutter_test.dart';
+ import 'package:path/path.dart' as p;
+ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+@@ -952,6 +953,100 @@ void main() {
      );
      expect(plain.language, isNull);
    });
 +
-+  // ---- Run 2026-11-03-screens · P318 (UX-2706): «Crear tarea» from a note
-+  // never waits in «Sin guardar» ----
-+  group('P318 · a note’s review never waits', () {
-+    test('UX-2706: a note’s review open now is never pending; a typed '
-+        'capture still is', () async {
-+      final typed = await store.create(
-+        'local',
-+        'Europe/Madrid',
-+        text: 'Call the plumber',
-+        source: 'typed',
-+      );
-+      final fromNote = await store.create(
-+        'local',
-+        'Europe/Madrid',
-+        text: 'Pilot pricing with Acme',
-+        source: 'note',
-+      );
-+      final pending = await store.pending('local');
-+      expect(pending.map((s) => s.id), [typed.id]);
-+      // Open in this run of the app, its review still reads it.
-+      expect((await store.read(fromNote.id, 'local'))?.source, 'note');
-+      // Left (Cancel, Back): gone from the store.
-+      await store.discard(fromNote.id, 'local');
-+      expect((await store.pending('local')).map((s) => s.id), [typed.id]);
-+    });
++  // ---- UX loop 2026-11-03-screens, round 1 · P318 ----
++  group(
++    'P318 · a note’s «Crear tarea» review never waits in «Sin guardar»',
++    () {
++      /// A note's review as a run of the app that was killed left it: written
++      /// straight to the table, never opened in this run.
++      Future<CaptureSession> leftByAnEarlierRun() async {
++        final session = CaptureSession(
++          id: 'note-left-open',
++          ownerKey: 'local',
++          capturedAt: DateTime.utc(2026, 11, 2, 18),
++          timezone: 'Europe/Madrid',
++          text: 'Precio del piloto con Acme',
++          transcript: 'Acordamos el piloto.',
++          source: 'note',
++          status: 'ready',
++          drafts: [
++            CaptureDraft(
++              id: 'draft-1',
++              task: Task(title: 'Precio del piloto con Acme', priority: 1),
++            ),
++          ],
++        );
++        await (await database.database).insert('captures', {
++          'id': session.id,
++          'owner_key': session.ownerKey,
++          'status': session.status,
++          'captured_at': session.capturedAt.toIso8601String(),
++          'data': jsonEncode(session.toJson()),
++        });
++        return session;
++      }
 +
-+    test('UX-2706: a note’s review left in the store by an app killed '
-+        'during it is not pending, and is deleted', () async {
-+      final typed = await store.create(
-+        'local',
-+        'Europe/Madrid',
-+        text: 'Call the plumber',
-+        source: 'typed',
-+      );
-+      // Written by an earlier run of the app, which never came back to it.
-+      final left = CaptureSession(
-+        id: 'left-by-a-killed-app',
-+        ownerKey: 'local',
-+        capturedAt: DateTime.utc(2026, 11, 2, 18),
-+        timezone: 'Europe/Madrid',
-+        text: 'Pilot pricing with Acme',
-+        source: 'note',
-+        status: 'ready',
-+      );
-+      final sql = await database.database;
-+      await sql.insert('captures', {
-+        'id': left.id,
-+        'owner_key': 'local',
-+        'status': left.status,
-+        'captured_at': left.capturedAt.toIso8601String(),
-+        'data': jsonEncode(left.toJson()),
++      test('UX-2706: a note’s session left in the store is not returned by '
++          'pending, and is gone after a restart', () async {
++        final typed = await store.create(
++          'local',
++          'Europe/Madrid',
++          text: 'Llamar al fontanero',
++          source: 'typed',
++        );
++        final left = await leftByAnEarlierRun();
++        expect((await store.pending('local')).map((s) => s.id), [typed.id]);
++        // It went: the note still holds it all.
++        expect(await store.read(left.id, 'local'), isNull);
++        await database.close();
++        await reopen();
++        expect((await store.pending('local')).map((s) => s.id), [typed.id]);
 +      });
-+      expect(CaptureStore.isEmpty(left), isFalse);
-+      final pending = await store.pending('local');
-+      expect(pending.map((s) => s.id), [typed.id]);
-+      expect(pending.where((s) => s.source == 'note'), isEmpty);
-+      final rows = await sql.query(
-+        'captures',
-+        where: 'id = ?',
-+        whereArgs: [left.id],
-+      );
-+      expect(rows, isEmpty);
-+    });
-+  });
++
++      test('UX-2706: a note’s review open now is not listed either', () async {
++        final open = await store.create(
++          'local',
++          'Europe/Madrid',
++          text: 'Precio del piloto con Acme',
++          source: 'note',
++        );
++        await store.update(
++          open.copyWith(
++            status: 'ready',
++            drafts: [
++              CaptureDraft(
++                id: 'draft-1',
++                task: Task(title: 'Precio del piloto con Acme', priority: 1),
++              ),
++            ],
++          ),
++        );
++        expect(await store.pending('local'), isEmpty);
++      });
++
++      test('UX-2706: «Sin guardar» (pendingCapturesProvider) never shows a '
++          'note’s session', () async {
++        final typed = await store.create(
++          'local',
++          'Europe/Madrid',
++          text: 'Llamar al fontanero',
++          source: 'typed',
++        );
++        await leftByAnEarlierRun();
++        final container = ProviderContainer(
++          overrides: [
++            captureOwnerProvider.overrideWithValue('local'),
++            captureStoreProvider.overrideWithValue(store),
++          ],
++        );
++        addTearDown(container.dispose);
++        final listed = await container.read(pendingCapturesProvider.future);
++        expect(listed.map((s) => s.id), [typed.id]);
++        expect(listed.any((s) => s.source == 'note'), isFalse);
++      });
++    },
++  );
  }
  
  Uint8List _wav() {
 diff --git a/App/test/meeting_screens_test.dart b/App/test/meeting_screens_test.dart
-index 7319f60..a4953a3 100644
+index 9845997..60846ed 100644
 --- a/App/test/meeting_screens_test.dart
 +++ b/App/test/meeting_screens_test.dart
-@@ -12,6 +12,7 @@ import 'package:agenda/models/checklist_item.dart';
+@@ -9,10 +9,12 @@ import 'dart:convert';
+ import 'package:agenda/l10n/generated/app_localizations.dart';
+ import 'package:agenda/l10n/meeting_copy.dart';
+ import 'package:agenda/l10n/region.dart';
++import 'package:agenda/models/capture_session.dart';
+ import 'package:agenda/models/checklist_item.dart';
  import 'package:agenda/models/meeting.dart';
  import 'package:agenda/models/task.dart';
  import 'package:agenda/providers/auth_provider.dart';
 +import 'package:agenda/providers/calendar_focus_provider.dart';
- import 'package:agenda/providers/task_provider.dart';
- import 'package:agenda/providers/theme_provider.dart';
- import 'package:agenda/providers/regional_provider.dart';
-@@ -27,9 +28,12 @@ import 'package:agenda/services/meeting_controller.dart';
- import 'package:agenda/services/meeting_note.dart';
- import 'package:agenda/services/meeting_recorder.dart';
- import 'package:agenda/services/notification_service.dart';
-+import 'package:agenda/services/task_database.dart';
+ import 'package:agenda/providers/first_task_provider.dart';
+ import 'package:agenda/providers/task_lists_provider.dart';
+ import 'package:agenda/services/invitation_links.dart';
+@@ -36,6 +38,7 @@ import 'package:agenda/services/notification_service.dart';
+ import 'package:agenda/services/revenuecat_service.dart';
  import 'package:agenda/theme/app_theme.dart';
  import 'package:agenda/widgets/capture_review_editor.dart';
 +import 'package:agenda/widgets/checklist_editor.dart';
  import 'package:agenda/widgets/meeting_banners.dart';
-+import 'package:agenda/widgets/note_task.dart';
  import 'package:flutter/material.dart';
- import 'package:flutter/services.dart';
- import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-@@ -898,22 +902,18 @@ void main() {
+ import 'package:flutter/rendering.dart';
+@@ -49,6 +52,7 @@ import 'support/capture_fixtures.dart';
+ import 'support/design_fixtures.dart';
+ import 'support/button_label.dart';
+ import 'support/meeting_screen_fakes.dart';
++import 'support/note_task_fakes.dart';
+ import 'support/reminder_fixtures.dart';
+ 
+ Widget _app(
+@@ -920,22 +924,18 @@ void main() {
          'Send the pilot quote · Miki · Friday',
          'Book the room',
        ]);
@@ -965,71 +910,65 @@ index 7319f60..a4953a3 100644
        expect(find.byType(CaptureReviewEditor), findsNothing);
        expect(captures.current!.status, 'discarded');
      });
-@@ -1215,6 +1215,392 @@ void main() {
+@@ -3565,6 +3565,449 @@ void main() {
        }
      });
    });
 +
-+  // ---- Run 2026-11-03-screens · P318 (UX-2701, UX-2702, UX-2706,
-+  // UX-2709): «Crear tarea» from a note chooses the steps, lands on the new
-+  // task, leaves without a question, and is the main button ----
-+  group('P318 · Crear tarea from a note', () {
-+    setUpAll(() async {
-+      // The phone's font, so 2× wraps as it measures there.
-+      await (FontLoader(
-+        'Manrope',
-+      )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
-+    });
-+
-+    const one = 'Send the pilot quote · Miki · Friday';
-+    const two = 'Book the room';
-+    const three = 'Ask Ana for the buyer’s contact';
-+    Task threeSteps() => Task(
-+      id: 90,
++  // ---- UX loop 2026-11-03-screens, round 1 · P318 ----
++  group('P318 · «Crear tarea» from a note: choose the steps, land on the '
++      'new task, leave without a question, the main button', () {
++    final es = lookupAppLocalizations(const Locale('es'));
++    const steps = [
++      'Enviar el presupuesto',
++      'Reservar la sala',
++      'Pedir el contacto de compras',
++    ];
++    Task note({bool withSteps = true}) => Task(
++      id: 95,
 +      kind: 'note',
-+      title: 'Pilot pricing with Acme',
-+      notes: 'We agreed the pilot.',
++      title: 'Precio del piloto con Acme',
++      notes: 'Acordamos el piloto.',
 +      priority: 1,
 +      checklist: [
-+        ChecklistItem(id: 's1', title: one),
-+        ChecklistItem(id: 's2', title: two),
-+        ChecklistItem(id: 's3', title: three),
++        if (withSteps)
++          for (var i = 0; i < steps.length; i++)
++            ChecklistItem(id: 'p$i', title: steps[i]),
 +      ],
 +    );
++    // Something said earlier and kept in «Sin guardar».
++    final kept = CaptureSession(
++      id: 'kept-earlier',
++      ownerKey: 'local',
++      capturedAt: DateTime.utc(2026, 11, 1, 9),
++      timezone: 'Europe/Madrid',
++      text: 'Llamar al fontanero',
++    );
 +
-+    Finder inReview(Finder finder) =>
-+        find.descendant(of: find.byType(CaptureReviewEditor), matching: finder);
-+    Finder stepBox(String title) => inReview(
-+      find.byWidgetPredicate((w) => w is Checkbox && w.semanticLabel == title),
-+    );
-+    Finder filled(String label) => find.ancestor(
-+      of: find.text(label),
-+      matching: find.byWidgetPredicate((w) => w is FilledButton),
-+    );
-+    Finder outlined(String label) => find.ancestor(
-+      of: find.text(label),
-+      matching: find.byWidgetPredicate((w) => w is OutlinedButton),
-+    );
-+    int shownTask(WidgetTester tester) =>
-+        tester.widget<TaskDetailScreen>(find.byType(TaskDetailScreen)).taskId;
-+
-+    /// The note's page, in [language] at [scale] on a 360×800 phone, Pro.
-+    Future<_NoteApp> open(
++    /// The note's page, Pro, on 360×800, with saving in memory.
++    Future<
++      ({
++        ProviderContainer container,
++        MemoryCaptures captures,
++        MemoryNoteTaskLinks links,
++      })
++    >
++    open(
 +      WidgetTester tester, {
++      Task? shown,
 +      String language = 'es',
 +      double scale = 1,
-+      Task? note,
 +    }) async {
 +      final captures = MemoryCaptures();
-+      final links = _MemoryNoteLinks();
++      final links = MemoryNoteTaskLinks();
 +      final container = designContainer(
-+        tasks: () => _NoteTasks([note ?? threeSteps()]),
-+        regionalStore: MemoryRegionalStore(),
++        tasks: () => NoteTaskList([shown ?? note()]),
++        pendingCaptures: [kept],
 +        overrides: [
 +          meetingsOverride(ScriptedMeetings()),
 +          captureStoreProvider.overrideWithValue(captures),
-+          noteTaskLinksProvider.overrideWithValue(links),
 +          ...captureSheetOverrides(),
++          ...noteTaskOverrides(links),
 +        ],
 +      );
 +      addTearDown(container.dispose);
@@ -1046,54 +985,80 @@ index 7319f60..a4953a3 100644
 +      await tester.pumpWidget(
 +        _app(
 +          container,
-+          TaskDetailScreen(taskId: (note ?? threeSteps()).id!),
++          TaskDetailScreen(taskId: (shown ?? note()).id!),
 +          language: language,
 +          scale: scale,
 +        ),
 +      );
 +      await tester.pumpAndSettle();
-+      return _NoteApp(container, captures, links);
++      return (container: container, captures: captures, links: links);
 +    }
 +
-+    List<Task> tasks(_NoteApp app) =>
-+        app.container.read(taskProvider).requireValue;
-+    Task made(_NoteApp app) =>
-+        tasks(app).singleWhere((task) => task.id != 90 && !task.isNote);
++    Finder stepBox(String title) => find.byWidgetPredicate(
++      (widget) => widget is Checkbox && widget.semanticLabel == title,
++    );
++    Finder outlinedButtonWithText(String label) => find.ancestor(
++      of: find.text(label),
++      matching: find.byWidgetPredicate((widget) => widget is OutlinedButton),
++    );
++    List<Task> tasks(ProviderContainer container) =>
++        container.read(taskProvider).valueOrNull ?? const [];
++    Task? made(ProviderContainer container) =>
++        tasks(container).where((task) => !task.isNote).firstOrNull;
++    // The page in front: the one TaskDetailScreen whose route is current.
++    int? front(WidgetTester tester) {
++      for (final element in find.byType(TaskDetailScreen).evaluate()) {
++        if (ModalRoute.of(element)?.isCurrent == true) {
++          return (element.widget as TaskDetailScreen).taskId;
++        }
++      }
++      return null;
++    }
 +
 +    Future<void> createTask(WidgetTester tester) async {
 +      await tester.tap(find.byKey(const ValueKey('note-create-task')));
 +      await tester.pumpAndSettle();
-+      expect(find.byType(CaptureReviewEditor), findsOneWidget);
++      expect(find.byType(CaptureResult), findsOneWidget);
 +    }
 +
-+    Future<void> saveFromReview(WidgetTester tester) async {
-+      final save = find.byKey(const ValueKey('save-drafts'));
-+      await tester.ensureVisible(save);
++    Future<void> untick(WidgetTester tester, String title) async {
++      await tester.ensureVisible(stepBox(title));
 +      await tester.pumpAndSettle();
-+      await tester.tap(save);
++      await tester.tap(stepBox(title));
 +      await tester.pumpAndSettle();
++    }
++
++    Future<void> addTask(WidgetTester tester) async {
++      await tester.ensureVisible(find.byKey(const ValueKey('save-drafts')));
++      await tester.pumpAndSettle();
++      await saveCapture(tester);
 +    }
 +
 +    testWidgets('UX-2701: the review shows «Pasos que se añaden», every step '
 +        'ticked, and no ⋮ on any step', (tester) async {
-+      final es = lookupAppLocalizations(const Locale('es'));
 +      await open(tester);
 +      await createTask(tester);
-+      expect(inReview(find.text(es.meetingStepsToAdd)), findsOneWidget);
-+      for (var done = 0; done <= 3; done++) {
-+        expect(find.text(es.checklistCount(done, 3)), findsNothing);
++      final editor = find.descendant(
++        of: find.byType(CaptureResult),
++        matching: find.byType(ChecklistEditor),
++      );
++      expect(editor, findsOneWidget);
++      expect(
++        find.descendant(of: editor, matching: find.text(es.meetingStepsToAdd)),
++        findsOneWidget,
++      );
++      // Not «Pasos · n/N» there.
++      for (var done = 0; done <= steps.length; done++) {
++        expect(find.text(es.checklistCount(done, steps.length)), findsNothing);
 +      }
-+      for (final title in [one, two, three]) {
++      for (final title in steps) {
++        // Each checkbox is read by its step's title.
 +        expect(stepBox(title), findsOneWidget, reason: title);
 +        expect(tester.widget<Checkbox>(stepBox(title)).value, isTrue);
-+        // Its TalkBack label stays the step's title.
-+        expect(tester.widget<Checkbox>(stepBox(title)).semanticLabel, title);
-+        expect(find.byTooltip(es.editCaptureItem(title)), findsNothing);
 +      }
-+      expect(inReview(find.byType(ChecklistEditor)), findsOneWidget);
 +      expect(
 +        find.descendant(
-+          of: find.byType(ChecklistEditor),
++          of: editor,
 +          matching: find.byWidgetPredicate((w) => w is PopupMenuButton),
 +        ),
 +        findsNothing,
@@ -1101,217 +1066,286 @@ index 7319f60..a4953a3 100644
 +      expect(tester.takeException(), isNull);
 +    });
 +
-+    testWidgets('UX-2701 / UX-2702: untick step 2 and add: the task keeps '
-+        'steps 1 and 3, open; its page opens over the note; Calendar’s focus '
-+        'is untouched', (tester) async {
-+      final es = lookupAppLocalizations(const Locale('es'));
++    testWidgets('UX-2701: unticking the second step leaves it out; the task '
++        'has steps 1 and 3, in order, neither done', (tester) async {
 +      final app = await open(tester);
 +      await createTask(tester);
-+      await tester.ensureVisible(stepBox(two));
-+      await tester.pumpAndSettle();
-+      await tester.tap(stepBox(two));
-+      await tester.pumpAndSettle();
-+      expect(tester.widget<Checkbox>(stepBox(two)).value, isFalse);
-+      await saveFromReview(tester);
-+
-+      final task = made(app);
-+      expect(task.title, 'Pilot pricing with Acme');
-+      expect(task.checklist.map((s) => s.title), [one, three]);
-+      expect(task.checklist.any((s) => s.done()), isFalse);
-+      expect(task.checklist.any((s) => s.completed), isFalse);
-+      // The note itself never changes.
-+      final note = tasks(app).singleWhere((t) => t.id == 90);
-+      expect(note.checklist.map((s) => s.title), [one, two, three]);
-+      expect(note.checklist.any((s) => s.done()), isFalse);
-+
-+      // Lands on the new task's page, not on Calendar.
-+      expect(find.byType(CaptureReviewEditor), findsNothing);
-+      expect(shownTask(tester), task.id);
-+      expect(app.container.read(calendarFocusProvider), isNull);
-+
-+      // One Back: the note, whose main button now opens that task.
-+      await tester.binding.handlePopRoute();
-+      await tester.pumpAndSettle();
-+      expect(shownTask(tester), 90);
-+      expect(find.text(es.meetingCreateTask), findsNothing);
-+      expect(filled(es.meetingViewTask), findsOneWidget);
-+      expect(outlined(es.editNote), findsOneWidget);
-+      expect(filled(es.editNote), findsNothing);
-+      final count = tasks(app).length;
-+      await tester.tap(find.text(es.meetingViewTask));
-+      await tester.pumpAndSettle();
-+      expect(shownTask(tester), task.id);
-+      expect(tasks(app).length, count);
-+      expect(tester.takeException(), isNull);
++      await untick(tester, steps[1]);
++      expect(tester.widget<Checkbox>(stepBox(steps[1])).value, isFalse);
++      await addTask(tester);
++      final task = made(app.container);
++      expect(task, isNotNull);
++      expect(task!.title, 'Precio del piloto con Acme');
++      expect(task.checklist.map((step) => step.title), [steps[0], steps[2]]);
++      expect(task.checklist.any((step) => step.done()), isFalse);
++      expect(task.checklist.any((step) => step.completed), isFalse);
++      // The note keeps its three steps, all open.
++      final kept = tasks(app.container).firstWhere((t) => t.id == 95);
++      expect(kept.checklist.map((step) => step.title), steps);
++      expect(kept.checklist.any((step) => step.done()), isFalse);
 +    });
 +
 +    testWidgets('UX-2701: a step typed in the review starts ticked and is '
-+        'saved open', (tester) async {
-+      final es = lookupAppLocalizations(const Locale('es'));
++        'saved as an open step', (tester) async {
 +      final app = await open(tester);
 +      await createTask(tester);
-+      final add = inReview(find.byKey(const ValueKey('add-checklist-item')));
-+      await tester.ensureVisible(add);
++      final field = find.descendant(
++        of: find.byType(ChecklistEditor),
++        matching: find.byKey(const ValueKey('add-checklist-item')),
++      );
++      await tester.ensureVisible(field);
 +      await tester.pumpAndSettle();
-+      await tester.enterText(add, 'Print the contract');
++      await tester.enterText(field, 'Llamar a Ana');
 +      await tester.testTextInput.receiveAction(TextInputAction.done);
 +      await tester.pumpAndSettle();
-+      expect(stepBox('Print the contract'), findsOneWidget);
-+      expect(
-+        tester.widget<Checkbox>(stepBox('Print the contract')).value,
-+        isTrue,
-+      );
-+      expect(inReview(find.text(es.meetingStepsToAdd)), findsOneWidget);
-+      await saveFromReview(tester);
-+      final task = made(app);
-+      expect(task.checklist.map((s) => s.title), [
-+        one,
-+        two,
-+        three,
-+        'Print the contract',
++      expect(stepBox('Llamar a Ana'), findsOneWidget);
++      expect(tester.widget<Checkbox>(stepBox('Llamar a Ana')).value, isTrue);
++      await addTask(tester);
++      final task = made(app.container)!;
++      expect(task.checklist.map((step) => step.title), [
++        ...steps,
++        'Llamar a Ana',
 +      ]);
-+      expect(task.checklist.any((s) => s.done()), isFalse);
++      expect(task.checklist.any((step) => step.done()), isFalse);
 +    });
 +
-+    testWidgets('UX-2702: Deshacer deletes the task and closes its page; the '
-+        'note offers «Crear tarea» again', (tester) async {
-+      final es = lookupAppLocalizations(const Locale('es'));
++    testWidgets('UX-2701: a dictated capture’s review keeps «Pasos · n/N», '
++        'the ⋮ and a tick that marks the step done', (tester) async {
++      final captures = MemoryCaptures();
++      final container = designContainer(
++        overrides: [
++          captureStoreProvider.overrideWithValue(captures),
++          ...captureSheetOverrides(),
++        ],
++      );
++      addTearDown(container.dispose);
++      captures.tasks = container;
++      final session = await captures.create(
++        'local',
++        'Europe/Madrid',
++        text: 'Preparar la mudanza',
++        source: 'speech',
++      );
++      await captures.update(
++        session.copyWith(
++          status: 'ready',
++          transcript: 'Preparar la mudanza',
++          drafts: [
++            CaptureDraft(
++              id: 'dictated',
++              task: Task(
++                title: 'Preparar la mudanza',
++                priority: 1,
++                checklist: [
++                  ChecklistItem(id: 'd1', title: 'Pedir cajas'),
++                  ChecklistItem(id: 'd2', title: 'Avisar al casero'),
++                ],
++              ),
++            ),
++          ],
++        ),
++      );
++      await tester.binding.setSurfaceSize(const Size(360, 800));
++      addTearDown(() => tester.binding.setSurfaceSize(null));
++      await tester.pumpWidget(
++        _app(container, const Scaffold(body: SizedBox()), language: 'es'),
++      );
++      await tester.pumpAndSettle();
++      await openCaptureResult(tester, session.id);
++      final editor = find.descendant(
++        of: find.byType(CaptureResult),
++        matching: find.byType(ChecklistEditor),
++      );
++      expect(editor, findsOneWidget);
++      expect(find.text(es.checklistCount(0, 2)), findsOneWidget);
++      expect(find.text(es.meetingStepsToAdd), findsNothing);
++      expect(
++        find.descendant(
++          of: editor,
++          matching: find.byWidgetPredicate((w) => w is PopupMenuButton),
++        ),
++        findsNWidgets(2),
++      );
++      expect(tester.widget<Checkbox>(stepBox('Pedir cajas')).value, isFalse);
++      await tester.ensureVisible(stepBox('Pedir cajas'));
++      await tester.pumpAndSettle();
++      await tester.tap(stepBox('Pedir cajas'));
++      await tester.pumpAndSettle();
++      expect(find.text(es.checklistCount(1, 2)), findsOneWidget);
++      expect(
++        captures.current!.drafts.single.task.checklist.first.done(),
++        isTrue,
++      );
++    });
++
++    testWidgets('UX-2702: «Añadir tarea» lands on the new task’s page; one '
++        'Back shows the note; Calendar’s focus is not set', (tester) async {
 +      final app = await open(tester);
 +      await createTask(tester);
-+      await saveFromReview(tester);
-+      final id = made(app).id;
-+      expect(shownTask(tester), id);
-+      final undo = find.descendant(
-+        of: find.byType(SnackBar),
-+        matching: find.text(es.undo),
-+      );
-+      expect(undo, findsOneWidget);
-+      await tester.tap(undo);
++      await addTask(tester);
++      final task = made(app.container);
++      expect(task, isNotNull);
++      expect(find.byType(CaptureResult), findsNothing);
++      expect(front(tester), task!.id);
++      expect(app.container.read(calendarFocusProvider), isNull);
++      await tester.binding.handlePopRoute();
 +      await tester.pumpAndSettle();
-+      expect(tasks(app).map((t) => t.id), [90]);
-+      expect(shownTask(tester), 90);
-+      expect(filled(es.meetingCreateTask), findsOneWidget);
++      expect(find.byType(TaskDetailScreen), findsOneWidget);
++      expect(front(tester), 95);
++      expect(app.container.read(calendarFocusProvider), isNull);
++    });
++
++    testWidgets('UX-2702: back on the note, «Ver tarea» and no «Crear tarea»; '
++        'it opens that same task, and no task is added', (tester) async {
++      final app = await open(tester);
++      await createTask(tester);
++      await addTask(tester);
++      final task = made(app.container)!;
++      await tester.binding.handlePopRoute();
++      await tester.pumpAndSettle();
++      expect(front(tester), 95);
++      expect(filledButtonWithText(es.meetingViewTask), findsOneWidget);
++      expect(find.text(es.meetingCreateTask), findsNothing);
++      final count = tasks(app.container).length;
++      await tester.tap(filledButtonWithText(es.meetingViewTask));
++      await tester.pumpAndSettle();
++      expect(front(tester), task.id);
++      expect(find.byType(CaptureResult), findsNothing);
++      expect(tasks(app.container).length, count);
++    });
++
++    testWidgets('UX-2702: «Deshacer» deletes the new task and closes its '
++        'page; the note offers «Crear tarea» again', (tester) async {
++      final app = await open(tester);
++      await createTask(tester);
++      await addTask(tester);
++      final task = made(app.container)!;
++      expect(front(tester), task.id);
++      await tester.tap(find.text(es.undo).last);
++      await tester.pumpAndSettle();
++      expect(made(app.container), isNull);
++      expect(front(tester), 95);
++      expect(find.byType(TaskDetailScreen), findsOneWidget);
++      expect(filledButtonWithText(es.meetingCreateTask), findsOneWidget);
 +      expect(find.text(es.meetingViewTask), findsNothing);
-+      expect(find.byType(CaptureReviewEditor), findsNothing);
-+      expect(tester.takeException(), isNull);
++      // Nothing waits in «Sin guardar» for it.
++      expect(app.captures.current!.status, 'discarded');
 +    });
 +
 +    testWidgets('UX-2702: deleting the made task from its page: the note '
 +        'offers «Crear tarea» again', (tester) async {
-+      final es = lookupAppLocalizations(const Locale('es'));
 +      final app = await open(tester);
 +      await createTask(tester);
-+      await saveFromReview(tester);
-+      final id = made(app).id;
-+      expect(shownTask(tester), id);
++      await addTask(tester);
++      final task = made(app.container)!;
++      expect(front(tester), task.id);
++      ScaffoldMessenger.of(
++        tester.element(find.byType(TaskDetailScreen).last),
++      ).removeCurrentSnackBar();
++      await tester.pumpAndSettle();
 +      await tester.tap(find.byTooltip(es.deleteTask));
 +      await tester.pumpAndSettle();
-+      expect(tasks(app).map((t) => t.id), [90]);
-+      expect(shownTask(tester), 90);
-+      expect(filled(es.meetingCreateTask), findsOneWidget);
++      expect(made(app.container), isNull);
++      expect(front(tester), 95);
++      expect(filledButtonWithText(es.meetingCreateTask), findsOneWidget);
 +      expect(find.text(es.meetingViewTask), findsNothing);
-+      expect(tester.takeException(), isNull);
 +    });
 +
-+    testWidgets('UX-2706: Cancelar and Back close the review at once, with no '
-+        'question, and the capture is gone', (tester) async {
-+      final es = lookupAppLocalizations(const Locale('es'));
++    testWidgets('UX-2706: Cancelar and Back close a note’s review with no '
++        'question; the capture goes, and «Sin guardar» is as before', (
++      tester,
++    ) async {
 +      final app = await open(tester);
 +      final before = await app.container.read(pendingCapturesProvider.future);
-+
-+      // Cancelar.
-+      await createTask(tester);
-+      final cancel = find.descendant(
-+        of: find.byType(CaptureResult),
-+        matching: find.widgetWithText(TextButton, es.cancel),
-+      );
-+      await tester.ensureVisible(cancel);
-+      await tester.pumpAndSettle();
-+      await tester.tap(cancel);
-+      await tester.pump();
-+      expect(find.byType(AlertDialog), findsNothing);
-+      expect(find.text(es.captureKeepTextQuestion), findsNothing);
-+      await tester.pumpAndSettle();
-+      expect(find.byType(AlertDialog), findsNothing);
-+      expect(find.byType(CaptureReviewEditor), findsNothing);
-+      expect(app.captures.current!.source, 'note');
-+      expect(app.captures.current!.status, 'discarded');
-+      expect(shownTask(tester), 90);
-+
-+      // Back.
-+      await createTask(tester);
-+      expect(app.captures.current!.status, 'ready');
-+      await tester.binding.handlePopRoute();
-+      await tester.pump();
-+      expect(find.byType(AlertDialog), findsNothing);
-+      await tester.pumpAndSettle();
-+      expect(find.byType(AlertDialog), findsNothing);
-+      expect(find.byType(CaptureReviewEditor), findsNothing);
-+      expect(app.captures.current!.status, 'discarded');
-+      expect(shownTask(tester), 90);
-+
-+      // Nothing was saved, nothing waits, and the note is as it was.
-+      expect(tasks(app).map((t) => t.id), [90]);
-+      final after = await app.container.read(pendingCapturesProvider.future);
-+      expect(after.map((s) => s.id), before.map((s) => s.id));
-+      expect(filled(es.meetingCreateTask), findsOneWidget);
-+      expect(tester.takeException(), isNull);
++      for (final leave in ['Cancelar', 'Back']) {
++        await createTask(tester);
++        expect(app.captures.current!.source, 'note');
++        if (leave == 'Cancelar') {
++          final cancel = find.descendant(
++            of: find.byType(CaptureResult),
++            matching: find.widgetWithText(TextButton, es.cancel),
++          );
++          await tester.ensureVisible(cancel);
++          await tester.pumpAndSettle();
++          await tester.tap(cancel);
++        } else {
++          await tester.binding.handlePopRoute();
++        }
++        await tester.pumpAndSettle();
++        expect(find.byType(AlertDialog), findsNothing, reason: leave);
++        expect(find.text(es.captureKeepTextQuestion), findsNothing);
++        expect(find.byType(CaptureResult), findsNothing, reason: leave);
++        expect(app.captures.current!.status, 'discarded', reason: leave);
++        expect(front(tester), 95, reason: leave);
++        final after = await app.container.read(pendingCapturesProvider.future);
++        expect(
++          after.map((capture) => capture.id),
++          before.map((capture) => capture.id),
++          reason: leave,
++        );
++        // Nothing was made, and the note is as it was.
++        expect(made(app.container), isNull, reason: leave);
++        expect(filledButtonWithText(es.meetingCreateTask), findsOneWidget);
++      }
 +    });
 +
-+    for (final (language, scale) in [('es', 1.0), ('es', 2.0), ('ca', 2.0)]) {
-+      testWidgets('UX-2709: «Crear tarea» is the filled button, first, beside '
-+          'an outlined «Editar nota» as tall ($language $scale×)', (
++    group('UX-2709 with Manrope', () {
++      setUpAll(loadManrope);
++
++      testWidgets('UX-2709: on a note with open steps, «Crear tarea» is the '
++          'filled button, first, and «Editar nota» outlined, as tall', (
 +        tester,
 +      ) async {
-+        final l = lookupAppLocalizations(Locale(language));
-+        await open(tester, language: language, scale: scale);
-+        final create = filled(l.meetingCreateTask);
-+        final edit = outlined(l.editNote);
-+        expect(create, findsOneWidget);
-+        expect(edit, findsOneWidget);
-+        expect(filled(l.editNote), findsNothing);
-+        expect(outlined(l.meetingCreateTask), findsNothing);
-+        final a = tester.getRect(create);
-+        final b = tester.getRect(edit);
-+        // First: on an earlier line, or before it on the same line.
-+        expect(
-+          a.top < b.top - 1 || ((a.top - b.top).abs() <= 1 && a.left < b.left),
-+          isTrue,
-+          reason: 'Crear tarea at $a, Editar nota at $b',
-+        );
-+        expect((a.height - b.height).abs(), lessThanOrEqualTo(1));
-+        // Both on screen, in the bottom bar.
-+        for (final rect in [a, b]) {
-+          expect(rect.left, greaterThanOrEqualTo(0));
-+          expect(rect.right, lessThanOrEqualTo(360));
-+          expect(rect.bottom, lessThanOrEqualTo(800));
++        for (final (language, scale) in [
++          ('es', 1.0),
++          ('es', 2.0),
++          ('ca', 2.0),
++        ]) {
++          final l = lookupAppLocalizations(Locale(language));
++          final why = '$language ${scale}x';
++          await open(tester, language: language, scale: scale);
++          final create = filledButtonWithText(l.meetingCreateTask);
++          final edit = outlinedButtonWithText(l.editNote);
++          expect(create, findsOneWidget, reason: why);
++          expect(edit, findsOneWidget, reason: why);
++          expect(filledButtonWithText(l.editNote), findsNothing, reason: why);
++          final a = tester.getRect(create);
++          final b = tester.getRect(edit);
++          // First: on an earlier line, or to the left on the same one.
++          final sameLine = (a.top - b.top).abs() < 1;
++          expect(
++            sameLine ? a.left < b.left : a.top < b.top,
++            isTrue,
++            reason: '$why: $a before $b',
++          );
++          expect(
++            (a.height - b.height).abs(),
++            lessThanOrEqualTo(1),
++            reason: '$why: ${a.height} vs ${b.height}',
++          );
++          // Both whole on screen.
++          for (final rect in [a, b]) {
++            expect(rect.left, greaterThanOrEqualTo(0), reason: why);
++            expect(rect.right, lessThanOrEqualTo(360), reason: why);
++            expect(rect.bottom, lessThanOrEqualTo(800), reason: why);
++          }
++          expect(tester.takeException(), isNull, reason: why);
++          await tester.pumpWidget(const SizedBox.shrink());
 +        }
-+        expect(tester.takeException(), isNull);
 +      });
-+    }
 +
-+    testWidgets('UX-2709: a note with no steps keeps only a filled «Editar '
-+        'nota»', (tester) async {
-+      final es = lookupAppLocalizations(const Locale('es'));
-+      await open(
-+        tester,
-+        note: Task(
-+          id: 91,
-+          kind: 'note',
-+          title: 'Plain',
-+          notes: 'Words',
-+          priority: 1,
-+        ),
-+      );
-+      expect(filled(es.editNote), findsOneWidget);
-+      expect(outlined(es.editNote), findsNothing);
-+      expect(find.text(es.meetingCreateTask), findsNothing);
-+      expect(find.text(es.meetingViewTask), findsNothing);
++      testWidgets('UX-2709: a note with no steps keeps a filled «Editar nota» '
++          'alone', (tester) async {
++        await open(tester, shown: note(withSteps: false));
++        expect(filledButtonWithText(es.editNote), findsOneWidget);
++        expect(outlinedButtonWithText(es.editNote), findsNothing);
++        expect(find.text(es.meetingCreateTask), findsNothing);
++        expect(find.text(es.meetingViewTask), findsNothing);
++      });
 +    });
 +
-+    test('the new copy in English, Spanish and Catalan', () {
++    test('The new copy exists in English, Spanish and Catalan', () {
 +      final en = lookupAppLocalizations(const Locale('en'));
-+      final es = lookupAppLocalizations(const Locale('es'));
 +      final ca = lookupAppLocalizations(const Locale('ca'));
 +      expect(en.meetingStepsToAdd, 'Steps to add');
 +      expect(es.meetingStepsToAdd, 'Pasos que se añaden');
@@ -1323,55 +1357,95 @@ index 7319f60..a4953a3 100644
 +      expect(es.meetingCreateTask, 'Crear tarea');
 +    });
 +  });
-+}
+ }
+ 
+ /// Signs out as the app does: sign-in shows once its state has no account.
+diff --git a/App/test/support/note_task_fakes.dart b/App/test/support/note_task_fakes.dart
+new file mode 100644
+index 0000000..6f93b3a
+--- /dev/null
++++ b/App/test/support/note_task_fakes.dart
+@@ -0,0 +1,66 @@
++// P318: «Crear tarea» from a note, in memory: a task list that saving adds
++// to and Deshacer or Eliminar take from, and the phone's note → task links.
++import 'package:agenda/models/task.dart';
++import 'package:agenda/providers/task_provider.dart';
++import 'package:agenda/services/task_database.dart';
++import 'package:agenda/widgets/note_task.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
 +
-+class _NoteApp {
-+  _NoteApp(this.container, this.captures, this.links);
-+  final ProviderContainer container;
-+  final MemoryCaptures captures;
-+  final _MemoryNoteLinks links;
-+}
++import 'design_fixtures.dart';
 +
-+/// The account's tasks in memory: «Añadir tarea» adds one, Deshacer and
-+/// Eliminar take it out.
-+class _NoteTasks extends DesignTaskNotifier {
-+  _NoteTasks(this.items);
++/// A task list in memory: added tasks get new ids, deleted ones go.
++class NoteTaskList extends TaskNotifier {
++  NoteTaskList(List<Task> items) : items = [...items], super(MemoryTasks());
 +  final List<Task> items;
++  int _next = 500;
++
 +  @override
-+  Future<void> loadTasks() async {
-+    if (!state.hasValue) state = AsyncData(items);
++  Future<void> loadTasks() async => state = AsyncValue.data([...items]);
++  @override
++  Future<void> showLocal() => loadTasks();
++  @override
++  Future<int> addTask(Task task) async {
++    final id = _next++;
++    items.add(task.copyWith(id: id));
++    await loadTasks();
++    return id;
 +  }
 +
 +  @override
-+  Future<void> showLocal() async {}
++  Future<void> addTasks(List<Task> tasks) async {
++    for (final task in tasks) {
++      items.add(task.copyWith(id: _next++));
++    }
++    await loadTasks();
++  }
++
++  @override
++  Future<void> deleteTask(int id, {bool sync = true}) async {
++    items.removeWhere((task) => task.id == id);
++    await loadTasks();
++  }
++
++  @override
++  Future<void> restoreTask(Task task) async {
++    items.add(task);
++    await loadTasks();
++  }
 +}
 +
 +/// The phone's note → task links, in memory.
-+class _MemoryNoteLinks extends NoteTaskLinks {
-+  _MemoryNoteLinks() : super(TaskDatabase());
-+  final links = <int, int>{};
++class MemoryNoteTaskLinks extends NoteTaskLinks {
++  MemoryNoteTaskLinks([Map<int, int>? links])
++    : links = {...?links},
++      super(TaskDatabase());
++  final Map<int, int> links;
 +  @override
 +  Future<Map<int, int>> read(String owner) async => {...links};
 +  @override
 +  Future<void> link(String owner, int noteId, int taskId) async =>
 +      links[noteId] = taskId;
- }
- 
- class _SignedOut extends AuthNotifier {
++}
++
++/// The overrides for [NoteTaskList] and [MemoryNoteTaskLinks].
++List<Override> noteTaskOverrides(MemoryNoteTaskLinks links) => [
++  noteTaskLinksProvider.overrideWithValue(links),
++];
 diff --git a/App/test/ux_previews/meeting_previews.dart b/App/test/ux_previews/meeting_previews.dart
-index 21c6e47..7cc0a38 100644
+index 7c09c36..ffd316b 100644
 --- a/App/test/ux_previews/meeting_previews.dart
 +++ b/App/test/ux_previews/meeting_previews.dart
-@@ -7,6 +7,8 @@ import 'package:agenda/models/meeting.dart';
- import 'package:agenda/models/task.dart';
+@@ -10,6 +10,8 @@ import 'package:agenda/models/task.dart';
+ import 'package:agenda/screens/notes_screen.dart';
  import 'package:agenda/services/meeting_controller.dart';
  import 'package:agenda/services/meeting_recorder.dart';
 +import 'package:agenda/services/task_database.dart';
 +import 'package:agenda/widgets/note_task.dart';
+ import 'package:flutter/material.dart';
  import 'package:flutter_test/flutter_test.dart';
  
- import '../support/meeting_screen_fakes.dart';
-@@ -48,7 +50,7 @@ const meetingLines = Screen(
+@@ -53,7 +55,7 @@ const meetingLines = Screen(
  const meetingNote = Screen(
    'meetings',
    'note',
@@ -1380,7 +1454,7 @@ index 21c6e47..7cc0a38 100644
    sources: [
      'lib/screens/task_detail_screen.dart',
      'lib/widgets/note_task.dart',
-@@ -98,16 +100,44 @@ Task _meetingNoteTask() => Task(
+@@ -107,6 +109,30 @@ Task _meetingNoteTask() => Task(
    ],
  );
  
@@ -1408,16 +1482,21 @@ index 21c6e47..7cc0a38 100644
 +      links[noteId] = taskId;
 +}
 +
+ /// Without [pro], an account with free dictations, and the store answering
+ /// with its price for the Pro screen.
  Future<PreviewApp> _open(
-   Preview p,
-   ScriptedMeetings meetings, {
+@@ -115,6 +141,7 @@ Future<PreviewApp> _open(
    bool pro = true,
    List<Task> tasks = const [],
+   bool notificationsAllowed = true,
 +  Map<int, int>? noteTasks,
  }) => PreviewApp.open(
    p,
    pro: pro,
+@@ -122,7 +149,10 @@ Future<PreviewApp> _open(
+   billing: pro ? null : (FakeRevenueCat()..info = billingInfo()),
    tasks: [...normalDay(), ...tasks],
+   notificationsAllowed: notificationsAllowed,
 -  overrides: [meetingsOverride(meetings)],
 +  overrides: [
 +    meetingsOverride(meetings),
@@ -1426,16 +1505,16 @@ index 21c6e47..7cc0a38 100644
  );
  
  /// Notas, then «Grabar una reunión».
-@@ -416,7 +446,7 @@ void meetingPreviews() {
+@@ -491,7 +521,7 @@ void meetingPreviews() {
      preview(
        meetingNote,
        'create-task',
--      'The meeting’s note opened: summary, decisions, open questions, parts, the to-dos as steps, and Crear tarea beside Editar nota.',
-+      'The meeting’s note opened: summary, decisions, open questions, parts, the to-dos as steps, and a filled Crear tarea first, with an outlined Editar nota as tall beside it.',
+-      'The meeting’s note opened: its steps (the to-dos) first, then the note: the meeting’s date and length, summary, decisions, open questions, parts; and Crear tarea beside Editar nota.',
++      'The meeting’s note opened: its steps (the to-dos) first, then the note: the meeting’s date and length, summary, decisions, open questions, parts; and a filled Crear tarea first, with an outlined Editar nota as tall beside it.',
        _all,
        (p) async {
          final app = await _open(
-@@ -434,7 +464,25 @@ void meetingPreviews() {
+@@ -509,7 +539,25 @@ void meetingPreviews() {
        },
        then: {
          'review':

@@ -5352,6 +5352,12 @@ class AppLocalizationsCa extends AppLocalizations {
   String get meetingCreateTask => 'Crea una tasca';
 
   @override
+  String get meetingStepsToAdd => 'Passos que s’afegeixen';
+
+  @override
+  String get meetingViewTask => 'Mostra la tasca';
+
+  @override
   String get meetingSignOutTitle => 'Vols tancar la sessió?';
 
   @override

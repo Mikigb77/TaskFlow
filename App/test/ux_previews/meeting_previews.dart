@@ -15,6 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/billing_fixtures.dart';
 import '../support/meeting_screen_fakes.dart';
+import '../support/note_task_fakes.dart';
 import 'support/app.dart';
 import 'support/fixtures.dart';
 import 'support/preview.dart';
@@ -53,7 +54,7 @@ const meetingLines = Screen(
 const meetingNote = Screen(
   'meetings',
   'note',
-  'A note made from a meeting, with Crear tarea, and the review it opens',
+  'A note made from a meeting, with Crear tarea, the review it opens, and Ver tarea once its task exists',
   sources: [
     'lib/screens/task_detail_screen.dart',
     'lib/widgets/note_task.dart',
@@ -107,14 +108,27 @@ Task _meetingNoteTask() => Task(
   ],
 );
 
+/// The task «Crear tarea» made from [_meetingNoteTask], with the steps kept.
+Task _madeTask() => Task(
+  id: 121,
+  title: 'Precio del piloto con Acme',
+  priority: 1,
+  checklist: [
+    ChecklistItem(id: 't1', title: 'Enviar el presupuesto · Miki · el viernes'),
+    ChecklistItem(id: 't3', title: 'Pedir el contacto de compras · Ana'),
+  ],
+);
+
 /// Without [pro], an account with free dictations, and the store answering
-/// with its price for the Pro screen.
+/// with its price for the Pro screen. [noteTasks] are the phone's note → task
+/// links, in memory.
 Future<PreviewApp> _open(
   Preview p,
   ScriptedMeetings meetings, {
   bool pro = true,
   List<Task> tasks = const [],
   bool notificationsAllowed = true,
+  Map<int, int>? noteTasks,
 }) => PreviewApp.open(
   p,
   pro: pro,
@@ -122,7 +136,10 @@ Future<PreviewApp> _open(
   billing: pro ? null : (FakeRevenueCat()..info = billingInfo()),
   tasks: [...normalDay(), ...tasks],
   notificationsAllowed: notificationsAllowed,
-  overrides: [meetingsOverride(meetings)],
+  overrides: [
+    meetingsOverride(meetings),
+    ...noteTaskOverrides(MemoryNoteTaskLinks(noteTasks)),
+  ],
 );
 
 /// Notas, then «Grabar una reunión».
@@ -137,7 +154,13 @@ Future<PreviewApp> _record(
     notificationsAllowed: notificationsAllowed,
   );
   await app.tab(p.l.notes);
-  // The last thing in Notas (UX-2707): below the fold at large text.
+  await _tapRecord(p);
+  return app;
+}
+
+/// In Notas, «Grabar una reunión»: the last thing there (UX-2707), below the
+/// fold at large text.
+Future<void> _tapRecord(Preview p) async {
   await p.tester.scrollUntilVisible(
     find.byKey(const ValueKey('record-meeting')),
     200,
@@ -151,7 +174,6 @@ Future<PreviewApp> _record(
   await p.tester.pumpAndSettle();
   await p.tester.tap(find.text(p.l.meetingRecord).hitTestable());
   await p.tester.pumpAndSettle();
-  return app;
 }
 
 /// Parar on ten minutes judged all silence (UX-2717): kept as a stopped
@@ -606,7 +628,7 @@ void meetingPreviews() {
     preview(
       meetingNote,
       'create-task',
-      'The meeting’s note opened: its steps (the to-dos) first, then the note: the meeting’s date and length, summary, decisions, open questions, parts; and Crear tarea beside Editar nota.',
+      'The meeting’s note opened: its steps (the to-dos) first, then the note: the meeting’s date and length, summary, decisions, open questions, parts; and a filled Crear tarea first, with an outlined Editar nota as tall beside it.',
       _all,
       (p) async {
         final app = await _open(
@@ -624,7 +646,25 @@ void meetingPreviews() {
       },
       then: {
         'review':
-            'Crear tarea: the review with the meeting’s title and its to-dos as the checklist, to drop some and set a day before saving.',
+            'Crear tarea: the review with the meeting’s title and its to-dos ticked under «Pasos que se añaden», with no ⋮, to untick what isn’t wanted and set a day before saving.',
+      },
+    );
+
+    preview(
+      meetingNote,
+      'after-task',
+      'The meeting’s note once its task exists: a filled Ver tarea, which opens that task, first, and an outlined Editar nota; no Crear tarea.',
+      [es1],
+      (p) async {
+        final app = await _open(
+          p,
+          ScriptedMeetings(),
+          tasks: [_meetingNoteTask(), _madeTask()],
+          noteTasks: {120: 121},
+        );
+        await app.tab(p.l.notes);
+        await app.tap('Precio del piloto con Acme');
+        await p.shoot();
       },
     );
 
@@ -636,8 +676,7 @@ void meetingPreviews() {
       (p) async {
         final app = await _open(p, ScriptedMeetings(), pro: false);
         await app.tab(p.l.notes);
-        await p.tester.tap(find.text(p.l.meetingRecord).hitTestable());
-        await p.tester.pumpAndSettle();
+        await _tapRecord(p);
         await p.shoot();
       },
     );
