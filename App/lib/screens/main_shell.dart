@@ -85,9 +85,11 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    // Read the notes' «Crear tarea» links before any note's page opens, so
-    // its main button shows the right label from the start (R1-P318-1).
+    // Read the notes' «Crear tarea» links and this phone's meeting notes
+    // before any note's page opens, so its main button shows the right
+    // label from the start (R1-P318-1, UX-2903).
     ref.listen(noteTasksProvider, (_, _) {});
+    ref.listen(meetingNotesProvider, (_, _) {});
     // Tasks saved from the pending list land on Calendar.
     ref.listen<CalendarFocus?>(calendarFocusProvider, (_, focus) {
       if (focus?.showCalendar == true && _index != 0) {

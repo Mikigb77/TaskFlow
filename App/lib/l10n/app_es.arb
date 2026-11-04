@@ -1504,9 +1504,9 @@
   "meetingContinueNamed": "Seguir grabando, {time} hasta ahora",
   "billingReasonMeetingNotes": "Con Pro, tus reuniones se convierten en notas:",
   "billingReasonMeetingNotesExample": "un resumen, las decisiones y las cosas por hacer",
-  "proBenefitMeetingNotes": "Notas de las reuniones que grabas, hasta {hours} horas al mes",
+  "proBenefitMeetingNotes": "{hours, plural, =1{Notas de las reuniones que grabas, hasta 1 hora al mes} other{Notas de las reuniones que grabas, hasta {hours} horas al mes}}",
   "meetingAudioDeleted": "El audio se envía para hacer las notas y después se borra.",
-  "meetingNotifyAsk": "Para pararla desde la notificación y avisarte cuando las notas estén listas.",
+  "meetingNotifyAsk": "Activa las notificaciones para parar la grabación desde ahí y saber cuándo están listas las notas.",
   "meetingNotifyAskContinue": "Continuar",
-  "billingReasonMeetingNotesLimit": "Hasta {hours} horas de reuniones al mes."
+  "billingReasonMeetingNotesLimit": "{hours, plural, =1{Hasta 1 hora de reuniones al mes.} other{Hasta {hours} horas de reuniones al mes.}}"
 }

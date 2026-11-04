@@ -130,7 +130,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                     // The month's meeting time, before anyone runs out of it
                     // (D4).
                     if (widget.reason == ProReason.meetingNotes) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 8),
                       Text(
                         l10n.billingReasonMeetingNotesLimit(
                           meetingHoursPerMonth,

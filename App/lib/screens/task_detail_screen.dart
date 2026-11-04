@@ -293,6 +293,13 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                   task,
                   ref.watch(meetingNotesProvider).value ?? const <int>{},
                 );
+            // While either is read, a note with open steps may offer «Crear
+            // tarea»: its place is held, so «Editar nota» neither moves nor
+            // changes style once the label is known (UX-2903).
+            final holds =
+                !linksRead &&
+                task.isNote &&
+                task.checklist.any((step) => !step.done());
             // Inert while Completar closes it: nothing on the page opens in
             // the hold (UX-2633).
             return AbsorbPointer(
@@ -563,7 +570,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                             runSpacing: 8,
                             alignment: WrapAlignment.center,
                             children: [
-                              if (!linksRead && makesTask)
+                              if (holds)
                                 // Holds the main button's place, unseen and
                                 // untappable, so «Crear tarea» never turns
                                 // into «Ver tarea» under a finger.
@@ -596,7 +603,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                                   icon: const Icon(Icons.add_task_rounded),
                                   label: Text(context.l10n.meetingCreateTask),
                                 ),
-                              if (made != null || makesTask)
+                              if (holds || made != null || makesTask)
                                 OutlinedButton.icon(
                                   // As tall as the filled button beside it.
                                   style: OutlinedButton.styleFrom(

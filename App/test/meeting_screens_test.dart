@@ -28,6 +28,7 @@ import 'package:agenda/services/task_database.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/screens/account_screen.dart';
 import 'package:agenda/screens/edit_task_screen.dart';
+import 'package:agenda/screens/main_shell.dart';
 import 'package:agenda/screens/meeting_screen.dart';
 import 'package:agenda/screens/notes_screen.dart';
 import 'package:agenda/screens/subscription_screen.dart';
@@ -43,6 +44,7 @@ import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/capture_review_editor.dart';
 import 'package:agenda/widgets/checklist_editor.dart';
 import 'package:agenda/widgets/meeting_banners.dart';
+import 'package:agenda/widgets/note_task.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -3841,6 +3843,11 @@ void main() {
       String language = 'es',
       double scale = 1,
       Set<int>? meetingNotes,
+      // Read once this completes (UX-2903).
+      Future<void>? meetingNotesReady,
+      Size size = const Size(360, 800),
+      // false: only the first frame is drawn.
+      bool settle = true,
     }) async {
       final captures = MemoryCaptures();
       final links = MemoryNoteTaskLinks();
@@ -3851,7 +3858,11 @@ void main() {
           meetingsOverride(ScriptedMeetings()),
           captureStoreProvider.overrideWithValue(captures),
           ...captureSheetOverrides(),
-          ...noteTaskOverrides(links, meetingNotes: meetingNotes),
+          ...noteTaskOverrides(
+            links,
+            meetingNotes: meetingNotes,
+            meetingNotesReady: meetingNotesReady,
+          ),
         ],
       );
       addTearDown(container.dispose);
@@ -3863,7 +3874,7 @@ void main() {
         (_) async => 'Europe/Madrid',
       );
       addTearDown(() => messenger.setMockMethodCallHandler(timezone, null));
-      await tester.binding.setSurfaceSize(const Size(360, 800));
+      await tester.binding.setSurfaceSize(size);
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(
         _app(
@@ -3873,7 +3884,7 @@ void main() {
           scale: scale,
         ),
       );
-      await tester.pumpAndSettle();
+      if (settle) await tester.pumpAndSettle();
       return (container: container, captures: captures, links: links);
     }
 
@@ -4285,6 +4296,185 @@ void main() {
       });
     });
 
+    group('UX-2903 with Manrope', () {
+      setUpAll(loadManrope);
+
+      // The unseen button that holds «Crear tarea»'s place.
+      Finder placeholder(String label) => find.ancestor(
+        of: find.text(label),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Visibility && !widget.visible,
+        ),
+      );
+      final create = find.byKey(const ValueKey('note-create-task'));
+
+      for (final scale in [1.0, 2.0]) {
+        testWidgets('UX-2903: a meeting note opened while its marks load, '
+            'es ${scale}x: no filled «Editar nota» on the first frame, and '
+            '«Editar nota» stays put when «Crear tarea» shows', (tester) async {
+          final marks = Completer<void>();
+          await open(
+            tester,
+            scale: scale,
+            size: const Size(360, 740),
+            meetingNotesReady: marks.future,
+            settle: false,
+          );
+          // The first frame.
+          expect(filledButtonWithText(es.editNote), findsNothing);
+          expect(outlinedButtonWithText(es.editNote), findsOneWidget);
+          expect(placeholder(es.meetingCreateTask), findsOneWidget);
+          expect(create, findsNothing);
+          final first = tester.getRect(outlinedButtonWithText(es.editNote));
+          final held = tester.getRect(placeholder(es.meetingCreateTask));
+          // The links read, the marks still loading: the same.
+          await tester.pumpAndSettle();
+          expect(filledButtonWithText(es.editNote), findsNothing);
+          expect(placeholder(es.meetingCreateTask), findsOneWidget);
+          expect(tester.getRect(outlinedButtonWithText(es.editNote)), first);
+          marks.complete();
+          await tester.pumpAndSettle();
+          expect(create, findsOneWidget);
+          expect(
+            tester.widget(create),
+            isA<FilledButton>(),
+            reason: '«Crear tarea» is the filled button',
+          );
+          expect(placeholder(es.meetingCreateTask), findsNothing);
+          expect(filledButtonWithText(es.editNote), findsNothing);
+          expect(outlinedButtonWithText(es.editNote), findsOneWidget);
+          // «Editar nota» didn't move, and «Crear tarea» took the place held
+          // for it (at 2×, the row above).
+          expect(tester.getRect(outlinedButtonWithText(es.editNote)), first);
+          expect(tester.getRect(create), held);
+          if (scale == 2) {
+            expect(held.bottom, lessThanOrEqualTo(first.top));
+          }
+          expect(tester.takeException(), isNull);
+        });
+      }
+
+      /// The app's shell on 360×740 in Spanish, with this phone's meeting
+      /// marks ([marked]) read by the app's own provider.
+      Future<({NoteTaskList list, MemoryMeetingNoteMarks marks})> shell(
+        WidgetTester tester,
+        List<Task> notes,
+        Set<int> marked,
+      ) async {
+        final marks = MemoryMeetingNoteMarks(marked);
+        final list = NoteTaskList(notes);
+        final container = designContainer(
+          tasks: () => list,
+          overrides: [
+            meetingsOverride(ScriptedMeetings()),
+            noteTaskLinksProvider.overrideWithValue(MemoryNoteTaskLinks()),
+            meetingNoteMarksOverride(marks),
+          ],
+        );
+        addTearDown(container.dispose);
+        await tester.binding.setSurfaceSize(const Size(360, 740));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.pumpWidget(
+          _app(container, const MainShell(), language: 'es'),
+        );
+        await tester.pumpAndSettle();
+        return (list: list, marks: marks);
+      }
+
+      // Opens note [id]'s page over the shell and draws its first frame on
+      // screen: on the push's own frame the Navigator lays a new page out
+      // offstage, to measure its heroes.
+      Future<void> openPage(WidgetTester tester, int id) async {
+        tester
+            .state<NavigatorState>(find.byType(Navigator).first)
+            .push(taskPageRoute(id));
+        await tester.pump();
+        await tester.pump();
+        expect(find.byType(TaskDetailScreen), findsOneWidget);
+      }
+
+      Future<void> back(WidgetTester tester) async {
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byType(TaskDetailScreen), findsNothing);
+      }
+
+      testWidgets('UX-2903: with the shell open, a meeting note opened twice '
+          'shows «Crear tarea» from the first frame both times, and its '
+          'marks are not read again', (tester) async {
+        final app = await shell(tester, [note()], {95});
+        // Read before any note's page opens.
+        final reads = app.marks.reads;
+        expect(reads, greaterThan(0));
+        for (final time in ['first', 'second']) {
+          await openPage(tester, 95);
+          expect(create, findsOneWidget, reason: '$time open, first frame');
+          expect(placeholder(es.meetingCreateTask), findsNothing);
+          expect(filledButtonWithText(es.editNote), findsNothing);
+          expect(outlinedButtonWithText(es.editNote), findsOneWidget);
+          await tester.pumpAndSettle();
+          expect(create, findsOneWidget, reason: '$time open, settled');
+          await back(tester);
+        }
+        expect(app.marks.reads, reads);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('UX-2903: a meeting note saved after the marks were read '
+          'offers «Crear tarea» when its page opens', (tester) async {
+        final app = await shell(tester, [note()], {95});
+        final reads = app.marks.reads;
+        // A meeting's note is saved with its mark, then the list reloads.
+        app.list.items.add(
+          note().copyWith(id: 96, title: 'Revisión del contrato'),
+        );
+        app.marks.ids.add(96);
+        await app.list.showLocal();
+        await tester.pumpAndSettle();
+        expect(app.marks.reads, greaterThan(reads));
+        await openPage(tester, 96);
+        expect(create, findsOneWidget, reason: 'first frame');
+        expect(filledButtonWithText(es.editNote), findsNothing);
+        await tester.pumpAndSettle();
+        expect(create, findsOneWidget);
+        expect(outlinedButtonWithText(es.editNote), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('UX-2903: the croquetas recipe with open steps, marks read, '
+          'keeps one filled «Editar nota» and no «Crear tarea» from the '
+          'first frame', (tester) async {
+        final recipe = Task(
+          id: 8,
+          kind: 'note',
+          title: 'Receta de croquetas',
+          priority: 1,
+          checklist: [
+            ChecklistItem(id: 'r0', title: 'Hacer la bechamel'),
+            ChecklistItem(id: 'r1', title: 'Rebozar'),
+          ],
+        );
+        await shell(tester, [note(), recipe], {95});
+        await openPage(tester, 8);
+        for (final when in ['first frame', 'settled']) {
+          expect(
+            filledButtonWithText(es.editNote),
+            findsOneWidget,
+            reason: when,
+          );
+          expect(
+            outlinedButtonWithText(es.editNote),
+            findsNothing,
+            reason: when,
+          );
+          expect(find.text(es.meetingCreateTask), findsNothing, reason: when);
+          expect(find.text(es.meetingViewTask), findsNothing, reason: when);
+          await tester.pumpAndSettle();
+        }
+        expect(tester.takeException(), isNull);
+      });
+    });
+
     test('The new copy exists in English, Spanish and Catalan', () {
       final en = lookupAppLocalizations(const Locale('en'));
       final ca = lookupAppLocalizations(const Locale('ca'));
@@ -4338,7 +4528,12 @@ void main() {
     testWidgets('D3: closing the sentence asks nothing more, and it is not '
         'asked again', (tester) async {
       final (access, store) = await record(tester);
+      // A stray tap on the dimmed screen leaves the card up (UX-2904).
       await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+      expect(find.text(es.meetingNotifyAsk), findsOneWidget);
+      // Back closes it.
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.text(es.meetingNotifyAsk), findsNothing);
       expect(access.permissionRequests, 0);
@@ -4380,11 +4575,11 @@ void main() {
       final ca = lookupAppLocalizations(const Locale('ca'));
       expect(
         es.meetingNotifyAsk,
-        'Para pararla desde la notificación y avisarte cuando las notas '
-        'estén listas.',
+        'Activa las notificaciones para parar la grabación desde ahí y saber '
+        'cuándo están listas las notas.',
       );
-      expect(en.meetingNotifyAsk, startsWith('So you can stop it'));
-      expect(ca.meetingNotifyAsk, startsWith('Per aturar-la'));
+      expect(en.meetingNotifyAsk, startsWith('Turn on notifications'));
+      expect(ca.meetingNotifyAsk, startsWith('Activa les notificacions'));
       expect(es.meetingNotifyAskContinue, 'Continuar');
       expect(en.meetingNotifyAskContinue, 'Continue');
       expect(ca.meetingNotifyAskContinue, 'Continua');
@@ -4406,6 +4601,277 @@ void main() {
       );
     });
   });
+
+  group('P327: the first meeting\'s notification card', () {
+    const esAsk =
+        'Activa las notificaciones para parar la grabación desde ahí y saber '
+        'cuándo están listas las notas.';
+    const enAsk =
+        'Turn on notifications to stop the recording from there and to know '
+        'when the notes are ready.';
+    const caAsk =
+        'Activa les notificacions per aturar l’enregistrament des d’allà i '
+        'saber quan les notes estan llestes.';
+    final card = find.byType(AlertDialog);
+    // The phone's accessibility timeout answers at once, so a feedback line
+    // shows without waiting out the channel's own timeout.
+    const timeoutChannel = MethodChannel('taskflow/accessibility');
+    final platform =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    setUp(
+      () =>
+          platform.setMockMethodCallHandler(timeoutChannel, (_) async => null),
+    );
+    tearDown(() => platform.setMockMethodCallHandler(timeoutChannel, null));
+
+    /// Starts a meeting with TaskFlow's notifications off, on [access] and
+    /// [store] when given (so a later meeting sees the same phone).
+    Future<(FakeReminderAccess, _WatchedStore)> record(
+      WidgetTester tester, {
+      String language = 'es',
+      double scale = 1,
+      bool grant = true,
+      FakeReminderAccess? access,
+      _WatchedStore? store,
+    }) async {
+      final phone = access ?? FakeReminderAccess(grant: grant);
+      final prefs = store ?? _WatchedStore();
+      final container = _container(
+        ScriptedMeetings(),
+        overrides: [
+          reminderAccessProvider.overrideWithValue(phone),
+          reminderPreferenceStoreProvider.overrideWithValue(prefs),
+        ],
+      );
+      await _notes(tester, container, language: language, scale: scale);
+      await tester.tap(find.byKey(const ValueKey('record-meeting')));
+      await tester.pumpAndSettle();
+      expect(find.byType(MeetingScreen), findsOneWidget);
+      return (phone, prefs);
+    }
+
+    Future<void> leave(WidgetTester tester) async {
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    }
+
+    test('UX-2901: the card is one whole sentence that names the recording '
+        'and the notifications, in all three languages', () {
+      final es = lookupAppLocalizations(const Locale('es'));
+      final en = lookupAppLocalizations(const Locale('en'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(es.meetingNotifyAsk, esAsk);
+      expect(en.meetingNotifyAsk, enAsk);
+      expect(ca.meetingNotifyAsk, caAsk);
+      expect(es.meetingNotifyAskContinue, 'Continuar');
+      expect(en.meetingNotifyAskContinue, 'Continue');
+      expect(ca.meetingNotifyAskContinue, 'Continua');
+    });
+
+    for (final (language, sentence, button) in [
+      ('es', esAsk, 'Continuar'),
+      ('en', enAsk, 'Continue'),
+      ('ca', caAsk, 'Continua'),
+    ]) {
+      testWidgets('UX-2901: in $language the card shows the sentence, one '
+          '«$button» and no title', (tester) async {
+        await record(tester, language: language);
+        expect(card, findsOneWidget);
+        expect(
+          find.descendant(of: card, matching: find.text(sentence)),
+          findsOneWidget,
+        );
+        expect(tester.widget<AlertDialog>(card).title, isNull);
+        final buttons = find.descendant(
+          of: card,
+          matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+        );
+        expect(buttons, findsOneWidget);
+        expect(
+          find.descendant(of: buttons, matching: find.text(button)),
+          findsOneWidget,
+        );
+        // Only the sentence and the button: no second line.
+        final texts = tester
+            .widgetList<Text>(
+              find.descendant(of: card, matching: find.byType(Text)),
+            )
+            .map((t) => t.data)
+            .toList();
+        expect(texts, unorderedEquals([sentence, button]));
+        await leave(tester);
+      });
+
+      testWidgets('UX-2901: in $language at 2× text on 360×740 the whole '
+          'sentence and «$button» show in the card', (tester) async {
+        await record(tester, language: language, scale: 2);
+        expect(tester.takeException(), isNull);
+        final screen = Offset.zero & const Size(360, 740);
+        final box = tester.getRect(card);
+        final text = tester.getRect(find.text(sentence));
+        final action = tester.getRect(find.text(button));
+        for (final rect in [text, action]) {
+          expect(box.contains(rect.topLeft), isTrue, reason: '$rect in $box');
+          expect(
+            box.contains(rect.bottomRight - const Offset(0.5, 0.5)),
+            isTrue,
+            reason: '$rect in $box',
+          );
+          expect(screen.contains(rect.topLeft), isTrue);
+          expect(
+            screen.contains(rect.bottomRight - const Offset(0.5, 0.5)),
+            isTrue,
+          );
+        }
+        // The sentence is laid out whole: nothing ellipsized or clipped.
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.text(sentence),
+        );
+        expect(paragraph.didExceedMaxLines, isFalse);
+        expect(text.top, greaterThanOrEqualTo(box.top));
+        expect(action.top, greaterThanOrEqualTo(text.bottom));
+        await leave(tester);
+      });
+    }
+
+    testWidgets('UX-2904: a tap on the dimmed screen leaves the card up; Back '
+        'closes it, asks Android nothing, and recording goes on', (
+      tester,
+    ) async {
+      final es = lookupAppLocalizations(const Locale('es'));
+      final (access, store) = await record(tester);
+      expect(card, findsOneWidget);
+      final box = tester.getRect(card);
+      // Taps above, below and beside the card, on the scrim.
+      for (final spot in [
+        const Offset(10, 10),
+        Offset(box.center.dx, box.top - 20),
+        Offset(box.center.dx, box.bottom + 20),
+        Offset(4, box.center.dy),
+      ]) {
+        await tester.tapAt(spot);
+        await tester.pumpAndSettle();
+        expect(find.text(es.meetingNotifyAsk), findsOneWidget, reason: '$spot');
+      }
+      expect(access.permissionRequests, 0);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text(es.meetingNotifyAsk), findsNothing);
+      expect(access.permissionRequests, 0);
+      expect(store.marked, isTrue);
+      // Back closed the card, not the recording.
+      expect(find.byType(MeetingScreen), findsOneWidget);
+      expect(find.text(es.meetingListeningHelp), findsOneWidget);
+      await leave(tester);
+    });
+
+    testWidgets('UX-2904: TalkBack finds no «Cerrar» on the scrim, and reads '
+        'the sentence', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await record(tester);
+      final dismiss = MaterialLocalizations.of(
+        tester.element(find.byType(MeetingScreen)),
+      ).modalBarrierDismissLabel;
+      expect(find.bySemanticsLabel(dismiss), findsNothing);
+      expect(find.bySemanticsLabel(esAsk), findsOneWidget);
+      await leave(tester);
+      semantics.dispose();
+    });
+
+    testWidgets('UX-2902: when Android refuses, «Continuar» closes the card '
+        'and says the phone isn\'t letting TaskFlow notify, with «Permitir '
+        'avisos» to its settings; reminders stay as they were', (tester) async {
+      final es = lookupAppLocalizations(const Locale('es'));
+      final (access, store) = await record(tester, grant: false);
+      await tester.tap(find.byKey(const ValueKey('meeting-notify-continue')));
+      await tester.pumpAndSettle();
+      expect(access.permissionRequests, 1);
+      expect(card, findsNothing);
+      expect(
+        find.text('El teléfono no deja que TaskFlow te avise.'),
+        findsOneWidget,
+      );
+      expect(
+        es.notificationPermissionOff,
+        'El teléfono no deja que TaskFlow te avise.',
+      );
+      final action = find.widgetWithText(SnackBarAction, 'Permitir avisos');
+      expect(action, findsOneWidget);
+      expect(access.notificationSettingsOpened, 0);
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      expect(access.notificationSettingsOpened, 1);
+      // Nothing switched reminders on, and nothing asked Android again.
+      expect(store.writes, 0);
+      expect(access.allowed, isFalse);
+      expect(access.permissionRequests, 1);
+      expect(find.text(es.meetingListeningHelp), findsOneWidget);
+      // A later meeting doesn't ask again.
+      await leave(tester);
+      await record(tester, access: access, store: store);
+      expect(card, findsNothing);
+      expect(find.text(es.meetingNotifyAsk), findsNothing);
+      expect(access.permissionRequests, 1);
+      await leave(tester);
+    });
+
+    testWidgets('UX-2902: when Android\'s request fails, «Continuar» shows the '
+        'same line and way to the settings', (tester) async {
+      final es = lookupAppLocalizations(const Locale('es'));
+      final access = _ThrowingAccess();
+      final (_, store) = await record(tester, access: access);
+      await tester.tap(find.byKey(const ValueKey('meeting-notify-continue')));
+      await tester.pumpAndSettle();
+      expect(card, findsNothing);
+      expect(find.text(es.notificationPermissionOff), findsOneWidget);
+      final action = find.widgetWithText(SnackBarAction, es.allowNotifications);
+      expect(action, findsOneWidget);
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      expect(access.notificationSettingsOpened, 1);
+      expect(store.writes, 0);
+      await leave(tester);
+    });
+
+    testWidgets('UX-2902: when Android grants, no message shows after '
+        '«Continuar», and a later meeting does not ask again', (tester) async {
+      final es = lookupAppLocalizations(const Locale('es'));
+      final (access, store) = await record(tester, grant: true);
+      await tester.tap(find.byKey(const ValueKey('meeting-notify-continue')));
+      await tester.pumpAndSettle();
+      expect(access.permissionRequests, 1);
+      expect(card, findsNothing);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(find.text(es.notificationPermissionOff), findsNothing);
+      expect(find.text(es.allowNotifications), findsNothing);
+      expect(find.text(es.meetingListeningHelp), findsOneWidget);
+      expect(store.writes, 0);
+      await leave(tester);
+      // Even were notifications off again, this phone was asked already.
+      access.allowed = false;
+      await record(tester, access: access, store: store);
+      expect(card, findsNothing);
+      expect(access.permissionRequests, 1);
+      await leave(tester);
+    });
+  });
+}
+
+/// The ask's flag in memory, counting every write of the reminder settings
+/// (P327: the card never switches reminders on).
+class _WatchedStore extends _AskedStore {
+  int writes = 0;
+  @override
+  Future<void> write(String owner, ReminderPreferences value) async => writes++;
+}
+
+/// A phone whose permission request fails instead of answering (UX-2902).
+class _ThrowingAccess extends FakeReminderAccess {
+  @override
+  Future<bool> requestPermission() async {
+    permissionRequests++;
+    throw PlatformException(code: 'no-activity');
+  }
 }
 
 /// Signs out as the app does: sign-in shows once its state has no account.

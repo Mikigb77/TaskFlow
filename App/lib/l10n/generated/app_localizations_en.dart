@@ -5326,7 +5326,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String proBenefitMeetingNotes(int hours) {
-    return 'Notes from your recorded meetings, up to $hours hours a month';
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'Notes from your recorded meetings, up to $hours hours a month',
+      one: 'Notes from your recorded meetings, up to 1 hour a month',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -5335,13 +5341,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get meetingNotifyAsk =>
-      'So you can stop it from the notification, and so we can tell you when the notes are ready.';
+      'Turn on notifications to stop the recording from there and to know when the notes are ready.';
 
   @override
   String get meetingNotifyAskContinue => 'Continue';
 
   @override
   String billingReasonMeetingNotesLimit(int hours) {
-    return 'Up to $hours hours of meetings a month.';
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'Up to $hours hours of meetings a month.',
+      one: 'Up to 1 hour of meetings a month.',
+    );
+    return '$_temp0';
   }
 }

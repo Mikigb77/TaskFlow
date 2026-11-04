@@ -5412,7 +5412,14 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String proBenefitMeetingNotes(int hours) {
-    return 'Notes de les reunions que enregistres, fins a $hours hores al mes';
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other:
+          'Notes de les reunions que enregistres, fins a $hours hores al mes',
+      one: 'Notes de les reunions que enregistres, fins a 1 hora al mes',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -5421,13 +5428,19 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get meetingNotifyAsk =>
-      'Per aturar-la des de la notificació i avisar-te quan les notes estiguin llestes.';
+      'Activa les notificacions per aturar l’enregistrament des d’allà i saber quan les notes estan llestes.';
 
   @override
   String get meetingNotifyAskContinue => 'Continua';
 
   @override
   String billingReasonMeetingNotesLimit(int hours) {
-    return 'Fins a $hours hores de reunions al mes.';
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'Fins a $hours hores de reunions al mes.',
+      one: 'Fins a 1 hora de reunions al mes.',
+    );
+    return '$_temp0';
   }
 }

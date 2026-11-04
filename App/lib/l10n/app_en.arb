@@ -4466,7 +4466,7 @@
   "@billingReasonMeetingNotesExample": {
     "description": "On the Pro screen, under billingReasonMeetingNotes: what the notes hold, with no final period. The to-dos become one task’s steps, so it says to-dos, not tasks."
   },
-  "proBenefitMeetingNotes": "Notes from your recorded meetings, up to {hours} hours a month",
+  "proBenefitMeetingNotes": "{hours, plural, =1{Notes from your recorded meetings, up to 1 hour a month} other{Notes from your recorded meetings, up to {hours} hours a month}}",
   "@proBenefitMeetingNotes": {
     "description": "The Pro screen's list of what Pro gives, last line: notes made from the meetings you record (Notes › Record a meeting), with the monthly meeting time (D4 of 2026-11-04). hours is a whole number, as 20. Left out when the screen opens for a meeting, whose heading already names it.",
     "placeholders": {
@@ -4479,15 +4479,15 @@
   "@meetingAudioDeleted": {
     "description": "On the recording screen, under meetingListeningHelp, quietly: what happens to the recording's audio (the owner's decision D5 of 2026-11-04). It must match the website's privacy page."
   },
-  "meetingNotifyAsk": "So you can stop it from the notification, and so we can tell you when the notes are ready.",
+  "meetingNotifyAsk": "Turn on notifications to stop the recording from there and to know when the notes are ready.",
   "@meetingNotifyAsk": {
-    "description": "Asked once, the first time a meeting records while TaskFlow's notifications are off, before Android's own permission dialog (D3 of 2026-11-04). It refers to the recording."
+    "description": "Asked once, the first time a meeting records while TaskFlow's notifications are off, before Android's own permission dialog (D3 of 2026-11-04). One whole sentence that names the recording and the notifications, shown with no title."
   },
   "meetingNotifyAskContinue": "Continue",
   "@meetingNotifyAskContinue": {
     "description": "The only button under meetingNotifyAsk: opens Android's notification permission dialog."
   },
-  "billingReasonMeetingNotesLimit": "Up to {hours} hours of meetings a month.",
+  "billingReasonMeetingNotesLimit": "{hours, plural, =1{Up to 1 hour of meetings a month.} other{Up to {hours} hours of meetings a month.}}",
   "@billingReasonMeetingNotesLimit": {
     "description": "On the Pro screen opened for a meeting, under billingReasonMeetingNotesExample: the monthly meeting time Pro includes (D4 of 2026-11-04). hours is a whole number, as 20.",
     "placeholders": {

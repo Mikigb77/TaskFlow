@@ -1536,6 +1536,148 @@ void main() {
       },
     );
   });
+
+  group('P330 · the meeting hours set apart, and as a plural', () {
+    final heading = find.byKey(const ValueKey('subscription-reason'));
+    final example = find.byKey(const ValueKey('subscription-reason-example'));
+    final limit = find.byKey(const ValueKey('subscription-meeting-limit'));
+
+    for (final (language, scale) in [('es', 1.0), ('es', 2.0), ('ca', 2.0)]) {
+      testWidgets(
+        'UX-3001: reason meetingNotes, $language ${scale.toInt()}× on 360×800 (meetings/pro.reason.$language.light.${scale.toInt()}x): «${language == 'es' ? 'Hasta 20 horas de reuniones al mes.' : 'Fins a 20 hores de reunions al mes.'}» sits at least 8 dp under the example, and the heading → example gap stays 4 dp',
+        (tester) async {
+          await loadManrope();
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          await openPro(
+            tester,
+            sdk: _CountingRevenueCat(),
+            language: language,
+            user: freeUser,
+            textScale: scale,
+            reason: ProReason.meetingNotes,
+          );
+          final l = lookupAppLocalizations(Locale(language));
+          expect(tester.widget<Text>(heading).data, l.billingReasonMeetingNotes);
+          expect(
+            tester.widget<Text>(example).data,
+            l.billingReasonMeetingNotesExample,
+          );
+          expect(
+            tester.widget<Text>(limit).data,
+            language == 'es'
+                ? 'Hasta 20 horas de reuniones al mes.'
+                : 'Fins a 20 hores de reunions al mes.',
+          );
+          final headingRect = tester.getRect(heading);
+          final exampleRect = tester.getRect(example);
+          final limitRect = tester.getRect(limit);
+          final exampleGap = limitRect.top - exampleRect.bottom;
+          final headingGap = exampleRect.top - headingRect.bottom;
+          expect(
+            exampleGap,
+            greaterThanOrEqualTo(8),
+            reason: 'example → hours line gap',
+          );
+          expect(
+            headingGap,
+            moreOrLessEquals(4, epsilon: 0.5),
+            reason: 'heading → example gap unchanged',
+          );
+          // Set apart: more room above the hours than above the example.
+          expect(exampleGap, greaterThan(headingGap));
+          // The hours line drawn whole, inside 360 dp.
+          expect(limitRect.left, greaterThanOrEqualTo(0));
+          expect(limitRect.right, lessThanOrEqualTo(360.5));
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(of: limit, matching: find.byType(RichText)),
+          );
+          expect(paragraph.didExceedMaxLines, isFalse);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+        },
+      );
+    }
+
+    test(
+      'UX-3002: proBenefitMeetingNotes and billingReasonMeetingNotesLimit read the singular with 1 and today’s text with 20, in EN, ES and CA',
+      () {
+        final expected = {
+          'en': (
+            benefit1: 'Notes from your recorded meetings, up to 1 hour a month',
+            benefit20:
+                'Notes from your recorded meetings, up to 20 hours a month',
+            limit1: 'Up to 1 hour of meetings a month.',
+            limit20: 'Up to 20 hours of meetings a month.',
+          ),
+          'es': (
+            benefit1: 'Notas de las reuniones que grabas, hasta 1 hora al mes',
+            benefit20:
+                'Notas de las reuniones que grabas, hasta 20 horas al mes',
+            limit1: 'Hasta 1 hora de reuniones al mes.',
+            limit20: 'Hasta 20 horas de reuniones al mes.',
+          ),
+          'ca': (
+            benefit1:
+                'Notes de les reunions que enregistres, fins a 1 hora al mes',
+            benefit20:
+                'Notes de les reunions que enregistres, fins a 20 hores al mes',
+            limit1: 'Fins a 1 hora de reunions al mes.',
+            limit20: 'Fins a 20 hores de reunions al mes.',
+          ),
+        };
+        for (final MapEntry(key: language, value: e) in expected.entries) {
+          final l = lookupAppLocalizations(Locale(language));
+          expect(l.proBenefitMeetingNotes(1), e.benefit1, reason: language);
+          expect(l.proBenefitMeetingNotes(20), e.benefit20, reason: language);
+          expect(
+            l.billingReasonMeetingNotesLimit(1),
+            e.limit1,
+            reason: language,
+          );
+          expect(
+            l.billingReasonMeetingNotesLimit(20),
+            e.limit20,
+            reason: language,
+          );
+          // Another count takes the plural too, with the number in it.
+          expect(l.proBenefitMeetingNotes(2), contains('2'), reason: language);
+          expect(
+            l.proBenefitMeetingNotes(2),
+            isNot(e.benefit1),
+            reason: language,
+          );
+        }
+      },
+    );
+
+    test(
+      'UX-3002: both keys are whole-sentence ICU plurals in the three ARB files, with an =1 case and an other case',
+      () {
+        for (final language in ['en', 'es', 'ca']) {
+          final arb =
+              jsonDecode(
+                    File('lib/l10n/app_$language.arb').readAsStringSync(),
+                  )
+                  as Map<String, dynamic>;
+          for (final key in [
+            'proBenefitMeetingNotes',
+            'billingReasonMeetingNotesLimit',
+          ]) {
+            final value = arb[key] as String;
+            expect(
+              value,
+              startsWith('{hours, plural, =1{'),
+              reason: '$language $key',
+            );
+            expect(value, contains('} other{'), reason: '$language $key');
+            expect(value, endsWith('}}'), reason: '$language $key');
+          }
+        }
+      },
+    );
+  });
 }
 
 class _UserAuth extends AuthNotifier {

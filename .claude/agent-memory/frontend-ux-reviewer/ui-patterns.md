@@ -167,3 +167,9 @@ What the app does today, so a consistency finding can name the standard and the 
 - **Dates:** `dayHeading(date, now)` (region.dart) drops the current year (Día view, task page); `priorityPhrase` for rows/capture card/form, `priorityName` for the task page and command cards; passed deadline «Venció el …» in grey.
 
 Related: [[recurring-problems]], [[screens-b-calendar-tasks]], [[decisions-in-docs]].
+
+## Meeting notes (run 2026-11-04-screens; widget level, device checks owed)
+- **One-time permission card (D3):** title-less, one sentence that names the request and the gain («Activa las notificaciones para parar la grabación desde ahí y saber cuándo están listas las notas.») + «Continuar»; `barrierDismissible: false` (Back closes, no ask); a false/throwing `requestPermission()` shows reminders' `notificationPermissionOff` + «Permitir avisos» via `showFeedback` (floating, above the bottom bar) — opens settings only, never switches reminders on, no second ask.
+- **Note-page bar providers:** `noteTasksProvider` and `meetingNotesProvider` are keep-alive and pre-read with `ref.listen` in `main_shell.dart`; `meetingNotesProvider` re-reads only when the set of note ids changes. While either is unread, the bar holds «Crear tarea»'s invisible place (`Visibility` maintainSize, no semantics) for any note with an open step, and «Editar nota» stays outlined — no flip on first frame.
+- **D1 marks:** «Crear tarea» needs `isNote` + the meeting mark + an open step (`noteMakesTask`); undo keeps the mark; schema 23 back-filled marks for notes a `meetings.note_id` still links (older ones stay unmarked, by design).
+- **Counts in copy:** `proBenefitMeetingNotes`, `billingReasonMeetingNotesLimit` are whole-sentence ICU plurals (=1/other; gen-l10n emits `one:`).

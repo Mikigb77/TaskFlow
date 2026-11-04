@@ -196,4 +196,18 @@ Problem types the 2026-10-13 whole-app run (slices A–D) found in more than one
     - The task page opened from Completadas stamped a new completion time, so the row jumped (UX-2646). Same family as 39.
     - When a list holds per-row state (a remembered time, a scope), check that the row's page and its actions receive it.
 
+47. **A permission ask whose button can silently do nothing.**
+    - On Android 13+ after notifications were turned off in Settings or refused twice (and on ≤12 when off), `requestPermission()` shows nothing and returns false; the meeting card's «Continuar» then did nothing (UX-2902).
+    - Every ask must handle false/throw with the existing line «El teléfono no deja que TaskFlow te avise.» + «Permitir avisos» (opens settings).
+
+48. **A one-time ask that a stray tap spends.** A dismissible dialog marked "asked" on any close, so a scrim tap used the only ask (UX-2904). One-time asks: `barrierDismissible: false`, Back still closes.
+
+49. **One-sentence card copy that is only a purpose clause.** «Para pararla desde la notificación…» named neither the subject nor the request, and its pronoun had no antecedent (in CA the gender pointed at the wrong noun) (UX-2901). Name the noun; say what is asked.
+
+50. **A page's main button decided by an async read flips after the first frame.** The meeting-note bar showed one filled «Editar nota», then «Crear tarea» appeared, on every open (UX-2903). Fix: keep-alive provider, pre-read in the shell, hold the place while unread.
+
+51. **A new per-item mark leaves data saved by the previous build unmarked.** Meeting notes saved before D1's marks lost «Crear tarea» until a schema-23 step filled the marks from what can still be traced (UX-2905). When a release adds a mark, ask what older rows get.
+
+52. **An added line with the same spacing and style as an open-ended example reads as its continuation** (Pro screen hours under the colon-completing example, UX-3001). Also: any copy with a count needs a whole-sentence ICU plural (UX-3002).
+
 Related: [[ui-patterns]], [[review-techniques]].

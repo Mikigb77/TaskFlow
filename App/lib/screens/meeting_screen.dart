@@ -328,8 +328,12 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen>
     }
     if (!mounted) return;
     final l = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
     final go = await showDialog<bool>(
       context: context,
+      // A brush of the dimmed screen mustn't spend the only ask (UX-2904);
+      // Back still closes it.
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         content: Text(l.meetingNotifyAsk),
         actions: [
@@ -342,11 +346,21 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen>
       ),
     );
     if (go != true) return;
+    var allowed = false;
     try {
-      await access.requestPermission();
+      allowed = await access.requestPermission();
     } catch (_) {
-      /* Android's dialog didn't open: reminders' settings still can. */
+      // Android's dialog didn't open: its settings page still can.
     }
+    // Android showed nothing, or was refused (UX-2902): say so, with the way
+    // to its settings. Reminders stay as they were.
+    if (allowed || !mounted) return;
+    unawaited(showFeedback(
+      messenger,
+      l.notificationPermissionOff,
+      actionLabel: l.allowNotifications,
+      onAction: () => unawaited(access.openNotificationSettings()),
+    ));
   }
 
   Future<void> _stop() async {

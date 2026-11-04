@@ -27,10 +27,21 @@ bool noteMakesTask(Task note, Set<int> meetingNotes) =>
     meetingNotes.contains(note.id) &&
     note.checklist.any((step) => !step.done());
 
-/// The signed-in account's notes made from a meeting on this phone, read
-/// again each time a note's page opens, so a meeting's note saved since
-/// offers «Crear tarea».
-final meetingNotesProvider = FutureProvider.autoDispose<Set<int>>((ref) async {
+/// The signed-in account's notes made from a meeting on this phone. Kept,
+/// and read before any note's page opens (main_shell.dart), so the page's
+/// main button is right from its first frame (UX-2903); read again when a
+/// note is added to or removed from the task list, so a meeting's note
+/// saved since offers «Crear tarea». The last marks stay while it does.
+final meetingNotesProvider = FutureProvider<Set<int>>((ref) async {
+  // Changes only when a note comes or goes, not on every task edit.
+  ref.watch(
+    taskProvider.select(
+      (state) => state.value
+          ?.where((task) => task.isNote && task.id != null)
+          .map((task) => task.id)
+          .join(','),
+    ),
+  );
   try {
     return await MeetingNoteMarks.read(
       ref.watch(meetingNoteMarksDatabaseProvider),

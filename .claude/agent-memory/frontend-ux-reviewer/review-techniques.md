@@ -40,3 +40,8 @@ Ways to turn "needs a device check" into measured evidence, proven in the 2026-1
 - iOS text fields default to smart quotes (`'` → `’`).
 
 Related: [[recurring-problems]], [[ui-patterns]].
+
+## Workflow quirks (run 2026-11-04-screens)
+- A verify step can be re-dispatched after its worktree was merged and removed: check the run's `merges.jsonl` and `git worktree list`, then verify read-only against the main checkout (`git diff HEAD -- <file>`). The tester's "infrastructure" n/a there is the missing worktree, not a failed fix.
+- Run paths in the task text may carry the repo root twice (`/home/claude/TaskFlow//home/claude/TaskFlow/...`); use the single root.
+- Riverpod 3: a `ref.listen` in the shell's build keeps a keep-alive provider live under pushed pages; a `ref.watch` in a hidden (offstage) widget is paused.

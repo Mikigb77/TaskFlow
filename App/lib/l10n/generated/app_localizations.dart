@@ -7351,7 +7351,7 @@ abstract class AppLocalizations {
   /// The Pro screen's list of what Pro gives, last line: notes made from the meetings you record (Notes › Record a meeting), with the monthly meeting time (D4 of 2026-11-04). hours is a whole number, as 20. Left out when the screen opens for a meeting, whose heading already names it.
   ///
   /// In en, this message translates to:
-  /// **'Notes from your recorded meetings, up to {hours} hours a month'**
+  /// **'{hours, plural, =1{Notes from your recorded meetings, up to 1 hour a month} other{Notes from your recorded meetings, up to {hours} hours a month}}'**
   String proBenefitMeetingNotes(int hours);
 
   /// On the recording screen, under meetingListeningHelp, quietly: what happens to the recording's audio (the owner's decision D5 of 2026-11-04). It must match the website's privacy page.
@@ -7360,10 +7360,10 @@ abstract class AppLocalizations {
   /// **'The audio is sent to make the notes, then deleted.'**
   String get meetingAudioDeleted;
 
-  /// Asked once, the first time a meeting records while TaskFlow's notifications are off, before Android's own permission dialog (D3 of 2026-11-04). It refers to the recording.
+  /// Asked once, the first time a meeting records while TaskFlow's notifications are off, before Android's own permission dialog (D3 of 2026-11-04). One whole sentence that names the recording and the notifications, shown with no title.
   ///
   /// In en, this message translates to:
-  /// **'So you can stop it from the notification, and so we can tell you when the notes are ready.'**
+  /// **'Turn on notifications to stop the recording from there and to know when the notes are ready.'**
   String get meetingNotifyAsk;
 
   /// The only button under meetingNotifyAsk: opens Android's notification permission dialog.
@@ -7375,7 +7375,7 @@ abstract class AppLocalizations {
   /// On the Pro screen opened for a meeting, under billingReasonMeetingNotesExample: the monthly meeting time Pro includes (D4 of 2026-11-04). hours is a whole number, as 20.
   ///
   /// In en, this message translates to:
-  /// **'Up to {hours} hours of meetings a month.'**
+  /// **'{hours, plural, =1{Up to 1 hour of meetings a month.} other{Up to {hours} hours of meetings a month.}}'**
   String billingReasonMeetingNotesLimit(int hours);
 }
 
