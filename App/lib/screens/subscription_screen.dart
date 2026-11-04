@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:agenda/l10n/meeting_copy.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/subscription_provider.dart';
@@ -126,6 +127,18 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                       key: const ValueKey('subscription-reason-example'),
                       style: TextStyle(color: colors.onPrimaryContainer),
                     ),
+                    // The month's meeting time, before anyone runs out of it
+                    // (D4).
+                    if (widget.reason == ProReason.meetingNotes) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        l10n.billingReasonMeetingNotesLimit(
+                          meetingHoursPerMonth,
+                        ),
+                        key: const ValueKey('subscription-meeting-limit'),
+                        style: TextStyle(color: colors.onPrimaryContainer),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                   ],
                   // Your plan first: the status, then its renewal or dictations left.
@@ -177,7 +190,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                       if (widget.reason != ProReason.reminderPlans)
                         l10n.proBenefitReminders,
                       if (widget.reason != ProReason.meetingNotes)
-                        l10n.proBenefitMeetingNotes,
+                        l10n.proBenefitMeetingNotes(meetingHoursPerMonth),
                     ].indexed)
                       Padding(
                         padding: EdgeInsets.only(top: index == 0 ? 0 : 8),

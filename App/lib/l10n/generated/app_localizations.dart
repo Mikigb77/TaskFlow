@@ -7348,11 +7348,35 @@ abstract class AppLocalizations {
   /// **'a summary, the decisions and the to-dos'**
   String get billingReasonMeetingNotesExample;
 
-  /// The Pro screen's list of what Pro gives, last line: notes made from the meetings you record (Notes › Record a meeting). Left out when the screen opens for a meeting, whose heading already names it.
+  /// The Pro screen's list of what Pro gives, last line: notes made from the meetings you record (Notes › Record a meeting), with the monthly meeting time (D4 of 2026-11-04). hours is a whole number, as 20. Left out when the screen opens for a meeting, whose heading already names it.
   ///
   /// In en, this message translates to:
-  /// **'Notes from your recorded meetings'**
-  String get proBenefitMeetingNotes;
+  /// **'Notes from your recorded meetings, up to {hours} hours a month'**
+  String proBenefitMeetingNotes(int hours);
+
+  /// On the recording screen, under meetingListeningHelp, quietly: what happens to the recording's audio (the owner's decision D5 of 2026-11-04). It must match the website's privacy page.
+  ///
+  /// In en, this message translates to:
+  /// **'The audio is sent to make the notes, then deleted.'**
+  String get meetingAudioDeleted;
+
+  /// Asked once, the first time a meeting records while TaskFlow's notifications are off, before Android's own permission dialog (D3 of 2026-11-04). It refers to the recording.
+  ///
+  /// In en, this message translates to:
+  /// **'So you can stop it from the notification, and so we can tell you when the notes are ready.'**
+  String get meetingNotifyAsk;
+
+  /// The only button under meetingNotifyAsk: opens Android's notification permission dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get meetingNotifyAskContinue;
+
+  /// On the Pro screen opened for a meeting, under billingReasonMeetingNotesExample: the monthly meeting time Pro includes (D4 of 2026-11-04). hours is a whole number, as 20.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to {hours} hours of meetings a month.'**
+  String billingReasonMeetingNotesLimit(int hours);
 }
 
 class _AppLocalizationsDelegate

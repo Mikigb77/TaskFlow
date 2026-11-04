@@ -244,9 +244,8 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen>
       if (!mounted) return false;
     }
     if (ref.read(hasProProvider)) return true;
-    await Navigator.of(
-      context,
-    ).pushNamed('/subscription', arguments: ProReason.meetingNotes);
+    await Navigator.of(context)
+        .pushNamed('/subscription', arguments: ProReason.meetingNotes);
     if (!mounted) return false;
     if (ref.read(hasProProvider)) return true;
     _leave();
@@ -295,6 +294,7 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen>
       if (!mounted) return;
       setState(() => _recordingNow(meeting.id));
       unawaited(_checkSpace());
+      unawaited(_askNotifications());
     } on MeetingStartRefused catch (error) {
       if (!mounted) return;
       final busy = ref.read(meetingsProvider).recording;
@@ -308,6 +308,44 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen>
       });
     } catch (_) {
       if (mounted) setState(() => _stage = _Stage.refused);
+    }
+  }
+
+  /// The first time a meeting records while TaskFlow's notifications are
+  /// off: one sentence on why, «Continuar», then Android's own dialog (D3
+  /// of 2026-11-04). Asked once on this phone, whatever the answer, so
+  /// never again after a refusal. Recording goes on meanwhile.
+  Future<void> _askNotifications() async {
+    final access = ref.read(reminderAccessProvider);
+    final store = ref.read(reminderPreferenceStoreProvider);
+    try {
+      if (!access.supported) return;
+      if ((await access.capability()).allowed) return;
+      if (await store.meetingNotificationsAsked()) return;
+      await store.setMeetingNotificationsAsked();
+    } catch (_) {
+      return;
+    }
+    if (!mounted) return;
+    final l = context.l10n;
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        content: Text(l.meetingNotifyAsk),
+        actions: [
+          FilledButton(
+            key: const ValueKey('meeting-notify-continue'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l.meetingNotifyAskContinue),
+          ),
+        ],
+      ),
+    );
+    if (go != true) return;
+    try {
+      await access.requestPermission();
+    } catch (_) {
+      /* Android's dialog didn't open: reminders' settings still can. */
     }
   }
 
@@ -723,6 +761,21 @@ class _Recording extends StatelessWidget {
             key: const ValueKey('meeting-space-low'),
             textAlign: TextAlign.center,
             style: TextStyle(color: colors.error, height: leading),
+          ),
+        ],
+        // What happens to the audio, quietly and last, so at large text it
+        // never pushes the help or a warning out of view (D5). The
+        // website's privacy page says the same.
+        if (!stopFailed) ...[
+          const SizedBox(height: 16),
+          Text(
+            l.meetingAudioDeleted,
+            key: const ValueKey('meeting-audio-deleted'),
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+              height: leading,
+            ),
           ),
         ],
       ],

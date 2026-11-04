@@ -87,6 +87,8 @@ class PreviewApp {
     bool reminderPrivacyShown = true,
     SpeechPermission mic = SpeechPermission.granted,
     bool notificationsAllowed = true,
+    // The first meeting has already asked for notifications on this phone.
+    bool meetingNotificationsAsked = true,
     bool exactAlarms = true,
     // The alerts the phone keeps, as `reminder_state` rows with `snooze_at`:
     // a reminder that has rung, or is snoozed.
@@ -155,7 +157,8 @@ class PreviewApp {
         complimentary: complimentary,
       );
     }
-    final reminderStore = MemoryReminderStore(reminders);
+    final reminderStore = MemoryReminderStore(reminders)
+      ..meetingAsked = meetingNotificationsAsked;
     final phone = PreviewDeviceCalendars(access: calendarAccess)
       ..data = phoneEvents;
     final access = FakeReminderAccess(

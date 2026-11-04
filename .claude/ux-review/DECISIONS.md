@@ -8,8 +8,15 @@ The owner asked for notes from a recorded conversation, then a task with a check
 - All AI on Vertex AI: "I wouldn't turn credits on AI Studio. I would rather use simply the Vertex AI, since we're already paying for it anyway."
 - Nothing unnecessary is kept: once the final notes exist, the pieces' text and chapter notes are deleted.
 - Abandoned recordings ("zombies") are cleaned up, but a few weeks without signal must not lose a real meeting.
-- Still open: Pro only or not, the consent reminder, and the 7- and 30-day limits.
 - 2026-11-04: dictations on staging move to Vertex only too (`AI_ROUTE=vertex`), off the free AI Studio tier; the owner chose it on a decision card.
+- 2026-11-04, the owner: "let's go with all the recommendations that you have" (run 2026-11-03-screens, D1–D7; the 7- and 30-day limits stay):
+  - D1 (UX-2722): «Crear tarea» only on notes made from a meeting, by a phone-local mark; a recipe note with a checklist doesn't offer it.
+  - D2 (UX-2719): meeting notes stay Pro only; free accounts still see «Grabar una reunión», which opens the Pro screen.
+  - D3 (UX-2813): the first time a meeting records with notifications off, one sentence and «Continuar», then Android's dialog; asked once per phone, never after a refusal.
+  - D4 (UX-2720): the Pro screen states "up to 20 hours a month" (`meetingHoursPerMonth`, the server's 240 pieces). The owner asked what that costs: about US$0.08 a meeting hour on Flash-Lite, so at most about US$1.60 a user a month at the cap.
+  - D5 (UX-2721): one quiet line on the recording screen, «El audio se envía para hacer las notas y después se borra.»; no consent reminder. The website's privacy page must say the same (MN-34).
+  - D6 (UX-2814): the "notes ready" notification is private on the lock screen (Android hides its text where the phone hides private content); the title shows once unlocked.
+  - D7 (UX-2815): the owner adds «Notas de las reuniones que grabas» to the RevenueCat paywall in its dashboard.
 
 ## 2026-11-01 — The UX loop as fast as the machine allows
 After the 2026-10-28-app plan took about 19 hours, the owner: "it cannot be that we are running for 19 hours … We should deploy all the agents that can be possibly deployed at the same time, if needed." What the main session put in place for it, reported to the owner (`.claude/skills/ux/references/speed-2026-11-01.md`):

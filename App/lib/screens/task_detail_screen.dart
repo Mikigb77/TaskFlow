@@ -283,7 +283,16 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             // Until this phone's note → task links are read, the main
             // button can't know its label (R1-P318-1).
             final linksRead =
-                !task.isNote || ref.watch(noteTasksProvider).hasValue;
+                !task.isNote ||
+                (ref.watch(noteTasksProvider).hasValue &&
+                    ref.watch(meetingNotesProvider).hasValue);
+            // Only a note made from a meeting offers «Crear tarea» (D1).
+            final makesTask =
+                task.isNote &&
+                noteMakesTask(
+                  task,
+                  ref.watch(meetingNotesProvider).value ?? const <int>{},
+                );
             // Inert while Completar closes it: nothing on the page opens in
             // the hold (UX-2633).
             return AbsorbPointer(
@@ -545,8 +554,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                         top: false,
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-                          // A note with steps (a meeting's to-dos) can
-                          // become a task with them (MN-22): the main
+                          // A meeting's note with steps (its to-dos) can
+                          // become a task with them (MN-22, D1): the main
                           // button, which opens that task once made
                           // (UX-2702, UX-2709).
                           child: Wrap(
@@ -554,7 +563,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                             runSpacing: 8,
                             alignment: WrapAlignment.center,
                             children: [
-                              if (!linksRead && noteMakesTask(task))
+                              if (!linksRead && makesTask)
                                 // Holds the main button's place, unseen and
                                 // untappable, so «Crear tarea» never turns
                                 // into «Ver tarea» under a finger.
@@ -579,7 +588,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                                   icon: const Icon(Icons.task_alt_rounded),
                                   label: Text(context.l10n.meetingViewTask),
                                 )
-                              else if (noteMakesTask(task))
+                              else if (makesTask)
                                 FilledButton.icon(
                                   key: const ValueKey('note-create-task'),
                                   onPressed: () =>
@@ -587,7 +596,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                                   icon: const Icon(Icons.add_task_rounded),
                                   label: Text(context.l10n.meetingCreateTask),
                                 ),
-                              if (made != null || noteMakesTask(task))
+                              if (made != null || makesTask)
                                 OutlinedButton.icon(
                                   // As tall as the filled button beside it.
                                   style: OutlinedButton.styleFrom(

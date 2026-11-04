@@ -1208,5 +1208,9 @@
   "meetingContinueNamed": "Continua enregistrant, {time} fins ara",
   "billingReasonMeetingNotes": "Amb Pro, les teves reunions es converteixen en notes:",
   "billingReasonMeetingNotesExample": "un resum, les decisions i les coses per fer",
-  "proBenefitMeetingNotes": "Notes de les reunions que enregistres"
+  "proBenefitMeetingNotes": "Notes de les reunions que enregistres, fins a {hours} hores al mes",
+  "meetingAudioDeleted": "L’àudio s’envia per fer les notes i després s’esborra.",
+  "meetingNotifyAsk": "Per aturar-la des de la notificació i avisar-te quan les notes estiguin llestes.",
+  "meetingNotifyAskContinue": "Continua",
+  "billingReasonMeetingNotesLimit": "Fins a {hours} hores de reunions al mes."
 }

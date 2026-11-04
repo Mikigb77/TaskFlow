@@ -128,6 +128,7 @@ Future<PreviewApp> _open(
   bool pro = true,
   List<Task> tasks = const [],
   bool notificationsAllowed = true,
+  bool notificationsAsked = true,
   Map<int, int>? noteTasks,
 }) => PreviewApp.open(
   p,
@@ -136,6 +137,7 @@ Future<PreviewApp> _open(
   billing: pro ? null : (FakeRevenueCat()..info = billingInfo()),
   tasks: [...normalDay(), ...tasks],
   notificationsAllowed: notificationsAllowed,
+  meetingNotificationsAsked: notificationsAsked,
   overrides: [
     meetingsOverride(meetings),
     ...noteTaskOverrides(MemoryNoteTaskLinks(noteTasks)),
@@ -147,11 +149,13 @@ Future<PreviewApp> _record(
   Preview p,
   ScriptedMeetings meetings, {
   bool notificationsAllowed = true,
+  bool notificationsAsked = true,
 }) async {
   final app = await _open(
     p,
     meetings,
     notificationsAllowed: notificationsAllowed,
+    notificationsAsked: notificationsAsked,
   );
   await app.tab(p.l.notes);
   await _tapRecord(p);
@@ -245,6 +249,22 @@ void meetingPreviews() {
       then: {
         'discard-question':
             'Descartar asks first; «Seguir grabando» is the safe choice.',
+      },
+    );
+
+    preview(
+      meetingRecording,
+      'notify-ask',
+      'The first meeting with TaskFlow’s notifications off: recording has started, and one sentence says why to allow them (to stop it from the notification, and to hear when the notes are ready), with a single «Continuar» that opens Android’s own dialog. Asked once on this phone (D3 of 2026-11-04).',
+      [...mainScreen, ...longText],
+      (p) async {
+        await _record(
+          p,
+          ScriptedMeetings(),
+          notificationsAllowed: false,
+          notificationsAsked: false,
+        );
+        await p.shoot();
       },
     );
 

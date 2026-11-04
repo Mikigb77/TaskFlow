@@ -95,6 +95,21 @@ class ReminderPreferenceStore {
     return data is int && data > 0 ? data : 0;
   }
 
+  /// Whether a meeting recording asked, on this phone, for TaskFlow's
+  /// notifications (D3 of 2026-11-04), whatever the answer: it asks once.
+  Future<bool> meetingNotificationsAsked() async {
+    final rows = await (await database.database).query('app_preferences',
+        where: 'scope = ?', whereArgs: [_meetingAsked]);
+    return rows.isNotEmpty;
+  }
+
+  Future<void> setMeetingNotificationsAsked() async =>
+      (await database.database).insert('app_preferences',
+          {'scope': _meetingAsked, 'data': jsonEncode(true)},
+          conflictAlgorithm: ConflictAlgorithm.replace);
+
+  static const _meetingAsked = 'meeting-notifications-asked';
+
   /// Sets how many «Ahora no» in a row: one more after «Ahora no», 0 after
   /// «Sí, recuérdamelo».
   Future<void> setPlanOfferDeclines(String owner, int count) async =>

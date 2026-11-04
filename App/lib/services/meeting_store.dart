@@ -939,6 +939,8 @@ class MeetingStore {
         'sync_id': syncId,
         'sync_pending': meeting.ownerKey == 'local' ? 0 : 1,
       });
+      // Only a meeting's note offers «Crear tarea» (D1).
+      await MeetingNoteMarks.add(tx, meeting.ownerKey, noteId);
       await TaskDatabase.stageAttachments(
         tx,
         meeting.ownerKey,

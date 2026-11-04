@@ -23,6 +23,8 @@ import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/reminder_provider.dart';
+import 'package:agenda/services/reminder_preferences.dart';
+import 'package:agenda/services/task_database.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/screens/account_screen.dart';
 import 'package:agenda/screens/edit_task_screen.dart';
@@ -71,9 +73,8 @@ Widget _app(
     supportedLocales: AppLocalizations.supportedLocales,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     builder: (context, child) => MediaQuery(
-      data: MediaQuery.of(
-        context,
-      ).copyWith(textScaler: TextScaler.linear(scale)),
+      data: MediaQuery.of(context)
+          .copyWith(textScaler: TextScaler.linear(scale)),
       child: child!,
     ),
     home: home,
@@ -370,9 +371,8 @@ void main() {
       TaskReminders.meetingAction.value = null;
 
       final l = lookupAppLocalizations(const Locale('es'));
-      final android = meetingRecordingNotificationDetails(
-        meetingNotice(l),
-      ).android!;
+      final android = meetingRecordingNotificationDetails(meetingNotice(l))
+          .android!;
       expect(android.channelId, meetingRecordingChannel);
       expect(android.ongoing, isTrue);
       expect(android.silent, isTrue);
@@ -901,6 +901,7 @@ void main() {
         overrides: [
           captureStoreProvider.overrideWithValue(captures),
           ...captureSheetOverrides(),
+          meetingNotesOverride(),
         ],
       );
       captures.tasks = container;
@@ -1212,6 +1213,9 @@ void main() {
       final details = meetingNotesNotificationDetails(ca).android!;
       expect(details.channelId, 'taskflow_meeting_notes');
       expect(details.channelName, 'Notes de reunions');
+      // D6: private on a locked phone, so the meeting's title stays off a
+      // lock screen that hides private content.
+      expect(details.visibility, NotificationVisibility.private);
       expect(ca.meetingNotesReady, 'Les notes de la reunió ja són a punt');
       expect(meetingNotesNotificationId, isNot(1));
       await TaskReminders.respond(
@@ -1620,37 +1624,38 @@ void main() {
   });
 
   group('P325 · meeting notifications', () {
-    testWidgets('UX-2811: a note’s page removes its "notes ready"; a task’s doesn’t', (
-      tester,
-    ) async {
-      final opened = <int>[];
-      final hook = MeetingHooks.noteOpened;
-      MeetingHooks.noteOpened = (id) async => opened.add(id);
-      addTearDown(() => MeetingHooks.noteOpened = hook);
-      final container = _container(
-        ScriptedMeetings(),
-        tasks: [
-          _meetingNote,
-          Task(id: 7, title: 'Call the dentist', priority: 1),
-        ],
-      );
-      await tester.pumpWidget(
-        _app(container, const TaskDetailScreen(taskId: 90)),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Edit note'), findsOneWidget);
-      expect(opened, [90]);
+    testWidgets(
+      'UX-2811: a note’s page removes its "notes ready"; a task’s doesn’t',
+      (tester) async {
+        final opened = <int>[];
+        final hook = MeetingHooks.noteOpened;
+        MeetingHooks.noteOpened = (id) async => opened.add(id);
+        addTearDown(() => MeetingHooks.noteOpened = hook);
+        final container = _container(
+          ScriptedMeetings(),
+          tasks: [
+            _meetingNote,
+            Task(id: 7, title: 'Call the dentist', priority: 1),
+          ],
+        );
+        await tester.pumpWidget(
+          _app(container, const TaskDetailScreen(taskId: 90)),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Edit note'), findsOneWidget);
+        expect(opened, [90]);
 
-      await tester.pumpWidget(
-        KeyedSubtree(
-          key: const ValueKey('task'),
-          child: _app(container, const TaskDetailScreen(taskId: 7)),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Call the dentist'), findsWidgets);
-      expect(opened, [90]);
-    });
+        await tester.pumpWidget(
+          KeyedSubtree(
+            key: const ValueKey('task'),
+            child: _app(container, const TaskDetailScreen(taskId: 7)),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Call the dentist'), findsWidgets);
+        expect(opened, [90]);
+      },
+    );
   });
   group('P320 · Signing out with a meeting', () {
     AppLocalizations words(String language) =>
@@ -1730,8 +1735,10 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    Finder inDialog(String text) =>
-        find.descendant(of: find.byType(AlertDialog), matching: find.text(text));
+    Finder inDialog(String text) => find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.text(text),
+    );
 
     String dialogBody(WidgetTester tester) {
       final content = tester.widget<AlertDialog>(find.byType(AlertDialog));
@@ -1862,82 +1869,84 @@ void main() {
     });
 
     for (final (language, scale) in [('es', 1.0), ('es', 2.0), ('ca', 2.0)]) {
-      testWidgets(
-        'UX-2804: one stopped recording, $language ${scale}x: titled '
-        'question read first, the count, reminders last, Save notes as the '
-        'primary; nothing cut',
-        (tester) async {
-          final semantics = tester.ensureSemantics();
-          final l = words(language);
-          await cuenta(tester, stoppedOne(), language: language, scale: scale);
-          await askSignOut(tester, l);
-          expect(inDialog(l.meetingSignOutTitle), findsOneWidget);
-          final body = dialogBody(tester);
-          expect(body, startsWith(l.meetingSignOutQuestion(1)));
-          expect(body, endsWith(l.meetingSignOutReminders));
-          expect(
-            find.descendant(
-              of: find.byType(FilledButton),
-              matching: find.text(l.meetingSendFirst),
-            ),
-            findsOneWidget,
-          );
-          // TalkBack opens on the question: the dialog's route is named by
-          // the title, and the title is the first thing read in it.
-          SemanticsNode? named;
-          bool seek(SemanticsNode n) {
-            if (n.flagsCollection.namesRoute &&
-                n.label == l.meetingSignOutTitle) {
-              named = n;
-              return false;
-            }
-            n.visitChildren(seek);
-            return named == null;
+      testWidgets('UX-2804: one stopped recording, $language ${scale}x: titled '
+          'question read first, the count, reminders last, Save notes as the '
+          'primary; nothing cut', (tester) async {
+        final semantics = tester.ensureSemantics();
+        final l = words(language);
+        await cuenta(tester, stoppedOne(), language: language, scale: scale);
+        await askSignOut(tester, l);
+        expect(inDialog(l.meetingSignOutTitle), findsOneWidget);
+        final body = dialogBody(tester);
+        expect(body, startsWith(l.meetingSignOutQuestion(1)));
+        expect(body, endsWith(l.meetingSignOutReminders));
+        expect(
+          find.descendant(
+            of: find.byType(FilledButton),
+            matching: find.text(l.meetingSendFirst),
+          ),
+          findsOneWidget,
+        );
+        // TalkBack opens on the question: the dialog's route is named by
+        // the title, and the title is the first thing read in it.
+        SemanticsNode? named;
+        bool seek(SemanticsNode n) {
+          if (n.flagsCollection.namesRoute &&
+              n.label == l.meetingSignOutTitle) {
+            named = n;
+            return false;
           }
+          n.visitChildren(seek);
+          return named == null;
+        }
 
-          seek(
-            tester.binding.renderViews.first.owner!.semanticsOwner!
-                .rootSemanticsNode!,
-          );
-          expect(named, isNotNull, reason: 'the dialog is named by its title');
-          final node = named!;
-          final labels = <String>[];
-          void walk(SemanticsNode n) {
-            if (n.label.isNotEmpty) labels.add(n.label);
-            for (final child in n.debugListChildrenInOrder(
-              DebugSemanticsDumpOrder.traversalOrder,
-            )) {
-              walk(child);
-            }
-          }
-
-          for (final child in node.debugListChildrenInOrder(
+        seek(
+          tester
+              .binding
+              .renderViews
+              .first
+              .owner!
+              .semanticsOwner!
+              .rootSemanticsNode!,
+        );
+        expect(named, isNotNull, reason: 'the dialog is named by its title');
+        final node = named!;
+        final labels = <String>[];
+        void walk(SemanticsNode n) {
+          if (n.label.isNotEmpty) labels.add(n.label);
+          for (final child in n.debugListChildrenInOrder(
             DebugSemanticsDumpOrder.traversalOrder,
           )) {
             walk(child);
           }
-          expect(labels.first, l.meetingSignOutTitle);
-          // Nothing cut: every line of the dialog fits the phone's width and
-          // no text is clipped or overflows.
-          expect(tester.takeException(), isNull);
-          for (final text in [
-            l.meetingSignOutTitle,
-            l.meetingDiscardAndSignOut,
-            l.cancel,
-            l.meetingSendFirst,
-          ]) {
-            final found = inDialog(text);
-            await tester.ensureVisible(found);
-            await tester.pumpAndSettle();
-            final rect = tester.getRect(found);
-            expect(rect.left, greaterThanOrEqualTo(0), reason: text);
-            expect(rect.right, lessThanOrEqualTo(360.5), reason: text);
-            final paragraph = tester.renderObject<RenderParagraph>(found);
-            expect(paragraph.didExceedMaxLines, isFalse, reason: text);
-          }
-          semantics.dispose();
-        },
-      );
+        }
+
+        for (final child in node.debugListChildrenInOrder(
+          DebugSemanticsDumpOrder.traversalOrder,
+        )) {
+          walk(child);
+        }
+        expect(labels.first, l.meetingSignOutTitle);
+        // Nothing cut: every line of the dialog fits the phone's width and
+        // no text is clipped or overflows.
+        expect(tester.takeException(), isNull);
+        for (final text in [
+          l.meetingSignOutTitle,
+          l.meetingDiscardAndSignOut,
+          l.cancel,
+          l.meetingSendFirst,
+        ]) {
+          final found = inDialog(text);
+          await tester.ensureVisible(found);
+          await tester.pumpAndSettle();
+          final rect = tester.getRect(found);
+          expect(rect.left, greaterThanOrEqualTo(0), reason: text);
+          expect(rect.right, lessThanOrEqualTo(360.5), reason: text);
+          final paragraph = tester.renderObject<RenderParagraph>(found);
+          expect(paragraph.didExceedMaxLines, isFalse, reason: text);
+        }
+        semantics.dispose();
+      });
     }
 
     testWidgets('UX-2804: a meeting recording now: the body starts with it, '
@@ -1946,10 +1955,7 @@ void main() {
       final meetings = ScriptedMeetings();
       await cuenta(tester, meetings);
       meetings.emit(
-        MeetingsState(
-          loaded: true,
-          recording: meetings.recordingStatus('r'),
-        ),
+        MeetingsState(loaded: true, recording: meetings.recordingStatus('r')),
       );
       await tester.pump();
       await askSignOut(tester, l);
@@ -2021,7 +2027,8 @@ void main() {
         if (stacked) {
           expect(discard.center.dy, lessThan(cancel.center.dy));
           expect(cancel.center.dy, lessThan(primary.center.dy));
-          final gap = button(l.meetingSendFirst).top -
+          final gap =
+              button(l.meetingSendFirst).top -
               button(l.meetingDiscardAndSignOut).bottom;
           expect(
             gap,
@@ -2204,9 +2211,15 @@ void main() {
     });
 
     for (final (problem, reason) in [
-      (MeetingProblem.pieceFailed, (AppLocalizations l) => l.meetingSendFailedLost),
+      (
+        MeetingProblem.pieceFailed,
+        (AppLocalizations l) => l.meetingSendFailedLost,
+      ),
       (MeetingProblem.expired, (AppLocalizations l) => l.meetingSendFailedLost),
-      (MeetingProblem.proRequired, (AppLocalizations l) => l.meetingSendFailedPro),
+      (
+        MeetingProblem.proRequired,
+        (AppLocalizations l) => l.meetingSendFailedPro,
+      ),
       (
         MeetingProblem.allowanceUsed,
         (AppLocalizations l) => l.meetingSendFailedAllowance,
@@ -2225,10 +2238,7 @@ void main() {
         final auth = await cuenta(tester, meetings);
         await askSignOut(tester, l);
         expect(inDialog(l.meetingSignOutTitle), findsOneWidget);
-        expect(
-          dialogBody(tester),
-          '${reason(l)} ${l.meetingSignOutReminders}',
-        );
+        expect(dialogBody(tester), '${reason(l)} ${l.meetingSignOutReminders}');
         expect(inDialog(l.meetingSendFirst), findsNothing);
         expect(inDialog(l.meetingDiscardAndSignOut), findsOneWidget);
         expect(
@@ -2275,8 +2285,10 @@ void main() {
       expect(body, startsWith(l.meetingSendFailedLost));
       expect(
         body,
-        contains('Descartar y cerrar sesión borra las 2 grabaciones que '
-            'esperan.'),
+        contains(
+          'Descartar y cerrar sesión borra las 2 grabaciones que '
+          'esperan.',
+        ),
       );
       expect(body, contains(l.meetingDiscardDeletesAll(2)));
       expect(inDialog(l.meetingSendFirst), findsNothing);
@@ -3059,7 +3071,7 @@ void main() {
         );
         expect(find.byKey(const ValueKey('subscription-error')), findsNothing);
         // Meeting notes is the reason, so it isn't listed again as a benefit.
-        expect(find.text(es.proBenefitMeetingNotes), findsNothing);
+        expect(find.text(es.proBenefitMeetingNotes(20)), findsNothing);
         expect(find.text(es.proBenefitReminders), findsOneWidget);
         expect(tester.takeException(), isNull);
       },
@@ -3581,7 +3593,10 @@ void main() {
         find.descendant(of: find.byType(AlertDialog), matching: finder);
 
     /// Notes in Spanish on a small phone, then «Grabar una reunión».
-    Future<void> recording(WidgetTester tester, ScriptedMeetings meetings) async {
+    Future<void> recording(
+      WidgetTester tester,
+      ScriptedMeetings meetings,
+    ) async {
       await _notes(tester, _container(meetings), language: 'es');
       await tester.tap(find.byKey(const ValueKey('record-meeting')));
       await tester.pumpAndSettle();
@@ -3627,7 +3642,10 @@ void main() {
       await recording(tester, meetings);
       final elapsed = find.byKey(const ValueKey('meeting-elapsed'));
       final screen = tester.getRect(find.byType(MeetingScreen)).center.dx;
-      expect(tester.getRect(elapsed).center.dx, moreOrLessEquals(screen, epsilon: 1));
+      expect(
+        tester.getRect(elapsed).center.dx,
+        moreOrLessEquals(screen, epsilon: 1),
+      );
 
       await tester.tap(find.byKey(const ValueKey('meeting-stop')));
       await tester.pumpAndSettle();
@@ -3670,7 +3688,9 @@ void main() {
       expect(find.byType(MeetingScreen), findsOneWidget);
       expect(find.text(es.meetingListening), findsNothing);
       expect(find.text(es.meetingListeningHelp), findsNothing);
-      await tester.tap(find.byKey(const ValueKey('meeting-stop')).hitTestable());
+      await tester.tap(
+        find.byKey(const ValueKey('meeting-stop')).hitTestable(),
+      );
       await _pumpSpinning(tester);
       expect(meetings.calls.stops, 2);
       expect(find.text(es.meetingPreparing), findsOneWidget);
@@ -3820,6 +3840,7 @@ void main() {
       Task? shown,
       String language = 'es',
       double scale = 1,
+      Set<int>? meetingNotes,
     }) async {
       final captures = MemoryCaptures();
       final links = MemoryNoteTaskLinks();
@@ -3830,7 +3851,7 @@ void main() {
           meetingsOverride(ScriptedMeetings()),
           captureStoreProvider.overrideWithValue(captures),
           ...captureSheetOverrides(),
-          ...noteTaskOverrides(links),
+          ...noteTaskOverrides(links, meetingNotes: meetingNotes),
         ],
       );
       addTearDown(container.dispose);
@@ -4151,9 +4172,8 @@ void main() {
       await addTask(tester);
       final task = made(app.container)!;
       expect(front(tester), task.id);
-      ScaffoldMessenger.of(
-        tester.element(find.byType(TaskDetailScreen).last),
-      ).removeCurrentSnackBar();
+      ScaffoldMessenger.of(tester.element(find.byType(TaskDetailScreen).last))
+          .removeCurrentSnackBar();
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip(es.deleteTask));
       await tester.pumpAndSettle();
@@ -4254,6 +4274,15 @@ void main() {
         expect(find.text(es.meetingCreateTask), findsNothing);
         expect(find.text(es.meetingViewTask), findsNothing);
       });
+
+      testWidgets('D1: a note with open steps not made from a meeting, as a '
+          'recipe, keeps a filled «Editar nota» alone', (tester) async {
+        await open(tester, meetingNotes: const {});
+        expect(filledButtonWithText(es.editNote), findsOneWidget);
+        expect(outlinedButtonWithText(es.editNote), findsNothing);
+        expect(find.text(es.meetingCreateTask), findsNothing);
+        expect(find.text(es.meetingViewTask), findsNothing);
+      });
     });
 
     test('The new copy exists in English, Spanish and Catalan', () {
@@ -4267,6 +4296,114 @@ void main() {
       expect(ca.meetingViewTask, 'Mostra la tasca');
       // «Crear tarea» itself is unchanged.
       expect(es.meetingCreateTask, 'Crear tarea');
+    });
+  });
+
+  group('The owner\'s decisions of 2026-11-04', () {
+    final es = lookupAppLocalizations(const Locale('es'));
+    Future<(FakeReminderAccess, _AskedStore)> record(
+      WidgetTester tester, {
+      bool allowed = false,
+      bool asked = false,
+    }) async {
+      final access = FakeReminderAccess(allowed: allowed);
+      final store = _AskedStore(asked: asked);
+      final container = _container(
+        ScriptedMeetings(),
+        overrides: [
+          reminderAccessProvider.overrideWithValue(access),
+          reminderPreferenceStoreProvider.overrideWithValue(store),
+        ],
+      );
+      await _notes(tester, container, language: 'es');
+      await tester.tap(find.byKey(const ValueKey('record-meeting')));
+      await tester.pumpAndSettle();
+      expect(find.byType(MeetingScreen), findsOneWidget);
+      return (access, store);
+    }
+
+    testWidgets('D3: notifications off at the first recording: one sentence '
+        'and «Continuar», then Android\'s dialog; asked once', (tester) async {
+      final (access, store) = await record(tester);
+      expect(find.text(es.meetingNotifyAsk), findsOneWidget);
+      expect(store.marked, isTrue);
+      await tester.tap(find.byKey(const ValueKey('meeting-notify-continue')));
+      await tester.pumpAndSettle();
+      expect(access.permissionRequests, 1);
+      expect(find.text(es.meetingNotifyAsk), findsNothing);
+      // Recording went on behind it.
+      expect(find.text(es.meetingListeningHelp), findsOneWidget);
+    });
+
+    testWidgets('D3: closing the sentence asks nothing more, and it is not '
+        'asked again', (tester) async {
+      final (access, store) = await record(tester);
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+      expect(find.text(es.meetingNotifyAsk), findsNothing);
+      expect(access.permissionRequests, 0);
+      expect(store.marked, isTrue);
+    });
+
+    testWidgets('D3: never asked again once asked, nor when notifications are '
+        'on', (tester) async {
+      final (access, _) = await record(tester, asked: true);
+      expect(find.text(es.meetingNotifyAsk), findsNothing);
+      expect(access.permissionRequests, 0);
+      await tester.pumpWidget(const SizedBox());
+      final (onAccess, onStore) = await record(tester, allowed: true);
+      expect(find.text(es.meetingNotifyAsk), findsNothing);
+      expect(onAccess.permissionRequests, 0);
+      expect(onStore.marked, isFalse);
+    });
+
+    testWidgets('D5: the recording screen says, after the help line, that the '
+        'audio is sent and then deleted', (tester) async {
+      await record(tester, allowed: true);
+      final line = find.byKey(const ValueKey('meeting-audio-deleted'));
+      expect(line, findsOneWidget);
+      expect(
+        tester.widget<Text>(line).data,
+        'El audio se envía para hacer las notas y después se borra.',
+      );
+      expect(
+        tester.getRect(line).top,
+        greaterThanOrEqualTo(
+          tester.getRect(find.byKey(const ValueKey('meeting-help'))).bottom,
+        ),
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    test('The new copy exists in English, Spanish and Catalan', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(
+        es.meetingNotifyAsk,
+        'Para pararla desde la notificación y avisarte cuando las notas '
+        'estén listas.',
+      );
+      expect(en.meetingNotifyAsk, startsWith('So you can stop it'));
+      expect(ca.meetingNotifyAsk, startsWith('Per aturar-la'));
+      expect(es.meetingNotifyAskContinue, 'Continuar');
+      expect(en.meetingNotifyAskContinue, 'Continue');
+      expect(ca.meetingNotifyAskContinue, 'Continua');
+      expect(
+        en.meetingAudioDeleted,
+        'The audio is sent to make the notes, then deleted.',
+      );
+      expect(
+        ca.meetingAudioDeleted,
+        'L’àudio s’envia per fer les notes i després s’esborra.',
+      );
+      expect(
+        en.billingReasonMeetingNotesLimit(20),
+        'Up to 20 hours of meetings a month.',
+      );
+      expect(
+        ca.billingReasonMeetingNotesLimit(20),
+        'Fins a 20 hores de reunions al mes.',
+      );
     });
   });
 }
@@ -4370,4 +4507,14 @@ class _P324QuietStop extends ScriptedMeetings {
     );
     return meeting;
   }
+}
+
+/// Whether a meeting asked for notifications on this phone, in memory (D3).
+class _AskedStore extends ReminderPreferenceStore {
+  _AskedStore({bool asked = false}) : marked = asked, super(TaskDatabase());
+  bool marked;
+  @override
+  Future<bool> meetingNotificationsAsked() async => marked;
+  @override
+  Future<void> setMeetingNotificationsAsked() async => marked = true;
 }

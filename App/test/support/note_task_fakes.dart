@@ -69,7 +69,24 @@ class MemoryNoteTaskLinks extends NoteTaskLinks {
       links[noteId] = taskId;
 }
 
-/// The overrides for [NoteTaskList] and [MemoryNoteTaskLinks].
-List<Override> noteTaskOverrides(MemoryNoteTaskLinks links) => [
+/// The overrides for [NoteTaskList] and [MemoryNoteTaskLinks]. Every note
+/// in the task list counts as made from a meeting on this phone, unless
+/// [meetingNotes] names them (D1).
+List<Override> noteTaskOverrides(
+  MemoryNoteTaskLinks links, {
+  Set<int>? meetingNotes,
+}) => [
   noteTaskLinksProvider.overrideWithValue(links),
+  meetingNotesOverride(meetingNotes),
 ];
+
+/// [meetingNotesProvider] in memory: [ids], or every note in the task list.
+Override meetingNotesOverride([Set<int>? ids]) =>
+    meetingNotesProvider.overrideWith(
+      (ref) async =>
+          ids ??
+          {
+            for (final task in ref.watch(taskProvider).value ?? const <Task>[])
+              if (task.isNote && task.id != null) task.id!,
+          },
+    );

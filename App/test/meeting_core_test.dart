@@ -803,6 +803,21 @@ void main() {
       expect(bare.notes, 'Short. Then more.');
     });
 
+    test('D1: a saved meeting note is marked as a meeting\'s on this phone, for its account only', () async {
+      final meeting = await store.create(owner, format: MeetingAudioFormat.opus, now: clock.now);
+      final path = await store.piecePath(meeting.id, Duration.zero, meeting.format);
+      await store.openPiece(meeting, index: 0, offset: Duration.zero, path: path, now: clock.now);
+      await store.closePiece(meeting, index: 0, duration: const Duration(seconds: 30), hasSound: true, now: clock.now);
+      final stopped = (await store.finish(meeting.id, owner, clock.now))!;
+      expect(await MeetingNoteMarks.read(database, owner), isEmpty);
+      final id = await store.saveNote(stopped, api.result);
+      expect(await MeetingNoteMarks.read(database, owner), {id});
+      expect(await MeetingNoteMarks.read(database, 'someone-else'), isEmpty);
+      // Saving again keeps one mark.
+      await store.saveNote(stopped, api.result);
+      expect(await MeetingNoteMarks.read(database, owner), {id});
+    });
+
     test('a note for a project that went is saved outside it', () async {
       final meeting = await store.create(owner, format: MeetingAudioFormat.opus, now: clock.now, projectId: 'gone');
       final path = await store.piecePath(meeting.id, Duration.zero, meeting.format);

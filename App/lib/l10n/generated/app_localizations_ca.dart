@@ -5411,5 +5411,23 @@ class AppLocalizationsCa extends AppLocalizations {
       'un resum, les decisions i les coses per fer';
 
   @override
-  String get proBenefitMeetingNotes => 'Notes de les reunions que enregistres';
+  String proBenefitMeetingNotes(int hours) {
+    return 'Notes de les reunions que enregistres, fins a $hours hores al mes';
+  }
+
+  @override
+  String get meetingAudioDeleted =>
+      'L’àudio s’envia per fer les notes i després s’esborra.';
+
+  @override
+  String get meetingNotifyAsk =>
+      'Per aturar-la des de la notificació i avisar-te quan les notes estiguin llestes.';
+
+  @override
+  String get meetingNotifyAskContinue => 'Continua';
+
+  @override
+  String billingReasonMeetingNotesLimit(int hours) {
+    return 'Fins a $hours hores de reunions al mes.';
+  }
 }

@@ -89,11 +89,7 @@ Not chosen: live streaming (Gemini 3.5 Transcribe Live, about $0.55 an hour, 10-
 - **MN-33.** Every new string goes in the three ARB files (English, Spanish, Catalan), checked at 2× text size.
 - **MN-34.** When it ships, the website's privacy page says what happens to recordings, through the `/ux-web` loop in `../TaskFlowWeb`.
 
-## Open decisions for the owner
+## Decisions taken after the build
 
-Decided on 2026-11-04: staging's dictations run on Vertex only too (`AI_ROUTE=vertex` in the staging deploy), off the free AI Studio tier.
-
-
-- Who gets meeting notes. Recommended: Pro only, since turning speech into tasks is the paid capability; at about $0.08 an hour no cap is needed, beyond perhaps 20 hours a month against abuse.
-- A one-line reminder before recording that the other people should know they're being recorded.
-- The 7-day (MN-26) and 30-day (MN-27) limits.
+- 2026-11-04: staging's dictations run on Vertex only too (`AI_ROUTE=vertex` in the staging deploy), off the free AI Studio tier.
+- 2026-11-04: meeting notes are Pro only, with up to 20 hours of meetings a month, stated on the Pro screen. That costs at most about US$1.60 a user a month on Flash-Lite. There is no consent reminder; the recording screen says the audio is sent to make the notes and then deleted. The 7-day (MN-26) and 30-day (MN-27) limits stay. The rest is in `.claude/ux-review/DECISIONS.md` (2026-11-03 entry).

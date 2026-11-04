@@ -6,6 +6,12 @@ import 'package:intl/intl.dart';
 import 'package:agenda/services/meeting_note.dart';
 import 'package:agenda/services/meeting_recorder.dart';
 
+/// The meeting time Pro includes each month, in hours, as the Pro screen
+/// states it (D4 of 2026-11-04): the server's allowance,
+/// `AI_MEETING_PIECES_PER_MONTH` (240 pieces of about 5 minutes). Change
+/// both together.
+const meetingHoursPerMonth = 20;
+
 /// The words a meeting's note puts around the server's text, in the
 /// meeting's language (MN-21). A language the app doesn't speak gets
 /// English ones, as the app falls back to English.
