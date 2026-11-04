@@ -1,4 +1,5 @@
-# Runtime data only. The private prototype .env is intentionally tracked.
+# Runtime data, and every .env file: secrets live only on the PC (.env), in
+# GitHub Actions secrets and in Google Secret Manager, never in Git.
 __pycache__/
 *.py[cod]
 *.log
@@ -9,7 +10,9 @@ __pycache__/
 htmlcov/
 artifacts/
 private_media/
-.env.local
-.env.production
+.env
+.env.*
+!.env.example
+!.env.ci
 .credentials/
 tests/fixtures/*.wav
