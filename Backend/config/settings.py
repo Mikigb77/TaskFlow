@@ -52,7 +52,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_THROTTLE_CLASSES": ["core.runtime_state.AtomicScopedThrottle"] if os.getenv("STATE_BACKEND") == "postgres" else ["rest_framework.throttling.ScopedRateThrottle"],
-    "DEFAULT_THROTTLE_RATES": {"auth": "10/min", "recovery": "5/hour", "tasks": "120/min", "ai": "6/min", "attachments": "60/min", "billing": "10/min", "invitations": "10/hour"},
+    "DEFAULT_THROTTLE_RATES": {"auth": "10/min", "recovery": "5/hour", "tasks": "120/min", "ai": "6/min", "attachments": "60/min", "billing": "10/min", "invitations": "10/hour", "meetings": "60/min"},
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 100,
 }
@@ -132,6 +132,13 @@ AI_VERTEX_PROJECT = os.getenv("AI_VERTEX_PROJECT", "")
 AI_VERTEX_LOCATION = os.getenv("AI_VERTEX_LOCATION", "global")
 AI_VERTEX_TEXT_MODEL = os.getenv("AI_VERTEX_TEXT_MODEL", "gemini-3.1-flash-lite")
 AI_VERTEX_AUDIO_MODEL = os.getenv("AI_VERTEX_AUDIO_MODEL", "gemini-3.1-flash-lite")
+# Meeting notes (docs/MEETINGS.md): always on Vertex, whatever AI_ROUTE says. The pieces' fallback
+# model is gemini-3.5-transcribe; changing the setting is enough.
+AI_MEETING_AUDIO_MODEL = os.getenv("AI_MEETING_AUDIO_MODEL", "gemini-3.5-flash-lite")
+AI_MEETING_TEXT_MODEL = os.getenv("AI_MEETING_TEXT_MODEL", "gemini-3.5-flash-lite")
+# Pieces of about 5 minutes per UTC calendar month for each Pro account: 240 is about 20 hours.
+AI_MEETING_PIECES_PER_MONTH = int(os.getenv("AI_MEETING_PIECES_PER_MONTH", "240"))
+MEETING_PIECE_MAX_BYTES = 8 * 1024 * 1024
 LOGGING = {
     "version": 1, "disable_existing_loggers": False,
     "handlers": {"ai_console": {"class": "logging.StreamHandler"}},

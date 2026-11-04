@@ -9,6 +9,7 @@ import 'package:agenda/screens/calendar_screen.dart';
 import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/screens/settings_screen.dart';
 import 'package:agenda/screens/notes_screen.dart';
+import 'package:agenda/widgets/note_task.dart';
 
 // Mirrors Flutter's private `_kMaxLabelTextScaleFactor` in
 // material/navigation_bar.dart: NavigationBar never scales a label past 1.3x.
@@ -84,6 +85,9 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Read the notes' «Crear tarea» links before any note's page opens, so
+    // its main button shows the right label from the start (R1-P318-1).
+    ref.listen(noteTasksProvider, (_, _) {});
     // Tasks saved from the pending list land on Calendar.
     ref.listen<CalendarFocus?>(calendarFocusProvider, (_, focus) {
       if (focus?.showCalendar == true && _index != 0) {

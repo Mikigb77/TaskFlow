@@ -13,11 +13,17 @@ class ChecklistEditor extends StatefulWidget {
     this.onChanged,
     this.occurrence,
     this.recurring = false,
+    this.choosing = false,
   });
   final List<ChecklistItem> items;
   final ValueChanged<List<ChecklistItem>>? onChanged;
   final String? occurrence;
   final bool recurring;
+
+  /// The review «Crear tarea» opens from a note (MN-22): a tick means the
+  /// step goes into the task, under «Pasos que se añaden», and a step typed
+  /// here starts ticked. The rows have no ⋮.
+  final bool choosing;
 
   @override
   State<ChecklistEditor> createState() => _ChecklistEditorState();
@@ -72,7 +78,10 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
       return;
     }
     _add.clear();
-    widget.onChanged?.call([...widget.items, ChecklistItem(title: title)]);
+    widget.onChanged?.call([
+      ...widget.items,
+      ChecklistItem(title: title, completed: widget.choosing),
+    ]);
     if (next) _addFocus.requestFocus();
   }
 
@@ -108,7 +117,10 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
     final items = widget.items;
     final onChanged = widget.onChanged;
     final occurrence = widget.occurrence;
-    final recurring = widget.recurring;
+    final choosing = widget.choosing;
+    // Choosing, a tick is a choice, not a step done: a repeat doesn't
+    // hold it back.
+    final recurring = widget.recurring && !choosing;
     final complete = items
         .where((item) => item.done(occurrence: occurrence))
         .length;
@@ -116,18 +128,25 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (items.isNotEmpty) ...[
-          Text(
-            context.l10n.checklistCount(complete, items.length),
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          const SizedBox(height: 8),
-          LinearProgressIndicator(
-            value: complete / items.length,
-            semanticsLabel: context.l10n.checklistSemantics(
-              complete,
-              items.length,
+          if (choosing)
+            Text(
+              context.l10n.meetingStepsToAdd,
+              style: Theme.of(context).textTheme.titleSmall,
+            )
+          else ...[
+            Text(
+              context.l10n.checklistCount(complete, items.length),
+              style: Theme.of(context).textTheme.titleSmall,
             ),
-          ),
+            const SizedBox(height: 8),
+            LinearProgressIndicator(
+              value: complete / items.length,
+              semanticsLabel: context.l10n.checklistSemantics(
+                complete,
+                items.length,
+              ),
+            ),
+          ],
           if (recurring && occurrence == null)
             Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -197,53 +216,54 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
                     ),
                   ),
                 ),
-                PopupMenuButton<String>(
-                  tooltip: context.l10n.editCaptureItem(items[index].title),
-                  enabled: onChanged != null,
-                  itemBuilder: (_) => [
-                    PopupMenuItem(
-                      value: 'edit',
-                      child: Text(context.l10n.editStep),
-                    ),
-                    if (index > 0)
+                if (!choosing)
+                  PopupMenuButton<String>(
+                    tooltip: context.l10n.editCaptureItem(items[index].title),
+                    enabled: onChanged != null,
+                    itemBuilder: (_) => [
                       PopupMenuItem(
-                        value: 'up',
-                        child: Text(context.l10n.moveUp),
+                        value: 'edit',
+                        child: Text(context.l10n.editStep),
                       ),
-                    if (index < items.length - 1)
+                      if (index > 0)
+                        PopupMenuItem(
+                          value: 'up',
+                          child: Text(context.l10n.moveUp),
+                        ),
+                      if (index < items.length - 1)
+                        PopupMenuItem(
+                          value: 'down',
+                          child: Text(context.l10n.moveDown),
+                        ),
                       PopupMenuItem(
-                        value: 'down',
-                        child: Text(context.l10n.moveDown),
+                        value: 'remove',
+                        child: Text(context.l10n.removeStep),
                       ),
-                    PopupMenuItem(
-                      value: 'remove',
-                      child: Text(context.l10n.removeStep),
-                    ),
-                  ],
-                  onSelected: (action) {
-                    if (action == 'edit') {
-                      _startRename(items[index]);
-                      return;
-                    }
-                    final changed = [...widget.items];
-                    final at = changed.indexWhere(
-                      (item) => item.id == items[index].id,
-                    );
-                    if (at < 0) return;
-                    final item = changed.removeAt(at);
-                    if (action != 'remove') {
-                      changed.insert(at + (action == 'up' ? -1 : 1), item);
-                    }
-                    // A step typed but not added yet is kept, even when the
-                    // last step goes and the host hides this editor.
-                    final typed = _add.text.trim();
-                    if (typed.isNotEmpty && changed.length < _maxSteps) {
-                      _add.clear();
-                      changed.add(ChecklistItem(title: typed));
-                    }
-                    onChanged?.call(changed);
-                  },
-                ),
+                    ],
+                    onSelected: (action) {
+                      if (action == 'edit') {
+                        _startRename(items[index]);
+                        return;
+                      }
+                      final changed = [...widget.items];
+                      final at = changed.indexWhere(
+                        (item) => item.id == items[index].id,
+                      );
+                      if (at < 0) return;
+                      final item = changed.removeAt(at);
+                      if (action != 'remove') {
+                        changed.insert(at + (action == 'up' ? -1 : 1), item);
+                      }
+                      // A step typed but not added yet is kept, even when the
+                      // last step goes and the host hides this editor.
+                      final typed = _add.text.trim();
+                      if (typed.isNotEmpty && changed.length < _maxSteps) {
+                        _add.clear();
+                        changed.add(ChecklistItem(title: typed));
+                      }
+                      onChanged?.call(changed);
+                    },
+                  ),
               ],
             ),
         ],

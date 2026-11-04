@@ -3,10 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/l10n/request_locale.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
+import 'package:agenda/models/meeting.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/services/google_sign_in_service.dart';
+import 'package:agenda/services/meeting_controller.dart';
 import 'package:agenda/widgets/google_login_button.dart';
+import 'package:agenda/widgets/meeting_banners.dart';
 import 'package:agenda/widgets/name_ask_sheet.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
@@ -23,6 +27,14 @@ class AccountScreen extends ConsumerStatefulWidget {
 }
 
 enum _Action { sync, import, google, signOut }
+
+enum _MeetingsChoice { send, discard }
+
+/// «Save notes and sign out» was tapped and still runs: the notes are being
+/// saved, then the account signs out. Held outside Cuenta, so leaving it
+/// doesn't hide the wait: Cuenta opened again shows it, and can't start a
+/// second sign-out.
+final meetingSignOutPendingProvider = StateProvider<bool>((ref) => false);
 
 class _AccountScreenState extends ConsumerState<AccountScreen> {
   _Action? _running;
@@ -50,14 +62,14 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
         });
       }
     } finally {
-      if (mounted) setState(() => _running = null);
+      if (mounted) {
+        setState(() => _running = null);
+      }
     }
   }
 
-  Future<void> _sync() => _run(
-    _Action.sync,
-    () => ref.read(taskProvider.notifier).loadTasks(),
-  );
+  Future<void> _sync() =>
+      _run(_Action.sync, () => ref.read(taskProvider.notifier).loadTasks());
 
   Future<void> _import() async {
     final count = await _localItems;
@@ -95,6 +107,25 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
   }
 
   Future<void> _signOut() async {
+    // Read before any wait, so a confirmed sign-out finishes even when
+    // Cuenta is left meanwhile.
+    final auth = ref.read(authProvider.notifier);
+    // Meeting recordings waiting here belong to this account (MN-13).
+    // Right after launch they may not have been read yet: read them now.
+    final reading = ref.read(meetingControllerProvider.notifier);
+    try {
+      await reading.ready;
+      await reading.refresh();
+    } catch (_) {
+      /* Counted from what the app has read. */
+    }
+    if (!mounted) return;
+    final meetings = ref.read(meetingsProvider);
+    if (meetings.recording != null ||
+        meetings.stopped.isNotEmpty ||
+        meetings.waiting.isNotEmpty) {
+      return _signOutWithMeetings(meetings, reading, auth);
+    }
     // Signing out cancels every reminder on this phone, so ask first.
     final confirmed = await showDialog<bool>(
       context: context,
@@ -114,10 +145,126 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    await _run(
-      _Action.signOut,
-      () => ref.read(authProvider.notifier).signOut(),
+    // A meeting's notes just saved: the server hears it may delete the
+    // meeting while this account can still tell it (MN-24).
+    final unacknowledged = meetings.ready.any(
+      (meeting) => meeting.phase == MeetingPhase.saved,
     );
+    await _run(_Action.signOut, () async {
+      if (unacknowledged) await tellServerBeforeSignOut(reading);
+      await auth.signOut();
+    });
+  }
+
+  /// Recordings still wait to be sent (MN-13): save their notes first, or
+  /// discard them, then sign out. If they can't all be sent, the account
+  /// stays. Recordings that can only fail to send are offered no send.
+  Future<void> _signOutWithMeetings(
+    MeetingsState meetings,
+    MeetingController controller,
+    AuthNotifier auth,
+  ) async {
+    final l = context.l10n;
+    final pending = ref.read(meetingSignOutPendingProvider.notifier);
+    final others = meetings.stopped.length + meetings.waiting.length;
+    final heldBack =
+        meetings.recording == null &&
+        [...meetings.stopped, ...meetings.waiting].every(meetingHeldBack);
+    final body = [
+      if (heldBack)
+        meetingHeldBackReason(l, meetings)!
+      else ...[
+        if (meetings.recording != null) l.meetingSignOutRecording,
+        if (others > 0) l.meetingSignOutQuestion(others),
+      ],
+      l.meetingSignOutReminders,
+    ].join(' ');
+    final choice = await showDialog<_MeetingsChoice>(
+      context: context,
+      builder: (context) => AlertDialog(
+        scrollable: true,
+        actionsOverflowButtonSpacing: 8,
+        // TalkBack opens on the question, not on «Alerta».
+        semanticLabel: l.meetingSignOutTitle,
+        title: Text(l.meetingSignOutTitle),
+        content: Text(body),
+        // Cancel sits between the irreversible Discard and the main action.
+        actions: [
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(context, _MeetingsChoice.discard),
+            child: Text(l.meetingDiscardAndSignOut),
+          ),
+          if (heldBack)
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(l.cancel),
+            )
+          else ...[
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(l.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, _MeetingsChoice.send),
+              child: Text(l.meetingSendFirst),
+            ),
+          ],
+        ],
+      ),
+    );
+    if (choice == null || !mounted) return;
+    // As they are now: one recording stops, and those that stopped by
+    // themselves are finished into notes.
+    final now = ref.read(meetingsProvider);
+    await _run(_Action.signOut, () async {
+      if (choice == _MeetingsChoice.discard) {
+        // Deleted on the server too, before the account's token goes
+        // (MN-13, MN-25).
+        await controller.discardAll();
+        await tellServerBeforeSignOut(controller);
+      } else {
+        // The line under Cerrar sesión stays until sign-in shows, or the
+        // send fails, in this Cuenta or one opened again meanwhile.
+        pending.state = true;
+        final MeetingSendResult result;
+        try {
+          if (now.recording != null) {
+            final stopped = await controller.stop();
+            // A quiet recording kept at Stop (UX-2717): its notes are
+            // made too, as the question said.
+            if (stopped?.phase == MeetingPhase.interrupted) {
+              await controller.finishMeeting(stopped!.id);
+            }
+          }
+          for (final meeting in now.stopped) {
+            await controller.finishMeeting(meeting.id);
+          }
+          result = await controller.uploadNow();
+          if (result == MeetingSendResult.done) await auth.signOut();
+        } finally {
+          pending.state = false;
+        }
+        if (result != MeetingSendResult.done) {
+          // With Cuenta left, nothing more: the account stays, and the
+          // Notes line says why the recording waits.
+          if (mounted) {
+            setState(() {
+              _message = meetingSendFailure(
+                l,
+                ref.read(meetingsProvider),
+                result,
+              );
+              _failed = true;
+            });
+          }
+        }
+        return;
+      }
+      await auth.signOut();
+    });
   }
 
   Future<void> _linkGoogle() async {
@@ -140,7 +287,10 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     if (auth.account == null) return const LoginScreen();
-    final busy = _running != null || auth.loading;
+    // A sign-out started from an earlier Cuenta may still be saving notes.
+    final savingNotes = ref.watch(meetingSignOutPendingProvider);
+    final signingOut = _running == _Action.signOut || savingNotes;
+    final busy = _running != null || auth.loading || savingNotes;
     final colors = Theme.of(context).colorScheme;
     final google = ref.watch(googleSignInServiceProvider);
     ref.watch(taskProvider);
@@ -186,8 +336,10 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
               if (name.isNotEmpty) ...[
                 Semantics(
                   header: true,
-                  child: Text(name,
-                      style: Theme.of(context).textTheme.headlineMedium),
+                  child: Text(
+                    name,
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
                 ),
                 const SizedBox(height: 8),
               ],
@@ -311,9 +463,11 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                 // and nothing at rest.
                 child: TextButton.icon(
                   onPressed: busy ? null : _signOut,
-                  icon: _running == _Action.signOut
+                  icon: signingOut
                       ? progress(
-                          context.l10n.accountSigningOut,
+                          savingNotes
+                              ? context.l10n.meetingSending
+                              : context.l10n.accountSigningOut,
                           color: colors.error,
                         )
                       : null,
@@ -323,6 +477,20 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                   ),
                 ),
               ),
+              // Saving a meeting's notes can take minutes: say so, and that
+              // signing out follows.
+              if (savingNotes)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      context.l10n.meetingSavingNotes,
+                      key: const ValueKey('account-saving-notes'),
+                      style: TextStyle(color: colors.onSurfaceVariant),
+                    ),
+                  ),
+                ),
               // Deleting the account is its own group, kept apart from
               // signing out.
               const SizedBox(height: 24),

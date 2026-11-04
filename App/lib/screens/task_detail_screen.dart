@@ -9,6 +9,7 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
+import 'package:agenda/services/meeting_note.dart';
 import 'package:agenda/services/reminder_plans.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
@@ -18,6 +19,24 @@ import 'package:agenda/widgets/task_interactions.dart';
 import 'package:agenda/widgets/task_assignment_picker.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:agenda/widgets/note_text.dart';
+import 'package:agenda/widgets/note_task.dart';
+
+/// A task's page as a route named `/task` with the task's id, so the pages
+/// that show a task can be told apart from others on the stack: Deshacer
+/// after «Crear tarea» closes those of the task it deletes, and only those
+/// (R1-P318-3).
+MaterialPageRoute<void> taskPageRoute(int taskId) => MaterialPageRoute<void>(
+  settings: RouteSettings(name: '/task', arguments: taskId),
+  builder: (_) => TaskDetailScreen(taskId: taskId),
+);
+
+/// The names of the routes that show one task, by its id.
+const _taskRoutes = {'/task', '/taskDetails', '/editTask'};
+
+/// Whether [route] shows the task [taskId]: its page or its edit form.
+bool routeShowsTask(Route<dynamic> route, int taskId) =>
+    _taskRoutes.contains(route.settings.name) &&
+    route.settings.arguments == taskId;
 
 class TaskDetailScreen extends ConsumerStatefulWidget {
   const TaskDetailScreen({
@@ -57,6 +76,20 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   /// Completar was tapped: the page holds until it pops, its buttons off
   /// and the whole page taking no taps (UX-2633).
   bool _closing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // A meeting's note: the "notes ready" that opens it has done its job
+    // (UX-2811). Not for a task; nothing when none shows.
+    final task = ref
+        .read(taskProvider)
+        .value
+        ?.firstWhereOrNull((item) => item.id == taskId);
+    if (task?.isNote ?? true) {
+      unawaited(MeetingHooks.noteOpened(taskId).catchError((Object _) {}));
+    }
+  }
 
   /// Ticks the task and closes the page, as Back does, so the message and
   /// the ticked row show in the list under it. Reopening keeps the page.
@@ -245,6 +278,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                 Navigator.pushNamed(context, '/editTask', arguments: taskId);
             void reschedule() =>
                 TaskInteractions.reschedule(context, ref, task);
+            // The task this note made with «Crear tarea», while it exists.
+            final made = task.isNote ? noteMadeTask(ref, task) : null;
+            // Until this phone's note → task links are read, the main
+            // button can't know its label (R1-P318-1).
+            final linksRead =
+                !task.isNote || ref.watch(noteTasksProvider).hasValue;
             // Inert while Completar closes it: nothing on the page opens in
             // the hold (UX-2633).
             return AbsorbPointer(
@@ -438,7 +477,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                           ),
                         ),
                       if (!task.isNote) const SizedBox(height: 28),
-                      // The notes come first, as in the form.
+                      // A note's steps (a meeting's to-dos) come before its
+                      // words (UX-2708); a task's notes come first, as in the
+                      // form.
+                      if (task.isNote) ..._steps(context, task, canEdit),
                       if (hasBody) ...[
                         _body(
                           context,
@@ -491,60 +533,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                         ),
                       if (!task.isNote && reminderShown)
                         const SizedBox(height: 16),
-                      if (task.checklist.isNotEmpty) ...[
-                        SectionLabel(
-                          context.l10n.checklistCount(
-                            task.checklistDone,
-                            task.checklist.length,
-                          ),
-                        ),
-                        AppSurface(
-                          child: Column(
-                            children: [
-                              LinearProgressIndicator(
-                                value:
-                                    task.checklistDone / task.checklist.length,
-                                semanticsLabel: context.l10n.checklistSemantics(
-                                  task.checklistDone,
-                                  task.checklist.length,
-                                ),
-                              ),
-                              for (final item in task.checklist)
-                                CheckboxListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  key: ValueKey('check-step-${item.id}'),
-                                  controlAffinity:
-                                      ListTileControlAffinity.leading,
-                                  title: Text(item.title),
-                                  value: item.done(
-                                    occurrence: task.checklistOccurrence,
-                                  ),
-                                  onChanged: !canEdit
-                                      ? null
-                                      : (value) async {
-                                          try {
-                                            await ref
-                                                .read(taskProvider.notifier)
-                                                .setChecklistCompleted(
-                                                  task,
-                                                  item.id,
-                                                  value == true,
-                                                );
-                                          } catch (_) {
-                                            if (context.mounted) {
-                                              showFeedback(
-                                                ScaffoldMessenger.of(context),
-                                                context.l10n.stepUpdateError,
-                                              );
-                                            }
-                                          }
-                                        },
-                                ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                      ],
+                      if (!task.isNote) ..._steps(context, task, canEdit),
                       AttachmentPanel(task: task, reveal: widget.showFiles),
                     ],
                   ),
@@ -556,13 +545,68 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                         top: false,
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-                          child: Center(
-                            heightFactor: 1,
-                            child: FilledButton.icon(
-                              onPressed: edit,
-                              icon: const Icon(Icons.edit_outlined),
-                              label: Text(context.l10n.editNote),
-                            ),
+                          // A note with steps (a meeting's to-dos) can
+                          // become a task with them (MN-22): the main
+                          // button, which opens that task once made
+                          // (UX-2702, UX-2709).
+                          child: Wrap(
+                            spacing: 12,
+                            runSpacing: 8,
+                            alignment: WrapAlignment.center,
+                            children: [
+                              if (!linksRead && noteMakesTask(task))
+                                // Holds the main button's place, unseen and
+                                // untappable, so «Crear tarea» never turns
+                                // into «Ver tarea» under a finger.
+                                Visibility(
+                                  visible: false,
+                                  maintainSize: true,
+                                  maintainAnimation: true,
+                                  maintainState: true,
+                                  child: FilledButton.icon(
+                                    onPressed: null,
+                                    icon: const Icon(Icons.add_task_rounded),
+                                    label: Text(context.l10n.meetingCreateTask),
+                                  ),
+                                )
+                              else if (made != null)
+                                FilledButton.icon(
+                                  key: const ValueKey('note-view-task'),
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    taskPageRoute(made.id!),
+                                  ),
+                                  icon: const Icon(Icons.task_alt_rounded),
+                                  label: Text(context.l10n.meetingViewTask),
+                                )
+                              else if (noteMakesTask(task))
+                                FilledButton.icon(
+                                  key: const ValueKey('note-create-task'),
+                                  onPressed: () =>
+                                      createTaskFromNote(context, task),
+                                  icon: const Icon(Icons.add_task_rounded),
+                                  label: Text(context.l10n.meetingCreateTask),
+                                ),
+                              if (made != null || noteMakesTask(task))
+                                OutlinedButton.icon(
+                                  // As tall as the filled button beside it.
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize: const Size(48, 48),
+                                    visualDensity: const VisualDensity(
+                                      vertical: 3,
+                                    ),
+                                  ),
+                                  onPressed: edit,
+                                  icon: const Icon(Icons.edit_outlined),
+                                  label: Text(context.l10n.editNote),
+                                )
+                              else
+                                FilledButton.icon(
+                                  onPressed: edit,
+                                  icon: const Icon(Icons.edit_outlined),
+                                  label: Text(context.l10n.editNote),
+                                ),
+                            ],
                           ),
                         ),
                       )
@@ -662,6 +706,57 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             child: InkWell(onTap: onTap, child: row),
           );
   }
+
+  /// The steps and their progress, when there are any.
+  List<Widget> _steps(BuildContext context, Task task, bool canEdit) => [
+    if (task.checklist.isNotEmpty) ...[
+      SectionLabel(
+        context.l10n.checklistCount(task.checklistDone, task.checklist.length),
+      ),
+      AppSurface(
+        child: Column(
+          children: [
+            LinearProgressIndicator(
+              value: task.checklistDone / task.checklist.length,
+              semanticsLabel: context.l10n.checklistSemantics(
+                task.checklistDone,
+                task.checklist.length,
+              ),
+            ),
+            for (final item in task.checklist)
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                key: ValueKey('check-step-${item.id}'),
+                controlAffinity: ListTileControlAffinity.leading,
+                title: Text(item.title),
+                value: item.done(occurrence: task.checklistOccurrence),
+                onChanged: !canEdit
+                    ? null
+                    : (value) async {
+                        try {
+                          await ref
+                              .read(taskProvider.notifier)
+                              .setChecklistCompleted(
+                                task,
+                                item.id,
+                                value == true,
+                              );
+                        } catch (_) {
+                          if (context.mounted) {
+                            showFeedback(
+                              ScaffoldMessenger.of(context),
+                              context.l10n.stepUpdateError,
+                            );
+                          }
+                        }
+                      },
+              ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 24),
+    ],
+  ];
 
   Widget _body(BuildContext context, Task task, {VoidCallback? onTap}) {
     final surface = AppSurface(

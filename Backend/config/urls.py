@@ -8,6 +8,7 @@ from core.list_views import TaskListViewSet, InvitationViewSet
 from core.attachment_views import AttachmentViewSet
 from core.group_views import TaskGroupViewSet, GroupInvitationViewSet, NotificationViewSet
 from core.billing import BillingAccessView
+from core.meeting_views import MeetingFinishView, MeetingPieceView, MeetingView
 
 router = DefaultRouter()
 router.register("tasks", TaskViewSet, basename="task")
@@ -40,5 +41,8 @@ urlpatterns = [
     path("api/ai/drafts/", views.DraftBatchView.as_view()),
     path("api/ai/drafts/<uuid:capture_id>/", views.DraftCancelView.as_view()),
     path("api/ai/reminder-plan/", views.ReminderPlanView.as_view()),
+    path("api/meetings/<uuid:meeting_id>/", MeetingView.as_view()),
+    path("api/meetings/<uuid:meeting_id>/finish/", MeetingFinishView.as_view()),
+    path("api/meetings/<uuid:meeting_id>/pieces/<int:index>/", MeetingPieceView.as_view()),
     path("api/", include(router.urls)),
 ]

@@ -114,7 +114,7 @@ void notesPreviews() {
     preview(
       notesTab,
       'empty',
-      'No notes yet: one line on what notes are for, no search, and Añadir nota.',
+      'No notes yet: one line on what notes are for, no search, then a quieter Grabar una reunión just above Añadir nota.',
       everywhere,
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay());
@@ -126,7 +126,7 @@ void notesPreviews() {
     preview(
       notesTab,
       'list',
-      'Five notes: one said in the sheet (its preview starts after its title), one with steps and one in a project.',
+      'Five notes: one said in the sheet (its preview starts after its title), one with steps and one in a project; Grabar una reunión after the last note.',
       [...mainScreen, ca2],
       (p) async {
         final app = await PreviewApp.open(
@@ -142,7 +142,7 @@ void notesPreviews() {
     preview(
       noteOpen,
       'with-steps',
-      'The croquetas note opened: its text and steps.',
+      'The croquetas note opened: its steps, then its text.',
       everywhere,
       (p) async {
         final app = await PreviewApp.open(
@@ -215,7 +215,7 @@ void notesPreviews() {
     preview(
       notesTab,
       'empty-with-project',
-      'No notes yet on an account with projects: no Proyecto filter and no search, just the empty line and Añadir nota.',
+      'No notes yet on an account with projects: no Proyecto filter and no search, just the empty line, Grabar una reunión and Añadir nota.',
       [es1],
       (p) async {
         final app = await PreviewApp.open(

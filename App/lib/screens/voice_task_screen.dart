@@ -5,6 +5,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/models/capture_command.dart';
+import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/models/task_list_info.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
@@ -22,6 +23,7 @@ import 'package:uuid/uuid.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/screens/home_screen.dart';
+import 'package:agenda/screens/task_detail_screen.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/capture_processor.dart';
@@ -562,6 +564,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   // Decided when the sheet opens, and again on `Volver a decirlo`; typing
   // alone never creates a recorder.
   late bool _voice = widget.voice;
+  // Opened typing because a meeting records and holds the mic (UX-2704).
+  late final bool _meetingMic;
   AudioRecorder? _recorder;
   final _words = TextEditingController();
   final _wordsFocus = FocusNode();
@@ -666,6 +670,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   @override
   void initState() {
     super.initState();
+    _meetingMic = !_voice && ref.read(meetingHoldsMicProvider);
     if (_voice) _recorder = ref.read(captureRecorderFactoryProvider)();
     _store = ref.read(captureStoreProvider);
     unawaited(CaptureDiagnostics(_store.database).record(CaptureEvent.opened));
@@ -2541,10 +2546,21 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
             style: wordsStyle,
           );
     final banners = <Widget>[
+      // A meeting holds the mic: say why the sheet types, while it still
+      // records.
+      if (_meetingMic && field && ref.watch(meetingHoldsMicProvider))
+        Text(
+          l10n.meetingTypeHere,
+          key: const ValueKey('capture-meeting-types'),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: colors.onSurfaceVariant,
+          ),
+        ),
       // Free dictations used up: say when more come, and where Pro is.
       // Without a free count (an older server), opened to speak without
       // voice: say why it types.
-      if (usedUpLine != null || (widget.askedToSpeak && !_voice)) ...[
+      if (usedUpLine != null ||
+          (widget.askedToSpeak && !_voice && !_meetingMic)) ...[
         Semantics(
           liveRegion: usedUpLine != null,
           child: Text(
@@ -2867,6 +2883,9 @@ class CaptureResult extends ConsumerStatefulWidget {
 
 class _CaptureResultState extends ConsumerState<CaptureResult> {
   late CaptureSession _session = widget.session;
+  // Opened by «Crear tarea» on a note (MN-22). Kept from the start: a saved
+  // capture no longer says where it came from.
+  late final bool _fromNote = widget.session.source == 'note';
   late List<CaptureDraft> _items = _session.drafts;
   // Create a project, find, change or delete a task: each its own card.
   late List<CaptureCommand> _commands = _session.commands;
@@ -3393,10 +3412,37 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     final sheetMessages = ScaffoldMessenger.of(context);
     final appMessages = ScaffoldMessenger.of(navigator.context);
     final origin = context.getInheritedWidgetOfExactType<_CaptureOrigin>();
-    final before = _session;
+    // From a note, a tick chose the step: the ticked ones go in, in order,
+    // as steps still to do, and the others stay out.
+    final chosen = _fromNote
+        ? _session.copyWith(
+            drafts: [
+              for (final draft in _items)
+                draft.pending
+                    ? draft.copyWith(
+                        task: draft.task.copyWith(
+                          checklist: [
+                            for (final step in draft.task.checklist)
+                              if (step.done())
+                                ChecklistItem(id: step.id, title: step.title),
+                          ],
+                        ),
+                      )
+                    : draft,
+            ],
+            status: 'ready',
+          )
+        : null;
+    final before = chosen ?? _session;
     final undoIds = <String, int>{};
+    // The task page a save from a note opens, for `Deshacer` to close.
+    Route<void>? taskPage;
     try {
       await _writes;
+      if (chosen != null) {
+        await _store.update(chosen);
+        _session = chosen;
+      }
       final result = await _store.saveReady(
         _session.id,
         _session.ownerKey,
@@ -3503,7 +3549,16 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
           : added;
       // The landing Deshacer takes back, if any.
       CalendarFocus? focus;
-      if (remaining == 0) {
+      if (remaining == 0 && _fromNote) {
+        // From a note, the new task's page opens over it, so Back returns
+        // to the note (UX-2702).
+        Navigator.pop(context);
+        final id = undoIds.values.firstOrNull;
+        if (id != null) {
+          taskPage = taskPageRoute(id);
+          unawaited(navigator.push(taskPage));
+        }
+      } else if (remaining == 0) {
         // From the pending list, back to Calendar, where the tasks land.
         if (origin?.showCalendar == true) {
           navigator.popUntil((route) => route.isFirst);
@@ -3561,7 +3616,32 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
             // The filter the landing widened comes back with the tasks gone.
             narrowAfterUndo(container, focus);
             container.invalidate(pendingCapturesProvider);
-            if (mounted) {
+            if (_fromNote) {
+              // The note still holds it all: nothing waits, and its page
+              // shows again.
+              await _store
+                  .discard(restored.id, restored.ownerKey)
+                  .catchError((Object _) {});
+              // Only the pages of the deleted task close: its page, a second
+              // one «Ver tarea» opened, its edit form (R1-P318-2). Anything
+              // else stays open, such as the note's own edit form, whose
+              // words save only from its own Back (R1-P318-3).
+              final page = taskPage;
+              if (navigator.mounted) {
+                final ids = undoIds.values.toSet();
+                var top = true;
+                while (top) {
+                  navigator.popUntil((route) {
+                    top =
+                        !route.isFirst &&
+                        ids.any((id) => routeShowsTask(route, id));
+                    return true;
+                  });
+                  if (top) navigator.pop();
+                }
+                if (page != null && page.isActive) navigator.removeRoute(page);
+              }
+            } else if (mounted) {
               setState(() {
                 _session = restored;
                 _items = restored.drafts;
@@ -4400,6 +4480,11 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
   /// does. While saving, nothing happens.
   Future<void> _leave() async {
     if (_saving || _asking || !mounted) return;
+    // From a note, nothing is lost: the note keeps it all (UX-2706).
+    if (_fromNote) {
+      await _discard();
+      return;
+    }
     // Nothing waits (a search, a task not found): it only closes.
     if (!_worthKeeping()) {
       await _finishEmpty();
@@ -4781,6 +4866,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                           onRemove: () => _remove(item),
                           onRenameProject: (from, to) =>
                               unawaited(_renameProject(from, to)),
+                          choosingSteps: _fromNote,
                         ),
                       ),
                     for (final view in views)

@@ -10,6 +10,7 @@ import 'package:agenda/services/attachment_files.dart';
 import 'package:agenda/services/attachment_store.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/invitation_links.dart';
+import 'package:agenda/services/meeting_store.dart';
 import 'package:agenda/services/task_database.dart';
 
 /// A project or group the person owns that goes to someone else.
@@ -145,11 +146,14 @@ class LocalAccountData {
     this.database, {
     AttachmentFiles? files,
     CaptureStore? captures,
+    MeetingStore? meetings,
   }) : files = files ?? AttachmentFiles(),
-       captures = captures ?? CaptureStore(database);
+       captures = captures ?? CaptureStore(database),
+       meetings = meetings ?? MeetingStore(database);
   final TaskDatabase database;
   final AttachmentFiles files;
   final CaptureStore captures;
+  final MeetingStore meetings;
 
   static const _ownedTables = [
     'tasks',
@@ -160,12 +164,15 @@ class LocalAccountData {
     'captures',
     'reminder_state',
     'reminder_snoozes',
+    'meetings',
+    'meeting_pieces',
+    'meeting_leases',
   ];
 
   /// Erases everything [owner] left here: tasks and notes, projects, file
   /// records with the app's copies of the files and its downloads, captures
-  /// with their audio, reminder records, import receipts and the account's
-  /// preferences. Other accounts, and what was kept before signing in, stay;
+  /// with their audio, recorded meetings with their audio, reminder records,
+  /// import receipts and the account's preferences. Other accounts, and what was kept before signing in, stay;
   /// a person's own files outside the app are never touched.
   Future<void> erase(String owner) async {
     if (!owner.contains('/users/')) {
@@ -174,6 +181,7 @@ class LocalAccountData {
     final db = await database.database;
     final paths = <String>{};
     final captureIds = <String>[];
+    final meetingIds = <String>{};
     await db.transaction((tx) async {
       for (final row in await tx.query(
         'tasks',
@@ -207,6 +215,18 @@ class LocalAccountData {
           whereArgs: [owner],
         )).map((row) => row['id'] as String),
       );
+      // Pieces are read too: a piece's folder is its meeting's, even with
+      // the meeting's row gone.
+      for (final table in ['meetings', 'meeting_pieces']) {
+        meetingIds.addAll(
+          (await tx.query(
+            table,
+            columns: [table == 'meetings' ? 'id' : 'meeting_id'],
+            where: 'owner_key = ?',
+            whereArgs: [owner],
+          )).map((row) => row.values.single as String),
+        );
+      }
       for (final table in _ownedTables) {
         await tx.delete(table, where: 'owner_key = ?', whereArgs: [owner]);
       }
@@ -240,5 +260,8 @@ class LocalAccountData {
     for (final id in captureIds) {
       await captures.removeAudioFile(id);
     }
+    // The audio of its meetings: recordings of conversations go with it,
+    // and no uploader runs for this account again.
+    if (meetingIds.isNotEmpty) await meetings.removeFolders(meetingIds);
   }
 }

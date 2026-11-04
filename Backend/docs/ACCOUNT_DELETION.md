@@ -17,7 +17,7 @@ Everything runs in one transaction on the server. Stored files are removed only 
 
 | Data | What happens |
 |---|---|
-| Account: email, name, password hash, time zone, `billing_id`, Google link (`GoogleIdentity`), sessions (`LoginSession`), free-dictation rows, notifications, project preferences, memberships | Deleted. |
+| Account: email, name, password hash, time zone, `billing_id`, Google link (`GoogleIdentity`), sessions (`LoginSession`), free-dictation rows, notifications, project preferences, memberships, meetings (`Meeting`, `MeetingPiece` and `MeetingChapter`: the pieces' transcribed text, the chapter notes and any final notes the app hadn't saved yet; they cascade from the user, and no audio is ever stored) | Deleted. |
 | Personal tasks and notes (no project, or in a personal project being deleted), soft-deleted rows included | Deleted, with their checklists, events and attachments. The attachment files are removed from storage. |
 | Personal projects (no members, no group) | Deleted with their tasks. |
 | Shared projects the person owns, with no group | Handed to an heir: the earliest editor, otherwise the earliest member. The heir's membership row goes, because owners aren't members. The version is bumped. |

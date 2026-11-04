@@ -299,7 +299,7 @@ def delete_account(user, expected_plan=None):
         OutstandingToken.objects.filter(user=user).delete()
         billing_id = user.billing_id
         # Cascades the rest of the account: Google link, sessions, free dictations,
-        # notifications and project preferences.
+        # notifications, project preferences and meetings (their pieces' text and chapter notes).
         user.delete()
         # The subscription provider's customer goes too, once the deletion has committed.
         transaction.on_commit(partial(_delete_billing_customer, billing_id))

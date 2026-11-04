@@ -6873,6 +6873,486 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'“a week before, and the day before at 8”'**
   String get billingReasonReminderPlansExample;
+
+  /// In the Notes tab, under “Add a note”: records a conversation (a meeting with a client, a class) and turns it into notes. Pro only; without Pro it opens the Pro screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Record a meeting'**
+  String get meetingRecord;
+
+  /// The title of the screen that records a meeting and then prepares its notes.
+  ///
+  /// In en, this message translates to:
+  /// **'Meeting'**
+  String get meetingScreenTitle;
+
+  /// On the recording screen, above the elapsed time: says the microphone is listening. Short.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording'**
+  String get meetingListening;
+
+  /// On the recording screen, just above the Stop button (meetingStop): leaving the screen or locking the phone doesn’t stop the recording.
+  ///
+  /// In en, this message translates to:
+  /// **'You can leave or lock the phone: it keeps recording until you press Stop.'**
+  String get meetingListeningHelp;
+
+  /// The large button that stops recording a meeting; its notes are then prepared. Also the Stop button of the ongoing “recording a meeting” notification.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get meetingStop;
+
+  /// Asked before a meeting recording is discarded, while recording or after it stopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard this recording? It’s deleted from your phone and can’t be recovered.'**
+  String get meetingDiscardQuestion;
+
+  /// In meetingDiscardQuestion while recording: closes the question and goes on recording. Also on a recording that stopped by itself: records more into the same meeting.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep recording'**
+  String get meetingKeepRecording;
+
+  /// After Stop: the meeting’s notes are being made. Also the Notes tab’s line for a meeting waiting for its notes.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing your notes…'**
+  String get meetingPreparing;
+
+  /// Under meetingPreparing on the meeting screen.
+  ///
+  /// In en, this message translates to:
+  /// **'It takes a few seconds. You can leave this screen: we’ll let you know when they’re ready.'**
+  String get meetingPreparingHelp;
+
+  /// Under meetingPreparing on the meeting screen, instead of meetingPreparingHelp, when the phone’s notifications are off for TaskFlow: no notice can arrive, so it says where the notes will be (the Notes tab).
+  ///
+  /// In en, this message translates to:
+  /// **'It takes a few seconds. You can leave this screen: the notes will be in Notes.'**
+  String get meetingPreparingHelpNoNotice;
+
+  /// A stopped meeting whose recording can’t be sent: the phone has no signal.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for connection'**
+  String get meetingWaitingConnection;
+
+  /// Under meetingWaitingConnection on the meeting screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Your recording is safe on this phone. The notes are made once you’re back online, and we’ll let you know.'**
+  String get meetingWaitingConnectionHelp;
+
+  /// Under meetingWaitingConnection on the meeting screen, instead of meetingWaitingConnectionHelp, when the phone’s notifications are off for TaskFlow.
+  ///
+  /// In en, this message translates to:
+  /// **'Your recording is safe on this phone. The notes are made once you’re back online, and they’ll be in Notes.'**
+  String get meetingWaitingConnectionHelpNoNotice;
+
+  /// A short message after Stop when the recording was only silence.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was heard, so there’s nothing to save.'**
+  String get meetingNothingHeard;
+
+  /// A short message on the meeting recording screen when Stop failed after the microphone had stopped: what was recorded is kept, and Stop (meetingStop) can be pressed again to finish.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t finish stopping. What was recorded is safe: press Stop again.'**
+  String get meetingStopFailed;
+
+  /// Asked after Stop when a meeting recording of a minute or more was judged nearly all silence. Its buttons are meetingMakeNotes (keeps the recording and makes the notes) and discard (deletes it).
+  ///
+  /// In en, this message translates to:
+  /// **'Almost nothing was heard. Make notes anyway?'**
+  String get meetingQuietQuestion;
+
+  /// Which recording a stopped meeting’s line is about, when it started today. time is the time of day it started, as 10:15.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording from today, {time}'**
+  String meetingRecordingToday(String time);
+
+  /// As meetingRecordingToday, for a recording that started yesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording from yesterday, {time}'**
+  String meetingRecordingYesterday(String time);
+
+  /// As meetingRecordingToday, for a recording that started before yesterday. date is the day with its weekday in full, as Tuesday, Nov 3 (es: martes 3 nov; ca: dimarts 3 de nov.).
+  ///
+  /// In en, this message translates to:
+  /// **'Recording from {date}, {time}'**
+  String meetingRecordingOn(String date, String time);
+
+  /// In the Notes tab, for a meeting recording that stopped without Stop (the app closed, the phone switched off). recording is meetingRecordingToday, meetingRecordingYesterday or meetingRecordingOn; length is how much was recorded, in words.
+  ///
+  /// In en, this message translates to:
+  /// **'{recording} · {length}. It stopped before you pressed Stop.'**
+  String meetingStoppedCut(String recording, String length);
+
+  /// Instead of meetingStoppedCut, in the Notes tab and on the meeting screen, for a stopped meeting recording judged nearly all silence (as after Stop and meetingQuietQuestion), waiting to be made into notes or discarded. recording is meetingRecordingToday, meetingRecordingYesterday or meetingRecordingOn; length is how much was recorded, in words.
+  ///
+  /// In en, this message translates to:
+  /// **'{recording} · {length}. Almost nothing was heard.'**
+  String meetingStoppedQuiet(String recording, String length);
+
+  /// The main button on a recording that stopped by itself: makes the notes from what was recorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Make the notes'**
+  String get meetingMakeNotes;
+
+  /// In the Notes tab while a meeting records and its screen was left. time is the recorded length in words (meetingLengthHoursMinutes and the like), as 12 min.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording a meeting · {time}'**
+  String meetingRecordingNow(String time);
+
+  /// Instead of meetingRecordingNow, in the Notes tab, when Stop failed after the microphone had stopped (meetingStopFailed): nothing is recording, and Stop (meetingStop) on its screen finishes it. length is the recorded length in words, as 12 min.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording not fully stopped · {length}. Open it and press Stop.'**
+  String meetingRecordingUnstopped(String length);
+
+  /// On meetingRecordingNow: opens the recording screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get meetingOpen;
+
+  /// Read by TalkBack for meetingOpen on the Notes recording line (shown as “Open”).
+  ///
+  /// In en, this message translates to:
+  /// **'Open the recording'**
+  String get meetingOpenNamed;
+
+  /// A meeting’s recorded length when it is under a minute, in running text and TalkBack names (“Recording a meeting · under 1 min”).
+  ///
+  /// In en, this message translates to:
+  /// **'under 1 min'**
+  String get meetingLengthUnderMinute;
+
+  /// A meeting’s length, or a point in it, in whole hours: “2 h”. Lengths under an hour use durationMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h'**
+  String meetingLengthHours(int hours);
+
+  /// A meeting’s length, or a point in it, past an hour: “1 h 42 min”. A length, not a time of day.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h {minutes} min'**
+  String meetingLengthHoursMinutes(int hours, int minutes);
+
+  /// Read by TalkBack for the recording screen’s time (shown as 0:07) under a minute.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds, plural, =1{1 second recorded} other{{seconds} seconds recorded}}'**
+  String meetingRecordedSeconds(int seconds);
+
+  /// Read by TalkBack for the recording screen’s time (shown as 12:03) under an hour.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes, plural, =1{1 minute} other{{minutes} minutes}} {seconds, plural, =1{1 second} other{{seconds} seconds}} recorded'**
+  String meetingRecordedMinutes(int minutes, int seconds);
+
+  /// Read by TalkBack for the recording screen’s time (shown as 1:04:05) from an hour on.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours, plural, =1{1 hour} other{{hours} hours}} {minutes, plural, =1{1 minute} other{{minutes} minutes}} {seconds, plural, =1{1 second} other{{seconds} seconds}} recorded'**
+  String meetingRecordedHours(int hours, int minutes, int seconds);
+
+  /// A stopped meeting whose notes the server refused: the account no longer has Pro.
+  ///
+  /// In en, this message translates to:
+  /// **'Meeting notes are part of TaskFlow Pro. Your recording waits on this phone.'**
+  String get meetingProRequired;
+
+  /// A stopped meeting held back: this month’s allowance of meeting time is used.
+  ///
+  /// In en, this message translates to:
+  /// **'You’ve used this month’s meeting time. Your recording waits on this phone until next month.'**
+  String get meetingAllowanceUsed;
+
+  /// On the recording screen, under the elapsed time, from the start of a recording: another meeting was already refused this month for the month’s meeting time. Recording goes on.
+  ///
+  /// In en, this message translates to:
+  /// **'You’ve used this month’s meeting time: you can record, and the notes come next month.'**
+  String get meetingAllowanceUsedStart;
+
+  /// A stopped meeting that can only be discarded: a piece of its audio is lost or refused for good.
+  ///
+  /// In en, this message translates to:
+  /// **'Part of this recording couldn’t be sent, so no notes can be made from it.'**
+  String get meetingCantMakeNotes;
+
+  /// The microphone permission was refused and Android no longer asks. Same path as captureMicrophoneBlocked; followed by captureOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'To record a meeting, open Settings and tap Permissions › Microphone › Allow.'**
+  String get meetingMicrophoneBlocked;
+
+  /// The microphone permission was refused, and Android still asks: followed by meetingAllowMicrophone.
+  ///
+  /// In en, this message translates to:
+  /// **'To record a meeting, TaskFlow needs the microphone.'**
+  String get meetingMicrophoneNeeded;
+
+  /// Button under meetingMicrophoneNeeded: asks Android for the microphone again, and records once it’s allowed.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow the microphone'**
+  String get meetingAllowMicrophone;
+
+  /// Under about 100 MB free: a meeting can’t start.
+  ///
+  /// In en, this message translates to:
+  /// **'Your phone is almost full. Free up some space to record a meeting.'**
+  String get meetingLowSpace;
+
+  /// On the recording screen, under the elapsed time, when the phone has under about 300 MB free: recording goes on, and stops safely by itself near 100 MB.
+  ///
+  /// In en, this message translates to:
+  /// **'Low on space: the recording stops by itself if the phone fills up.'**
+  String get meetingSpaceLowWarning;
+
+  /// The microphone failed to start a meeting recording.
+  ///
+  /// In en, this message translates to:
+  /// **'The recording couldn’t start. Try again.'**
+  String get meetingStartFailed;
+
+  /// On the meeting screen, above meetingPreparing: the recording stopped itself to keep the phone working.
+  ///
+  /// In en, this message translates to:
+  /// **'Your phone ran out of space, so the recording stopped.'**
+  String get meetingStoppedNoSpace;
+
+  /// On the meeting screen, above the stopped recording's question: the microphone failed mid-recording.
+  ///
+  /// In en, this message translates to:
+  /// **'The microphone stopped working, so the recording stopped.'**
+  String get meetingMicrophoneFailed;
+
+  /// The title of the ongoing notification while a meeting records.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording a meeting'**
+  String get meetingNoticeTitle;
+
+  /// In the capture sheet, above the text field, when it opens for typing because a meeting is recording and holds the microphone.
+  ///
+  /// In en, this message translates to:
+  /// **'A meeting is recording: type here.'**
+  String get meetingTypeHere;
+
+  /// The name Android’s notification settings give the ongoing “recording a meeting” notification.
+  ///
+  /// In en, this message translates to:
+  /// **'Meeting recording'**
+  String get meetingRecordingChannel;
+
+  /// The name Android’s notification settings give the “your meeting notes are ready” notification.
+  ///
+  /// In en, this message translates to:
+  /// **'Meeting notes'**
+  String get meetingNotesChannel;
+
+  /// The text of the notification when a meeting’s notes are saved, under the note’s title; its title when the note has none. Tapping it opens the note.
+  ///
+  /// In en, this message translates to:
+  /// **'Your meeting notes are ready'**
+  String get meetingNotesReady;
+
+  /// In a note made from a meeting: the heading over the decisions taken. Written in the meeting’s language.
+  ///
+  /// In en, this message translates to:
+  /// **'Decisions'**
+  String get meetingNoteDecisions;
+
+  /// In a note made from a meeting: the heading over what was left unanswered.
+  ///
+  /// In en, this message translates to:
+  /// **'Open questions'**
+  String get meetingNoteOpenQuestions;
+
+  /// In a note made from a meeting: the heading over one line per part, as “Minutes 30–52 · Pricing”.
+  ///
+  /// In en, this message translates to:
+  /// **'Parts of the meeting'**
+  String get meetingNoteChapters;
+
+  /// The first line of a note made from a meeting whose first part was deleted from the server after 30 days without signal.
+  ///
+  /// In en, this message translates to:
+  /// **'The start of this recording expired, so these notes cover only the rest.'**
+  String get meetingNoteStartMissing;
+
+  /// The title of a note made from a meeting in which nothing was said.
+  ///
+  /// In en, this message translates to:
+  /// **'Meeting notes'**
+  String get meetingNoteUntitled;
+
+  /// The first line of a note made from a meeting, in the meeting’s language: when it started and how long it was, so a relative “Friday” in its to-dos can still be placed. date is the weekday in full, the day and the short month from the language’s date format, then the 24-hour time.
+  ///
+  /// In en, this message translates to:
+  /// **'Meeting on {date} · {length}'**
+  String meetingNoteHeader(String date, String length);
+
+  /// In a note made from a meeting: how a part of it within the first hour starts its line, as “Minutes 0–30 · Pricing”. Later parts use lengths, as “1 h 30 min – 2 h · …”.
+  ///
+  /// In en, this message translates to:
+  /// **'Minutes {start}–{end}'**
+  String meetingNoteChapterMinutes(int start, int end);
+
+  /// On a note with steps (a meeting’s to-dos): opens the review with a task titled like the note and its steps as the checklist.
+  ///
+  /// In en, this message translates to:
+  /// **'Create task'**
+  String get meetingCreateTask;
+
+  /// Heading over the steps in the review «Create task» opens from a note: each ticked step goes into the task, unticked ones are left out.
+  ///
+  /// In en, this message translates to:
+  /// **'Steps to add'**
+  String get meetingStepsToAdd;
+
+  /// On a note that already made a task with «Create task»: opens that task.
+  ///
+  /// In en, this message translates to:
+  /// **'View task'**
+  String get meetingViewTask;
+
+  /// Title of the question on Sign out when meeting recordings still wait on this phone.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out?'**
+  String get meetingSignOutTitle;
+
+  /// Body of meetingSignOutTitle when a meeting is recording now; meetingSignOutQuestion follows for any other meetings waiting, then meetingSignOutReminders.
+  ///
+  /// In en, this message translates to:
+  /// **'You’re recording a meeting. It stops, and its notes are made before you sign out.'**
+  String get meetingSignOutRecording;
+
+  /// Body of meetingSignOutTitle when meeting recordings still wait on this phone (not counting one recording now): they belong to this account and can’t be sent after signing out. meetingSignOutReminders follows.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{A meeting’s notes aren’t ready yet, and its recording is only on this phone.} other{The notes of {count} meetings aren’t ready yet, and their recordings are only on this phone.}}'**
+  String meetingSignOutQuestion(int count);
+
+  /// Ends the body of meetingSignOutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminders on this phone stop until you sign in again.'**
+  String get meetingSignOutReminders;
+
+  /// In meetingSignOutTitle: sends the recordings so their notes are made, then signs out.
+  ///
+  /// In en, this message translates to:
+  /// **'Save notes and sign out'**
+  String get meetingSendFirst;
+
+  /// In meetingSignOutTitle: deletes the recordings, then signs out.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard and sign out'**
+  String get meetingDiscardAndSignOut;
+
+  /// On the account screen while meetingSendFirst sends.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending your recording…'**
+  String get meetingSending;
+
+  /// Under Sign out on the account screen, from the tap on meetingSendFirst until sign-in shows or the send fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving your meeting’s notes… This can take a few minutes. Then you’ll be signed out.'**
+  String get meetingSavingNotes;
+
+  /// After meetingSendFirst, when the phone couldn’t reach the server: you stay signed in.
+  ///
+  /// In en, this message translates to:
+  /// **'No connection, so the notes couldn’t be made. You’re still signed in; tap Sign out again once you’re online.'**
+  String get meetingSendFailed;
+
+  /// After meetingSendFirst, when the notes still weren’t made after a few minutes of trying while online: you stay signed in.
+  ///
+  /// In en, this message translates to:
+  /// **'The notes are taking longer than usual. You’re still signed in; try Sign out again in a few minutes.'**
+  String get meetingSendSlow;
+
+  /// A stopped meeting that can only be discarded: it waited so long that the server deleted what it had already received.
+  ///
+  /// In en, this message translates to:
+  /// **'This recording was kept too long without being finished, so no notes can be made from it.'**
+  String get meetingNotesExpired;
+
+  /// After meetingSendFirst, when the account no longer has Pro: you stay signed in.
+  ///
+  /// In en, this message translates to:
+  /// **'Your recording can’t be sent without TaskFlow Pro. Stay signed in to keep it, or discard it.'**
+  String get meetingSendFailedPro;
+
+  /// After meetingSendFirst, when this month’s meeting allowance is used: you stay signed in.
+  ///
+  /// In en, this message translates to:
+  /// **'You’ve used this month’s meeting time, so your recording can’t be sent until next month. Stay signed in to keep it, or discard it.'**
+  String get meetingSendFailedAllowance;
+
+  /// After meetingSendFirst, when a recording can only be discarded (meetingCantMakeNotes or meetingNotesExpired): you stay signed in.
+  ///
+  /// In en, this message translates to:
+  /// **'A recording can’t become notes any more. Discard it to sign out.'**
+  String get meetingSendFailedLost;
+
+  /// Follows meetingSendFailedLost when more than one recording waits ({count} is 2 or more): meetingDiscardAndSignOut deletes them all, not only the lost one.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard and sign out deletes all {count} waiting recordings.'**
+  String meetingDiscardDeletesAll(int count);
+
+  /// Read by TalkBack for Discard on a meeting line in Notes (shown as “Discard”), so several lines’ buttons can be told apart. {time} is the recorded length in words.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard the recording of {time}'**
+  String meetingDiscardNamed(String time);
+
+  /// Read by TalkBack for meetingMakeNotes on a stopped meeting’s line. {time} is the recorded length in words.
+  ///
+  /// In en, this message translates to:
+  /// **'Make the notes from the recording of {time}'**
+  String meetingFinishNamed(String time);
+
+  /// Read by TalkBack for meetingKeepRecording on a stopped meeting’s line: records more into the same meeting. {time} is the recorded length in words.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep recording, {time} so far'**
+  String meetingContinueNamed(String time);
+
+  /// On the Pro screen, opened from “Record a meeting” in Notes or from “Explore Pro” on a recording held back for Pro: what Pro adds there, worded to fit both (it never asks to record a meeting already recorded). A heading, followed by billingReasonMeetingNotesExample.
+  ///
+  /// In en, this message translates to:
+  /// **'With Pro, your meetings become notes:'**
+  String get billingReasonMeetingNotes;
+
+  /// On the Pro screen, under billingReasonMeetingNotes: what the notes hold, with no final period. The to-dos become one task’s steps, so it says to-dos, not tasks.
+  ///
+  /// In en, this message translates to:
+  /// **'a summary, the decisions and the to-dos'**
+  String get billingReasonMeetingNotesExample;
+
+  /// The Pro screen's list of what Pro gives, last line: notes made from the meetings you record (Notes › Record a meeting). Left out when the screen opens for a meeting, whose heading already names it.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes from your recorded meetings'**
+  String get proBenefitMeetingNotes;
 }
 
 class _AppLocalizationsDelegate

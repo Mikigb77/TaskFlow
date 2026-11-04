@@ -1,0 +1,1542 @@
+diff --git a/App/lib/l10n/app_ca.arb b/App/lib/l10n/app_ca.arb
+index 3752ce4..19a8489 100644
+--- a/App/lib/l10n/app_ca.arb
++++ b/App/lib/l10n/app_ca.arb
+@@ -1182,6 +1182,8 @@
+   "meetingNoteHeader": "Reunió del {date} · {length}",
+   "meetingNoteChapterMinutes": "Minuts {start}–{end}",
+   "meetingCreateTask": "Crea una tasca",
++  "meetingStepsToAdd": "Passos que s’afegeixen",
++  "meetingViewTask": "Mostra la tasca",
+   "meetingSignOutTitle": "Vols tancar la sessió?",
+   "meetingSignOutRecording": "Estàs enregistrant una reunió. S’aturarà i se’n faran les notes abans de tancar la sessió.",
+   "meetingSignOutQuestion": "{count, plural, =1{Les notes d’una reunió encara no estan a punt, i l’enregistrament només és en aquest telèfon.} other{Les notes de {count} reunions encara no estan a punt, i els enregistraments només són en aquest telèfon.}}",
+diff --git a/App/lib/l10n/app_en.arb b/App/lib/l10n/app_en.arb
+index 870e833..9331ef3 100644
+--- a/App/lib/l10n/app_en.arb
++++ b/App/lib/l10n/app_en.arb
+@@ -4318,6 +4318,14 @@
+   "@meetingCreateTask": {
+     "description": "On a note with steps (a meeting’s to-dos): opens the review with a task titled like the note and its steps as the checklist."
+   },
++  "meetingStepsToAdd": "Steps to add",
++  "@meetingStepsToAdd": {
++    "description": "Heading over the steps in the review «Create task» opens from a note: each ticked step goes into the task, unticked ones are left out."
++  },
++  "meetingViewTask": "View task",
++  "@meetingViewTask": {
++    "description": "On a note that already made a task with «Create task»: opens that task."
++  },
+   "meetingSignOutTitle": "Sign out?",
+   "@meetingSignOutTitle": {
+     "description": "Title of the question on Sign out when meeting recordings still wait on this phone."
+diff --git a/App/lib/l10n/app_es.arb b/App/lib/l10n/app_es.arb
+index d9b93c5..ebe4bf2 100644
+--- a/App/lib/l10n/app_es.arb
++++ b/App/lib/l10n/app_es.arb
+@@ -1478,6 +1478,8 @@
+   "meetingNoteHeader": "Reunión del {date} · {length}",
+   "meetingNoteChapterMinutes": "Minutos {start}–{end}",
+   "meetingCreateTask": "Crear tarea",
++  "meetingStepsToAdd": "Pasos que se añaden",
++  "meetingViewTask": "Ver tarea",
+   "meetingSignOutTitle": "¿Cerrar sesión?",
+   "meetingSignOutRecording": "Estás grabando una reunión. Se parará y se harán sus notas antes de cerrar sesión.",
+   "meetingSignOutQuestion": "{count, plural, =1{Las notas de una reunión aún no están listas, y su grabación solo está en este teléfono.} other{Las notas de {count} reuniones aún no están listas, y sus grabaciones solo están en este teléfono.}}",
+diff --git a/App/lib/screens/main_shell.dart b/App/lib/screens/main_shell.dart
+index f6c59f9..72c74ad 100644
+--- a/App/lib/screens/main_shell.dart
++++ b/App/lib/screens/main_shell.dart
+@@ -9,6 +9,7 @@ import 'package:agenda/screens/calendar_screen.dart';
+ import 'package:agenda/screens/home_screen.dart';
+ import 'package:agenda/screens/settings_screen.dart';
+ import 'package:agenda/screens/notes_screen.dart';
++import 'package:agenda/widgets/note_task.dart';
+ 
+ // Mirrors Flutter's private `_kMaxLabelTextScaleFactor` in
+ // material/navigation_bar.dart: NavigationBar never scales a label past 1.3x.
+@@ -84,6 +85,9 @@ class _MainShellState extends ConsumerState<MainShell> {
+ 
+   @override
+   Widget build(BuildContext context) {
++    // Read the notes' «Crear tarea» links before any note's page opens, so
++    // its main button shows the right label from the start (R1-P318-1).
++    ref.listen(noteTasksProvider, (_, _) {});
+     // Tasks saved from the pending list land on Calendar.
+     ref.listen<CalendarFocus?>(calendarFocusProvider, (_, focus) {
+       if (focus?.showCalendar == true && _index != 0) {
+diff --git a/App/lib/screens/task_detail_screen.dart b/App/lib/screens/task_detail_screen.dart
+index 6e01a0e..efe9f33 100644
+--- a/App/lib/screens/task_detail_screen.dart
++++ b/App/lib/screens/task_detail_screen.dart
+@@ -261,6 +261,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
+                 Navigator.pushNamed(context, '/editTask', arguments: taskId);
+             void reschedule() =>
+                 TaskInteractions.reschedule(context, ref, task);
++            // The task this note made with «Crear tarea», while it exists.
++            final made = task.isNote ? noteMadeTask(ref, task) : null;
++            // Until this phone's note → task links are read, the main
++            // button can't know its label (R1-P318-1).
++            final linksRead =
++                !task.isNote || ref.watch(noteTasksProvider).hasValue;
+             // Inert while Completar closes it: nothing on the page opens in
+             // the hold (UX-2633).
+             return AbsorbPointer(
+@@ -523,25 +529,69 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
+                         child: Padding(
+                           padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+                           // A note with steps (a meeting's to-dos) can
+-                          // become a task with them (MN-22).
++                          // become a task with them (MN-22): the main
++                          // button, which opens that task once made
++                          // (UX-2702, UX-2709).
+                           child: Wrap(
+                             spacing: 12,
+                             runSpacing: 8,
+                             alignment: WrapAlignment.center,
+                             children: [
+-                              FilledButton.icon(
+-                                onPressed: edit,
+-                                icon: const Icon(Icons.edit_outlined),
+-                                label: Text(context.l10n.editNote),
+-                              ),
+-                              if (noteMakesTask(task))
+-                                OutlinedButton.icon(
++                              if (!linksRead && noteMakesTask(task))
++                                // Holds the main button's place, unseen and
++                                // untappable, so «Crear tarea» never turns
++                                // into «Ver tarea» under a finger.
++                                Visibility(
++                                  visible: false,
++                                  maintainSize: true,
++                                  maintainAnimation: true,
++                                  maintainState: true,
++                                  child: FilledButton.icon(
++                                    onPressed: null,
++                                    icon: const Icon(Icons.add_task_rounded),
++                                    label: Text(context.l10n.meetingCreateTask),
++                                  ),
++                                )
++                              else if (made != null)
++                                FilledButton.icon(
++                                  key: const ValueKey('note-view-task'),
++                                  onPressed: () => Navigator.push(
++                                    context,
++                                    MaterialPageRoute<void>(
++                                      builder: (_) =>
++                                          TaskDetailScreen(taskId: made.id!),
++                                    ),
++                                  ),
++                                  icon: const Icon(Icons.task_alt_rounded),
++                                  label: Text(context.l10n.meetingViewTask),
++                                )
++                              else if (noteMakesTask(task))
++                                FilledButton.icon(
+                                   key: const ValueKey('note-create-task'),
+                                   onPressed: () =>
+                                       createTaskFromNote(context, task),
+                                   icon: const Icon(Icons.add_task_rounded),
+                                   label: Text(context.l10n.meetingCreateTask),
+                                 ),
++                              if (made != null || noteMakesTask(task))
++                                OutlinedButton.icon(
++                                  // As tall as the filled button beside it.
++                                  style: OutlinedButton.styleFrom(
++                                    minimumSize: const Size(48, 48),
++                                    visualDensity: const VisualDensity(
++                                      vertical: 3,
++                                    ),
++                                  ),
++                                  onPressed: edit,
++                                  icon: const Icon(Icons.edit_outlined),
++                                  label: Text(context.l10n.editNote),
++                                )
++                              else
++                                FilledButton.icon(
++                                  onPressed: edit,
++                                  icon: const Icon(Icons.edit_outlined),
++                                  label: Text(context.l10n.editNote),
++                                ),
+                             ],
+                           ),
+                         ),
+diff --git a/App/lib/screens/voice_task_screen.dart b/App/lib/screens/voice_task_screen.dart
+index 72ebea0..ba7c60c 100644
+--- a/App/lib/screens/voice_task_screen.dart
++++ b/App/lib/screens/voice_task_screen.dart
+@@ -5,6 +5,7 @@ import 'package:flutter/semantics.dart';
+ import 'package:flutter/services.dart';
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import 'package:agenda/models/capture_command.dart';
++import 'package:agenda/models/checklist_item.dart';
+ import 'package:agenda/models/task.dart';
+ import 'package:agenda/models/task_list_info.dart';
+ import 'package:agenda/providers/calendar_focus_provider.dart';
+@@ -22,6 +23,7 @@ import 'package:uuid/uuid.dart';
+ import 'package:agenda/models/capture_session.dart';
+ import 'package:agenda/providers/auth_provider.dart';
+ import 'package:agenda/screens/home_screen.dart';
++import 'package:agenda/screens/task_detail_screen.dart';
+ import 'package:agenda/providers/task_provider.dart';
+ import 'package:agenda/services/capture_store.dart';
+ import 'package:agenda/services/capture_processor.dart';
+@@ -2881,6 +2883,9 @@ class CaptureResult extends ConsumerStatefulWidget {
+ 
+ class _CaptureResultState extends ConsumerState<CaptureResult> {
+   late CaptureSession _session = widget.session;
++  // Opened by «Crear tarea» on a note (MN-22). Kept from the start: a saved
++  // capture no longer says where it came from.
++  late final bool _fromNote = widget.session.source == 'note';
+   late List<CaptureDraft> _items = _session.drafts;
+   // Create a project, find, change or delete a task: each its own card.
+   late List<CaptureCommand> _commands = _session.commands;
+@@ -3407,10 +3412,39 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
+     final sheetMessages = ScaffoldMessenger.of(context);
+     final appMessages = ScaffoldMessenger.of(navigator.context);
+     final origin = context.getInheritedWidgetOfExactType<_CaptureOrigin>();
+-    final before = _session;
++    // From a note, a tick chose the step: the ticked ones go in, in order,
++    // as steps still to do, and the others stay out.
++    final chosen = _fromNote
++        ? _session.copyWith(
++            drafts: [
++              for (final draft in _items)
++                draft.pending
++                    ? draft.copyWith(
++                        task: draft.task.copyWith(
++                          checklist: [
++                            for (final step in draft.task.checklist)
++                              if (step.done())
++                                ChecklistItem(id: step.id, title: step.title),
++                          ],
++                        ),
++                      )
++                    : draft,
++            ],
++            status: 'ready',
++          )
++        : null;
++    final before = chosen ?? _session;
+     final undoIds = <String, int>{};
++    // The task page a save from a note opens, and the note's page under it,
++    // for `Deshacer` to go back to.
++    Route<void>? taskPage;
++    Route<dynamic>? notePage;
+     try {
+       await _writes;
++      if (chosen != null) {
++        await _store.update(chosen);
++        _session = chosen;
++      }
+       final result = await _store.saveReady(
+         _session.id,
+         _session.ownerKey,
+@@ -3517,7 +3551,23 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
+           : added;
+       // The landing Deshacer takes back, if any.
+       CalendarFocus? focus;
+-      if (remaining == 0) {
++      if (remaining == 0 && _fromNote) {
++        // From a note, the new task's page opens over it, so Back returns
++        // to the note (UX-2702).
++        Navigator.pop(context);
++        // The route the sheet opened over, now on top: the note's page.
++        navigator.popUntil((route) {
++          notePage = route;
++          return true;
++        });
++        final id = undoIds.values.firstOrNull;
++        if (id != null) {
++          taskPage = MaterialPageRoute<void>(
++            builder: (_) => TaskDetailScreen(taskId: id),
++          );
++          unawaited(navigator.push(taskPage));
++        }
++      } else if (remaining == 0) {
+         // From the pending list, back to Calendar, where the tasks land.
+         if (origin?.showCalendar == true) {
+           navigator.popUntil((route) => route.isFirst);
+@@ -3575,7 +3625,22 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
+             // The filter the landing widened comes back with the tasks gone.
+             narrowAfterUndo(container, focus);
+             container.invalidate(pendingCapturesProvider);
+-            if (mounted) {
++            if (_fromNote) {
++              // The note still holds it all: nothing waits, and its page
++              // shows again.
++              await _store
++                  .discard(restored.id, restored.ownerKey)
++                  .catchError((Object _) {});
++              // Back on the note, whatever opened over it since: the task's
++              // page again, or its edit form (R1-P318-2).
++              final note = notePage;
++              final page = taskPage;
++              if (note != null && note.isActive && navigator.mounted) {
++                navigator.popUntil((route) => route == note);
++              } else if (page != null && page.isActive && navigator.mounted) {
++                page.isCurrent ? navigator.pop() : navigator.removeRoute(page);
++              }
++            } else if (mounted) {
+               setState(() {
+                 _session = restored;
+                 _items = restored.drafts;
+@@ -4415,6 +4480,11 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
+   /// does. While saving, nothing happens.
+   Future<void> _leave() async {
+     if (_saving || _asking || !mounted) return;
++    // From a note, nothing is lost: the note keeps it all (UX-2706).
++    if (_fromNote) {
++      await _discard();
++      return;
++    }
+     // Nothing waits (a search, a task not found): it only closes.
+     if (!_worthKeeping()) {
+       await _finishEmpty();
+@@ -4796,6 +4866,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
+                           onRemove: () => _remove(item),
+                           onRenameProject: (from, to) =>
+                               unawaited(_renameProject(from, to)),
++                          choosingSteps: _fromNote,
+                         ),
+                       ),
+                     for (final view in views)
+diff --git a/App/lib/services/capture_store.dart b/App/lib/services/capture_store.dart
+index 6e93ff4..8bb93e8 100644
+--- a/App/lib/services/capture_store.dart
++++ b/App/lib/services/capture_store.dart
+@@ -32,6 +32,11 @@ class CaptureStore {
+   final Directory? directory;
+   CaptureStore(this.database, {this.directory});
+ 
++  /// The reviews «Crear tarea» opened from a note in this run of the app
++  /// (source 'note'). Any other such capture was left by an app closed
++  /// during its review: the note still holds it all, so it goes.
++  static final _openFromNotes = <String>{};
++
+   Future<Directory> _directory() async {
+     final root =
+         directory ??
+@@ -71,6 +76,7 @@ class CaptureStore {
+       day: day,
+       language: language,
+     );
++    if (source == 'note') _openFromNotes.add(id);
+     await (await database.database).insert('captures', {
+       'id': id,
+       'owner_key': ownerKey,
+@@ -167,8 +173,16 @@ class CaptureStore {
+       orderBy: 'captured_at DESC',
+     );
+     final sessions = rows.map(_decode).toList();
+-    // Opened and left without a word: nothing to come back to.
+-    final empty = sessions.where(isEmpty).map((s) => s.id).toList();
++    // Opened and left without a word, or a note's review left open when the
++    // app closed: nothing to come back to. A note's review open now is
++    // never listed, nor in «Sin guardar».
++    bool fromNote(CaptureSession s) => s.source == 'note';
++    final empty = sessions
++        .where(
++          (s) => isEmpty(s) || (fromNote(s) && !_openFromNotes.contains(s.id)),
++        )
++        .map((s) => s.id)
++        .toList();
+     if (empty.isNotEmpty) {
+       await (await database.database).delete(
+         'captures',
+@@ -177,7 +191,7 @@ class CaptureStore {
+         whereArgs: [ownerKey, ...empty],
+       );
+     }
+-    return sessions.where((s) => !isEmpty(s)).toList();
++    return sessions.where((s) => !isEmpty(s) && !fromNote(s)).toList();
+   }
+ 
+   Future<void> update(CaptureSession session) async {
+diff --git a/App/lib/widgets/capture_review_editor.dart b/App/lib/widgets/capture_review_editor.dart
+index 1e6e2d7..d316b19 100644
+--- a/App/lib/widgets/capture_review_editor.dart
++++ b/App/lib/widgets/capture_review_editor.dart
+@@ -30,6 +30,7 @@ class CaptureReviewEditor extends ConsumerStatefulWidget {
+     required this.onRemove,
+     this.enabled = true,
+     this.onRenameProject,
++    this.choosingSteps = false,
+   });
+   final CaptureDraft draft;
+   final bool compact;
+@@ -42,6 +43,10 @@ class CaptureReviewEditor extends ConsumerStatefulWidget {
+   /// The project this task's confirming tap creates, renamed from its chip:
+   /// the name it had, and the one typed. Nothing is created yet.
+   final void Function(String from, String to)? onRenameProject;
++
++  /// A task «Crear tarea» makes from a note: its steps are chosen, ticked to
++  /// go in ([ChecklistEditor.choosing]).
++  final bool choosingSteps;
+   @override
+   ConsumerState<CaptureReviewEditor> createState() =>
+       _CaptureReviewEditorState();
+@@ -813,6 +818,7 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
+               key: _steps,
+               items: task.checklist,
+               recurring: task.isRecurring,
++              choosing: widget.choosingSteps,
+               onChanged: !widget.enabled
+                   ? null
+                   : (items) => _change(task.copyWith(checklist: items)),
+@@ -934,6 +940,7 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
+                 key: _steps,
+                 items: task.checklist,
+                 recurring: task.isRecurring,
++                choosing: widget.choosingSteps,
+                 onChanged: !widget.enabled
+                     ? null
+                     : (items) => _change(task.copyWith(checklist: items)),
+diff --git a/App/lib/widgets/checklist_editor.dart b/App/lib/widgets/checklist_editor.dart
+index fe5f128..11f7cae 100644
+--- a/App/lib/widgets/checklist_editor.dart
++++ b/App/lib/widgets/checklist_editor.dart
+@@ -13,12 +13,18 @@ class ChecklistEditor extends StatefulWidget {
+     this.onChanged,
+     this.occurrence,
+     this.recurring = false,
++    this.choosing = false,
+   });
+   final List<ChecklistItem> items;
+   final ValueChanged<List<ChecklistItem>>? onChanged;
+   final String? occurrence;
+   final bool recurring;
+ 
++  /// The review «Crear tarea» opens from a note (MN-22): a tick means the
++  /// step goes into the task, under «Pasos que se añaden», and a step typed
++  /// here starts ticked. The rows have no ⋮.
++  final bool choosing;
++
+   @override
+   State<ChecklistEditor> createState() => _ChecklistEditorState();
+ }
+@@ -72,7 +78,10 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
+       return;
+     }
+     _add.clear();
+-    widget.onChanged?.call([...widget.items, ChecklistItem(title: title)]);
++    widget.onChanged?.call([
++      ...widget.items,
++      ChecklistItem(title: title, completed: widget.choosing),
++    ]);
+     if (next) _addFocus.requestFocus();
+   }
+ 
+@@ -108,7 +117,10 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
+     final items = widget.items;
+     final onChanged = widget.onChanged;
+     final occurrence = widget.occurrence;
+-    final recurring = widget.recurring;
++    final choosing = widget.choosing;
++    // Choosing, a tick is a choice, not a step done: a repeat doesn't
++    // hold it back.
++    final recurring = widget.recurring && !choosing;
+     final complete = items
+         .where((item) => item.done(occurrence: occurrence))
+         .length;
+@@ -116,18 +128,25 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
+       crossAxisAlignment: CrossAxisAlignment.start,
+       children: [
+         if (items.isNotEmpty) ...[
+-          Text(
+-            context.l10n.checklistCount(complete, items.length),
+-            style: Theme.of(context).textTheme.titleSmall,
+-          ),
+-          const SizedBox(height: 8),
+-          LinearProgressIndicator(
+-            value: complete / items.length,
+-            semanticsLabel: context.l10n.checklistSemantics(
+-              complete,
+-              items.length,
++          if (choosing)
++            Text(
++              context.l10n.meetingStepsToAdd,
++              style: Theme.of(context).textTheme.titleSmall,
++            )
++          else ...[
++            Text(
++              context.l10n.checklistCount(complete, items.length),
++              style: Theme.of(context).textTheme.titleSmall,
+             ),
+-          ),
++            const SizedBox(height: 8),
++            LinearProgressIndicator(
++              value: complete / items.length,
++              semanticsLabel: context.l10n.checklistSemantics(
++                complete,
++                items.length,
++              ),
++            ),
++          ],
+           if (recurring && occurrence == null)
+             Padding(
+               padding: const EdgeInsets.only(top: 8),
+@@ -197,53 +216,54 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
+                     ),
+                   ),
+                 ),
+-                PopupMenuButton<String>(
+-                  tooltip: context.l10n.editCaptureItem(items[index].title),
+-                  enabled: onChanged != null,
+-                  itemBuilder: (_) => [
+-                    PopupMenuItem(
+-                      value: 'edit',
+-                      child: Text(context.l10n.editStep),
+-                    ),
+-                    if (index > 0)
++                if (!choosing)
++                  PopupMenuButton<String>(
++                    tooltip: context.l10n.editCaptureItem(items[index].title),
++                    enabled: onChanged != null,
++                    itemBuilder: (_) => [
+                       PopupMenuItem(
+-                        value: 'up',
+-                        child: Text(context.l10n.moveUp),
++                        value: 'edit',
++                        child: Text(context.l10n.editStep),
+                       ),
+-                    if (index < items.length - 1)
++                      if (index > 0)
++                        PopupMenuItem(
++                          value: 'up',
++                          child: Text(context.l10n.moveUp),
++                        ),
++                      if (index < items.length - 1)
++                        PopupMenuItem(
++                          value: 'down',
++                          child: Text(context.l10n.moveDown),
++                        ),
+                       PopupMenuItem(
+-                        value: 'down',
+-                        child: Text(context.l10n.moveDown),
++                        value: 'remove',
++                        child: Text(context.l10n.removeStep),
+                       ),
+-                    PopupMenuItem(
+-                      value: 'remove',
+-                      child: Text(context.l10n.removeStep),
+-                    ),
+-                  ],
+-                  onSelected: (action) {
+-                    if (action == 'edit') {
+-                      _startRename(items[index]);
+-                      return;
+-                    }
+-                    final changed = [...widget.items];
+-                    final at = changed.indexWhere(
+-                      (item) => item.id == items[index].id,
+-                    );
+-                    if (at < 0) return;
+-                    final item = changed.removeAt(at);
+-                    if (action != 'remove') {
+-                      changed.insert(at + (action == 'up' ? -1 : 1), item);
+-                    }
+-                    // A step typed but not added yet is kept, even when the
+-                    // last step goes and the host hides this editor.
+-                    final typed = _add.text.trim();
+-                    if (typed.isNotEmpty && changed.length < _maxSteps) {
+-                      _add.clear();
+-                      changed.add(ChecklistItem(title: typed));
+-                    }
+-                    onChanged?.call(changed);
+-                  },
+-                ),
++                    ],
++                    onSelected: (action) {
++                      if (action == 'edit') {
++                        _startRename(items[index]);
++                        return;
++                      }
++                      final changed = [...widget.items];
++                      final at = changed.indexWhere(
++                        (item) => item.id == items[index].id,
++                      );
++                      if (at < 0) return;
++                      final item = changed.removeAt(at);
++                      if (action != 'remove') {
++                        changed.insert(at + (action == 'up' ? -1 : 1), item);
++                      }
++                      // A step typed but not added yet is kept, even when the
++                      // last step goes and the host hides this editor.
++                      final typed = _add.text.trim();
++                      if (typed.isNotEmpty && changed.length < _maxSteps) {
++                        _add.clear();
++                        changed.add(ChecklistItem(title: typed));
++                      }
++                      onChanged?.call(changed);
++                    },
++                  ),
+               ],
+             ),
+         ],
+diff --git a/App/lib/widgets/note_task.dart b/App/lib/widgets/note_task.dart
+index 4051edd..b346fa6 100644
+--- a/App/lib/widgets/note_task.dart
++++ b/App/lib/widgets/note_task.dart
+@@ -1,5 +1,8 @@
++import 'dart:convert';
++import 'package:collection/collection.dart';
+ import 'package:flutter/material.dart';
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
++import 'package:sqflite/sqflite.dart';
+ import 'package:uuid/uuid.dart';
+ import 'package:agenda/models/capture_session.dart';
+ import 'package:agenda/models/checklist_item.dart';
+@@ -7,19 +10,96 @@ import 'package:agenda/models/task.dart';
+ import 'package:agenda/providers/auth_provider.dart';
+ import 'package:agenda/providers/regional_provider.dart';
+ import 'package:agenda/providers/task_lists_provider.dart';
++import 'package:agenda/providers/task_provider.dart';
+ import 'package:agenda/screens/voice_task_screen.dart';
+ import 'package:agenda/services/capture_store.dart';
++import 'package:agenda/services/task_database.dart';
+ 
+ /// Whether [note] offers «Crear tarea»: a note with steps still open, as a
+ /// meeting's note has its to-dos (MN-22).
+ bool noteMakesTask(Task note) =>
+     note.isNote && note.checklist.any((step) => !step.done());
+ 
++/// The task «Crear tarea» made from [note] on this phone, while it exists
++/// (done or not): the note then offers «Ver tarea» (UX-2702).
++Task? noteMadeTask(WidgetRef ref, Task note) {
++  final id = ref.watch(noteTasksProvider).valueOrNull?[note.id];
++  if (id == null) return null;
++  return ref
++      .watch(taskProvider)
++      .valueOrNull
++      ?.firstWhereOrNull((task) => task.id == id);
++}
++
++/// Remembers, on this phone only, the task each note made with «Crear
++/// tarea». Never synced or sent: on another phone the note offers «Crear
++/// tarea» again.
++class NoteTaskLinks {
++  NoteTaskLinks(this.database);
++  final TaskDatabase database;
++
++  // Per-account preferences are scoped `<kind>:<owner>`, so deleting the
++  // account erases this too.
++  static String _scope(String owner) => 'noteTasks:$owner';
++
++  /// Each note's id, with the id of the task it made.
++  Future<Map<int, int>> read(String owner) async {
++    final rows = await (await database.database).query(
++      'app_preferences',
++      where: 'scope = ?',
++      whereArgs: [_scope(owner)],
++    );
++    if (rows.isEmpty) return const {};
++    final data = jsonDecode(rows.single['data'] as String);
++    if (data is! Map) return const {};
++    return {
++      for (final entry in data.entries)
++        if (int.tryParse('${entry.key}') case final note?)
++          if (entry.value is int) note: entry.value as int,
++    };
++  }
++
++  Future<void> link(String owner, int noteId, int taskId) async {
++    final db = await database.database;
++    await db.transaction((tx) async {
++      final rows = await tx.query(
++        'app_preferences',
++        where: 'scope = ?',
++        whereArgs: [_scope(owner)],
++      );
++      final data = rows.isEmpty
++          ? null
++          : jsonDecode(rows.single['data'] as String);
++      await tx.insert('app_preferences', {
++        'scope': _scope(owner),
++        'data': jsonEncode({if (data is Map) ...data, '$noteId': taskId}),
++      }, conflictAlgorithm: ConflictAlgorithm.replace);
++    });
++  }
++}
++
++final noteTaskLinksProvider = Provider((ref) => NoteTaskLinks(TaskDatabase()));
++
++/// The signed-in account's note → task links on this phone.
++final noteTasksProvider = FutureProvider<Map<int, int>>((ref) async {
++  try {
++    return await ref
++        .watch(noteTaskLinksProvider)
++        .read(ref.watch(captureOwnerProvider));
++  } catch (_) {
++    // Unread: the notes offer «Crear tarea».
++    return const {};
++  }
++});
++
+ /// «Crear tarea» (MN-22): the capture's review, with one task titled like
+-/// [note] and its open steps as the checklist, so the person can drop the
+-/// ones they don't want and set a day before saving. Nothing is saved
+-/// until they confirm there. Leaving the review asks, as for any capture,
+-/// whether to keep it in `Sin guardar` or discard it.
++/// [note] and its open steps as the checklist, all ticked to go in, so the
++/// person unticks the ones they don't want and can set a day before
++/// saving. Nothing is saved until they confirm there. Leaving the review
++/// closes it with no question: the note still holds everything, and the
++/// capture never waits in `Sin guardar` (source 'note', UX-2706). Once
++/// saved, the new task's page opens over the note, which then offers «Ver
++/// tarea».
+ Future<void> createTaskFromNote(BuildContext context, Task note) async {
+   final container = ProviderScope.containerOf(context, listen: false);
+   final store = container.read(captureStoreProvider);
+@@ -38,7 +118,7 @@ Future<void> createTaskFromNote(BuildContext context, Task note) async {
+     _zone(container),
+     text: note.title,
+     projectId: projectId,
+-    source: 'typed',
++    source: 'note',
+   );
+   final drafts = [
+     CaptureDraft(
+@@ -49,7 +129,8 @@ Future<void> createTaskFromNote(BuildContext context, Task note) async {
+         listId: projectId,
+         checklist: [
+           for (final step in note.checklist)
+-            if (!step.done()) ChecklistItem(title: step.title),
++            // Ticked: chosen to go in. Saved as steps still to do.
++            if (!step.done()) ChecklistItem(title: step.title, completed: true),
+         ],
+       ),
+     ),
+@@ -64,7 +145,6 @@ Future<void> createTaskFromNote(BuildContext context, Task note) async {
+       drafts: drafts,
+     ),
+   );
+-  container.invalidate(pendingCapturesProvider);
+   if (!context.mounted) return;
+   await showCaptureSheet(
+     context,
+@@ -72,6 +152,20 @@ Future<void> createTaskFromNote(BuildContext context, Task note) async {
+     startListening: false,
+     useScope: false,
+   );
++  // Saved: the note remembers its task.
++  final noteId = note.id;
++  if (noteId == null) return;
++  try {
++    final saved = await store.read(session.id, owner);
++    final taskId = saved?.status == 'saved'
++        ? saved!.drafts.map((d) => d.savedTaskId).nonNulls.firstOrNull
++        : null;
++    if (taskId == null) return;
++    await container.read(noteTaskLinksProvider).link(owner, noteId, taskId);
++    container.invalidate(noteTasksProvider);
++  } catch (_) {
++    /* The note offers «Crear tarea» again. */
++  }
+ }
+ 
+ /// The capture's zone, as the task form picks it: the one chosen in
+diff --git a/App/test/capture_recovery_test.dart b/App/test/capture_recovery_test.dart
+index 3f2a5a8..bacbc59 100644
+--- a/App/test/capture_recovery_test.dart
++++ b/App/test/capture_recovery_test.dart
+@@ -16,6 +16,7 @@ import 'package:agenda/l10n/generated/app_localizations_en.dart';
+ import 'package:agenda/l10n/generated/app_localizations_es.dart';
+ import 'package:agenda/services/capture_store.dart';
+ import 'package:agenda/services/task_database.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import 'package:flutter_test/flutter_test.dart';
+ import 'package:path/path.dart' as p;
+ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+@@ -952,6 +953,100 @@ void main() {
+     );
+     expect(plain.language, isNull);
+   });
++
++  // ---- UX loop 2026-11-03-screens, round 1 · P318 ----
++  group(
++    'P318 · a note’s «Crear tarea» review never waits in «Sin guardar»',
++    () {
++      /// A note's review as a run of the app that was killed left it: written
++      /// straight to the table, never opened in this run.
++      Future<CaptureSession> leftByAnEarlierRun() async {
++        final session = CaptureSession(
++          id: 'note-left-open',
++          ownerKey: 'local',
++          capturedAt: DateTime.utc(2026, 11, 2, 18),
++          timezone: 'Europe/Madrid',
++          text: 'Precio del piloto con Acme',
++          transcript: 'Acordamos el piloto.',
++          source: 'note',
++          status: 'ready',
++          drafts: [
++            CaptureDraft(
++              id: 'draft-1',
++              task: Task(title: 'Precio del piloto con Acme', priority: 1),
++            ),
++          ],
++        );
++        await (await database.database).insert('captures', {
++          'id': session.id,
++          'owner_key': session.ownerKey,
++          'status': session.status,
++          'captured_at': session.capturedAt.toIso8601String(),
++          'data': jsonEncode(session.toJson()),
++        });
++        return session;
++      }
++
++      test('UX-2706: a note’s session left in the store is not returned by '
++          'pending, and is gone after a restart', () async {
++        final typed = await store.create(
++          'local',
++          'Europe/Madrid',
++          text: 'Llamar al fontanero',
++          source: 'typed',
++        );
++        final left = await leftByAnEarlierRun();
++        expect((await store.pending('local')).map((s) => s.id), [typed.id]);
++        // It went: the note still holds it all.
++        expect(await store.read(left.id, 'local'), isNull);
++        await database.close();
++        await reopen();
++        expect((await store.pending('local')).map((s) => s.id), [typed.id]);
++      });
++
++      test('UX-2706: a note’s review open now is not listed either', () async {
++        final open = await store.create(
++          'local',
++          'Europe/Madrid',
++          text: 'Precio del piloto con Acme',
++          source: 'note',
++        );
++        await store.update(
++          open.copyWith(
++            status: 'ready',
++            drafts: [
++              CaptureDraft(
++                id: 'draft-1',
++                task: Task(title: 'Precio del piloto con Acme', priority: 1),
++              ),
++            ],
++          ),
++        );
++        expect(await store.pending('local'), isEmpty);
++      });
++
++      test('UX-2706: «Sin guardar» (pendingCapturesProvider) never shows a '
++          'note’s session', () async {
++        final typed = await store.create(
++          'local',
++          'Europe/Madrid',
++          text: 'Llamar al fontanero',
++          source: 'typed',
++        );
++        await leftByAnEarlierRun();
++        final container = ProviderContainer(
++          overrides: [
++            captureOwnerProvider.overrideWithValue('local'),
++            captureStoreProvider.overrideWithValue(store),
++          ],
++        );
++        addTearDown(container.dispose);
++        final listed = await container.read(pendingCapturesProvider.future);
++        expect(listed.map((s) => s.id), [typed.id]);
++        expect(listed.any((s) => s.source == 'note'), isFalse);
++      });
++    },
++  );
+ }
+ 
+ Uint8List _wav() {
+diff --git a/App/test/meeting_screens_test.dart b/App/test/meeting_screens_test.dart
+index 9845997..60846ed 100644
+--- a/App/test/meeting_screens_test.dart
++++ b/App/test/meeting_screens_test.dart
+@@ -9,10 +9,12 @@ import 'dart:convert';
+ import 'package:agenda/l10n/generated/app_localizations.dart';
+ import 'package:agenda/l10n/meeting_copy.dart';
+ import 'package:agenda/l10n/region.dart';
++import 'package:agenda/models/capture_session.dart';
+ import 'package:agenda/models/checklist_item.dart';
+ import 'package:agenda/models/meeting.dart';
+ import 'package:agenda/models/task.dart';
+ import 'package:agenda/providers/auth_provider.dart';
++import 'package:agenda/providers/calendar_focus_provider.dart';
+ import 'package:agenda/providers/first_task_provider.dart';
+ import 'package:agenda/providers/task_lists_provider.dart';
+ import 'package:agenda/services/invitation_links.dart';
+@@ -36,6 +38,7 @@ import 'package:agenda/services/notification_service.dart';
+ import 'package:agenda/services/revenuecat_service.dart';
+ import 'package:agenda/theme/app_theme.dart';
+ import 'package:agenda/widgets/capture_review_editor.dart';
++import 'package:agenda/widgets/checklist_editor.dart';
+ import 'package:agenda/widgets/meeting_banners.dart';
+ import 'package:flutter/material.dart';
+ import 'package:flutter/rendering.dart';
+@@ -49,6 +52,7 @@ import 'support/capture_fixtures.dart';
+ import 'support/design_fixtures.dart';
+ import 'support/button_label.dart';
+ import 'support/meeting_screen_fakes.dart';
++import 'support/note_task_fakes.dart';
+ import 'support/reminder_fixtures.dart';
+ 
+ Widget _app(
+@@ -920,22 +924,18 @@ void main() {
+         'Send the pilot quote · Miki · Friday',
+         'Book the room',
+       ]);
+-      expect(draft.task.checklist.every((s) => !s.completed), isTrue);
++      // Ticked: each one chosen to go into the task (UX-2701).
++      expect(draft.task.checklist.every((s) => s.completed), isTrue);
++      expect(captures.current!.source, 'note');
+       expect(find.text('Send the pilot quote · Miki · Friday'), findsWidgets);
+       // The zone chosen in Settings, as the task form uses.
+       expect(captures.current!.timezone, 'America/New_York');
+ 
+-      // Leaving asks, as for any capture: Discard leaves nothing in
+-      // Unsaved.
++      // Leaving closes at once, with no question: the note keeps it all,
++      // and nothing waits in Unsaved (UX-2706).
+       await tester.binding.handlePopRoute();
+       await tester.pumpAndSettle();
+-      await tester.tap(
+-        find.descendant(
+-          of: find.byType(AlertDialog),
+-          matching: find.text('Discard'),
+-        ),
+-      );
+-      await tester.pumpAndSettle();
++      expect(find.byType(AlertDialog), findsNothing);
+       expect(find.byType(CaptureReviewEditor), findsNothing);
+       expect(captures.current!.status, 'discarded');
+     });
+@@ -3565,6 +3565,449 @@ void main() {
+       }
+     });
+   });
++
++  // ---- UX loop 2026-11-03-screens, round 1 · P318 ----
++  group('P318 · «Crear tarea» from a note: choose the steps, land on the '
++      'new task, leave without a question, the main button', () {
++    final es = lookupAppLocalizations(const Locale('es'));
++    const steps = [
++      'Enviar el presupuesto',
++      'Reservar la sala',
++      'Pedir el contacto de compras',
++    ];
++    Task note({bool withSteps = true}) => Task(
++      id: 95,
++      kind: 'note',
++      title: 'Precio del piloto con Acme',
++      notes: 'Acordamos el piloto.',
++      priority: 1,
++      checklist: [
++        if (withSteps)
++          for (var i = 0; i < steps.length; i++)
++            ChecklistItem(id: 'p$i', title: steps[i]),
++      ],
++    );
++    // Something said earlier and kept in «Sin guardar».
++    final kept = CaptureSession(
++      id: 'kept-earlier',
++      ownerKey: 'local',
++      capturedAt: DateTime.utc(2026, 11, 1, 9),
++      timezone: 'Europe/Madrid',
++      text: 'Llamar al fontanero',
++    );
++
++    /// The note's page, Pro, on 360×800, with saving in memory.
++    Future<
++      ({
++        ProviderContainer container,
++        MemoryCaptures captures,
++        MemoryNoteTaskLinks links,
++      })
++    >
++    open(
++      WidgetTester tester, {
++      Task? shown,
++      String language = 'es',
++      double scale = 1,
++    }) async {
++      final captures = MemoryCaptures();
++      final links = MemoryNoteTaskLinks();
++      final container = designContainer(
++        tasks: () => NoteTaskList([shown ?? note()]),
++        pendingCaptures: [kept],
++        overrides: [
++          meetingsOverride(ScriptedMeetings()),
++          captureStoreProvider.overrideWithValue(captures),
++          ...captureSheetOverrides(),
++          ...noteTaskOverrides(links),
++        ],
++      );
++      addTearDown(container.dispose);
++      captures.tasks = container;
++      final messenger = tester.binding.defaultBinaryMessenger;
++      const timezone = MethodChannel('flutter_timezone');
++      messenger.setMockMethodCallHandler(
++        timezone,
++        (_) async => 'Europe/Madrid',
++      );
++      addTearDown(() => messenger.setMockMethodCallHandler(timezone, null));
++      await tester.binding.setSurfaceSize(const Size(360, 800));
++      addTearDown(() => tester.binding.setSurfaceSize(null));
++      await tester.pumpWidget(
++        _app(
++          container,
++          TaskDetailScreen(taskId: (shown ?? note()).id!),
++          language: language,
++          scale: scale,
++        ),
++      );
++      await tester.pumpAndSettle();
++      return (container: container, captures: captures, links: links);
++    }
++
++    Finder stepBox(String title) => find.byWidgetPredicate(
++      (widget) => widget is Checkbox && widget.semanticLabel == title,
++    );
++    Finder outlinedButtonWithText(String label) => find.ancestor(
++      of: find.text(label),
++      matching: find.byWidgetPredicate((widget) => widget is OutlinedButton),
++    );
++    List<Task> tasks(ProviderContainer container) =>
++        container.read(taskProvider).valueOrNull ?? const [];
++    Task? made(ProviderContainer container) =>
++        tasks(container).where((task) => !task.isNote).firstOrNull;
++    // The page in front: the one TaskDetailScreen whose route is current.
++    int? front(WidgetTester tester) {
++      for (final element in find.byType(TaskDetailScreen).evaluate()) {
++        if (ModalRoute.of(element)?.isCurrent == true) {
++          return (element.widget as TaskDetailScreen).taskId;
++        }
++      }
++      return null;
++    }
++
++    Future<void> createTask(WidgetTester tester) async {
++      await tester.tap(find.byKey(const ValueKey('note-create-task')));
++      await tester.pumpAndSettle();
++      expect(find.byType(CaptureResult), findsOneWidget);
++    }
++
++    Future<void> untick(WidgetTester tester, String title) async {
++      await tester.ensureVisible(stepBox(title));
++      await tester.pumpAndSettle();
++      await tester.tap(stepBox(title));
++      await tester.pumpAndSettle();
++    }
++
++    Future<void> addTask(WidgetTester tester) async {
++      await tester.ensureVisible(find.byKey(const ValueKey('save-drafts')));
++      await tester.pumpAndSettle();
++      await saveCapture(tester);
++    }
++
++    testWidgets('UX-2701: the review shows «Pasos que se añaden», every step '
++        'ticked, and no ⋮ on any step', (tester) async {
++      await open(tester);
++      await createTask(tester);
++      final editor = find.descendant(
++        of: find.byType(CaptureResult),
++        matching: find.byType(ChecklistEditor),
++      );
++      expect(editor, findsOneWidget);
++      expect(
++        find.descendant(of: editor, matching: find.text(es.meetingStepsToAdd)),
++        findsOneWidget,
++      );
++      // Not «Pasos · n/N» there.
++      for (var done = 0; done <= steps.length; done++) {
++        expect(find.text(es.checklistCount(done, steps.length)), findsNothing);
++      }
++      for (final title in steps) {
++        // Each checkbox is read by its step's title.
++        expect(stepBox(title), findsOneWidget, reason: title);
++        expect(tester.widget<Checkbox>(stepBox(title)).value, isTrue);
++      }
++      expect(
++        find.descendant(
++          of: editor,
++          matching: find.byWidgetPredicate((w) => w is PopupMenuButton),
++        ),
++        findsNothing,
++      );
++      expect(tester.takeException(), isNull);
++    });
++
++    testWidgets('UX-2701: unticking the second step leaves it out; the task '
++        'has steps 1 and 3, in order, neither done', (tester) async {
++      final app = await open(tester);
++      await createTask(tester);
++      await untick(tester, steps[1]);
++      expect(tester.widget<Checkbox>(stepBox(steps[1])).value, isFalse);
++      await addTask(tester);
++      final task = made(app.container);
++      expect(task, isNotNull);
++      expect(task!.title, 'Precio del piloto con Acme');
++      expect(task.checklist.map((step) => step.title), [steps[0], steps[2]]);
++      expect(task.checklist.any((step) => step.done()), isFalse);
++      expect(task.checklist.any((step) => step.completed), isFalse);
++      // The note keeps its three steps, all open.
++      final kept = tasks(app.container).firstWhere((t) => t.id == 95);
++      expect(kept.checklist.map((step) => step.title), steps);
++      expect(kept.checklist.any((step) => step.done()), isFalse);
++    });
++
++    testWidgets('UX-2701: a step typed in the review starts ticked and is '
++        'saved as an open step', (tester) async {
++      final app = await open(tester);
++      await createTask(tester);
++      final field = find.descendant(
++        of: find.byType(ChecklistEditor),
++        matching: find.byKey(const ValueKey('add-checklist-item')),
++      );
++      await tester.ensureVisible(field);
++      await tester.pumpAndSettle();
++      await tester.enterText(field, 'Llamar a Ana');
++      await tester.testTextInput.receiveAction(TextInputAction.done);
++      await tester.pumpAndSettle();
++      expect(stepBox('Llamar a Ana'), findsOneWidget);
++      expect(tester.widget<Checkbox>(stepBox('Llamar a Ana')).value, isTrue);
++      await addTask(tester);
++      final task = made(app.container)!;
++      expect(task.checklist.map((step) => step.title), [
++        ...steps,
++        'Llamar a Ana',
++      ]);
++      expect(task.checklist.any((step) => step.done()), isFalse);
++    });
++
++    testWidgets('UX-2701: a dictated capture’s review keeps «Pasos · n/N», '
++        'the ⋮ and a tick that marks the step done', (tester) async {
++      final captures = MemoryCaptures();
++      final container = designContainer(
++        overrides: [
++          captureStoreProvider.overrideWithValue(captures),
++          ...captureSheetOverrides(),
++        ],
++      );
++      addTearDown(container.dispose);
++      captures.tasks = container;
++      final session = await captures.create(
++        'local',
++        'Europe/Madrid',
++        text: 'Preparar la mudanza',
++        source: 'speech',
++      );
++      await captures.update(
++        session.copyWith(
++          status: 'ready',
++          transcript: 'Preparar la mudanza',
++          drafts: [
++            CaptureDraft(
++              id: 'dictated',
++              task: Task(
++                title: 'Preparar la mudanza',
++                priority: 1,
++                checklist: [
++                  ChecklistItem(id: 'd1', title: 'Pedir cajas'),
++                  ChecklistItem(id: 'd2', title: 'Avisar al casero'),
++                ],
++              ),
++            ),
++          ],
++        ),
++      );
++      await tester.binding.setSurfaceSize(const Size(360, 800));
++      addTearDown(() => tester.binding.setSurfaceSize(null));
++      await tester.pumpWidget(
++        _app(container, const Scaffold(body: SizedBox()), language: 'es'),
++      );
++      await tester.pumpAndSettle();
++      await openCaptureResult(tester, session.id);
++      final editor = find.descendant(
++        of: find.byType(CaptureResult),
++        matching: find.byType(ChecklistEditor),
++      );
++      expect(editor, findsOneWidget);
++      expect(find.text(es.checklistCount(0, 2)), findsOneWidget);
++      expect(find.text(es.meetingStepsToAdd), findsNothing);
++      expect(
++        find.descendant(
++          of: editor,
++          matching: find.byWidgetPredicate((w) => w is PopupMenuButton),
++        ),
++        findsNWidgets(2),
++      );
++      expect(tester.widget<Checkbox>(stepBox('Pedir cajas')).value, isFalse);
++      await tester.ensureVisible(stepBox('Pedir cajas'));
++      await tester.pumpAndSettle();
++      await tester.tap(stepBox('Pedir cajas'));
++      await tester.pumpAndSettle();
++      expect(find.text(es.checklistCount(1, 2)), findsOneWidget);
++      expect(
++        captures.current!.drafts.single.task.checklist.first.done(),
++        isTrue,
++      );
++    });
++
++    testWidgets('UX-2702: «Añadir tarea» lands on the new task’s page; one '
++        'Back shows the note; Calendar’s focus is not set', (tester) async {
++      final app = await open(tester);
++      await createTask(tester);
++      await addTask(tester);
++      final task = made(app.container);
++      expect(task, isNotNull);
++      expect(find.byType(CaptureResult), findsNothing);
++      expect(front(tester), task!.id);
++      expect(app.container.read(calendarFocusProvider), isNull);
++      await tester.binding.handlePopRoute();
++      await tester.pumpAndSettle();
++      expect(find.byType(TaskDetailScreen), findsOneWidget);
++      expect(front(tester), 95);
++      expect(app.container.read(calendarFocusProvider), isNull);
++    });
++
++    testWidgets('UX-2702: back on the note, «Ver tarea» and no «Crear tarea»; '
++        'it opens that same task, and no task is added', (tester) async {
++      final app = await open(tester);
++      await createTask(tester);
++      await addTask(tester);
++      final task = made(app.container)!;
++      await tester.binding.handlePopRoute();
++      await tester.pumpAndSettle();
++      expect(front(tester), 95);
++      expect(filledButtonWithText(es.meetingViewTask), findsOneWidget);
++      expect(find.text(es.meetingCreateTask), findsNothing);
++      final count = tasks(app.container).length;
++      await tester.tap(filledButtonWithText(es.meetingViewTask));
++      await tester.pumpAndSettle();
++      expect(front(tester), task.id);
++      expect(find.byType(CaptureResult), findsNothing);
++      expect(tasks(app.container).length, count);
++    });
++
++    testWidgets('UX-2702: «Deshacer» deletes the new task and closes its '
++        'page; the note offers «Crear tarea» again', (tester) async {
++      final app = await open(tester);
++      await createTask(tester);
++      await addTask(tester);
++      final task = made(app.container)!;
++      expect(front(tester), task.id);
++      await tester.tap(find.text(es.undo).last);
++      await tester.pumpAndSettle();
++      expect(made(app.container), isNull);
++      expect(front(tester), 95);
++      expect(find.byType(TaskDetailScreen), findsOneWidget);
++      expect(filledButtonWithText(es.meetingCreateTask), findsOneWidget);
++      expect(find.text(es.meetingViewTask), findsNothing);
++      // Nothing waits in «Sin guardar» for it.
++      expect(app.captures.current!.status, 'discarded');
++    });
++
++    testWidgets('UX-2702: deleting the made task from its page: the note '
++        'offers «Crear tarea» again', (tester) async {
++      final app = await open(tester);
++      await createTask(tester);
++      await addTask(tester);
++      final task = made(app.container)!;
++      expect(front(tester), task.id);
++      ScaffoldMessenger.of(
++        tester.element(find.byType(TaskDetailScreen).last),
++      ).removeCurrentSnackBar();
++      await tester.pumpAndSettle();
++      await tester.tap(find.byTooltip(es.deleteTask));
++      await tester.pumpAndSettle();
++      expect(made(app.container), isNull);
++      expect(front(tester), 95);
++      expect(filledButtonWithText(es.meetingCreateTask), findsOneWidget);
++      expect(find.text(es.meetingViewTask), findsNothing);
++    });
++
++    testWidgets('UX-2706: Cancelar and Back close a note’s review with no '
++        'question; the capture goes, and «Sin guardar» is as before', (
++      tester,
++    ) async {
++      final app = await open(tester);
++      final before = await app.container.read(pendingCapturesProvider.future);
++      for (final leave in ['Cancelar', 'Back']) {
++        await createTask(tester);
++        expect(app.captures.current!.source, 'note');
++        if (leave == 'Cancelar') {
++          final cancel = find.descendant(
++            of: find.byType(CaptureResult),
++            matching: find.widgetWithText(TextButton, es.cancel),
++          );
++          await tester.ensureVisible(cancel);
++          await tester.pumpAndSettle();
++          await tester.tap(cancel);
++        } else {
++          await tester.binding.handlePopRoute();
++        }
++        await tester.pumpAndSettle();
++        expect(find.byType(AlertDialog), findsNothing, reason: leave);
++        expect(find.text(es.captureKeepTextQuestion), findsNothing);
++        expect(find.byType(CaptureResult), findsNothing, reason: leave);
++        expect(app.captures.current!.status, 'discarded', reason: leave);
++        expect(front(tester), 95, reason: leave);
++        final after = await app.container.read(pendingCapturesProvider.future);
++        expect(
++          after.map((capture) => capture.id),
++          before.map((capture) => capture.id),
++          reason: leave,
++        );
++        // Nothing was made, and the note is as it was.
++        expect(made(app.container), isNull, reason: leave);
++        expect(filledButtonWithText(es.meetingCreateTask), findsOneWidget);
++      }
++    });
++
++    group('UX-2709 with Manrope', () {
++      setUpAll(loadManrope);
++
++      testWidgets('UX-2709: on a note with open steps, «Crear tarea» is the '
++          'filled button, first, and «Editar nota» outlined, as tall', (
++        tester,
++      ) async {
++        for (final (language, scale) in [
++          ('es', 1.0),
++          ('es', 2.0),
++          ('ca', 2.0),
++        ]) {
++          final l = lookupAppLocalizations(Locale(language));
++          final why = '$language ${scale}x';
++          await open(tester, language: language, scale: scale);
++          final create = filledButtonWithText(l.meetingCreateTask);
++          final edit = outlinedButtonWithText(l.editNote);
++          expect(create, findsOneWidget, reason: why);
++          expect(edit, findsOneWidget, reason: why);
++          expect(filledButtonWithText(l.editNote), findsNothing, reason: why);
++          final a = tester.getRect(create);
++          final b = tester.getRect(edit);
++          // First: on an earlier line, or to the left on the same one.
++          final sameLine = (a.top - b.top).abs() < 1;
++          expect(
++            sameLine ? a.left < b.left : a.top < b.top,
++            isTrue,
++            reason: '$why: $a before $b',
++          );
++          expect(
++            (a.height - b.height).abs(),
++            lessThanOrEqualTo(1),
++            reason: '$why: ${a.height} vs ${b.height}',
++          );
++          // Both whole on screen.
++          for (final rect in [a, b]) {
++            expect(rect.left, greaterThanOrEqualTo(0), reason: why);
++            expect(rect.right, lessThanOrEqualTo(360), reason: why);
++            expect(rect.bottom, lessThanOrEqualTo(800), reason: why);
++          }
++          expect(tester.takeException(), isNull, reason: why);
++          await tester.pumpWidget(const SizedBox.shrink());
++        }
++      });
++
++      testWidgets('UX-2709: a note with no steps keeps a filled «Editar nota» '
++          'alone', (tester) async {
++        await open(tester, shown: note(withSteps: false));
++        expect(filledButtonWithText(es.editNote), findsOneWidget);
++        expect(outlinedButtonWithText(es.editNote), findsNothing);
++        expect(find.text(es.meetingCreateTask), findsNothing);
++        expect(find.text(es.meetingViewTask), findsNothing);
++      });
++    });
++
++    test('The new copy exists in English, Spanish and Catalan', () {
++      final en = lookupAppLocalizations(const Locale('en'));
++      final ca = lookupAppLocalizations(const Locale('ca'));
++      expect(en.meetingStepsToAdd, 'Steps to add');
++      expect(es.meetingStepsToAdd, 'Pasos que se añaden');
++      expect(ca.meetingStepsToAdd, 'Passos que s’afegeixen');
++      expect(en.meetingViewTask, 'View task');
++      expect(es.meetingViewTask, 'Ver tarea');
++      expect(ca.meetingViewTask, 'Mostra la tasca');
++      // «Crear tarea» itself is unchanged.
++      expect(es.meetingCreateTask, 'Crear tarea');
++    });
++  });
+ }
+ 
+ /// Signs out as the app does: sign-in shows once its state has no account.
+diff --git a/App/test/support/note_task_fakes.dart b/App/test/support/note_task_fakes.dart
+new file mode 100644
+index 0000000..6f93b3a
+--- /dev/null
++++ b/App/test/support/note_task_fakes.dart
+@@ -0,0 +1,66 @@
++// P318: «Crear tarea» from a note, in memory: a task list that saving adds
++// to and Deshacer or Eliminar take from, and the phone's note → task links.
++import 'package:agenda/models/task.dart';
++import 'package:agenda/providers/task_provider.dart';
++import 'package:agenda/services/task_database.dart';
++import 'package:agenda/widgets/note_task.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++
++import 'design_fixtures.dart';
++
++/// A task list in memory: added tasks get new ids, deleted ones go.
++class NoteTaskList extends TaskNotifier {
++  NoteTaskList(List<Task> items) : items = [...items], super(MemoryTasks());
++  final List<Task> items;
++  int _next = 500;
++
++  @override
++  Future<void> loadTasks() async => state = AsyncValue.data([...items]);
++  @override
++  Future<void> showLocal() => loadTasks();
++  @override
++  Future<int> addTask(Task task) async {
++    final id = _next++;
++    items.add(task.copyWith(id: id));
++    await loadTasks();
++    return id;
++  }
++
++  @override
++  Future<void> addTasks(List<Task> tasks) async {
++    for (final task in tasks) {
++      items.add(task.copyWith(id: _next++));
++    }
++    await loadTasks();
++  }
++
++  @override
++  Future<void> deleteTask(int id, {bool sync = true}) async {
++    items.removeWhere((task) => task.id == id);
++    await loadTasks();
++  }
++
++  @override
++  Future<void> restoreTask(Task task) async {
++    items.add(task);
++    await loadTasks();
++  }
++}
++
++/// The phone's note → task links, in memory.
++class MemoryNoteTaskLinks extends NoteTaskLinks {
++  MemoryNoteTaskLinks([Map<int, int>? links])
++    : links = {...?links},
++      super(TaskDatabase());
++  final Map<int, int> links;
++  @override
++  Future<Map<int, int>> read(String owner) async => {...links};
++  @override
++  Future<void> link(String owner, int noteId, int taskId) async =>
++      links[noteId] = taskId;
++}
++
++/// The overrides for [NoteTaskList] and [MemoryNoteTaskLinks].
++List<Override> noteTaskOverrides(MemoryNoteTaskLinks links) => [
++  noteTaskLinksProvider.overrideWithValue(links),
++];
+diff --git a/App/test/ux_previews/meeting_previews.dart b/App/test/ux_previews/meeting_previews.dart
+index 7c09c36..ffd316b 100644
+--- a/App/test/ux_previews/meeting_previews.dart
++++ b/App/test/ux_previews/meeting_previews.dart
+@@ -10,6 +10,8 @@ import 'package:agenda/models/task.dart';
+ import 'package:agenda/screens/notes_screen.dart';
+ import 'package:agenda/services/meeting_controller.dart';
+ import 'package:agenda/services/meeting_recorder.dart';
++import 'package:agenda/services/task_database.dart';
++import 'package:agenda/widgets/note_task.dart';
+ import 'package:flutter/material.dart';
+ import 'package:flutter_test/flutter_test.dart';
+ 
+@@ -53,7 +55,7 @@ const meetingLines = Screen(
+ const meetingNote = Screen(
+   'meetings',
+   'note',
+-  'A note made from a meeting, with Crear tarea, and the review it opens',
++  'A note made from a meeting, with Crear tarea, the review it opens, and Ver tarea once its task exists',
+   sources: [
+     'lib/screens/task_detail_screen.dart',
+     'lib/widgets/note_task.dart',
+@@ -107,6 +109,30 @@ Task _meetingNoteTask() => Task(
+   ],
+ );
+ 
++/// The task «Crear tarea» made from [_meetingNoteTask], with the steps kept.
++Task _madeTask() => Task(
++  id: 121,
++  title: 'Precio del piloto con Acme',
++  priority: 1,
++  checklist: [
++    ChecklistItem(id: 't1', title: 'Enviar el presupuesto · Miki · el viernes'),
++    ChecklistItem(id: 't3', title: 'Pedir el contacto de compras · Ana'),
++  ],
++);
++
++/// The phone's note → task links, in memory.
++class _NoteLinks extends NoteTaskLinks {
++  _NoteLinks([Map<int, int>? links])
++    : links = {...?links},
++      super(TaskDatabase());
++  final Map<int, int> links;
++  @override
++  Future<Map<int, int>> read(String owner) async => {...links};
++  @override
++  Future<void> link(String owner, int noteId, int taskId) async =>
++      links[noteId] = taskId;
++}
++
+ /// Without [pro], an account with free dictations, and the store answering
+ /// with its price for the Pro screen.
+ Future<PreviewApp> _open(
+@@ -115,6 +141,7 @@ Future<PreviewApp> _open(
+   bool pro = true,
+   List<Task> tasks = const [],
+   bool notificationsAllowed = true,
++  Map<int, int>? noteTasks,
+ }) => PreviewApp.open(
+   p,
+   pro: pro,
+@@ -122,7 +149,10 @@ Future<PreviewApp> _open(
+   billing: pro ? null : (FakeRevenueCat()..info = billingInfo()),
+   tasks: [...normalDay(), ...tasks],
+   notificationsAllowed: notificationsAllowed,
+-  overrides: [meetingsOverride(meetings)],
++  overrides: [
++    meetingsOverride(meetings),
++    noteTaskLinksProvider.overrideWithValue(_NoteLinks(noteTasks)),
++  ],
+ );
+ 
+ /// Notas, then «Grabar una reunión».
+@@ -491,7 +521,7 @@ void meetingPreviews() {
+     preview(
+       meetingNote,
+       'create-task',
+-      'The meeting’s note opened: its steps (the to-dos) first, then the note: the meeting’s date and length, summary, decisions, open questions, parts; and Crear tarea beside Editar nota.',
++      'The meeting’s note opened: its steps (the to-dos) first, then the note: the meeting’s date and length, summary, decisions, open questions, parts; and a filled Crear tarea first, with an outlined Editar nota as tall beside it.',
+       _all,
+       (p) async {
+         final app = await _open(
+@@ -509,7 +539,25 @@ void meetingPreviews() {
+       },
+       then: {
+         'review':
+-            'Crear tarea: the review with the meeting’s title and its to-dos as the checklist, to drop some and set a day before saving.',
++            'Crear tarea: the review with the meeting’s title and its to-dos ticked under «Pasos que se añaden», with no ⋮, to untick what isn’t wanted and set a day before saving.',
++      },
++    );
++
++    preview(
++      meetingNote,
++      'after-task',
++      'The meeting’s note once its task exists: a filled Ver tarea, which opens that task, first, and an outlined Editar nota; no Crear tarea.',
++      [es1],
++      (p) async {
++        final app = await _open(
++          p,
++          ScriptedMeetings(),
++          tasks: [_meetingNoteTask(), _madeTask()],
++          noteTasks: {120: 121},
++        );
++        await app.tab(p.l.notes);
++        await app.tap('Precio del piloto con Acme');
++        await p.shoot();
+       },
+     );

@@ -3,6 +3,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
 from core.email_delivery import deliver_email
+from core.meetings import sweep as sweep_meetings
 from core.models import EmailDelivery, PasswordReset, RuntimeState
 
 
@@ -21,4 +22,6 @@ class Command(BaseCommand):
         OutstandingToken.objects.filter(expires_at__lt=now).delete()
         # Recovery codes that expired over an hour ago: past their sending limits' hour too.
         PasswordReset.objects.filter(expires_at__lt=now - timedelta(hours=1)).delete()
-        self.stdout.write(f"Maintenance complete; {processed} pending messages processed.")
+        # Meetings whose last piece arrived over 30 days ago, finished or not (MN-27).
+        meetings = sweep_meetings(now)
+        self.stdout.write(f"Maintenance complete; {processed} pending messages processed; {meetings} old meetings deleted.")

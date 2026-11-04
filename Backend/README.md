@@ -228,6 +228,9 @@ All paths below have the `/api/` prefix. Task and AI endpoints require `Authoriz
 | POST | `ai/draft/` | JSON text or multipart WAV + timezone |
 | POST | `ai/drafts/` | Text/WAV capture with Pro or a free dictation left, plus optional `capture_id`; returns up to 12 reviewed drafts with project and responsibility, and `free_voice` |
 | DELETE | `ai/drafts/<uuid>/` | Cancel a free dictation still being understood; idempotent, 204 |
+| PUT | `meetings/<uuid>/pieces/<int>/` | Pro: one numbered piece of a recorded meeting (multipart `audio`, `offset_seconds`, `duration_seconds`, optional `language`), transcribed on Vertex and saved once; see `docs/MEETINGS.md` |
+| POST | `meetings/<uuid>/finish/` | Pro: `last_index`; 200 with the final notes, or 202 with the pieces still `missing` |
+| GET, DELETE | `meetings/<uuid>/` | Pro: the meeting's status or notes; delete it and its text (204, idempotent) |
 
 Task writes accept `title`, nullable offset-aware `due_date`, nullable `scheduled_date` (YYYY-MM-DD), `recurrence` (none/daily/weekly/monthly/yearly), nullable `repeat_until`, `completed_dates` (ISO calendar dates), `priority` (1–3), `reminder_minutes` (null follows device default, -1 off, 0–10080 lead minutes), `reminder_time` (null default or 0–1439 local minute of day for date-only tasks), `notes`, `is_completed`, `is_deleted`, and `version`. Recurrence requires a start date; `is_completed` applies to one-off tasks and `completed_dates` to repeating tasks. A new client-generated UUID uses version 0. Updates/deletes require the current version; HTTP 409 returns `current`. List with `?include_deleted=true` for synchronization; follow pagination until `next` is null. The legacy single-draft endpoint rejects multi-task output instead of discarding tasks.
 

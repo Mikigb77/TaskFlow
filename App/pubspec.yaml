@@ -55,6 +55,7 @@ dependencies:
   file_picker: ^13.3.2
   open_file: ^4.0.0
   http: ^1.6.0
+  http_parser: ^4.1.2
   # 10.x first: it migrates data saved by 9.x to the new ciphers. 11 can't
   # read 9.x data, so it waits until phones have run a 10.x build.
   flutter_secure_storage: ^10.3.4

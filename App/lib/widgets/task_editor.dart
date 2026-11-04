@@ -220,7 +220,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor>
         // Gone meanwhile: the next words start a new one.
         _capture = null;
         _captureId = null;
-        return await _writeWords(text);
+        await _writeWords(text);
+        return;
       }
       final next = session.copyWith(text: text);
       if (CaptureStore.isEmpty(next)) {
@@ -927,7 +928,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor>
                       ],
                       if (_creating &&
                           widget.askedToSpeak &&
-                          !ref.watch(voiceAvailableProvider))
+                          !ref.watch(voiceAvailableProvider) &&
+                          !ref.watch(meetingHoldsMicProvider))
                         ..._noMic(),
                       TextFormField(
                         key: const ValueKey('task-title'),
