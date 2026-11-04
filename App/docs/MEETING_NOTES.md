@@ -91,7 +91,9 @@ Not chosen: live streaming (Gemini 3.5 Transcribe Live, about $0.55 an hour, 10-
 
 ## Open decisions for the owner
 
-- Move today's dictations to Vertex too (`AI_VERTEX_PROJECT` and `AI_ROUTE=vertex` are unset, so they still use the free AI Studio tier). Recommended: yes.
+Decided on 2026-11-04: staging's dictations run on Vertex only too (`AI_ROUTE=vertex` in the staging deploy), off the free AI Studio tier.
+
+
 - Who gets meeting notes. Recommended: Pro only, since turning speech into tasks is the paid capability; at about $0.08 an hour no cap is needed, beyond perhaps 20 hours a month against abuse.
 - A one-line reminder before recording that the other people should know they're being recorded.
 - The 7-day (MN-26) and 30-day (MN-27) limits.

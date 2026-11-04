@@ -23,6 +23,7 @@ Only the API receives database credentials, storage credentials, and AI secrets.
 Development AI routing (11 October 2026): local Django uses AI Studio Gemma 4
 26B for free-first extraction, with Gemini 3.1 Flash-Lite on Vertex as a bounded
 paid fallback for quota/temporary failures. Audio has an independent route.
+Staging runs on Vertex only (`AI_ROUTE=vertex`, decided 2026-11-04).
 LangChain core composes the validated extraction pipeline; it has no autonomous
 tools or write access. The dedicated `taskflow-ai-staging` identity can predict
 and use APIs only. Local impersonated ADC is ignored and mounted read-only;
