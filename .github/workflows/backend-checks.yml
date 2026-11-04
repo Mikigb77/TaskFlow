@@ -35,10 +35,9 @@ jobs:
       - run: pip install -r requirements.lock
       - name: python manage.py test core
         run: |
-          # The settings Docker Compose gives the tests, from the tracked .env,
-          # with every key blanked: no test may reach a paid or real service.
-          set -a; . ./.env; set +a
-          export GEMINI_API_KEY= REVENUECAT_API_KEY= POSTGRES_PASSWORD= DJANGO_SECRET_KEY=ci-only-not-a-secret
+          # Committed test settings with every key blank or fake: no test may
+          # reach a paid or real service, and no secret is needed.
+          set -a; . ./.env.ci; set +a
           python manage.py test core --settings=config.test_settings
 
   image:
