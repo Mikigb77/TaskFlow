@@ -8,7 +8,8 @@ The owner asked for notes from a recorded conversation, then a task with a check
 - All AI on Vertex AI: "I wouldn't turn credits on AI Studio. I would rather use simply the Vertex AI, since we're already paying for it anyway."
 - Nothing unnecessary is kept: once the final notes exist, the pieces' text and chapter notes are deleted.
 - Abandoned recordings ("zombies") are cleaned up, but a few weeks without signal must not lose a real meeting.
-- Still open: Pro only or not, the consent reminder, the 7- and 30-day limits, and moving today's dictations to Vertex.
+- Still open: Pro only or not, the consent reminder, and the 7- and 30-day limits.
+- 2026-11-04: dictations on staging move to Vertex only too (`AI_ROUTE=vertex`), off the free AI Studio tier; the owner chose it on a decision card.
 
 ## 2026-11-01 — The UX loop as fast as the machine allows
 After the 2026-10-28-app plan took about 19 hours, the owner: "it cannot be that we are running for 19 hours … We should deploy all the agents that can be possibly deployed at the same time, if needed." What the main session put in place for it, reported to the owner (`.claude/skills/ux/references/speed-2026-11-01.md`):

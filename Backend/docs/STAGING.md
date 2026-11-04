@@ -139,7 +139,7 @@ App limits are 80 emails/day, 2,700/month, 8/recipient/day, inside Resend's Free
 Uploads remain 6 MiB/file, 20/task and 1,000/account. Without Pro, an account or
 list owner has 100 MiB in total, and Pro has no total cap. There is no newly
 enabled automatic customer-data retention purge.
-AI defaults to the free AI Studio route with a bounded Vertex fallback; secrets
+AI runs on Vertex AI only (`AI_ROUTE=vertex`, the owner's decision of 2026-11-04), never the free AI Studio tier; secrets
 stay on the backend and paid access is verified independently of the phone.
 
 ## Rebuild and redeploy

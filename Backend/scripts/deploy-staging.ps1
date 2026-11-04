@@ -124,7 +124,7 @@ $taskflowEnvironment = @{
     EMAIL_RETRY_QUEUE="projects/$Project/locations/$Region/queues/$taskflowQueue"
     EMAIL_RETRY_JOB="https://run.googleapis.com/v2/projects/$Project/locations/$Region/jobs/${taskflowMaintenance}:run"
     EMAIL_RETRY_IDENTITY=$taskflowMailInvoker
-    AI_ROUTE='auto'; AI_VERTEX_PROJECT=$Project; AI_VERTEX_LOCATION='global'
+    AI_ROUTE='vertex'; AI_VERTEX_PROJECT=$Project; AI_VERTEX_LOCATION='global'
     AI_VERTEX_TEXT_MODEL='gemini-3.1-flash-lite'; AI_VERTEX_AUDIO_MODEL='gemini-3.1-flash-lite'
     AI_REQUESTS_PER_DAY='30'; ATTACHMENT_BUCKET='docs4taskflow'
 }
