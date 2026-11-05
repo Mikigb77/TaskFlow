@@ -210,6 +210,32 @@ void main() {
       );
     },
   );
+
+  test(
+    'Speech goes online by default, also for preferences saved before; '
+    'on-device only once chosen since (owner, 2026-11-05)',
+    () {
+      expect(const RegionalPreferences().speechOnline, isTrue);
+      expect(RegionalPreferences.fromJson({}).speechOnline, isTrue);
+      // Saved for everyone before online became the default: not a choice.
+      expect(
+        RegionalPreferences.fromJson({'speechOnline': false}).speechOnline,
+        isTrue,
+      );
+      final onDevice = const RegionalPreferences().withSpeechOnline(false);
+      final read = RegionalPreferences.fromJson(
+        jsonDecode(jsonEncode(onDevice.toJson())) as Map<String, dynamic>,
+      );
+      expect(read.speechOnline, isFalse);
+      expect(
+        RegionalPreferences.fromJson(
+          jsonDecode(jsonEncode(read.withSpeechOnline(true).toJson()))
+              as Map<String, dynamic>,
+        ).speechOnline,
+        isTrue,
+      );
+    },
+  );
 }
 
 class _DelayedStore extends MemoryRegionalStore {

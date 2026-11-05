@@ -4312,6 +4312,22 @@
   "@meetingNoteChapters": {
     "description": "In a note made from a meeting: the heading over one line per part, as “Minutes 30–52 · Pricing”."
   },
+  "meetingNoteSteps": "Steps of each task",
+  "@meetingNoteSteps": {
+    "description": "In a note made from a meeting, in the meeting’s language: the heading over each task’s steps, listed under the task’s name."
+  },
+  "meetingNoteTaskCount": "Tasks · {done}/{total}",
+  "@meetingNoteTaskCount": {
+    "description": "On a note made from a meeting: the heading over its lines, one per task, with how many are ticked.",
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "meetingNoteStartMissing": "The start of this recording expired, so these notes cover only the rest.",
   "@meetingNoteStartMissing": {
     "description": "The first line of a note made from a meeting whose first part was deleted from the server after 30 days without signal."
@@ -4346,17 +4362,27 @@
       }
     }
   },
-  "meetingCreateTask": "Create task",
+  "meetingCreateTask": "{count, plural, =1{Create task} other{Create tasks}}",
   "@meetingCreateTask": {
-    "description": "On a note with steps (a meeting’s to-dos): opens the review with a task titled like the note and its steps as the checklist."
+    "description": "On a note made from a meeting: opens the review with one task for each of its open lines (the meeting’s tasks), each with its own steps. count is how many open lines: one says «Create task», more say «Create tasks»; the review then says how many.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "meetingStepsToAdd": "Steps to add",
   "@meetingStepsToAdd": {
     "description": "Heading over the steps in the review «Create task» opens from a note: each ticked step goes into the task, unticked ones are left out."
   },
-  "meetingViewTask": "View task",
+  "meetingViewTask": "{count, plural, =1{View task} other{View tasks}}",
   "@meetingViewTask": {
-    "description": "On a note that already made a task with «Create task»: opens that task."
+    "description": "On a note that already made tasks with «Create task»: opens the task, or shows the tasks on Calendar when there are several. count is how many still exist.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "meetingSignOutTitle": "Sign out?",
   "@meetingSignOutTitle": {

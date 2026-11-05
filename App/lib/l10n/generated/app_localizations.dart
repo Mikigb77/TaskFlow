@@ -7186,6 +7186,18 @@ abstract class AppLocalizations {
   /// **'Parts of the meeting'**
   String get meetingNoteChapters;
 
+  /// In a note made from a meeting, in the meeting’s language: the heading over each task’s steps, listed under the task’s name.
+  ///
+  /// In en, this message translates to:
+  /// **'Steps of each task'**
+  String get meetingNoteSteps;
+
+  /// On a note made from a meeting: the heading over its lines, one per task, with how many are ticked.
+  ///
+  /// In en, this message translates to:
+  /// **'Tasks · {done}/{total}'**
+  String meetingNoteTaskCount(int done, int total);
+
   /// The first line of a note made from a meeting whose first part was deleted from the server after 30 days without signal.
   ///
   /// In en, this message translates to:
@@ -7210,11 +7222,11 @@ abstract class AppLocalizations {
   /// **'Minutes {start}–{end}'**
   String meetingNoteChapterMinutes(int start, int end);
 
-  /// On a note with steps (a meeting’s to-dos): opens the review with a task titled like the note and its steps as the checklist.
+  /// On a note made from a meeting: opens the review with one task for each of its open lines (the meeting’s tasks), each with its own steps. count is how many open lines: one says «Create task», more say «Create tasks»; the review then says how many.
   ///
   /// In en, this message translates to:
-  /// **'Create task'**
-  String get meetingCreateTask;
+  /// **'{count, plural, =1{Create task} other{Create tasks}}'**
+  String meetingCreateTask(int count);
 
   /// Heading over the steps in the review «Create task» opens from a note: each ticked step goes into the task, unticked ones are left out.
   ///
@@ -7222,11 +7234,11 @@ abstract class AppLocalizations {
   /// **'Steps to add'**
   String get meetingStepsToAdd;
 
-  /// On a note that already made a task with «Create task»: opens that task.
+  /// On a note that already made tasks with «Create task»: opens the task, or shows the tasks on Calendar when there are several. count is how many still exist.
   ///
   /// In en, this message translates to:
-  /// **'View task'**
-  String get meetingViewTask;
+  /// **'{count, plural, =1{View task} other{View tasks}}'**
+  String meetingViewTask(int count);
 
   /// Title of the question on Sign out when meeting recordings still wait on this phone.
   ///

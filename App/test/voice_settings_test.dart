@@ -155,7 +155,8 @@ void main() {
           reason: option,
         );
       }
-      // The two ways; on-device is the default where it works.
+      // The two ways; online is the default, even where on-device works
+      // (owner, 2026-11-05).
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('speech-on-device')),
@@ -170,8 +171,8 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(checked(tester, const ValueKey('speech-on-device')), isTrue);
-      expect(checked(tester, const ValueKey('speech-online')), isFalse);
+      expect(checked(tester, const ValueKey('speech-online')), isTrue);
+      expect(checked(tester, const ValueKey('speech-on-device')), isFalse);
       expect(find.text(es.onDeviceUnavailable), findsNothing);
       final privacy = find.descendant(
         of: page,
@@ -210,7 +211,7 @@ void main() {
       tester.platformDispatcher.textScaleFactorTestValue = 2;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       final store = _JsonRegionalStore(
-        const RegionalPreferences(language: 'es'),
+        const RegionalPreferences(language: 'es', speechOnline: false),
       );
       await openApp(
         tester,
@@ -238,7 +239,7 @@ void main() {
       addTearDown(tester.platformDispatcher.clearLocalesTestValue);
       final speech = _Speech();
       final store = _JsonRegionalStore(
-        const RegionalPreferences(language: 'ca'),
+        const RegionalPreferences(language: 'ca', speechOnline: false),
       );
       await openApp(tester, store, speech);
       await openCapture(tester);
@@ -256,7 +257,7 @@ void main() {
       tester.platformDispatcher.localesTestValue = const [Locale('es', 'ES')];
       addTearDown(tester.platformDispatcher.clearLocalesTestValue);
       final store = _JsonRegionalStore(
-        const RegionalPreferences(language: 'es'),
+        const RegionalPreferences(language: 'es', speechOnline: false),
       );
       await openApp(tester, store, _Speech());
       await openVoice(tester, es);
@@ -298,7 +299,7 @@ void main() {
     (tester) async {
       final speech = _Speech();
       final store = _JsonRegionalStore(
-        const RegionalPreferences(language: 'es'),
+        const RegionalPreferences(language: 'es', speechOnline: false),
       );
       await openApp(tester, store, speech);
       Finder line() => find.descendant(
@@ -371,7 +372,7 @@ void main() {
       final speech = _Speech();
       await openApp(
         tester,
-        _JsonRegionalStore(const RegionalPreferences(language: 'es')),
+        _JsonRegionalStore(const RegionalPreferences(language: 'es', speechOnline: false)),
         speech,
         size: const Size(360, 740),
       );
@@ -415,7 +416,7 @@ void main() {
       final speech = _Speech();
       await openApp(
         tester,
-        _JsonRegionalStore(const RegionalPreferences(language: 'es')),
+        _JsonRegionalStore(const RegionalPreferences(language: 'es', speechOnline: false)),
         speech,
         size: const Size(360, 740),
       );
@@ -504,7 +505,7 @@ void main() {
       expect(es.onlineAudio, 'En línea, al terminar');
       await openApp(
         tester,
-        _JsonRegionalStore(const RegionalPreferences(language: 'es')),
+        _JsonRegionalStore(const RegionalPreferences(language: 'es', speechOnline: false)),
         _Speech(),
         size: const Size(390, 1400),
       );
@@ -573,7 +574,7 @@ void main() {
       expect(ca.voiceSetupRequested, contains(ca.checkAgain));
       await openApp(
         tester,
-        _JsonRegionalStore(const RegionalPreferences(language: 'es')),
+        _JsonRegionalStore(const RegionalPreferences(language: 'es', speechOnline: false)),
         _Speech()..installed = false,
         size: const Size(390, 1600),
       );
@@ -617,7 +618,7 @@ void main() {
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       await openApp(
         tester,
-        _JsonRegionalStore(const RegionalPreferences(language: 'ca')),
+        _JsonRegionalStore(const RegionalPreferences(language: 'ca', speechOnline: false)),
         _Speech()..installed = false,
         size: const Size(320, 640),
       );
@@ -686,7 +687,7 @@ void main() {
   }) async {
     await openApp(
       tester,
-      _JsonRegionalStore(RegionalPreferences(language: language)),
+      _JsonRegionalStore(RegionalPreferences(language: language, speechOnline: false)),
       speech..installed = false,
       size: size,
     );
@@ -889,7 +890,7 @@ void main() {
     (tester) async {
       await openApp(
         tester,
-        _JsonRegionalStore(const RegionalPreferences(language: 'es')),
+        _JsonRegionalStore(const RegionalPreferences(language: 'es', speechOnline: false)),
         _Speech()..installed = false,
         size: const Size(390, 1600),
       );
@@ -968,7 +969,7 @@ void main() {
       final captures = MemoryCaptures();
       final speech = _Speech();
       final store = _JsonRegionalStore(
-        const RegionalPreferences(language: 'ca'),
+        const RegionalPreferences(language: 'ca', speechOnline: false),
       );
       await openApp(tester, store, speech, captures: captures);
       await openCapture(tester);
@@ -1053,7 +1054,7 @@ void main() {
       final speech = _Speech();
       await openApp(
         tester,
-        _JsonRegionalStore(RegionalPreferences(language: language)),
+        _JsonRegionalStore(RegionalPreferences(language: language, speechOnline: false)),
         speech,
         size: const Size(360, 740),
       );
@@ -1147,7 +1148,7 @@ void main() {
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       await openApp(
         tester,
-        _JsonRegionalStore(RegionalPreferences(language: language)),
+        _JsonRegionalStore(RegionalPreferences(language: language, speechOnline: false)),
         _Speech()..installed = false,
         size: const Size(320, 640),
       );
@@ -1263,7 +1264,7 @@ void main() {
       final speech = _Speech()..installed = false;
       await openApp(
         tester,
-        _JsonRegionalStore(const RegionalPreferences(language: 'es')),
+        _JsonRegionalStore(const RegionalPreferences(language: 'es', speechOnline: false)),
         speech,
         size: const Size(390, 1600),
       );
@@ -1332,7 +1333,7 @@ void main() {
           final l = lookupAppLocalizations(Locale(language));
           await openApp(
             tester,
-            _JsonRegionalStore(RegionalPreferences(language: language)),
+            _JsonRegionalStore(RegionalPreferences(language: language, speechOnline: false)),
             _Speech(),
           );
           await openVoice(tester, l);

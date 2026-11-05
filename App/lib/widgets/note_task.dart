@@ -8,13 +8,16 @@ import 'package:uuid/uuid.dart';
 import 'package:agenda/models/capture_session.dart';
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/task.dart';
+import 'package:agenda/models/meeting.dart';
 import 'package:agenda/providers/auth_provider.dart';
+import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/regional_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/meeting_note.dart';
+import 'package:agenda/services/quick_schedule_parser.dart';
 import 'package:agenda/services/task_database.dart';
 
 /// Whether [note] offers «Crear tarea»: a note made from a meeting on this
@@ -56,20 +59,38 @@ final meetingNotesProvider = FutureProvider<Set<int>>((ref) async {
 /// The database [meetingNotesProvider] reads; tests replace it.
 final meetingNoteMarksDatabaseProvider = Provider((ref) => TaskDatabase());
 
-/// The task «Crear tarea» made from [note] on this phone, while it exists
-/// (done or not): the note then offers «Ver tarea» (UX-2702).
-Task? noteMadeTask(WidgetRef ref, Task note) {
-  final id = ref.watch(noteTasksProvider).value?[note.id];
-  if (id == null) return null;
-  return ref
-      .watch(taskProvider)
-      .value
-      ?.firstWhereOrNull((task) => task.id == id);
+/// The tasks «Crear tareas» made from [note] on this phone that still exist
+/// (done or not): the note then offers «Ver tarea» or «Ver tareas»
+/// (UX-2702).
+List<Task> noteMadeTasks(WidgetRef ref, Task note) {
+  final ids = ref.watch(noteTasksProvider).value?[note.id];
+  if (ids == null || ids.isEmpty) return const [];
+  final tasks = ref.watch(taskProvider).value ?? const <Task>[];
+  return [
+    for (final id in ids) ?tasks.firstWhereOrNull((task) => task.id == id),
+  ];
 }
 
-/// Remembers, on this phone only, the task each note made with «Crear
-/// tarea». Never synced or sent: on another phone the note offers «Crear
-/// tarea» again.
+/// «Ver tareas»: Calendar, on the earliest day of [tasks], with them lit,
+/// as after saving them from the pending list.
+void showNoteTasks(BuildContext context, List<Task> tasks) {
+  final container = ProviderScope.containerOf(context, listen: false);
+  final days = [
+    for (final task in tasks)
+      if (task.displayDate ?? task.deadline case final day?) Task.day(day),
+  ]..sort();
+  container.read(calendarFocusProvider.notifier).state = CalendarFocus(
+    days.firstOrNull,
+    {for (final task in tasks) task.id!},
+    showCalendar: true,
+    undated: tasks.any((task) => task.dueDate == null && task.deadline == null),
+  );
+  Navigator.of(context).popUntil((route) => route.isFirst);
+}
+
+/// Remembers, on this phone only, the tasks each note made with «Crear
+/// tareas». Never synced or sent: on another phone the note offers «Crear
+/// tareas» again.
 class NoteTaskLinks {
   NoteTaskLinks(this.database);
   final TaskDatabase database;
@@ -78,8 +99,9 @@ class NoteTaskLinks {
   // account erases this too.
   static String _scope(String owner) => 'noteTasks:$owner';
 
-  /// Each note's id, with the id of the task it made.
-  Future<Map<int, int>> read(String owner) async {
+  /// Each note's id, with the ids of the tasks it made (one, before notes
+  /// made several).
+  Future<Map<int, List<int>>> read(String owner) async {
     final rows = await (await database.database).query(
       'app_preferences',
       where: 'scope = ?',
@@ -91,11 +113,17 @@ class NoteTaskLinks {
     return {
       for (final entry in data.entries)
         if (int.tryParse('${entry.key}') case final note?)
-          if (entry.value is int) note: entry.value as int,
+          if (entry.value is int)
+            note: [entry.value as int]
+          else if (entry.value is List)
+            note: [
+              for (final id in entry.value as List)
+                if (id is int) id,
+            ],
     };
   }
 
-  Future<void> link(String owner, int noteId, int taskId) async {
+  Future<void> link(String owner, int noteId, List<int> taskIds) async {
     final db = await database.database;
     await db.transaction((tx) async {
       final rows = await tx.query(
@@ -108,7 +136,7 @@ class NoteTaskLinks {
           : jsonDecode(rows.single['data'] as String);
       await tx.insert('app_preferences', {
         'scope': _scope(owner),
-        'data': jsonEncode({if (data is Map) ...data, '$noteId': taskId}),
+        'data': jsonEncode({if (data is Map) ...data, '$noteId': taskIds}),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     });
   }
@@ -116,8 +144,8 @@ class NoteTaskLinks {
 
 final noteTaskLinksProvider = Provider((ref) => NoteTaskLinks(TaskDatabase()));
 
-/// The signed-in account's note → task links on this phone.
-final noteTasksProvider = FutureProvider<Map<int, int>>((ref) async {
+/// The signed-in account's note → tasks links on this phone.
+final noteTasksProvider = FutureProvider<Map<int, List<int>>>((ref) async {
   try {
     return await ref
         .watch(noteTaskLinksProvider)
@@ -128,14 +156,15 @@ final noteTasksProvider = FutureProvider<Map<int, int>>((ref) async {
   }
 });
 
-/// «Crear tarea» (MN-22): the capture's review, with one task titled like
-/// [note] and its open steps as the checklist, all ticked to go in, so the
-/// person unticks the ones they don't want and can set a day before
-/// saving. Nothing is saved until they confirm there. Leaving the review
-/// closes it with no question: the note still holds everything, and the
-/// capture never waits in `Sin guardar` (source 'note', UX-2706). Once
-/// saved, the new task's page opens over the note, which then offers «Ver
-/// tarea».
+/// «Crear tareas» (MN-22): the capture's review, with one task for each of
+/// [note]'s open lines (a meeting's tasks), each with its own steps, all
+/// ticked to go in, so the person unticks the steps or removes the tasks
+/// they don't want and can change a day before saving. A line's «when» gives
+/// its day, read against the meeting's. Nothing is saved until they confirm
+/// there. Leaving the review closes it with no question: the note still
+/// holds everything, and the capture never waits in `Sin guardar` (source
+/// 'note', UX-2706). Once saved, a single new task's page opens over the
+/// note, which then offers «Ver tarea» («Ver tareas» for several).
 Future<void> createTaskFromNote(BuildContext context, Task note) async {
   final container = ProviderScope.containerOf(context, listen: false);
   final store = container.read(captureStoreProvider);
@@ -149,6 +178,18 @@ Future<void> createTaskFromNote(BuildContext context, Task note) async {
   } catch (_) {
     /* The account's zone then. */
   }
+  MeetingNoteTasks? tasks;
+  try {
+    if (note.id case final id?) {
+      tasks = await MeetingNoteMarks.tasks(
+        container.read(meetingNoteMarksDatabaseProvider),
+        owner,
+        id,
+      );
+    }
+  } catch (_) {
+    /* Each line becomes a task without steps. */
+  }
   final session = await store.create(
     owner,
     _zone(container),
@@ -157,19 +198,17 @@ Future<void> createTaskFromNote(BuildContext context, Task note) async {
     source: 'note',
   );
   final drafts = [
-    CaptureDraft(
-      id: const Uuid().v4(),
-      task: Task(
-        title: note.title,
-        priority: 1,
-        listId: projectId,
-        checklist: [
-          for (final step in note.checklist)
-            // Ticked: chosen to go in. Saved as steps still to do.
-            if (!step.done()) ChecklistItem(title: step.title, completed: true),
-        ],
-      ),
-    ),
+    for (final line in note.checklist)
+      if (!line.done())
+        CaptureDraft(
+          id: const Uuid().v4(),
+          task: noteLineTask(
+            line,
+            tasks?.tasks[line.id],
+            day: tasks?.day,
+            projectId: projectId,
+          ),
+        ),
   ];
   await store.update(
     session.copyWith(
@@ -188,20 +227,63 @@ Future<void> createTaskFromNote(BuildContext context, Task note) async {
     startListening: false,
     useScope: false,
   );
-  // Saved: the note remembers its task.
+  // Saved: the note remembers its tasks.
   final noteId = note.id;
   if (noteId == null) return;
   try {
     final saved = await store.read(session.id, owner);
-    final taskId = saved?.status == 'saved'
-        ? saved!.drafts.map((d) => d.savedTaskId).nonNulls.firstOrNull
-        : null;
-    if (taskId == null) return;
-    await container.read(noteTaskLinksProvider).link(owner, noteId, taskId);
+    final taskIds = saved?.status == 'saved'
+        ? saved!.drafts.map((d) => d.savedTaskId).nonNulls.toList()
+        : const <int>[];
+    if (taskIds.isEmpty) return;
+    await container.read(noteTaskLinksProvider).link(owner, noteId, taskIds);
     container.invalidate(noteTasksProvider);
   } catch (_) {
-    /* The note offers «Crear tarea» again. */
+    /* The note offers «Crear tareas» again. */
   }
+}
+
+/// The task one of a meeting note's lines becomes: its [task] as the server
+/// wrote it when the line still reads as it did, with its steps ticked to go
+/// in, and the day its «when» says, read against the meeting's [day]. The
+/// words of a day read whole leave the title; any others stay. A line the
+/// person reworded, or one with no [task] (a note from before tasks had
+/// steps), keeps its words and has no steps.
+Task noteLineTask(
+  ChecklistItem line,
+  MeetingTask? task, {
+  DateTime? day,
+  String? projectId,
+}) {
+  final asSaved = task != null && line.title == meetingTaskLine(task);
+  final when = asSaved ? task.when : null;
+  final found = when == null
+      ? null
+      : QuickScheduleParser.parse(when, day ?? DateTime.now());
+  // A bare «a las 5» could be morning or afternoon: no day is guessed.
+  final dated = found != null && found.ambiguousHour == null;
+  final deadline = dated && found.isDeadline;
+  final title = !asSaved
+      ? line.title
+      : dated && found.title.trim().isEmpty
+      ? [task.title, ?task.who].join(' · ')
+      : line.title;
+  return Task(
+    title: title,
+    priority: 1,
+    listId: projectId,
+    dueDate: dated && !deadline ? found.date : null,
+    hasTime: dated && !deadline && found.hasTime,
+    deadline: deadline ? found.date : null,
+    deadlineHasTime: deadline && found.hasTime,
+    reminderAnchor: deadline ? 'deadline' : 'planned',
+    checklist: [
+      if (asSaved)
+        for (final step in task.steps)
+          // Ticked: chosen to go in. Saved as steps still to do.
+          ChecklistItem(title: step, completed: true),
+    ],
+  );
 }
 
 /// The capture's zone, as the task form picks it: the one chosen in

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/meeting.dart';
@@ -848,14 +849,124 @@ void main() {
         'start_missing': true,
         'language': 'ca',
       });
-      expect(result.todos.single.text, 'Do it');
-      expect(result.todos.single.when, isNull);
+      // A server from before tasks had steps: one task per to-do.
+      expect(result.tasks.single.title, 'Do it');
+      expect(result.tasks.single.when, isNull);
+      expect(result.tasks.single.steps, isEmpty);
       expect(result.decisions, ['A']);
       expect(result.openQuestions, isEmpty);
       expect(result.chapters.single.endMinute, 30);
       expect(result.startMissing, isTrue);
       expect(result.language, 'ca');
       expect(MeetingAnswer.fromJson({'status': 'waiting', 'missing': [7, 8]}).missing, [7, 8]);
+    });
+
+    test('tasks come with their own steps, and win over the to-dos', () {
+      final result = MeetingResult.fromJson({
+        'tasks': [
+          {'title': ' Acabar el front-end ', 'who': null, 'when': 'dilluns', 'steps': ['El bàner', ' ', 3, 'El backlog']},
+          {'title': 'Trucar al client', 'who': 'jo', 'when': 'dilluns', 'steps': null},
+          {'title': ''},
+        ],
+        'todos': [
+          {'text': 'Acabar el front-end', 'who': null, 'when': 'dilluns'},
+          {'text': 'Trucar al client', 'who': 'jo', 'when': 'dilluns'},
+        ],
+      });
+      expect(result.tasks.map((task) => task.title), ['Acabar el front-end', 'Trucar al client']);
+      expect(result.tasks.first.steps, ['El bàner', 'El backlog']);
+      expect(result.tasks.last.steps, isEmpty);
+      expect(result.tasks.last.who, 'jo');
+    });
+
+    test('one line per task, and each task\'s steps under its name in the body', () {
+      final note = meetingNote(
+        const MeetingResult(
+          title: 'Setmana',
+          summary: 'Parlem de la setmana.',
+          tasks: [
+            MeetingTask(title: 'Acabar el front-end', when: 'dilluns', steps: ['El bàner', 'El backlog']),
+            MeetingTask(title: 'Trucar al client', who: 'jo', when: 'dilluns'),
+          ],
+          decisions: ['Endarrerir el lliurament'],
+        ),
+        labels: const MeetingNoteLabels(steps: 'Passos de cada tasca', decisions: 'Decisions'),
+      );
+      expect(note.checklist.map((line) => line.title), [
+        'Acabar el front-end · dilluns',
+        'Trucar al client · jo · dilluns',
+      ]);
+      expect(
+        note.notes,
+        'Parlem de la setmana.\n\n'
+        'Passos de cada tasca\n\nAcabar el front-end\n• El bàner\n• El backlog\n\n'
+        'Decisions\n• Endarrerir el lliurament',
+      );
+      final tasks = MeetingNoteTasks.of(
+        note,
+        const MeetingResult(tasks: [
+          MeetingTask(title: 'Acabar el front-end', when: 'dilluns', steps: ['El bàner', 'El backlog']),
+          MeetingTask(title: 'Trucar al client', who: 'jo', when: 'dilluns'),
+        ]),
+        startedAt: DateTime(2026, 11, 5, 16, 19),
+      );
+      final read = MeetingNoteTasks.fromJson(jsonDecode(jsonEncode(tasks.toJson())))!;
+      expect(read.day, DateTime(2026, 11, 5));
+      expect(read.tasks.keys, note.checklist.map((line) => line.id));
+      expect(read.tasks[note.checklist.first.id]!.steps, ['El bàner', 'El backlog']);
+    });
+
+    test('«Crear tareas»: a line becomes its task, its steps and the day its words say, from the meeting\'s day', () {
+      // Thursday 5 November 2026.
+      final day = DateTime(2026, 11, 5);
+      const front = MeetingTask(title: 'Acabar el front-end', when: 'dilluns', steps: ['El bàner', 'El backlog']);
+      final made = noteLineTask(ChecklistItem(id: 'a', title: meetingTaskLine(front)), front, day: day, projectId: 'p1');
+      expect(made.title, 'Acabar el front-end');
+      expect(made.dueDate, DateTime(2026, 11, 9));
+      expect(made.hasTime, isFalse);
+      expect(made.listId, 'p1');
+      expect(made.checklist.map((step) => step.title), ['El bàner', 'El backlog']);
+      // Ticked: chosen to go in.
+      expect(made.checklist.every((step) => step.completed), isTrue);
+      // Who stays in the title; the words of a day read whole leave it.
+      const call = MeetingTask(title: 'Trucar al client', who: 'jo', when: 'el dimarts');
+      final called = noteLineTask(ChecklistItem(title: meetingTaskLine(call)), call, day: day);
+      expect(called.title, 'Trucar al client · jo');
+      expect(called.dueDate, DateTime(2026, 11, 10));
+      // Words beyond the day stay, and the day still applies.
+      const buy = MeetingTask(title: 'Comprar coixins', when: 'dissabte al matí');
+      final bought = noteLineTask(ChecklistItem(title: meetingTaskLine(buy)), buy, day: day);
+      expect(bought.title, 'Comprar coixins · dissabte al matí');
+      expect(bought.dueDate, DateTime(2026, 11, 7));
+      // Words that aren't a day, or a bare hour, give no day.
+      const later = MeetingTask(title: 'Revisar-ho', when: 'la setmana que ve');
+      expect(noteLineTask(ChecklistItem(title: meetingTaskLine(later)), later, day: day).dueDate, isNull);
+      const five = MeetingTask(title: 'Trucar', when: 'demà a les 5');
+      expect(noteLineTask(ChecklistItem(title: meetingTaskLine(five)), five, day: day).dueDate, isNull);
+      // A line the person reworded keeps their words, with no steps or day.
+      final reworded = noteLineTask(ChecklistItem(title: 'Acabar la web'), front, day: day);
+      expect((reworded.title, reworded.dueDate, reworded.checklist.length), ('Acabar la web', null, 0));
+      // A note from before tasks had steps: the line as it is.
+      final old = noteLineTask(ChecklistItem(title: 'Send the quote · Friday'), null, day: day);
+      expect((old.title, old.dueDate, old.checklist.length), ('Send the quote · Friday', null, 0));
+    });
+
+    test('a saved meeting note keeps its tasks\' steps on this phone, by line', () async {
+      final meeting = await store.create(owner, format: MeetingAudioFormat.opus, now: clock.now);
+      final path = await store.piecePath(meeting.id, Duration.zero, meeting.format);
+      await store.openPiece(meeting, index: 0, offset: Duration.zero, path: path, now: clock.now);
+      await store.closePiece(meeting, index: 0, duration: const Duration(seconds: 30), hasSound: true, now: clock.now);
+      final stopped = (await store.finish(meeting.id, owner, clock.now))!;
+      final id = (await store.saveNote(stopped, api.result))!;
+      final note = (await database.getTasks(ownerKey: owner)).single;
+      final tasks = (await MeetingNoteMarks.tasks(database, owner, id))!;
+      expect(tasks.tasks.keys, note.checklist.map((line) => line.id));
+      expect(tasks.tasks.values.map((task) => task.steps), [
+        ['Price for 20 seats', 'Start date'],
+        <String>[],
+      ]);
+      expect(tasks.day, Task.day(stopped.startedAt.toLocal()));
+      expect(await MeetingNoteMarks.tasks(database, 'someone-else', id), isNull);
     });
   });
 

@@ -4664,6 +4664,7 @@ class _App {
               language: language,
               clock: clockFormat,
               weekStart: 1,
+              speechOnline: false,
             ),
           ),
         ),

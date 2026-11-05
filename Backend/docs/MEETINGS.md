@@ -66,7 +66,9 @@ After a `DELETE`, a piece for that meeting id answers `404` for about a day (a p
 {
   "title": "Pilot pricing with Acme",
   "summary": "Three to five sentences.",
-  "todos": [{"text": "Send the pilot quote", "who": "Miki", "when": "Friday"}],
+  "tasks": [{"title": "Send the pilot quote", "who": "Miki", "when": "Friday", "steps": ["Price for 20 seats", "Start date"]},
+            {"title": "Book the room", "who": null, "when": null, "steps": []}],
+  "todos": [{"text": "Send the pilot quote", "who": "Miki", "when": "Friday"}, {"text": "Book the room", "who": null, "when": null}],
   "decisions": ["Start the pilot in December"],
   "open_questions": ["Who signs for Acme?"],
   "chapters": [{"start_minute": 0, "end_minute": 30, "title": "Introductions and scope", "notes": "Short notes."}],
@@ -76,7 +78,10 @@ After a `DELETE`, a piece for that meeting id answers `404` for about a day (a p
 ```
 
 - Written in the language mostly spoken in the meeting (`language`, BCP-47 primary tag).
-- `who` and `when` are `null` unless they were said. `when` is the words as said; the app's existing review step reads dates.
+- `tasks`: one entry per separate task said in the meeting. `steps` are the parts of that same task that were said (`[]` when none); something with its own goal is its own task, even when said right after another one or on the same day (owner, 2026-11-05).
+- `who` and `when` are `null` unless they were said. `when` is the words as said; the app reads the day from them against the meeting's date.
+- `todos` is `tasks` without the steps, one line per task, for an app from before tasks had steps. A new app reads `tasks`.
+- The transcript comes from speech recognition, so the notes steps are told to write the word that was meant where the context makes a misheard one clear ("paga general" where "vaga general" was meant), and never to change a name, figure, date or time on a guess. The transcript itself isn't corrected or returned.
 - Empty lists are `[]`, never missing. A meeting with no speech answers a result with an empty summary and empty lists.
 
 ## Models and cost

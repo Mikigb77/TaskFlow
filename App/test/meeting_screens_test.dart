@@ -113,6 +113,23 @@ final _meetingNote = Task(
   ],
 );
 
+/// [_meetingNote]'s tasks as the server wrote them, kept on this phone: the
+/// quote with its two steps, on Friday of the meeting's week (Thursday 5
+/// November 2026).
+final _meetingNoteTasks = MeetingNoteTasks(
+  tasks: const {
+    's1': MeetingTask(
+      title: 'Send the pilot quote',
+      who: 'Miki',
+      when: 'Friday',
+      steps: ['Price for 20 seats', 'Start date'],
+    ),
+    's2': MeetingTask(title: 'Book the room'),
+    's3': MeetingTask(title: 'Already done'),
+  },
+  day: DateTime(2026, 11, 5),
+);
+
 ProviderContainer _container(
   ScriptedMeetings meetings, {
   bool pro = true,
@@ -889,9 +906,8 @@ void main() {
   });
 
   group('Create task from a note', () {
-    testWidgets('opens the review with the title and the open steps', (
-      tester,
-    ) async {
+    testWidgets('opens the review with one task for each open line, each '
+        'with its own steps and the day its words say', (tester) async {
       final captures = MemoryCaptures();
       final meetings = ScriptedMeetings();
       final container = _container(
@@ -904,6 +920,9 @@ void main() {
           captureStoreProvider.overrideWithValue(captures),
           ...captureSheetOverrides(),
           meetingNotesOverride(),
+          meetingNoteMarksOverride(
+            MemoryMeetingNoteMarks({90}, {90: _meetingNoteTasks}),
+          ),
         ],
       );
       captures.tasks = container;
@@ -921,22 +940,32 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Edit note'), findsOneWidget);
+      // Two lines still open: two tasks. Its lines are tasks, not steps.
+      expect(find.text('Create tasks'), findsOneWidget);
+      expect(find.text('TASKS · 1/3'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('note-create-task')));
       await tester.pumpAndSettle();
       expect(find.byType(CaptureResult), findsOneWidget);
-      expect(find.byType(CaptureReviewEditor), findsOneWidget);
-      final draft = captures.current!.drafts.single;
+      // One card per open line; the line already ticked stays out.
+      final drafts = captures.current!.drafts;
       expect(captures.current!.status, 'ready');
-      expect(draft.task.kind, 'task');
-      expect(draft.task.title, 'Pilot pricing with Acme');
-      expect(draft.task.checklist.map((s) => s.title), [
-        'Send the pilot quote · Miki · Friday',
+      expect(drafts.map((d) => d.task.kind), ['task', 'task']);
+      expect(drafts.map((d) => d.task.title), [
+        'Send the pilot quote · Miki',
         'Book the room',
       ]);
-      // Ticked: each one chosen to go into the task (UX-2701).
-      expect(draft.task.checklist.every((s) => s.completed), isTrue);
+      // Each with its own steps, ticked: chosen to go in (UX-2701).
+      expect(drafts.first.task.checklist.map((s) => s.title), [
+        'Price for 20 seats',
+        'Start date',
+      ]);
+      expect(drafts.first.task.checklist.every((s) => s.completed), isTrue);
+      expect(drafts.last.task.checklist, isEmpty);
+      // «Friday», from the meeting's Thursday.
+      expect(drafts.first.task.dueDate, DateTime(2026, 11, 6));
+      expect(drafts.last.task.dueDate, isNull);
       expect(captures.current!.source, 'note');
-      expect(find.text('Send the pilot quote · Miki · Friday'), findsWidgets);
+      expect(find.byType(CaptureReviewEditor), findsWidgets);
       // The zone chosen in Settings, as the task form uses.
       expect(captures.current!.timezone, 'America/New_York');
 
@@ -1402,7 +1431,7 @@ void main() {
           summary: 'We agreed the pilot.',
           language: language,
           startMissing: true,
-          todos: const [MeetingTodo(text: 'Send the quote', when: 'Friday')],
+          tasks: const [MeetingTask(title: 'Send the quote', when: 'Friday')],
         ),
         labels: meetingNoteLabels(language),
         startedAt: startedAt,
@@ -1461,14 +1490,14 @@ void main() {
               notes: 'Descuento del 20 % los tres primeros meses.',
             ),
           ],
-          todos: [
-            MeetingTodo(
-              text: 'Enviar el presupuesto del piloto',
+          tasks: [
+            MeetingTask(
+              title: 'Enviar el presupuesto del piloto',
               who: 'Miki',
               when: 'el viernes',
             ),
-            MeetingTodo(text: 'Reservar la sala para la firma'),
-            MeetingTodo(text: 'Pedir los datos de los almacenes'),
+            MeetingTask(title: 'Reservar la sala para la firma'),
+            MeetingTask(title: 'Pedir los datos de los almacenes'),
           ],
         ),
         labels: meetingNoteLabels('es'),
@@ -3808,17 +3837,20 @@ void main() {
       'Reservar la sala',
       'Pedir el contacto de compras',
     ];
+    // The meeting's one task, whose steps are these, as the server wrote
+    // it: the note's one line.
+    const line = 'Precio del piloto con Acme';
     Task note({bool withSteps = true}) => Task(
       id: 95,
       kind: 'note',
       title: 'Precio del piloto con Acme',
       notes: 'Acordamos el piloto.',
       priority: 1,
-      checklist: [
-        if (withSteps)
-          for (var i = 0; i < steps.length; i++)
-            ChecklistItem(id: 'p$i', title: steps[i]),
-      ],
+      checklist: [if (withSteps) ChecklistItem(id: 'p0', title: line)],
+    );
+    final noteTasks = MeetingNoteTasks(
+      tasks: const {'p0': MeetingTask(title: line, steps: steps)},
+      day: DateTime(2026, 11, 5),
     );
     // Something said earlier and kept in «Sin guardar».
     final kept = CaptureSession(
@@ -3862,6 +3894,9 @@ void main() {
             links,
             meetingNotes: meetingNotes,
             meetingNotesReady: meetingNotesReady,
+          ),
+          meetingNoteMarksOverride(
+            MemoryMeetingNoteMarks({95}, {95: noteTasks}),
           ),
         ],
       );
@@ -3973,9 +4008,9 @@ void main() {
       expect(task.checklist.map((step) => step.title), [steps[0], steps[2]]);
       expect(task.checklist.any((step) => step.done()), isFalse);
       expect(task.checklist.any((step) => step.completed), isFalse);
-      // The note keeps its three steps, all open.
+      // The note keeps its line, open.
       final kept = tasks(app.container).firstWhere((t) => t.id == 95);
-      expect(kept.checklist.map((step) => step.title), steps);
+      expect(kept.checklist.map((step) => step.title), [line]);
       expect(kept.checklist.any((step) => step.done()), isFalse);
     });
 
@@ -4089,6 +4124,40 @@ void main() {
       expect(app.container.read(calendarFocusProvider), isNull);
     });
 
+    testWidgets('Several tasks: «Crear tareas» makes both, leaves the note '
+        'in view, and «Ver tareas» shows them on Calendar', (tester) async {
+      final two = note().copyWith(
+        checklist: [
+          ChecklistItem(id: 'p0', title: line),
+          ChecklistItem(id: 'p1', title: 'Llamar al cliente por el retraso'),
+        ],
+      );
+      final app = await open(tester, shown: two);
+      expect(filledButtonWithText(es.meetingCreateTask(2)), findsOneWidget);
+      expect(es.meetingCreateTask(2), 'Crear tareas');
+      await createTask(tester);
+      expect(app.captures.current!.drafts.length, 2);
+      await addTask(tester);
+      final made = tasks(app.container).where((task) => !task.isNote).toList();
+      expect(made.map((task) => task.title), [
+        line,
+        'Llamar al cliente por el retraso',
+      ]);
+      expect(made.first.checklist.map((step) => step.title), steps);
+      expect(made.last.checklist, isEmpty);
+      // No task's page opens: the note stays in front.
+      expect(front(tester), 95);
+      expect(app.links.links[95], unorderedEquals(made.map((t) => t.id)));
+      expect(filledButtonWithText(es.meetingViewTask(2)), findsOneWidget);
+      expect(es.meetingViewTask(2), 'Ver tareas');
+      await tester.tap(filledButtonWithText(es.meetingViewTask(2)));
+      await tester.pumpAndSettle();
+      final focus = app.container.read(calendarFocusProvider)!;
+      expect(focus.taskIds, made.map((t) => t.id).toSet());
+      expect(focus.showCalendar, isTrue);
+      expect(focus.undated, isTrue);
+    });
+
     testWidgets('UX-2702: back on the note, «Ver tarea» and no «Crear tarea»; '
         'it opens that same task, and no task is added', (tester) async {
       final app = await open(tester);
@@ -4098,10 +4167,10 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(front(tester), 95);
-      expect(filledButtonWithText(es.meetingViewTask), findsOneWidget);
-      expect(find.text(es.meetingCreateTask), findsNothing);
+      expect(filledButtonWithText(es.meetingViewTask(1)), findsOneWidget);
+      expect(find.text(es.meetingCreateTask(1)), findsNothing);
       final count = tasks(app.container).length;
-      await tester.tap(filledButtonWithText(es.meetingViewTask));
+      await tester.tap(filledButtonWithText(es.meetingViewTask(1)));
       await tester.pumpAndSettle();
       expect(front(tester), task.id);
       expect(find.byType(CaptureResult), findsNothing);
@@ -4120,8 +4189,8 @@ void main() {
       expect(made(app.container), isNull);
       expect(front(tester), 95);
       expect(find.byType(TaskDetailScreen), findsOneWidget);
-      expect(filledButtonWithText(es.meetingCreateTask), findsOneWidget);
-      expect(find.text(es.meetingViewTask), findsNothing);
+      expect(filledButtonWithText(es.meetingCreateTask(1)), findsOneWidget);
+      expect(find.text(es.meetingViewTask(1)), findsNothing);
       // Nothing waits in «Sin guardar» for it.
       expect(app.captures.current!.status, 'discarded');
     });
@@ -4154,7 +4223,7 @@ void main() {
       expect(front(tester), 95);
       final saved = tasks(app.container).singleWhere((task) => task.id == 95);
       expect(saved.notes, words);
-      expect(filledButtonWithText(es.meetingCreateTask), findsOneWidget);
+      expect(filledButtonWithText(es.meetingCreateTask(1)), findsOneWidget);
     });
 
     testWidgets('R1-P318-3: «Ver tarea» from the note opened again, then '
@@ -4165,7 +4234,7 @@ void main() {
       final task = made(app.container)!;
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      await tester.tap(filledButtonWithText(es.meetingViewTask));
+      await tester.tap(filledButtonWithText(es.meetingViewTask(1)));
       await tester.pumpAndSettle();
       expect(front(tester), task.id);
       await tester.tap(find.text(es.undo).last);
@@ -4190,8 +4259,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(made(app.container), isNull);
       expect(front(tester), 95);
-      expect(filledButtonWithText(es.meetingCreateTask), findsOneWidget);
-      expect(find.text(es.meetingViewTask), findsNothing);
+      expect(filledButtonWithText(es.meetingCreateTask(1)), findsOneWidget);
+      expect(find.text(es.meetingViewTask(1)), findsNothing);
     });
 
     testWidgets('UX-2706: Cancelar and Back close a note’s review with no '
@@ -4228,7 +4297,7 @@ void main() {
         );
         // Nothing was made, and the note is as it was.
         expect(made(app.container), isNull, reason: leave);
-        expect(filledButtonWithText(es.meetingCreateTask), findsOneWidget);
+        expect(filledButtonWithText(es.meetingCreateTask(1)), findsOneWidget);
       }
     });
 
@@ -4247,7 +4316,7 @@ void main() {
           final l = lookupAppLocalizations(Locale(language));
           final why = '$language ${scale}x';
           await open(tester, language: language, scale: scale);
-          final create = filledButtonWithText(l.meetingCreateTask);
+          final create = filledButtonWithText(l.meetingCreateTask(1));
           final edit = outlinedButtonWithText(l.editNote);
           expect(create, findsOneWidget, reason: why);
           expect(edit, findsOneWidget, reason: why);
@@ -4282,8 +4351,8 @@ void main() {
         await open(tester, shown: note(withSteps: false));
         expect(filledButtonWithText(es.editNote), findsOneWidget);
         expect(outlinedButtonWithText(es.editNote), findsNothing);
-        expect(find.text(es.meetingCreateTask), findsNothing);
-        expect(find.text(es.meetingViewTask), findsNothing);
+        expect(find.text(es.meetingCreateTask(1)), findsNothing);
+        expect(find.text(es.meetingViewTask(1)), findsNothing);
       });
 
       testWidgets('D1: a note with open steps not made from a meeting, as a '
@@ -4291,8 +4360,8 @@ void main() {
         await open(tester, meetingNotes: const {});
         expect(filledButtonWithText(es.editNote), findsOneWidget);
         expect(outlinedButtonWithText(es.editNote), findsNothing);
-        expect(find.text(es.meetingCreateTask), findsNothing);
-        expect(find.text(es.meetingViewTask), findsNothing);
+        expect(find.text(es.meetingCreateTask(1)), findsNothing);
+        expect(find.text(es.meetingViewTask(1)), findsNothing);
       });
     });
 
@@ -4323,14 +4392,14 @@ void main() {
           // The first frame.
           expect(filledButtonWithText(es.editNote), findsNothing);
           expect(outlinedButtonWithText(es.editNote), findsOneWidget);
-          expect(placeholder(es.meetingCreateTask), findsOneWidget);
+          expect(placeholder(es.meetingCreateTask(1)), findsOneWidget);
           expect(create, findsNothing);
           final first = tester.getRect(outlinedButtonWithText(es.editNote));
-          final held = tester.getRect(placeholder(es.meetingCreateTask));
+          final held = tester.getRect(placeholder(es.meetingCreateTask(1)));
           // The links read, the marks still loading: the same.
           await tester.pumpAndSettle();
           expect(filledButtonWithText(es.editNote), findsNothing);
-          expect(placeholder(es.meetingCreateTask), findsOneWidget);
+          expect(placeholder(es.meetingCreateTask(1)), findsOneWidget);
           expect(tester.getRect(outlinedButtonWithText(es.editNote)), first);
           marks.complete();
           await tester.pumpAndSettle();
@@ -4340,7 +4409,7 @@ void main() {
             isA<FilledButton>(),
             reason: '«Crear tarea» is the filled button',
           );
-          expect(placeholder(es.meetingCreateTask), findsNothing);
+          expect(placeholder(es.meetingCreateTask(1)), findsNothing);
           expect(filledButtonWithText(es.editNote), findsNothing);
           expect(outlinedButtonWithText(es.editNote), findsOneWidget);
           // «Editar nota» didn't move, and «Crear tarea» took the place held
@@ -4409,7 +4478,7 @@ void main() {
         for (final time in ['first', 'second']) {
           await openPage(tester, 95);
           expect(create, findsOneWidget, reason: '$time open, first frame');
-          expect(placeholder(es.meetingCreateTask), findsNothing);
+          expect(placeholder(es.meetingCreateTask(1)), findsNothing);
           expect(filledButtonWithText(es.editNote), findsNothing);
           expect(outlinedButtonWithText(es.editNote), findsOneWidget);
           await tester.pumpAndSettle();
@@ -4467,8 +4536,12 @@ void main() {
             findsNothing,
             reason: when,
           );
-          expect(find.text(es.meetingCreateTask), findsNothing, reason: when);
-          expect(find.text(es.meetingViewTask), findsNothing, reason: when);
+          expect(
+            find.text(es.meetingCreateTask(1)),
+            findsNothing,
+            reason: when,
+          );
+          expect(find.text(es.meetingViewTask(1)), findsNothing, reason: when);
           await tester.pumpAndSettle();
         }
         expect(tester.takeException(), isNull);
@@ -4481,11 +4554,11 @@ void main() {
       expect(en.meetingStepsToAdd, 'Steps to add');
       expect(es.meetingStepsToAdd, 'Pasos que se añaden');
       expect(ca.meetingStepsToAdd, 'Passos que s’afegeixen');
-      expect(en.meetingViewTask, 'View task');
-      expect(es.meetingViewTask, 'Ver tarea');
-      expect(ca.meetingViewTask, 'Mostra la tasca');
+      expect(en.meetingViewTask(1), 'View task');
+      expect(es.meetingViewTask(1), 'Ver tarea');
+      expect(ca.meetingViewTask(1), 'Mostra la tasca');
       // «Crear tarea» itself is unchanged.
-      expect(es.meetingCreateTask, 'Crear tarea');
+      expect(es.meetingCreateTask(1), 'Crear tarea');
     });
   });
 

@@ -2,6 +2,12 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-11-05 — Dictation sends the recording online by default
+The owner: "The recording for the phone most of the time is bad, so we should start by defaulting to sending the record to the backend. I think it's more expensive, but it's way better … way less prone to error."
+- Voz's «Cómo se pasa la voz a texto» defaults to «En línea, al terminar», also where the phone's own recognizer works. «En el teléfono, mientras hablas» stays, as the person's choice.
+- Phones that saved the old default move too: only a choice made after this change keeps on-device speech (`speechOnDevice` in the regional preferences).
+- The privacy policy's voice paragraph says so; its wording waits on the owner's sign-off (TaskFlowWeb, `docs/LEGAL_RELEASE.md`).
+
 ## 2026-11-03 — Meeting notes from a recording (built 2026-11-04; device checks owed)
 The owner asked for notes from a recorded conversation, then a task with a checklist in one tap. Requirements: `App/docs/MEETING_NOTES.md`.
 - Record on the phone and send pieces of about 5 minutes while recording; no live streaming. "As cheap as we can while maintaining some quality", in any common language.
@@ -17,6 +23,8 @@ The owner asked for notes from a recorded conversation, then a task with a check
   - D5 (UX-2721): one quiet line on the recording screen, «El audio se envía para hacer las notas y después se borra.»; no consent reminder. The website's privacy page must say the same (MN-34).
   - D6 (UX-2814): the "notes ready" notification is private on the lock screen (Android hides its text where the phone hides private content); the title shows once unlocked.
   - D7 (UX-2815): the owner adds «Notas de las reuniones que grabas» to the RevenueCat paywall in its dashboard.
+- 2026-11-05, after a Catalan meeting came back as one note whose three steps were really three tasks: "we need to allow for more than one task creation at a time … the banner and the backlog are steps towards the first task, but if the conversation then moves on to … call the client … That's another task." So a meeting gives one task per goal, each with its own steps; something with its own goal is its own task, even said right after another or on the same day. The note has one line per task (heading «Tareas · n/N»), each task's steps in its text, and «Crear tareas» opens the review with one card per open line, its steps ticked and its day read from the words said, against the meeting's day. One task made opens over the note as before; several leave the note in view, which then offers «Ver tareas» (Calendar, with them lit).
+- 2026-11-05, the owner chose "Fix them while writing the notes" on a decision card: the chapter and final notes are told the transcript comes from speech recognition and write the word meant where the context makes a misheard one clear («paga general» where «vaga general» was meant), never changing a name, figure, date or time on a guess. No separate correction pass (it would cost about 30% more a meeting); the transcript itself isn't corrected or shown.
 - 2026-11-05, the owner chose "Keep as built" on a decision card (UX-3004, run 2026-11-04-screens): the notes-ready notification stays `private` and keeps the meeting's title. It shows on the lock screen unless the phone hides sensitive content; no title-free lock-screen version, and not secret.
 
 ## 2026-11-01 — The UX loop as fast as the machine allows

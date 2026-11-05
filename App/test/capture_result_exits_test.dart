@@ -873,6 +873,7 @@ class _App {
               language: language,
               clock: ClockFormat.twentyFour,
               weekStart: 1,
+              speechOnline: false,
             ),
           ),
         ),

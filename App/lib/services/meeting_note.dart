@@ -19,7 +19,11 @@ class MeetingNoteLabels {
     this.untitled,
     this.chapterRange,
     this.meetingLine,
+    this.steps,
   });
+
+  /// The heading over each task's steps.
+  final String? steps;
 
   /// The heading over the decisions.
   final String? decisions;
@@ -87,16 +91,17 @@ class SavedMeetingNote {
   final String? language;
 }
 
-/// A to-do as a checklist line: its words, then who and when if they were
-/// said (`Send the pilot quote · Miki · Friday`).
-String meetingTodoLine(MeetingTodo todo) =>
-    [todo.text, ?todo.who, ?todo.when].join(' · ');
+/// A task as a checklist line of its note: its words, then who and when if
+/// they were said (`Send the pilot quote · Miki · Friday`).
+String meetingTaskLine(MeetingTask task) =>
+    [task.title, ?task.who, ?task.when].join(' · ');
 
 /// The meeting's notes as an ordinary note (MN-21): the title the server
 /// wrote, a body of the meeting's date and length (from [startedAt], local,
 /// and [length]), the summary, decisions, open questions and one line per
-/// chapter with its notes, and the to-dos as its checklist, so one tap can
-/// turn them into a task (MN-22).
+/// chapter with its notes, and one checklist line per task, so one tap can
+/// turn them into tasks (MN-22). Each task's steps are in the body, under
+/// its line's words, and [MeetingNoteTasks] keeps them for «Crear tareas».
 Task meetingNote(
   MeetingResult result, {
   required MeetingNoteLabels labels,
@@ -114,6 +119,13 @@ Task meetingNote(
   if (result.summary.isNotEmpty) sections.add(result.summary);
   String list(String? heading, List<String> lines) =>
       [?heading, for (final line in lines) '• $line'].join('\n');
+  final steps = [
+    for (final task in result.tasks)
+      if (task.steps.isNotEmpty) list(task.title, task.steps),
+  ];
+  if (steps.isNotEmpty) {
+    sections.add([?labels.steps, ...steps].join('\n\n'));
+  }
   if (result.decisions.isNotEmpty) {
     sections.add(list(labels.decisions, result.decisions));
   }
@@ -147,10 +159,51 @@ Task meetingNote(
     listId: projectId,
     notes: body.isEmpty ? null : body,
     checklist: [
-      for (final todo in result.todos)
-        ChecklistItem(title: meetingTodoLine(todo)),
+      for (final task in result.tasks)
+        ChecklistItem(title: meetingTaskLine(task)),
     ],
   );
+}
+
+/// What «Crear tareas» needs of a meeting's note and the note doesn't hold:
+/// each line's task as the server wrote it, by its checklist item's id, with
+/// its steps, and the day the meeting was, to read its «when» against.
+class MeetingNoteTasks {
+  const MeetingNoteTasks({required this.tasks, this.day});
+
+  /// The meeting's [note] (made by [meetingNote] from [result]) and its
+  /// tasks, line by line; [startedAt] is local.
+  factory MeetingNoteTasks.of(
+    Task note,
+    MeetingResult result, {
+    DateTime? startedAt,
+  }) => MeetingNoteTasks(
+    tasks: {
+      for (final (i, item) in note.checklist.indexed)
+        if (i < result.tasks.length) item.id: result.tasks[i],
+    },
+    day: startedAt == null ? null : Task.day(startedAt),
+  );
+
+  final Map<String, MeetingTask> tasks;
+  final DateTime? day;
+
+  Map<String, Object?> toJson() => {
+    if (day != null) 'day': Task.dateKey(day!),
+    'tasks': {for (final e in tasks.entries) e.key: e.value.toJson()},
+  };
+
+  static MeetingNoteTasks? fromJson(Object? json) {
+    if (json is! Map || json['tasks'] is! Map) return null;
+    final day = DateTime.tryParse('${json['day']}');
+    return MeetingNoteTasks(
+      tasks: {
+        for (final entry in (json['tasks'] as Map).entries)
+          '${entry.key}': ?MeetingTask.fromJson(entry.value),
+      },
+      day: day == null ? null : Task.day(day),
+    );
+  }
 }
 
 /// Marks, on this phone only, the notes made from a meeting, so only they
@@ -171,9 +224,34 @@ class MeetingNoteMarks {
     };
   }
 
+  // Each note's tasks, for «Crear tareas»: `{noteId: MeetingNoteTasks}`.
+  static String _tasksScope(String owner) => 'meetingTasks:$owner';
+
   /// Marks note [noteId] of [owner] as a meeting's, inside [tx], the
-  /// transaction that saves it.
-  static Future<void> add(DatabaseExecutor tx, String owner, int noteId) async {
+  /// transaction that saves it, with its [tasks] when known.
+  static Future<void> add(
+    DatabaseExecutor tx,
+    String owner,
+    int noteId, {
+    MeetingNoteTasks? tasks,
+  }) async {
+    if (tasks != null && tasks.tasks.isNotEmpty) {
+      final rows = await tx.query(
+        'app_preferences',
+        where: 'scope = ?',
+        whereArgs: [_tasksScope(owner)],
+      );
+      final data = rows.isEmpty
+          ? null
+          : jsonDecode(rows.single['data'] as String);
+      await tx.insert('app_preferences', {
+        'scope': _tasksScope(owner),
+        'data': jsonEncode({
+          if (data is Map) ...data,
+          '$noteId': tasks.toJson(),
+        }),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
     final ids = _ids(
       await tx.query(
         'app_preferences',
@@ -196,4 +274,21 @@ class MeetingNoteMarks {
           whereArgs: [_scope(owner)],
         ),
       );
+
+  /// Note [noteId]'s tasks, or null when this phone has none for it, such
+  /// as a note saved before tasks had steps.
+  static Future<MeetingNoteTasks?> tasks(
+    TaskDatabase database,
+    String owner,
+    int noteId,
+  ) async {
+    final rows = await (await database.database).query(
+      'app_preferences',
+      where: 'scope = ?',
+      whereArgs: [_tasksScope(owner)],
+    );
+    if (rows.isEmpty) return null;
+    final data = jsonDecode(rows.single['data'] as String);
+    return data is Map ? MeetingNoteTasks.fromJson(data['$noteId']) : null;
+  }
 }

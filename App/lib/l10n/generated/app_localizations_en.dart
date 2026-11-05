@@ -5211,6 +5211,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get meetingNoteChapters => 'Parts of the meeting';
 
   @override
+  String get meetingNoteSteps => 'Steps of each task';
+
+  @override
+  String meetingNoteTaskCount(int done, int total) {
+    return 'Tasks · $done/$total';
+  }
+
+  @override
   String get meetingNoteStartMissing =>
       'The start of this recording expired, so these notes cover only the rest.';
 
@@ -5228,13 +5236,29 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get meetingCreateTask => 'Create task';
+  String meetingCreateTask(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Create tasks',
+      one: 'Create task',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get meetingStepsToAdd => 'Steps to add';
 
   @override
-  String get meetingViewTask => 'View task';
+  String meetingViewTask(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'View tasks',
+      one: 'View task',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get meetingSignOutTitle => 'Sign out?';

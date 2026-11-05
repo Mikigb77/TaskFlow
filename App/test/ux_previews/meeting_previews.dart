@@ -1,6 +1,6 @@
 // Meeting notes (App/docs/MEETING_NOTES.md): «Grabar una reunión» in Notas,
 // the recording screen, what follows Stop, the Notas lines for stopped and
-// waiting meetings, «Crear tarea» on the note, and the sign-out question.
+// waiting meetings, «Crear tareas» on the note, and the sign-out question.
 // The meeting core is scripted: no microphone, server or WorkManager.
 import 'dart:async';
 
@@ -9,6 +9,7 @@ import 'package:agenda/models/meeting.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/screens/notes_screen.dart';
 import 'package:agenda/services/meeting_controller.dart';
+import 'package:agenda/services/meeting_note.dart';
 import 'package:agenda/services/meeting_recorder.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -54,7 +55,7 @@ const meetingLines = Screen(
 const meetingNote = Screen(
   'meetings',
   'note',
-  'A note made from a meeting, with Crear tarea, the review it opens, and Ver tarea once its task exists',
+  'A note made from a meeting, with one line per task and Crear tareas, the review it opens with one card per task, and Ver tareas once they exist',
   sources: [
     'lib/screens/task_detail_screen.dart',
     'lib/widgets/note_task.dart',
@@ -84,7 +85,8 @@ const meetingSignOut = Screen(
 const _all = [...everywhere, ...longText];
 
 /// A meeting's note, as the core saves it: the meeting's date and length,
-/// summary, decisions, open questions, parts, and the to-dos as its steps.
+/// summary, each task's steps, decisions, open questions, parts, and one
+/// line per task.
 Task _meetingNoteTask() => Task(
   id: 120,
   kind: 'note',
@@ -93,6 +95,9 @@ Task _meetingNoteTask() => Task(
       'Reunión del martes 3 nov, 10:15 · 52 min\n\n'
       'Acordamos empezar el piloto en diciembre con dos almacenes. Falta '
       'cerrar el precio por usuario y quién firma por parte de Acme.\n\n'
+      'Pasos de cada tarea\n\n'
+      'Enviar el presupuesto\n• Precio por usuario\n'
+      '• Descuento de los tres primeros meses\n\n'
       'Decisiones\n• Empezar el piloto en diciembre\n\n'
       'Preguntas abiertas\n• ¿Quién firma por Acme?\n\n'
       'Partes de la reunión\n\n'
@@ -108,16 +113,37 @@ Task _meetingNoteTask() => Task(
   ],
 );
 
-/// The task «Crear tarea» made from [_meetingNoteTask], with the steps kept.
-Task _madeTask() => Task(
-  id: 121,
-  title: 'Precio del piloto con Acme',
-  priority: 1,
-  checklist: [
-    ChecklistItem(id: 't1', title: 'Enviar el presupuesto · Miki · el viernes'),
-    ChecklistItem(id: 't3', title: 'Pedir el contacto de compras · Ana'),
-  ],
+/// [_meetingNoteTask]'s tasks as the server wrote them, kept on this phone:
+/// the meeting was on Tuesday 3 November.
+final _meetingNoteTasks = MeetingNoteTasks(
+  tasks: const {
+    'm1': MeetingTask(
+      title: 'Enviar el presupuesto',
+      who: 'Miki',
+      when: 'el viernes',
+      steps: ['Precio por usuario', 'Descuento de los tres primeros meses'],
+    ),
+    'm2': MeetingTask(title: 'Reservar la sala para la demo'),
+    'm3': MeetingTask(title: 'Pedir el contacto de compras', who: 'Ana'),
+  },
+  day: DateTime(2026, 11, 3),
 );
+
+/// The tasks «Crear tareas» made from [_meetingNoteTask]: the quote, with
+/// its steps, and the room.
+List<Task> _madeTasks() => [
+  Task(
+    id: 121,
+    title: 'Enviar el presupuesto · Miki',
+    priority: 1,
+    dueDate: DateTime(2026, 11, 6),
+    checklist: [
+      ChecklistItem(id: 't1', title: 'Precio por usuario'),
+      ChecklistItem(id: 't2', title: 'Descuento de los tres primeros meses'),
+    ],
+  ),
+  Task(id: 122, title: 'Reservar la sala para la demo', priority: 1),
+];
 
 /// Without [pro], an account with free dictations, and the store answering
 /// with its price for the Pro screen. [noteTasks] are the phone's note → task
@@ -129,7 +155,7 @@ Future<PreviewApp> _open(
   List<Task> tasks = const [],
   bool notificationsAllowed = true,
   bool notificationsAsked = true,
-  Map<int, int>? noteTasks,
+  Map<int, List<int>>? noteTasks,
 }) => PreviewApp.open(
   p,
   pro: pro,
@@ -140,7 +166,10 @@ Future<PreviewApp> _open(
   meetingNotificationsAsked: notificationsAsked,
   overrides: [
     meetingsOverride(meetings),
-    ...noteTaskOverrides(MemoryNoteTaskLinks(noteTasks)),
+    ...noteTaskOverrides(MemoryNoteTaskLinks(null, noteTasks)),
+    meetingNoteMarksOverride(
+      MemoryMeetingNoteMarks({120}, {120: _meetingNoteTasks}),
+    ),
   ],
 );
 
@@ -526,8 +555,7 @@ void meetingPreviews() {
         await p.shoot('quiet-dismissed');
       },
       then: {
-        'quiet-dismissed':
-            'The question closed without an answer: the stopped meeting says which recording (its day and start time), «· 10 min. Casi no se oyó nada.», with Hacer las notas, Seguir grabando and Descartar.',
+        'quiet-dismissed': 'The question closed without an answer: the stopped meeting says which recording (its day and start time), «· 10 min. Casi no se oyó nada.», with Hacer las notas, Seguir grabando and Descartar.',
       },
     );
 
@@ -648,7 +676,7 @@ void meetingPreviews() {
     preview(
       meetingNote,
       'create-task',
-      'The meeting’s note opened: its steps (the to-dos) first, then the note: the meeting’s date and length, summary, decisions, open questions, parts; and a filled Crear tarea first, with an outlined Editar nota as tall beside it.',
+      'The meeting’s note opened: «Tareas · 0/3», one line per task said in the meeting, first, then the note: the meeting’s date and length, summary, each task’s steps under «Pasos de cada tarea», decisions, open questions, parts; and a filled «Crear tareas» first, with an outlined Editar nota as tall beside it.',
       _all,
       (p) async {
         final app = await _open(
@@ -659,28 +687,29 @@ void meetingPreviews() {
         await app.tab(p.l.notes);
         await app.tap('Precio del piloto con Acme');
         await p.shoot();
-        await p.tester.tap(find.text(p.l.meetingCreateTask).hitTestable());
+        await p.tester.tap(find.text(p.l.meetingCreateTask(3)).hitTestable());
         await p.frames(10, const Duration(milliseconds: 100));
         await p.tester.pumpAndSettle();
         await p.shoot('review');
       },
       then: {
-        'review':
-            'Crear tarea: the review with the meeting’s title and its to-dos ticked under «Pasos que se añaden», with no ⋮, to untick what isn’t wanted and set a day before saving.',
+        'review': 'Crear tareas: the review with one card per task: «Enviar el presupuesto · Miki» on Friday 6 November (the meeting’s «el viernes») with its two steps ticked under «Pasos que se añaden», with no ⋮; «Reservar la sala para la demo» and «Pedir el contacto de compras · Ana» with no day. Each can be removed, a step unticked, or a day set before saving.',
       },
     );
 
     preview(
       meetingNote,
       'after-task',
-      'The meeting’s note once its task exists: a filled Ver tarea, which opens that task, first, and an outlined Editar nota; no Crear tarea.',
+      'The meeting’s note once two of its tasks exist: a filled «Ver tareas», which shows them on Calendar, first, and an outlined Editar nota; no Crear tareas.',
       [es1],
       (p) async {
         final app = await _open(
           p,
           ScriptedMeetings(),
-          tasks: [_meetingNoteTask(), _madeTask()],
-          noteTasks: {120: 121},
+          tasks: [_meetingNoteTask(), ..._madeTasks()],
+          noteTasks: {
+            120: [121, 122],
+          },
         );
         await app.tab(p.l.notes);
         await app.tap('Precio del piloto con Acme');

@@ -278,8 +278,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                 Navigator.pushNamed(context, '/editTask', arguments: taskId);
             void reschedule() =>
                 TaskInteractions.reschedule(context, ref, task);
-            // The task this note made with «Crear tarea», while it exists.
-            final made = task.isNote ? noteMadeTask(ref, task) : null;
+            // The tasks this note made with «Crear tareas» that still exist.
+            final made = task.isNote ? noteMadeTasks(ref, task) : const <Task>[];
             // Until this phone's note → task links are read, the main
             // button can't know its label (R1-P318-1).
             final linksRead =
@@ -300,6 +300,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                 !linksRead &&
                 task.isNote &&
                 task.checklist.any((step) => !step.done());
+            // One task for each open line of a meeting's note.
+            final openLines = task.checklist
+                .where((step) => !step.done())
+                .length;
             // Inert while Completar closes it: nothing on the page opens in
             // the hold (UX-2633).
             return AbsorbPointer(
@@ -582,18 +586,28 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                                   child: FilledButton.icon(
                                     onPressed: null,
                                     icon: const Icon(Icons.add_task_rounded),
-                                    label: Text(context.l10n.meetingCreateTask),
+                                    label: Text(
+                                      context.l10n.meetingCreateTask(
+                                        openLines,
+                                      ),
+                                    ),
                                   ),
                                 )
-                              else if (made != null)
+                              else if (made.isNotEmpty)
                                 FilledButton.icon(
                                   key: const ValueKey('note-view-task'),
-                                  onPressed: () => Navigator.push(
-                                    context,
-                                    taskPageRoute(made.id!),
-                                  ),
+                                  // One task opens over the note; several
+                                  // show on Calendar, where they landed.
+                                  onPressed: () => made.length == 1
+                                      ? Navigator.push(
+                                          context,
+                                          taskPageRoute(made.single.id!),
+                                        )
+                                      : showNoteTasks(context, made),
                                   icon: const Icon(Icons.task_alt_rounded),
-                                  label: Text(context.l10n.meetingViewTask),
+                                  label: Text(
+                                    context.l10n.meetingViewTask(made.length),
+                                  ),
                                 )
                               else if (makesTask)
                                 FilledButton.icon(
@@ -601,9 +615,11 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                                   onPressed: () =>
                                       createTaskFromNote(context, task),
                                   icon: const Icon(Icons.add_task_rounded),
-                                  label: Text(context.l10n.meetingCreateTask),
+                                  label: Text(
+                                    context.l10n.meetingCreateTask(openLines),
+                                  ),
                                 ),
-                              if (holds || made != null || makesTask)
+                              if (holds || made.isNotEmpty || makesTask)
                                 OutlinedButton.icon(
                                   // As tall as the filled button beside it.
                                   style: OutlinedButton.styleFrom(
@@ -727,7 +743,18 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   List<Widget> _steps(BuildContext context, Task task, bool canEdit) => [
     if (task.checklist.isNotEmpty) ...[
       SectionLabel(
-        context.l10n.checklistCount(task.checklistDone, task.checklist.length),
+        // A meeting's note: each line is a task (D1).
+        task.isNote &&
+                (ref.watch(meetingNotesProvider).value ?? const <int>{})
+                    .contains(task.id)
+            ? context.l10n.meetingNoteTaskCount(
+                task.checklistDone,
+                task.checklist.length,
+              )
+            : context.l10n.checklistCount(
+                task.checklistDone,
+                task.checklist.length,
+              ),
       ),
       AppSurface(
         child: Column(
