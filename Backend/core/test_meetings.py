@@ -47,8 +47,7 @@ class FakeVertex:
         self.answers = {}  # stage -> responses to give instead, one per call
         self.final = FINAL
 
-    def __call__(self, timeout_ms=45000, *, vertex=False):
-        self.vertex_flags = getattr(self, "vertex_flags", []) + [vertex]
+    def __call__(self, timeout_ms=45000):
         return self
 
     def __enter__(self):
@@ -101,7 +100,7 @@ class MeetingTestCase(TestCase):
         fake = patch("core.ai.client", self.vertex)
         fake.start()
         self.addCleanup(fake.stop)
-        configured = override_settings(AI_VERTEX_PROJECT="taskflow-test", AI_ROUTE="ai_studio")
+        configured = override_settings(AI_VERTEX_PROJECT="taskflow-test")
         configured.enable()
         self.addCleanup(configured.disable)
 
@@ -143,9 +142,8 @@ class PieceTests(MeetingTestCase):
         piece = meeting.pieces.get()
         self.assertEqual((piece.index, piece.offset_seconds, piece.duration_seconds, piece.text),
                          (0, 0, 300, "Words of piece 0. Last line of piece 0."))
-        # Always Vertex with the meeting model, whatever AI_ROUTE says, and the audio as sent.
+        # The meeting model, and the audio as sent.
         call = self.vertex.calls[0]
-        self.assertEqual(self.vertex.vertex_flags, [True])
         self.assertEqual((call["model"], call["mime_type"]), ("gemini-3.5-flash-lite", "audio/ogg"))
         self.assertIn("es-ES", call["contents"][0].text)
         self.assertEqual(self.counted(), 1)

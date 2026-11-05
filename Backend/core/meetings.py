@@ -9,7 +9,7 @@ is done by the request that completes it, and every call is safe to repeat:
   notes are written once, under the meeting's row lock.
 
 No queue and no background work: a failed step is done again by the next call. Audio is held in
-memory only, during its transcription call. All AI runs on Vertex, whatever AI_ROUTE says.
+memory only, during its transcription call. All AI runs on Vertex.
 """
 import json
 import logging
@@ -213,7 +213,7 @@ def transcribe_piece(raw, mime_type, *, context=None, language=None):
                 types.Part.from_bytes(data=raw, mime_type=mime_type)]
 
     def call():
-        with ai.client(AUDIO_TIMEOUT_MS, vertex=True) as api:
+        with ai.client(AUDIO_TIMEOUT_MS) as api:
             response = api.models.generate_content(model=model, contents=contents, config=types.GenerateContentConfig(
                 max_output_tokens=8192, thinking_config=thinking,
                 automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)))
@@ -223,7 +223,7 @@ def transcribe_piece(raw, mime_type, *, context=None, language=None):
 
 def _generate_json(stage, prompt, schema_model, instruction, tokens):
     def call():
-        with ai.client(TEXT_TIMEOUT_MS, vertex=True) as api:
+        with ai.client(TEXT_TIMEOUT_MS) as api:
             response = api.models.generate_content(
                 model=settings.AI_MEETING_TEXT_MODEL, contents=prompt,
                 config=types.GenerateContentConfig(

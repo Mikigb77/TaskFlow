@@ -121,18 +121,12 @@ if os.getenv("AWS_ENDPOINT_URL_S3"):
         }},
         "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
     }
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-AI_TEXT_MODEL = os.getenv("AI_TEXT_MODEL", "gemma-4-26b-a4b-it")
-AI_AUDIO_MODEL = os.getenv("AI_AUDIO_MODEL", "gemini-3.5-transcribe")
-# ai_studio is free-route only; auto explicitly permits paid Vertex fallback.
-# vertex sends both stages directly to Vertex using Application Default Credentials.
-AI_ROUTE = os.getenv("AI_ROUTE", "ai_studio")
-AI_FREE_ATTEMPT_SECONDS = max(1, min(20, int(os.getenv("AI_FREE_ATTEMPT_SECONDS", "10"))))
+# Every AI call runs on Vertex AI with Application Default Credentials: no API key exists.
 AI_VERTEX_PROJECT = os.getenv("AI_VERTEX_PROJECT", "")
 AI_VERTEX_LOCATION = os.getenv("AI_VERTEX_LOCATION", "global")
 AI_VERTEX_TEXT_MODEL = os.getenv("AI_VERTEX_TEXT_MODEL", "gemini-3.1-flash-lite")
 AI_VERTEX_AUDIO_MODEL = os.getenv("AI_VERTEX_AUDIO_MODEL", "gemini-3.1-flash-lite")
-# Meeting notes (docs/MEETINGS.md): always on Vertex, whatever AI_ROUTE says. The pieces' fallback
+# Meeting notes (docs/MEETINGS.md). The pieces' fallback
 # model is gemini-3.5-transcribe; changing the setting is enough.
 AI_MEETING_AUDIO_MODEL = os.getenv("AI_MEETING_AUDIO_MODEL", "gemini-3.5-flash-lite")
 AI_MEETING_TEXT_MODEL = os.getenv("AI_MEETING_TEXT_MODEL", "gemini-3.5-flash-lite")

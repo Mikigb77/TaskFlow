@@ -20,10 +20,9 @@ Cloud Run executes Python and application permissions. PostgreSQL stores account
 
 Only the API receives database credentials, storage credentials, and AI secrets. Flutter receives public OAuth client IDs and its own short-lived application tokens. Production secrets belong in Secret Manager, outside source control and container layers. Existing prototype credentials must be reviewed and rotated before production use.
 
-Development AI routing (11 October 2026): local Django uses AI Studio Gemma 4
-26B for free-first extraction, with Gemini 3.1 Flash-Lite on Vertex as a bounded
-paid fallback for quota/temporary failures. Audio has an independent route.
-Staging runs on Vertex only (`AI_ROUTE=vertex`, decided 2026-11-04).
+AI routing: every environment runs on Vertex AI only, with Application Default
+Credentials and no API key (staging since 2026-11-04, local development and the
+code since 2026-11-05, when the AI Studio route and its key were removed).
 LangChain core composes the validated extraction pipeline; it has no autonomous
 tools or write access. The dedicated `taskflow-ai-staging` identity can predict
 and use APIs only. Local impersonated ADC is ignored and mounted read-only;

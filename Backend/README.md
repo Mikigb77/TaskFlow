@@ -49,15 +49,11 @@ source refresh credential: do not share it or use it in a deployed image. For
 Cloud Run, attach a dedicated runtime service account instead of mounting local
 ADC. Flutter only talks to the authenticated Django API.
 
-| Mode | Behaviour |
-| --- | --- |
-| `auto` | AI Studio first; bounded retries, then paid Vertex on quota/temporary failures. |
-| `vertex` | Direct Vertex for predictable development demonstrations. |
-| `ai_studio` | AI Studio only; never makes a Vertex call. |
-
-Switch with `scripts/start-ai-dev.ps1 -Mode vertex` (or another mode).
-Plain `docker compose up` uses the base configuration and free-only default;
-use the script whenever the ADC-mounted Vertex route is wanted. Existing volumes
+All AI (dictations, «A tu manera» and meeting notes) runs on Vertex AI, signed in
+with Application Default Credentials. There is no API key and no free AI Studio
+route (the owner's decision of 2026-11-05). Start the local backend with AI using
+`scripts/start-ai-dev.ps1`. Plain `docker compose up` has no Google credentials,
+so AI answers that it isn't configured while everything else works. Existing volumes
 and accounts are preserved. The optional overlay does not deploy a public API.
 
 `Backend/.env` holds the local secrets (the Google key, the Django secret and the local database credentials) and is never committed: `.gitignore` excludes every `.env` file except `.env.example` and `.env.ci`. On a new machine, copy `Backend/.env.example` to `Backend/.env` and fill it in. Docker injects these at runtime; `.dockerignore` excludes the environment files from the image build context, and the Flutter APK does not contain the key. GitHub Actions runs the tests with the committed `Backend/.env.ci`, which has no real keys, and deploys staging with keyless Google sign-in and the runtime config in Google Secret Manager, so no workflow needs a file from the PC.
@@ -149,41 +145,34 @@ The scheduler keeps stable alert identities, preserves snoozes, rejects stale no
 The bounded LangChain pipeline is:
 
 ```text
-WAV recording → Gemini transcription → Gemma extraction → validation → review/edit/remove drafts → save together
+WAV recording → Gemini transcription → Gemini extraction → validation → review/edit/remove drafts → save together
 Typed text ────────────────────────────┘
 ```
 
-AI Studio defaults are `gemini-3.5-transcribe` for transcription and `gemma-4-26b-a4b-it` for extraction. The 26B model replaces the intermittent 31B model with the user's approval. Vertex uses `gemini-3.1-flash-lite` for either stage. Environment settings select each model and route; recreate the API container to apply them. LangChain core composes prompt construction, generation and Pydantic validation. Google's official Gen AI SDK handles each provider call underneath that pipeline. LangGraph, agent loops, model tools and LangSmith tracing are not needed or enabled.
+Vertex uses `gemini-3.1-flash-lite` for both stages by default (`AI_VERTEX_AUDIO_MODEL`, `AI_VERTEX_TEXT_MODEL`). Environment settings select each model; recreate the API container to apply them. LangChain core composes prompt construction, generation and Pydantic validation. Google's official Gen AI SDK handles each provider call underneath that pipeline. LangGraph, agent loops, model tools and LangSmith tracing are not needed or enabled.
 
 Vertex receives a supported generation schema with explicit assignment enums;
-Pydantic still checks the complete response on both routes. This prevents a
+Pydantic still checks the complete response. This prevents a
 model response from bypassing task, date, membership or assignment validation.
 Models propose drafts only; database writes require explicit app review/save.
 
 The request includes an IANA time zone and a reference time, so “Friday” is resolved in the user's calendar. Drafts contain titles, optional dates/times, recurrence, priorities, notes and clarification questions. Omitted dates mean Inbox; omitted times mean Any time. Ambiguous times and daylight-saving gaps/overlaps require editing or explicit confirmation. Medical appointments and treatment default to high priority; explicit user priorities take precedence. Preparation notes remain with their appointment. Unsupported recurrence patterns are flagged rather than silently approximated. Drafts are not automatically saved: the app lets you edit/remove each one, then saves all remaining tasks in one SQLite transaction. A failed batch saves none. Signed-in batches enter the existing per-task sync queue.
 
-Audio is accepted only as a validated 16-bit PCM WAV, up to 60 seconds and 6 MB. The phone keeps unfinished recordings, source text and drafts in account-scoped local storage so failures and interruptions can be recovered from Unfinished captures. Raw input is removed after every draft is saved/removed, or the user explicitly discards the capture. Retrying uses its original reference time and timezone. The backend does not keep recordings. Google processes submitted audio/text under the selected API tier's terms. Capture diagnostics contain only bounded local counters and stage timings, never words or audio.
+Audio is accepted only as a validated 16-bit PCM WAV, up to 60 seconds and 6 MB. The phone keeps unfinished recordings, source text and drafts in account-scoped local storage so failures and interruptions can be recovered from Unfinished captures. Raw input is removed after every draft is saved/removed, or the user explicitly discards the capture. Retrying uses its original reference time and timezone. The backend does not keep recordings. Google processes submitted audio/text under the Vertex AI (Google Cloud) terms. Capture diagnostics contain only bounded local counters and stage timings, never words or audio.
 
 Explicit Note capture sends `capture_type=note`. A recording is transcribed once and returned as one note with its wording retained, without a task-extraction call. Typed/on-device-transcribed notes are prepared locally by the phone without an AI request. These processing timings are recorded separately from task extraction. The live synthetic note-recording test passed in 1.807 seconds; that single measurement is not a microphone-quality or task-extraction speed claim.
 
-Both AI endpoints require a valid account token; anonymous requests return HTTP 401. Accounts without server-verified `taskflow_pro` get `FREE_VOICE_CAPTURES_PER_MONTH` (default 10) dictations per UTC calendar month. One request is one dictation, whatever the number of tasks, and it counts only once the AI answers: failed, throttled and cancelled dictations don't count, nor does an answer with no task and no command, and resending the same `capture_id` with the same words is free. At the limit the answer is HTTP 402 `free_voice_used_up` with a `free_voice` block (`limit`, `left`, `resets_at`), before any budget or provider call; if Pro can't be checked at that point, it is HTTP 503 `billing_unavailable` instead. A duplicate still in flight gets HTTP 409 `capture_in_progress`. `DELETE ai/drafts/<capture_id>/` cancels a dictation that is still being understood; its request then gets HTTP 409 `capture_cancelled` and no result. A spoken capture may send `language`, the speech language chosen in the app (BCP-47, such as `ca-ES`); transcription uses it as a hint, and a model that refuses the hint transcribes without it. A cancel that arrives before its own request is remembered for 5 minutes, so that request gets the same answer without reaching the AI; a new attempt needs a new `capture_id`. Successful responses carry the updated `free_voice` block, and so do `auth/me/` and the login and registration responses, together with `storage` (`used_bytes`, `limit_bytes`). Configure `REVENUECAT_API_KEY`; without it, only complimentary grants are Pro. Test Store grants additionally require `DEPLOYMENT_ENVIRONMENT=development` and `REVENUECAT_ALLOW_SANDBOX=1`. Production rejects sandbox access. Limits remain 6 requests/minute, 50 successful captures/day per account (`AI_REQUESTS_PER_DAY`), and 200 attempts/day globally (`AI_GLOBAL_REQUESTS_PER_DAY`). Both daily limits start again at 00:00 UTC, and their HTTP 429 says how many seconds remain in `Retry-After`. A batch counts as one capture, including provider fallback. Failed captures release the account reservation; global attempt counts remain. Sign-in, registration and recovery retain their existing burst throttles. The local deployment trusts the direct peer (`NUM_PROXIES=0`); configure a trusted proxy boundary before public deployment. Task storage, accounts and sync remain authenticated. Provider errors leave manual creation available.
+Both AI endpoints require a valid account token; anonymous requests return HTTP 401. Accounts without server-verified `taskflow_pro` get `FREE_VOICE_CAPTURES_PER_MONTH` (default 10) dictations per UTC calendar month. One request is one dictation, whatever the number of tasks, and it counts only once the AI answers: failed, throttled and cancelled dictations don't count, nor does an answer with no task and no command, and resending the same `capture_id` with the same words is free. At the limit the answer is HTTP 402 `free_voice_used_up` with a `free_voice` block (`limit`, `left`, `resets_at`), before any budget or provider call; if Pro can't be checked at that point, it is HTTP 503 `billing_unavailable` instead. A duplicate still in flight gets HTTP 409 `capture_in_progress`. `DELETE ai/drafts/<capture_id>/` cancels a dictation that is still being understood; its request then gets HTTP 409 `capture_cancelled` and no result. A spoken capture may send `language`, the speech language chosen in the app (BCP-47, such as `ca-ES`); transcription is told to expect it. A cancel that arrives before its own request is remembered for 5 minutes, so that request gets the same answer without reaching the AI; a new attempt needs a new `capture_id`. Successful responses carry the updated `free_voice` block, and so do `auth/me/` and the login and registration responses, together with `storage` (`used_bytes`, `limit_bytes`). Configure `REVENUECAT_API_KEY`; without it, only complimentary grants are Pro. Test Store grants additionally require `DEPLOYMENT_ENVIRONMENT=development` and `REVENUECAT_ALLOW_SANDBOX=1`. Production rejects sandbox access. Limits remain 6 requests/minute, 50 successful captures/day per account (`AI_REQUESTS_PER_DAY`), and 200 attempts/day globally (`AI_GLOBAL_REQUESTS_PER_DAY`). Both daily limits start again at 00:00 UTC, and their HTTP 429 says how many seconds remain in `Retry-After`. A batch counts as one capture, including its retry. Failed captures release the account reservation; global attempt counts remain. Sign-in, registration and recovery retain their existing burst throttles. The local deployment trusts the direct peer (`NUM_PROXIES=0`); configure a trusted proxy boundary before public deployment. Task storage, accounts and sync remain authenticated. Provider errors leave manual creation available.
 
-In `auto`, each stage makes at most two free attempts, each with a default 10-second
-inference timeout, followed by at most one Vertex attempt. An HTTP 429 skips the
-second free attempt. HTTP 500/502/503/504 and transport timeouts qualify for retry;
-input/authentication/permission and validation errors do not cause paid fallback.
-Each stage shares a 45-second inference/retry budget. Credential refresh and
-network setup can add overhead; a recording has two stages. SDK retries are
-disabled, so they cannot silently multiply these calls. Redis stores a shared
-60-second quota cooldown or 30-second overload cooldown, honoring numeric
-`Retry-After` up to five minutes. During cooldown, `auto` goes straight to Vertex.
-Audio and extraction cooldowns are independent. Logs contain provider, stage,
-status and elapsed time, without recordings, prompts or credentials.
+Each stage shares a 45-second inference/retry budget, with one retry after HTTP
+500/502/503/504 or a transport timeout when at least 10 seconds remain. Quota (429),
+input, authentication, permission and validation errors are not retried. SDK retries
+are disabled, so they cannot silently multiply these calls; a recording has two
+stages. Logs contain provider, stage, status and elapsed time, without recordings,
+prompts or credentials.
 
 Vertex is pay-as-you-go; there is no reserved GPU or idle model instance. These
-request limits are not a monetary billing cap. AI Studio free availability and
-quota depend on the selected model/project; do not assume unlimited free use.
-Check [AI Studio pricing](https://ai.google.dev/gemini-api/docs/pricing) and
+request limits are not a monetary billing cap. Check
 [Vertex pricing](https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing)
 before setting public allowances. [Model lifecycle](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/model-versions)
 was checked on 2026-10-11: 3.1 Flash-Lite remains supported; 2.5 Flash-Lite is

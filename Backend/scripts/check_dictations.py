@@ -3,8 +3,9 @@
 For prompt changes: each named case goes to POST /api/ai/drafts/ (with commands, as today's app
 asks) or, for «A tu manera», POST /api/ai/reminder-plan/, and the drafts' key fields are printed.
 It uses an in-memory database and a throwaway account, as Pro, so the free account's monthly
-dictations never stop a long check. Keys come from Backend/.env, loaded into this process only;
-nothing secret is printed. The free model is noisy: run a case a few times before trusting it.
+dictations never stop a long check. Settings come from Backend/.env, loaded into this process only;
+the AI is Vertex, signed in with the ADC from scripts/login-vertex.ps1. Run a case a few times
+before trusting it.
 
 Run from Backend/ with its virtualenv:
     .venv/Scripts/python.exe -X utf8 scripts/check_dictations.py [--times N] [case ...]
@@ -27,6 +28,10 @@ for line in (BACKEND / ".env").read_text(encoding="utf-8").splitlines():
         key, value = line.split("=", 1)
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 os.environ["DJANGO_SECRET_KEY"] = "local-check-only"
+os.environ.setdefault("AI_VERTEX_PROJECT", "taskflow-511107")
+adc = BACKEND / ".credentials" / "gcloud" / "application_default_credentials.json"
+if adc.exists():
+    os.environ.setdefault("GOOGLE_APPLICATION_CREDENTIALS", str(adc))
 os.environ["DJANGO_SETTINGS_MODULE"] = "config.test_settings"
 sys.path.insert(0, str(BACKEND))
 import django  # noqa: E402
