@@ -15,4 +15,4 @@ try:
     print(raw)
     print(validate_draft(raw))
 except Exception as error:
-    print(type(error).__name__, str(getattr(error, "message", error)).replace(os.getenv("GEMINI_API_KEY", "unused-secret"), "[redacted]"))
+    print(type(error).__name__, str(getattr(error, "message", error)))

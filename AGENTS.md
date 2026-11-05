@@ -88,7 +88,7 @@ docker compose up -d --build
 docker compose exec -T api python manage.py test core --settings=config.test_settings
 ```
 
-After a change to the AI prompts, check dictations against the real model, through the real views (it makes real AI calls; the free model is noisy, so run a case a few times):
+After a change to the AI prompts, check dictations against the real model, through the real views (it makes real, paid Vertex calls with your ADC from `Backend/scripts/login-vertex.ps1`; the model is noisy, so run a case a few times):
 
 ```powershell
 .venv/Scripts/python.exe -X utf8 scripts/check_dictations.py --times 3 project-es until-es noday-es

@@ -81,7 +81,7 @@ After a `DELETE`, a piece for that meeting id answers `404` for about a day (a p
 
 ## Models and cost
 
-- `AI_MEETING_AUDIO_MODEL` (pieces) and `AI_MEETING_TEXT_MODEL` (chapter and final notes), both default `gemini-3.5-flash-lite`, always on Vertex (`AI_VERTEX_PROJECT`, `AI_VERTEX_LOCATION`), whatever `AI_ROUTE` says. The fallback for pieces is `gemini-3.5-transcribe`; changing the setting is enough.
+- `AI_MEETING_AUDIO_MODEL` (pieces) and `AI_MEETING_TEXT_MODEL` (chapter and final notes), both default `gemini-3.5-flash-lite`, on Vertex (`AI_VERTEX_PROJECT`, `AI_VERTEX_LOCATION`), like all AI. The fallback for pieces is `gemini-3.5-transcribe`; changing the setting is enough.
 - Meetings don't use the daily dictation budget (`AI_REQUESTS_PER_DAY`) or free dictations; the monthly allowance above bounds them.
 - About US$0.08 for an hour of meeting with Flash-Lite, US$0.32 with Transcribe for the pieces (`App/docs/MEETING_NOTES.md` §6).
 

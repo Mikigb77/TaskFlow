@@ -44,7 +44,7 @@ class Command(BaseCommand):
                 self.stdout.write("Stopped after quota refusal; remaining cases are unmeasured.")
                 break
         report = {"schema_version": 1, "evaluated_at": datetime.now(timezone.utc).isoformat(),
-                  "model": settings.AI_TEXT_MODEL, "mode": "synthetic_text", "scheduled_cases": len(cases),
+                  "model": settings.AI_VERTEX_TEXT_MODEL, "mode": "synthetic_text", "scheduled_cases": len(cases),
                   "summary": summarize(results), "results": results}
         if options["output"]:
             path = Path(options["output"])

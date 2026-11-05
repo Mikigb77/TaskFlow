@@ -1,9 +1,8 @@
-# Optional local development overlay. Never copy credentials into an image.
+# Local AI: Vertex with the developer's Application Default Credentials, mounted
+# read-only (scripts/start-ai-dev.ps1). Never copy credentials into an image.
 services:
   api:
     environment:
-      AI_ROUTE: ${TASKFLOW_AI_ROUTE:-auto}
-      AI_TEXT_MODEL: gemma-4-26b-a4b-it
       AI_VERTEX_PROJECT: taskflow-511107
       AI_VERTEX_LOCATION: global
       AI_VERTEX_TEXT_MODEL: gemini-3.1-flash-lite

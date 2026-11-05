@@ -73,7 +73,7 @@ env = {
     "PASSWORD_RESET_BASE_URL": f"{e['URL']}/reset-password/", "INVITATION_BASE_URL": f"{e['URL']}/invite/",
     "EMAIL_RETRY_QUEUE": f"projects/{e['PROJECT']}/locations/{e['REGION']}/queues/{e['QUEUE']}",
     "EMAIL_RETRY_JOB": job, "EMAIL_RETRY_IDENTITY": e["MAIL_INVOKER"],
-    "AI_ROUTE": "vertex", "AI_VERTEX_PROJECT": e["PROJECT"], "AI_VERTEX_LOCATION": "global",
+    "AI_VERTEX_PROJECT": e["PROJECT"], "AI_VERTEX_LOCATION": "global",
     "AI_VERTEX_TEXT_MODEL": "gemini-3.1-flash-lite", "AI_VERTEX_AUDIO_MODEL": "gemini-3.1-flash-lite",
     "AI_REQUESTS_PER_DAY": "30", "ATTACHMENT_BUCKET": "docs4taskflow",
 }

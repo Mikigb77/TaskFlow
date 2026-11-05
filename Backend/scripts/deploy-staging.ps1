@@ -60,8 +60,6 @@ foreach ($key in @('DATABASE_URL','DATABASE_URL_UNPOOLED','AWS_ACCESS_KEY_ID','A
 $taskflowResendPath = Join-Path $taskflowBackend '.credentials/staging-resend-key'
 if (-not (Test-Path -LiteralPath $taskflowResendPath)) { throw 'Configure the private Resend sending key before deploying.' }
 $taskflowValues.RESEND_API_KEY = (Get-Content -LiteralPath $taskflowResendPath -Raw).Trim()
-$taskflowLocal = Read-TaskFlowEnv (Join-Path $taskflowBackend '.env')
-if ($taskflowLocal.GEMINI_API_KEY) { $taskflowValues.GEMINI_API_KEY = $taskflowLocal.GEMINI_API_KEY }
 $taskflowPrivateJson = Join-Path $taskflowBackend '.credentials/staging-runtime.json'
 $taskflowValues | ConvertTo-Json | Set-Content -LiteralPath $taskflowPrivateJson
 Cloud @('services','enable','run.googleapis.com','cloudbuild.googleapis.com','artifactregistry.googleapis.com','secretmanager.googleapis.com','aiplatform.googleapis.com','cloudtasks.googleapis.com','cloudscheduler.googleapis.com','cloudresourcemanager.googleapis.com') | Out-Null
@@ -124,7 +122,7 @@ $taskflowEnvironment = @{
     EMAIL_RETRY_QUEUE="projects/$Project/locations/$Region/queues/$taskflowQueue"
     EMAIL_RETRY_JOB="https://run.googleapis.com/v2/projects/$Project/locations/$Region/jobs/${taskflowMaintenance}:run"
     EMAIL_RETRY_IDENTITY=$taskflowMailInvoker
-    AI_ROUTE='vertex'; AI_VERTEX_PROJECT=$Project; AI_VERTEX_LOCATION='global'
+    AI_VERTEX_PROJECT=$Project; AI_VERTEX_LOCATION='global'
     AI_VERTEX_TEXT_MODEL='gemini-3.1-flash-lite'; AI_VERTEX_AUDIO_MODEL='gemini-3.1-flash-lite'
     AI_REQUESTS_PER_DAY='30'; ATTACHMENT_BUCKET='docs4taskflow'
 }
