@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/meeting.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/services/api_client.dart';
@@ -12,6 +13,7 @@ import 'package:agenda/services/meeting_store.dart';
 import 'package:agenda/services/meeting_uploader.dart';
 import 'package:agenda/services/notification_service.dart';
 import 'package:agenda/services/task_database.dart';
+import 'package:agenda/widgets/note_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -803,6 +805,21 @@ void main() {
       expect(bare.notes, 'Short. Then more.');
     });
 
+    test('D1: a saved meeting note is marked as a meeting\'s on this phone, for its account only', () async {
+      final meeting = await store.create(owner, format: MeetingAudioFormat.opus, now: clock.now);
+      final path = await store.piecePath(meeting.id, Duration.zero, meeting.format);
+      await store.openPiece(meeting, index: 0, offset: Duration.zero, path: path, now: clock.now);
+      await store.closePiece(meeting, index: 0, duration: const Duration(seconds: 30), hasSound: true, now: clock.now);
+      final stopped = (await store.finish(meeting.id, owner, clock.now))!;
+      expect(await MeetingNoteMarks.read(database, owner), isEmpty);
+      final id = await store.saveNote(stopped, api.result);
+      expect(await MeetingNoteMarks.read(database, owner), {id});
+      expect(await MeetingNoteMarks.read(database, 'someone-else'), isEmpty);
+      // Saving again keeps one mark.
+      await store.saveNote(stopped, api.result);
+      expect(await MeetingNoteMarks.read(database, owner), {id});
+    });
+
     test('a note for a project that went is saved outside it', () async {
       final meeting = await store.create(owner, format: MeetingAudioFormat.opus, now: clock.now, projectId: 'gone');
       final path = await store.piecePath(meeting.id, Duration.zero, meeting.format);
@@ -1209,7 +1226,106 @@ void main() {
     final after = await old.rawQuery("SELECT name FROM sqlite_master WHERE type = 'table'");
     expect(after.map((row) => row['name']), containsAll(['meetings', 'meeting_pieces', 'meeting_leases']));
     expect((await old.query('tasks')).single['title'], 'Kept');
-    expect(TaskDatabase.schemaVersion, 22);
+    expect(TaskDatabase.schemaVersion, greaterThanOrEqualTo(22));
+  });
+
+  group('P329 · meeting notes saved before the marks (UX-2905)', () {
+    /// A database as the released build (schema 22) left it, at [path].
+    Future<Database> version22(String path) async {
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.execute(
+        'CREATE TABLE tasks(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, dueDate TEXT, priority INTEGER, isCompleted INTEGER, notes TEXT, filePaths TEXT, imagePaths TEXT)',
+      );
+      await TaskDatabase.upgrade(db, 3, 22);
+      await db.execute('PRAGMA user_version = 22');
+      return db;
+    }
+
+    Task meetingNoteWithSteps(String title) => Task(
+      title: title,
+      kind: 'note',
+      priority: 1,
+      checklist: [ChecklistItem(title: 'Send the budget'), ChecklistItem(title: 'Book the room')],
+    );
+
+    Future<void> meetingRow(Database db, String id, String key, int? noteId) => db.insert('meetings', {
+      'id': id,
+      'owner_key': key,
+      'phase': 'done',
+      'started_at': clock.now.toIso8601String(),
+      'format': 'opus',
+      'note_id': noteId,
+    });
+
+    Future<void> openRealDatabase(String folder) async {
+      databaseFactory = databaseFactoryFfi;
+      await databaseFactory.setDatabasesPath(folder);
+      addTearDown(() => TaskDatabase().close());
+    }
+
+    test('UX-2905: upgrading a version-22 database marks the note a meeting row still links, '
+        'and that note offers «Crear tarea»', () async {
+      final folder = p.join(directory.path, 'real');
+      await Directory(folder).create();
+      final old = await version22(p.join(folder, 'task_database.db'));
+      final released = TaskDatabase.forTesting(old);
+      final linked = await released.insertTask(meetingNoteWithSteps('Weekly meeting'), ownerKey: owner);
+      final unlinked = await released.insertTask(meetingNoteWithSteps('Croquetas'), ownerKey: owner);
+      await meetingRow(old, 'm-linked', owner, linked);
+      await meetingRow(old, 'm-gone', owner, 9999);
+      await meetingRow(old, 'm-no-note', owner, null);
+      // Another account's meeting row never marks this account's note.
+      await meetingRow(old, 'm-other', other, unlinked);
+      expect(await MeetingNoteMarks.read(released, owner), isEmpty);
+      await old.close();
+
+      // The app opens it as this build does: schema 22 to the current one.
+      await openRealDatabase(folder);
+      final upgraded = TaskDatabase();
+      final version = await (await upgraded.database).rawQuery('PRAGMA user_version');
+      expect(version.single.values.single, TaskDatabase.schemaVersion);
+
+      final marks = await MeetingNoteMarks.read(upgraded, owner);
+      expect(marks, {linked});
+      expect(await MeetingNoteMarks.read(upgraded, other), isEmpty);
+
+      final notes = {for (final note in await upgraded.getTasks(ownerKey: owner)) note.id: note};
+      expect(noteMakesTask(notes[linked]!, marks), isTrue);
+      // Not linked from a meeting row: never guessed from its text or steps.
+      expect(noteMakesTask(notes[unlinked]!, marks), isFalse);
+    });
+
+    test('UX-2905: a meeting row whose note no longer exists adds no mark, and marks already there are kept', () async {
+      final old = await version22(p.join(directory.path, 'marked.db'));
+      addTearDown(old.close);
+      final released = TaskDatabase.forTesting(old);
+      final kept = await released.insertTask(meetingNoteWithSteps('Saved after D1'), ownerKey: owner);
+      final linked = await released.insertTask(meetingNoteWithSteps('Saved before D1'), ownerKey: owner);
+      await MeetingNoteMarks.add(old, owner, kept);
+      await meetingRow(old, 'm-linked', owner, linked);
+      await meetingRow(old, 'm-linked-again', owner, linked);
+      await meetingRow(old, 'm-gone', owner, 4242);
+
+      await TaskDatabase.upgrade(old, 22, 23);
+      expect(await MeetingNoteMarks.read(released, owner), {kept, linked});
+      expect(await MeetingNoteMarks.read(released, owner), isNot(contains(4242)));
+    });
+
+    test('UX-2905: a fresh database at the current version has no marks', () async {
+      // The suite's own database, built from scratch.
+      expect(await MeetingNoteMarks.read(database, owner), isEmpty);
+
+      // And a fresh install, as the app creates it.
+      final folder = p.join(directory.path, 'fresh');
+      await Directory(folder).create();
+      await openRealDatabase(folder);
+      final fresh = TaskDatabase();
+      final version = await (await fresh.database).rawQuery('PRAGMA user_version');
+      expect(TaskDatabase.schemaVersion, 23);
+      expect(version.single.values.single, 23);
+      expect(await MeetingNoteMarks.read(fresh, owner), isEmpty);
+      expect(await MeetingNoteMarks.read(fresh, other), isEmpty);
+    });
   });
 
   group('P325 · meeting notifications', () {

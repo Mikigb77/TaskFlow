@@ -153,6 +153,10 @@ NotificationDetails meetingNotesNotificationDetails(AppLocalizations l,
             priority: Priority.defaultPriority,
             icon: 'app_notifications_icon',
             category: AndroidNotificationCategory.status,
+            // The title is written from what was said: on a locked phone
+            // that hides private content, Android shows TaskFlow without
+            // the text (D6 of 2026-11-04).
+            visibility: NotificationVisibility.private,
             tag: tag),
         iOS: const DarwinNotificationDetails());
 

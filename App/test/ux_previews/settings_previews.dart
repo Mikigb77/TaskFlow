@@ -300,7 +300,7 @@ void settingsPreviews() {
     preview(
       pro,
       'free',
-      'An account without Pro: the plan first («No hay una suscripción Pro activa» and 4 of 10 free dictations left), then what Pro gives, in four lines with 20 dp checks (dictation and file space without limit, typed sentences turned into tasks, reminders in your own words, notes from your recorded meetings), then 42 of 100 MB used, and the price.',
+      'An account without Pro: the plan first («No hay una suscripción Pro activa» and 4 of 10 free dictations left), then what Pro gives, in four lines with 20 dp checks (dictation and file space without limit, typed sentences turned into tasks, reminders in your own words, notes from your recorded meetings, up to 20 hours a month: «…, hasta 20 horas al mes»), then 42 of 100 MB used, and the price.',
       [es1, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(

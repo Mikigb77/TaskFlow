@@ -20,6 +20,7 @@ import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
 import 'support/billing_fixtures.dart';
 import 'support/button_label.dart';
 import 'support/icon_button_label.dart';
@@ -72,7 +73,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       final context = tester.element(find.byType(SubscriptionScreen));
-        final l10n = AppLocalizations.of(context);
+      final l10n = AppLocalizations.of(context);
       expect(find.text(l10n.billingStatus('active')), findsOneWidget);
       expect(find.text(l10n.billingComplimentary), findsOneWidget);
       for (final key in [
@@ -118,9 +119,8 @@ void main() {
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               builder: (context, child) => MediaQuery(
-                data: MediaQuery.of(
-                  context,
-                ).copyWith(textScaler: const TextScaler.linear(1.7)),
+                data: MediaQuery.of(context)
+                    .copyWith(textScaler: const TextScaler.linear(1.7)),
                 child: child!,
               ),
               home: const SubscriptionScreen(),
@@ -189,9 +189,8 @@ void main() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(
-              context,
-            ).copyWith(textScaler: TextScaler.linear(textScale)),
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: TextScaler.linear(textScale)),
             child: child!,
           ),
           home: SubscriptionScreen(reason: reason),
@@ -202,9 +201,17 @@ void main() {
     return controller;
   }
 
-  for (final (purchased, active) in [(true, false), (true, true), (false, false)]) {
+  for (final (purchased, active) in [
+    (true, false),
+    (true, true),
+    (false, false),
+  ]) {
     testWidgets(
-      'UX-423: the Pro screen ${active ? 'for an active subscriber' : purchased ? 'for someone who bought Pro before' : 'for someone who never bought Pro'} shows ${purchased ? 'Gestionar suscripción' : 'no Gestionar suscripción'}${active ? ', no Restaurar compras (UX-1614)' : ', Restaurar compras and Ver suscripción'}, and no Abrir suscripciones de la tienda or Actualizar estado',
+      'UX-423: the Pro screen ${active
+          ? 'for an active subscriber'
+          : purchased
+          ? 'for someone who bought Pro before'
+          : 'for someone who never bought Pro'} shows ${purchased ? 'Gestionar suscripción' : 'no Gestionar suscripción'}${active ? ', no Restaurar compras (UX-1614)' : ', Restaurar compras and Ver suscripción'}, and no Abrir suscripciones de la tienda or Actualizar estado',
       (tester) async {
         // Tall enough for every button to be built.
         tester.view.physicalSize = const Size(390, 1600);
@@ -268,7 +275,10 @@ void main() {
             'left': 4,
             'resets_at': resets.toIso8601String(),
           },
-          'storage': {'used_bytes': 42 * megabyte, 'limit_bytes': 100 * megabyte},
+          'storage': {
+            'used_bytes': 42 * megabyte,
+            'limit_bytes': 100 * megabyte,
+          },
         };
         await openPro(
           tester,
@@ -330,9 +340,8 @@ void main() {
         greaterThanOrEqualTo(tester.getRect(usage).bottom - 0.5),
         reason: 'under the usage line',
       );
-      final colors = Theme.of(
-        tester.element(find.byType(SubscriptionScreen)),
-      ).colorScheme;
+      final colors = Theme.of(tester.element(find.byType(SubscriptionScreen)))
+          .colorScheme;
       final label = tester.renderObject<RenderParagraph>(
         find.descendant(of: see, matching: find.byType(RichText)),
       );
@@ -374,129 +383,116 @@ void main() {
     },
   );
 
-  test(
-    'UX-501: billingTestMode no longer says Pro unlocks voice capture, and the removed keys are gone from the three ARB files',
-    () {
-      for (final (language, voice) in [
-        ('en', 'voice'),
-        ('es', 'voz'),
-        ('ca', 'veu'),
+  test('UX-501: billingTestMode no longer says Pro unlocks voice capture, and the removed keys are gone from the three ARB files', () {
+    for (final (language, voice) in [
+      ('en', 'voice'),
+      ('es', 'voz'),
+      ('ca', 'veu'),
+    ]) {
+      final arb = jsonDecode(
+        File('lib/l10n/app_$language.arb').readAsStringSync(),
+      ) as Map<String, dynamic>;
+      final testMode = (arb['billingTestMode'] as String).toLowerCase();
+      expect(testMode, isNot(contains(voice)), reason: language);
+      for (final key in [
+        'voiceAccessUnavailable',
+        'voiceProRequired',
+        'billingOpenStore',
+        'billingRefresh',
       ]) {
-        final arb =
-            jsonDecode(File('lib/l10n/app_$language.arb').readAsStringSync())
-                as Map<String, dynamic>;
-        final testMode = (arb['billingTestMode'] as String).toLowerCase();
-        expect(testMode, isNot(contains(voice)), reason: language);
-        for (final key in [
-          'voiceAccessUnavailable',
-          'voiceProRequired',
-          'billingOpenStore',
-          'billingRefresh',
-        ]) {
-          expect(arb.containsKey(key), isFalse, reason: '$language: $key');
-        }
+        expect(arb.containsKey(key), isFalse, reason: '$language: $key');
       }
-    },
-  );
+    }
+  });
 
   // ---- Round 2 · P96 · UX-509: billing messages point to what exists ----
 
-  test(
-    'UX-509: no billing message tells people to refresh: accountUnavailable, network and awaitingEntitlement in EN, ES and CA, and nothing in EN’s billingError or billingResult',
-    () {
-      // `No se pudo actualizar` / `Estado … actualizado` (update, updated) in
-      // branches the plan keeps as they are are not a request to refresh.
-      for (final language in ['en', 'es', 'ca']) {
-        final l = lookupAppLocalizations(Locale(language));
-        for (final text in [
-          l.billingError('accountUnavailable'),
-          l.billingError('network'),
-          l.billingResult('awaitingEntitlement'),
-        ]) {
-          for (final word in ['refresh', 'actualiza', 'actualitza']) {
-            expect(text.toLowerCase(), isNot(contains(word)), reason: text);
-          }
+  test('UX-509: no billing message tells people to refresh: accountUnavailable, network and awaitingEntitlement in EN, ES and CA, and nothing in EN’s billingError or billingResult', () {
+    // `No se pudo actualizar` / `Estado … actualizado` (update, updated) in
+    // branches the plan keeps as they are are not a request to refresh.
+    for (final language in ['en', 'es', 'ca']) {
+      final l = lookupAppLocalizations(Locale(language));
+      for (final text in [
+        l.billingError('accountUnavailable'),
+        l.billingError('network'),
+        l.billingResult('awaitingEntitlement'),
+      ]) {
+        for (final word in ['refresh', 'actualiza', 'actualitza']) {
+          expect(text.toLowerCase(), isNot(contains(word)), reason: text);
         }
       }
-      final arb =
-          jsonDecode(File('lib/l10n/app_en.arb').readAsStringSync())
-              as Map<String, dynamic>;
-      for (final key in ['billingError', 'billingResult']) {
-        expect(
-          (arb[key] as String).toLowerCase(),
-          isNot(contains('refresh')),
-          reason: key,
-        );
-      }
-    },
-  );
+    }
+    final arb = jsonDecode(
+      File('lib/l10n/app_en.arb').readAsStringSync(),
+    ) as Map<String, dynamic>;
+    for (final key in ['billingError', 'billingResult']) {
+      expect(
+        (arb[key] as String).toLowerCase(),
+        isNot(contains('refresh')),
+        reason: key,
+      );
+    }
+  });
 
-  test(
-    'UX-509: billingError for accountUnavailable and network, and billingResult for awaitingEntitlement, in EN, ES and CA',
-    () {
-      final en = lookupAppLocalizations(const Locale('en'));
-      final es = lookupAppLocalizations(const Locale('es'));
-      final ca = lookupAppLocalizations(const Locale('ca'));
+  test('UX-509: billingError for accountUnavailable and network, and billingResult for awaitingEntitlement, in EN, ES and CA', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    final es = lookupAppLocalizations(const Locale('es'));
+    final ca = lookupAppLocalizations(const Locale('ca'));
+    expect(
+      es.billingError('network'),
+      'No se pudo comprobar tu suscripción. Revisa tu conexión y vuelve a abrir esta pantalla.',
+    );
+    expect(
+      en.billingError('network'),
+      'Could not check your subscription. Check your connection and open this screen again.',
+    );
+    expect(
+      ca.billingError('network'),
+      'No s’ha pogut comprovar la subscripció. Revisa la connexió i torna a obrir aquesta pantalla.',
+    );
+    expect(
+      es.billingError('accountUnavailable'),
+      'No se pudo conectar con tu cuenta de TaskFlow. Revisa tu conexión y vuelve a abrir esta pantalla.',
+    );
+    expect(
+      en.billingError('accountUnavailable'),
+      'Could not connect to your TaskFlow account. Check your connection and open this screen again.',
+    );
+    expect(
+      ca.billingError('accountUnavailable'),
+      'No s’ha pogut connectar amb el teu compte de TaskFlow. Revisa la connexió i torna a obrir aquesta pantalla.',
+    );
+    // awaitingEntitlement names the restore button, as it reads.
+    for (final (l, restore) in [
+      (en, 'Restore purchases'),
+      (es, 'Restaurar compras'),
+      (ca, 'Restaura les compres'),
+    ]) {
+      expect(l.billingRestore, restore);
       expect(
-        es.billingError('network'),
-        'No se pudo comprobar tu suscripción. Revisa tu conexión y vuelve a abrir esta pantalla.',
+        l.billingResult('awaitingEntitlement'),
+        contains(restore),
+        reason: l.localeName,
       );
-      expect(
-        en.billingError('network'),
-        'Could not check your subscription. Check your connection and open this screen again.',
-      );
-      expect(
-        ca.billingError('network'),
-        'No s’ha pogut comprovar la subscripció. Revisa la connexió i torna a obrir aquesta pantalla.',
-      );
-      expect(
-        es.billingError('accountUnavailable'),
-        'No se pudo conectar con tu cuenta de TaskFlow. Revisa tu conexión y vuelve a abrir esta pantalla.',
-      );
-      expect(
-        en.billingError('accountUnavailable'),
-        'Could not connect to your TaskFlow account. Check your connection and open this screen again.',
-      );
-      expect(
-        ca.billingError('accountUnavailable'),
-        'No s’ha pogut connectar amb el teu compte de TaskFlow. Revisa la connexió i torna a obrir aquesta pantalla.',
-      );
-      // awaitingEntitlement names the restore button, as it reads.
-      for (final (l, restore) in [
-        (en, 'Restore purchases'),
-        (es, 'Restaurar compras'),
-        (ca, 'Restaura les compres'),
-      ]) {
-        expect(l.billingRestore, restore);
-        expect(
-          l.billingResult('awaitingEntitlement'),
-          contains(restore),
-          reason: l.localeName,
-        );
-      }
-    },
-  );
+    }
+  });
 
-  test(
-    'UX-514: billingError accountUnavailable names no server in EN, ES or CA, and still says to open the screen again',
-    () {
-      for (final (language, again) in [
-        ('en', 'open this screen again'),
-        ('es', 'vuelve a abrir esta pantalla'),
-        ('ca', 'torna a obrir aquesta pantalla'),
-      ]) {
-        final message = lookupAppLocalizations(
-          Locale(language),
-        ).billingError('accountUnavailable');
-        expect(
-          message.toLowerCase(),
-          isNot(matches(RegExp('server|servidor'))),
-          reason: '$language: $message',
-        );
-        expect(message, contains(again), reason: language);
-      }
-    },
-  );
+  test('UX-514: billingError accountUnavailable names no server in EN, ES or CA, and still says to open the screen again', () {
+    for (final (language, again) in [
+      ('en', 'open this screen again'),
+      ('es', 'vuelve a abrir esta pantalla'),
+      ('ca', 'torna a obrir aquesta pantalla'),
+    ]) {
+      final message = lookupAppLocalizations(Locale(language))
+          .billingError('accountUnavailable');
+      expect(
+        message.toLowerCase(),
+        isNot(matches(RegExp('server|servidor'))),
+        reason: '$language: $message',
+      );
+      expect(message, contains(again), reason: language);
+    }
+  });
 
   testWidgets(
     'UX-509: the Pro screen in Spanish with a network billing error says to check the connection and open the screen again',
@@ -549,12 +545,18 @@ void main() {
     );
     expect(ca.proBenefitDictation, 'Dictats i espai per a fitxers sense límit');
     for (final reason in ['store', 'other']) {
-      expect(en.billingError(reason),
-          'The store didn’t answer. Open this screen again.');
-      expect(es.billingError(reason),
-          'La tienda no respondió. Vuelve a abrir esta pantalla.');
-      expect(ca.billingError(reason),
-          'La botiga no ha respost. Torna a obrir aquesta pantalla.');
+      expect(
+        en.billingError(reason),
+        'The store didn’t answer. Open this screen again.',
+      );
+      expect(
+        es.billingError(reason),
+        'La tienda no respondió. Vuelve a abrir esta pantalla.',
+      );
+      expect(
+        ca.billingError(reason),
+        'La botiga no ha respost. Torna a obrir aquesta pantalla.',
+      );
     }
   });
 
@@ -629,12 +631,15 @@ void main() {
       );
       // [at]: how many buttons are on screen at least.
       void expectApart(String where, {required int at}) {
-        final buttons = tester
-            .widgetList(find.byWidgetPredicate((w) => w is ButtonStyleButton))
-            .map((w) => tester.getRect(find.byWidget(w)))
-            .where((r) => r.bottom > 0 && r.top < 800)
-            .toList()
-          ..sort((a, b) => a.top.compareTo(b.top));
+        final buttons =
+            tester
+                .widgetList(
+                  find.byWidgetPredicate((w) => w is ButtonStyleButton),
+                )
+                .map((w) => tester.getRect(find.byWidget(w)))
+                .where((r) => r.bottom > 0 && r.top < 800)
+                .toList()
+              ..sort((a, b) => a.top.compareTo(b.top));
         expect(buttons.length, greaterThanOrEqualTo(at), reason: where);
         for (var i = 1; i < buttons.length; i++) {
           final above = buttons[i - 1], below = buttons[i];
@@ -713,7 +718,9 @@ void main() {
         'La tienda no respondió. Vuelve a abrir esta pantalla.',
       );
       expect(
-        find.text('La tienda no pudo completar la solicitud. Inténtalo de nuevo.'),
+        find.text(
+          'La tienda no pudo completar la solicitud. Inténtalo de nuevo.',
+        ),
         findsNothing,
       );
       expect(tester.takeException(), isNull);
@@ -916,29 +923,26 @@ void main() {
       },
     );
 
-    test(
-      'UX-2607: the Spanish Pro copy: «El {date} tendrás más.», «las condiciones de cualquier prueba»; the file line binds its numbers to their words in EN, ES and CA',
-      () {
-        final en = lookupAppLocalizations(const Locale('en'));
-        final es = lookupAppLocalizations(const Locale('es'));
-        final ca = lookupAppLocalizations(const Locale('ca'));
-        expect(
-          es.freeVoiceStatus(4, 10, '1 nov'),
-          'Dictados gratis: te quedan 4 de 10 este mes. El 1 nov tendrás más.',
-        );
-        expect(
-          es.freeVoiceStatus(1, 10, '1 nov'),
-          'Dictados gratis: te queda 1 de 10 este mes. El 1 nov tendrás más.',
-        );
-        expect(
-          es.billingRenewalHelp,
-          'Se renueva automáticamente cada mes hasta que la canceles. Revisa el precio final y las condiciones de cualquier prueba antes de confirmar.',
-        );
-        expect(es.storageUsage(42, 100), 'Archivos: 42 de 100 MB usados');
-        expect(en.storageUsage(42, 100), 'Files: 42 of 100 MB used');
-        expect(ca.storageUsage(42, 100), 'Fitxers: 42 de 100 MB utilitzats');
-      },
-    );
+    test('UX-2607: the Spanish Pro copy: «El {date} tendrás más.», «las condiciones de cualquier prueba»; the file line binds its numbers to their words in EN, ES and CA', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final es = lookupAppLocalizations(const Locale('es'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(
+        es.freeVoiceStatus(4, 10, '1 nov'),
+        'Dictados gratis: te quedan 4 de 10 este mes. El 1 nov tendrás más.',
+      );
+      expect(
+        es.freeVoiceStatus(1, 10, '1 nov'),
+        'Dictados gratis: te queda 1 de 10 este mes. El 1 nov tendrás más.',
+      );
+      expect(
+        es.billingRenewalHelp,
+        'Se renueva automáticamente cada mes hasta que la canceles. Revisa el precio final y las condiciones de cualquier prueba antes de confirmar.',
+      );
+      expect(es.storageUsage(42, 100), 'Archivos: 42 de 100 MB usados');
+      expect(en.storageUsage(42, 100), 'Files: 42 of 100 MB used');
+      expect(ca.storageUsage(42, 100), 'Fitxers: 42 de 100 MB utilitzats');
+    });
 
     testWidgets(
       'UX-2607: the Pro screen in Spanish reads «Dictados gratis: te quedan 4 de 10 este mes. El {date} tendrás más.» with the reset date as it shows it, and «…las condiciones de cualquier prueba antes de confirmar.»',
@@ -1023,8 +1027,8 @@ void main() {
     ];
 
     /// The free dictations line, with the reset date as the screen shows it.
-    String voiceLine(WidgetTester tester, AppLocalizations l) => l
-        .freeVoiceStatus(
+    String voiceLine(WidgetTester tester, AppLocalizations l) =>
+        l.freeVoiceStatus(
           4,
           10,
           tester
@@ -1069,9 +1073,12 @@ void main() {
           );
           final body = find.byType(ListView);
           expect(
-            tester.state<ScrollableState>(
-              find.descendant(of: body, matching: find.byType(Scrollable)),
-            ).position.pixels,
+            tester
+                .state<ScrollableState>(
+                  find.descendant(of: body, matching: find.byType(Scrollable)),
+                )
+                .position
+                .pixels,
             0,
             reason: 'nothing scrolled',
           );
@@ -1142,7 +1149,8 @@ void main() {
             expect(
               (icon.center.dy - lineCentre).abs(),
               lessThanOrEqualTo(4),
-              reason: '$benefit: check at ${icon.center.dy}, line at $lineCentre',
+              reason:
+                  '$benefit: check at ${icon.center.dy}, line at $lineCentre',
             );
           }
           expect(tester.takeException(), isNull);
@@ -1299,66 +1307,63 @@ void main() {
       );
     }
 
-    test(
-      'UX-2807, UX-2809: the copy in EN, ES and CA: one heading for both ways in, the to-dos example, and the new benefit line',
-      () {
-        final en = lookupAppLocalizations(const Locale('en'));
-        final es = lookupAppLocalizations(const Locale('es'));
-        final ca = lookupAppLocalizations(const Locale('ca'));
+    test('UX-2807, UX-2809: the copy in EN, ES and CA: one heading for both ways in, the to-dos example, and the new benefit line', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final es = lookupAppLocalizations(const Locale('es'));
+      final ca = lookupAppLocalizations(const Locale('ca'));
+      expect(
+        [
+          es.billingReasonMeetingNotes,
+          es.billingReasonMeetingNotesExample,
+          es.proBenefitMeetingNotes(20),
+        ],
+        [
+          'Con Pro, tus reuniones se convierten en notas:',
+          'un resumen, las decisiones y las cosas por hacer',
+          'Notas de las reuniones que grabas, hasta 20 horas al mes',
+        ],
+      );
+      expect(
+        [
+          en.billingReasonMeetingNotes,
+          en.billingReasonMeetingNotesExample,
+          en.proBenefitMeetingNotes(20),
+        ],
+        [
+          'With Pro, your meetings become notes:',
+          'a summary, the decisions and the to-dos',
+          'Notes from your recorded meetings, up to 20 hours a month',
+        ],
+      );
+      expect(
+        [
+          ca.billingReasonMeetingNotes,
+          ca.billingReasonMeetingNotesExample,
+          ca.proBenefitMeetingNotes(20),
+        ],
+        [
+          'Amb Pro, les teves reunions es converteixen en notes:',
+          'un resum, les decisions i les coses per fer',
+          'Notes de les reunions que enregistres, fins a 20 hores al mes',
+        ],
+      );
+      // It never asks to record a meeting already recorded, and the notes
+      // give to-dos, not tasks.
+      for (final l in [en, es, ca]) {
         expect(
-          [
-            es.billingReasonMeetingNotes,
-            es.billingReasonMeetingNotesExample,
-            es.proBenefitMeetingNotes,
-          ],
-          [
-            'Con Pro, tus reuniones se convierten en notas:',
-            'un resumen, las decisiones y las cosas por hacer',
-            'Notas de las reuniones que grabas',
-          ],
-        );
-        expect(
-          [
-            en.billingReasonMeetingNotes,
-            en.billingReasonMeetingNotesExample,
-            en.proBenefitMeetingNotes,
-          ],
-          [
-            'With Pro, your meetings become notes:',
-            'a summary, the decisions and the to-dos',
-            'Notes from your recorded meetings',
-          ],
-        );
-        expect(
-          [
-            ca.billingReasonMeetingNotes,
-            ca.billingReasonMeetingNotesExample,
-            ca.proBenefitMeetingNotes,
-          ],
-          [
-            'Amb Pro, les teves reunions es converteixen en notes:',
-            'un resum, les decisions i les coses per fer',
-            'Notes de les reunions que enregistres',
-          ],
-        );
-        // It never asks to record a meeting already recorded, and the notes
-        // give to-dos, not tasks.
-        for (final l in [en, es, ca]) {
-          expect(
-            l.billingReasonMeetingNotes.toLowerCase(),
-            isNot(
-              anyOf(
-                contains('graba'),
-                contains('record a'),
-                contains('enregistra'),
-              ),
+          l.billingReasonMeetingNotes.toLowerCase(),
+          isNot(
+            anyOf(
+              contains('graba'),
+              contains('record a'),
+              contains('enregistra'),
             ),
-          );
-        }
-        expect(es.billingReasonMeetingNotesExample, isNot(contains('tareas')));
-        expect(ca.billingReasonMeetingNotesExample, isNot(contains('tasques')));
-      },
-    );
+          ),
+        );
+      }
+      expect(es.billingReasonMeetingNotesExample, isNot(contains('tareas')));
+      expect(ca.billingReasonMeetingNotesExample, isNot(contains('tasques')));
+    });
 
     testWidgets(
       'UX-2807: reason meetingNotes, ES 1× with the priced store: the reason box reads «Con Pro, tus reuniones se convierten en notas:» then «un resumen, las decisiones y las cosas por hacer», then the plan, with the price and the pinned «Ver suscripción»',
@@ -1382,6 +1387,13 @@ void main() {
         final node = tester.getSemantics(heading).getSemanticsData();
         expect(node.label, l.billingReasonMeetingNotes);
         expect(node.flagsCollection.isHeader, isTrue);
+        // Under the benefits, a scroll away since the month's meeting time
+        // joined the reason (D4).
+        await tester.scrollUntilVisible(
+          find.text(l.billingMonthlyPrice('€4.99')),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
         expect(find.text(l.billingMonthlyPrice('€4.99')), findsOneWidget);
         expect(offer, findsOneWidget);
         expect(find.byKey(const ValueKey('subscription-error')), findsNothing);
@@ -1424,7 +1436,7 @@ void main() {
             l.proBenefitDictation,
             l.proBenefitTyping,
             l.proBenefitReminders,
-            l.proBenefitMeetingNotes,
+            l.proBenefitMeetingNotes(20),
           ];
           // The first benefit in view above «Ver suscripción», unscrolled
           // (UX-2640).
@@ -1444,10 +1456,10 @@ void main() {
               reason: '«${lines[i]}» under «${lines[i - 1]}»',
             );
           }
-          final meeting = find.text(l.proBenefitMeetingNotes);
+          final meeting = find.text(l.proBenefitMeetingNotes(20));
           await tester.ensureVisible(meeting);
           await tester.pumpAndSettle();
-          expectWhole(tester, meeting, l.proBenefitMeetingNotes);
+          expectWhole(tester, meeting, l.proBenefitMeetingNotes(20));
           // With its own check, as every benefit.
           final row = find
               .ancestor(of: meeting, matching: find.byType(Row))
@@ -1475,7 +1487,24 @@ void main() {
       (tester) async {
         final l = lookupAppLocalizations(const Locale('es'));
         await openFree(tester, 'es', 1, reason: ProReason.meetingNotes);
-        expect(find.text(l.proBenefitMeetingNotes), findsNothing);
+        expect(find.text(l.proBenefitMeetingNotes(20)), findsNothing);
+        // D4: the month's meeting time is said up front, under the example.
+        expect(
+          find.text('Hasta 20 horas de reuniones al mes.'),
+          findsOneWidget,
+        );
+        expect(
+          tester
+              .getRect(find.byKey(const ValueKey('subscription-meeting-limit')))
+              .top,
+          greaterThanOrEqualTo(
+            tester
+                .getRect(
+                  find.byKey(const ValueKey('subscription-reason-example')),
+                )
+                .bottom,
+          ),
+        );
         for (final line in [
           l.proBenefitDictation,
           l.proBenefitTyping,
@@ -1487,15 +1516,165 @@ void main() {
 
         await openFree(tester, 'es', 1, reason: ProReason.reminderPlans);
         expect(find.text(l.proBenefitReminders), findsNothing);
+        expect(
+          find.byKey(const ValueKey('subscription-meeting-limit')),
+          findsNothing,
+        );
+        expect(
+          find.text('Notas de las reuniones que grabas, hasta 20 horas al mes'),
+          findsOneWidget,
+        );
         for (final line in [
           l.proBenefitDictation,
           l.proBenefitTyping,
-          l.proBenefitMeetingNotes,
+          l.proBenefitMeetingNotes(20),
         ]) {
           expect(find.text(line), findsOneWidget, reason: line);
         }
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());
+      },
+    );
+  });
+
+  group('P330 · the meeting hours set apart, and as a plural', () {
+    final heading = find.byKey(const ValueKey('subscription-reason'));
+    final example = find.byKey(const ValueKey('subscription-reason-example'));
+    final limit = find.byKey(const ValueKey('subscription-meeting-limit'));
+
+    for (final (language, scale) in [('es', 1.0), ('es', 2.0), ('ca', 2.0)]) {
+      testWidgets(
+        'UX-3001: reason meetingNotes, $language ${scale.toInt()}× on 360×800 (meetings/pro.reason.$language.light.${scale.toInt()}x): «${language == 'es' ? 'Hasta 20 horas de reuniones al mes.' : 'Fins a 20 hores de reunions al mes.'}» sits at least 8 dp under the example, and the heading → example gap stays 4 dp',
+        (tester) async {
+          await loadManrope();
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          await openPro(
+            tester,
+            sdk: _CountingRevenueCat(),
+            language: language,
+            user: freeUser,
+            textScale: scale,
+            reason: ProReason.meetingNotes,
+          );
+          final l = lookupAppLocalizations(Locale(language));
+          expect(tester.widget<Text>(heading).data, l.billingReasonMeetingNotes);
+          expect(
+            tester.widget<Text>(example).data,
+            l.billingReasonMeetingNotesExample,
+          );
+          expect(
+            tester.widget<Text>(limit).data,
+            language == 'es'
+                ? 'Hasta 20 horas de reuniones al mes.'
+                : 'Fins a 20 hores de reunions al mes.',
+          );
+          final headingRect = tester.getRect(heading);
+          final exampleRect = tester.getRect(example);
+          final limitRect = tester.getRect(limit);
+          final exampleGap = limitRect.top - exampleRect.bottom;
+          final headingGap = exampleRect.top - headingRect.bottom;
+          expect(
+            exampleGap,
+            greaterThanOrEqualTo(8),
+            reason: 'example → hours line gap',
+          );
+          expect(
+            headingGap,
+            moreOrLessEquals(4, epsilon: 0.5),
+            reason: 'heading → example gap unchanged',
+          );
+          // Set apart: more room above the hours than above the example.
+          expect(exampleGap, greaterThan(headingGap));
+          // The hours line drawn whole, inside 360 dp.
+          expect(limitRect.left, greaterThanOrEqualTo(0));
+          expect(limitRect.right, lessThanOrEqualTo(360.5));
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(of: limit, matching: find.byType(RichText)),
+          );
+          expect(paragraph.didExceedMaxLines, isFalse);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+        },
+      );
+    }
+
+    test(
+      'UX-3002: proBenefitMeetingNotes and billingReasonMeetingNotesLimit read the singular with 1 and today’s text with 20, in EN, ES and CA',
+      () {
+        final expected = {
+          'en': (
+            benefit1: 'Notes from your recorded meetings, up to 1 hour a month',
+            benefit20:
+                'Notes from your recorded meetings, up to 20 hours a month',
+            limit1: 'Up to 1 hour of meetings a month.',
+            limit20: 'Up to 20 hours of meetings a month.',
+          ),
+          'es': (
+            benefit1: 'Notas de las reuniones que grabas, hasta 1 hora al mes',
+            benefit20:
+                'Notas de las reuniones que grabas, hasta 20 horas al mes',
+            limit1: 'Hasta 1 hora de reuniones al mes.',
+            limit20: 'Hasta 20 horas de reuniones al mes.',
+          ),
+          'ca': (
+            benefit1:
+                'Notes de les reunions que enregistres, fins a 1 hora al mes',
+            benefit20:
+                'Notes de les reunions que enregistres, fins a 20 hores al mes',
+            limit1: 'Fins a 1 hora de reunions al mes.',
+            limit20: 'Fins a 20 hores de reunions al mes.',
+          ),
+        };
+        for (final MapEntry(key: language, value: e) in expected.entries) {
+          final l = lookupAppLocalizations(Locale(language));
+          expect(l.proBenefitMeetingNotes(1), e.benefit1, reason: language);
+          expect(l.proBenefitMeetingNotes(20), e.benefit20, reason: language);
+          expect(
+            l.billingReasonMeetingNotesLimit(1),
+            e.limit1,
+            reason: language,
+          );
+          expect(
+            l.billingReasonMeetingNotesLimit(20),
+            e.limit20,
+            reason: language,
+          );
+          // Another count takes the plural too, with the number in it.
+          expect(l.proBenefitMeetingNotes(2), contains('2'), reason: language);
+          expect(
+            l.proBenefitMeetingNotes(2),
+            isNot(e.benefit1),
+            reason: language,
+          );
+        }
+      },
+    );
+
+    test(
+      'UX-3002: both keys are whole-sentence ICU plurals in the three ARB files, with an =1 case and an other case',
+      () {
+        for (final language in ['en', 'es', 'ca']) {
+          final arb =
+              jsonDecode(
+                    File('lib/l10n/app_$language.arb').readAsStringSync(),
+                  )
+                  as Map<String, dynamic>;
+          for (final key in [
+            'proBenefitMeetingNotes',
+            'billingReasonMeetingNotesLimit',
+          ]) {
+            final value = arb[key] as String;
+            expect(
+              value,
+              startsWith('{hours, plural, =1{'),
+              reason: '$language $key',
+            );
+            expect(value, contains('} other{'), reason: '$language $key');
+            expect(value, endsWith('}}'), reason: '$language $key');
+          }
+        }
       },
     );
   });

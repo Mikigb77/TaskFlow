@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,12 +14,47 @@ import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
 import 'package:agenda/services/capture_store.dart';
+import 'package:agenda/services/meeting_note.dart';
 import 'package:agenda/services/task_database.dart';
 
-/// Whether [note] offers «Crear tarea»: a note with steps still open, as a
-/// meeting's note has its to-dos (MN-22).
-bool noteMakesTask(Task note) =>
-    note.isNote && note.checklist.any((step) => !step.done());
+/// Whether [note] offers «Crear tarea»: a note made from a meeting on this
+/// phone ([meetingNotes], its ids) with steps still open, its to-dos
+/// (MN-22). Other notes with a checklist, such as a recipe, don't: the
+/// owner's decision of 2026-11-04 (D1, UX-2722).
+bool noteMakesTask(Task note, Set<int> meetingNotes) =>
+    note.isNote &&
+    note.id != null &&
+    meetingNotes.contains(note.id) &&
+    note.checklist.any((step) => !step.done());
+
+/// The signed-in account's notes made from a meeting on this phone. Kept,
+/// and read before any note's page opens (main_shell.dart), so the page's
+/// main button is right from its first frame (UX-2903); read again when a
+/// note is added to or removed from the task list, so a meeting's note
+/// saved since offers «Crear tarea». The last marks stay while it does.
+final meetingNotesProvider = FutureProvider<Set<int>>((ref) async {
+  // Changes only when a note comes or goes, not on every task edit.
+  ref.watch(
+    taskProvider.select(
+      (state) => state.value
+          ?.where((task) => task.isNote && task.id != null)
+          .map((task) => task.id)
+          .join(','),
+    ),
+  );
+  try {
+    return await MeetingNoteMarks.read(
+      ref.watch(meetingNoteMarksDatabaseProvider),
+      ref.watch(captureOwnerProvider),
+    );
+  } catch (_) {
+    // Unread: no note offers «Crear tarea».
+    return const {};
+  }
+});
+
+/// The database [meetingNotesProvider] reads; tests replace it.
+final meetingNoteMarksDatabaseProvider = Provider((ref) => TaskDatabase());
 
 /// The task «Crear tarea» made from [note] on this phone, while it exists
 /// (done or not): the note then offers «Ver tarea» (UX-2702).

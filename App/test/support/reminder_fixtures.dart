@@ -25,6 +25,15 @@ class MemoryReminderStore extends ReminderPreferenceStore {
   @override
   Future<List<Map<String, Object?>>> schedulingInfo() async => info;
 
+  /// The first meeting has asked for notifications on this phone (D3 of
+  /// 2026-11-04). True by default, so a meeting started with notifications
+  /// off shows no question unless a test or preview asks for it.
+  bool meetingAsked = true;
+  @override
+  Future<bool> meetingNotificationsAsked() async => meetingAsked;
+  @override
+  Future<void> setMeetingNotificationsAsked() async => meetingAsked = true;
+
   /// The tasks the reminder question has offered a plan for.
   final Set<int> offered = {};
   @override

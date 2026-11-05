@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:sqflite/sqflite.dart';
+import 'package:agenda/services/task_database.dart';
 import 'package:agenda/l10n/meeting_copy.dart';
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/meeting.dart';
@@ -143,7 +147,53 @@ Task meetingNote(
     listId: projectId,
     notes: body.isEmpty ? null : body,
     checklist: [
-      for (final todo in result.todos) ChecklistItem(title: meetingTodoLine(todo)),
+      for (final todo in result.todos)
+        ChecklistItem(title: meetingTodoLine(todo)),
     ],
   );
+}
+
+/// Marks, on this phone only, the notes made from a meeting, so only they
+/// offer «Crear tarea» (D1). Never synced or sent: on another phone a
+/// meeting's note doesn't offer it.
+class MeetingNoteMarks {
+  // Per-account preferences are scoped `<kind>:<owner>`, so deleting the
+  // account erases this too.
+  static String _scope(String owner) => 'meetingNotes:$owner';
+
+  static Set<int> _ids(List<Map<String, Object?>> rows) {
+    if (rows.isEmpty) return const {};
+    final data = jsonDecode(rows.single['data'] as String);
+    if (data is! List) return const {};
+    return {
+      for (final id in data)
+        if (id is int) id,
+    };
+  }
+
+  /// Marks note [noteId] of [owner] as a meeting's, inside [tx], the
+  /// transaction that saves it.
+  static Future<void> add(DatabaseExecutor tx, String owner, int noteId) async {
+    final ids = _ids(
+      await tx.query(
+        'app_preferences',
+        where: 'scope = ?',
+        whereArgs: [_scope(owner)],
+      ),
+    );
+    await tx.insert('app_preferences', {
+      'scope': _scope(owner),
+      'data': jsonEncode([...ids, noteId]),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  /// The ids of [owner]'s notes made from a meeting on this phone.
+  static Future<Set<int>> read(TaskDatabase database, String owner) async =>
+      _ids(
+        await (await database.database).query(
+          'app_preferences',
+          where: 'scope = ?',
+          whereArgs: [_scope(owner)],
+        ),
+      );
 }

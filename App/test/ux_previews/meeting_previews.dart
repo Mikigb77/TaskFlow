@@ -128,6 +128,7 @@ Future<PreviewApp> _open(
   bool pro = true,
   List<Task> tasks = const [],
   bool notificationsAllowed = true,
+  bool notificationsAsked = true,
   Map<int, int>? noteTasks,
 }) => PreviewApp.open(
   p,
@@ -136,6 +137,7 @@ Future<PreviewApp> _open(
   billing: pro ? null : (FakeRevenueCat()..info = billingInfo()),
   tasks: [...normalDay(), ...tasks],
   notificationsAllowed: notificationsAllowed,
+  meetingNotificationsAsked: notificationsAsked,
   overrides: [
     meetingsOverride(meetings),
     ...noteTaskOverrides(MemoryNoteTaskLinks(noteTasks)),
@@ -147,11 +149,13 @@ Future<PreviewApp> _record(
   Preview p,
   ScriptedMeetings meetings, {
   bool notificationsAllowed = true,
+  bool notificationsAsked = true,
 }) async {
   final app = await _open(
     p,
     meetings,
     notificationsAllowed: notificationsAllowed,
+    notificationsAsked: notificationsAsked,
   );
   await app.tab(p.l.notes);
   await _tapRecord(p);
@@ -245,6 +249,22 @@ void meetingPreviews() {
       then: {
         'discard-question':
             'Descartar asks first; «Seguir grabando» is the safe choice.',
+      },
+    );
+
+    preview(
+      meetingRecording,
+      'notify-ask',
+      'The first meeting with TaskFlow’s notifications off: recording has started, and one sentence with no title, «Activa las notificaciones para parar la grabación desde ahí y saber cuándo están listas las notas.», with a single «Continuar» that opens Android’s own dialog. A tap on the dimmed screen leaves it up. Asked once on this phone (D3 of 2026-11-04).',
+      [...mainScreen, ...longText],
+      (p) async {
+        await _record(
+          p,
+          ScriptedMeetings(),
+          notificationsAllowed: false,
+          notificationsAsked: false,
+        );
+        await p.shoot();
       },
     );
 
@@ -671,8 +691,8 @@ void meetingPreviews() {
     preview(
       meetingPro,
       'reason',
-      'A free account taps Grabar una reunión: the Pro screen says first, as a heading, «Con Pro, tus reuniones se convierten en notas:», then «un resumen, las decisiones y las cosas por hacer», then the plan with its price, then what else Pro gives (dictation and file space without limit, typed sentences turned into tasks, reminders in your own words), and «Ver suscripción» pinned at the bottom.',
-      [es1, ca2],
+      'A free account taps Grabar una reunión: the Pro screen says first, as a heading, «Con Pro, tus reuniones se convierten en notas:», then «un resumen, las decisiones y las cosas por hacer», then, 8 dp under it, «Hasta 20 horas de reuniones al mes.», then the plan with its price, then what else Pro gives (dictation and file space without limit, typed sentences turned into tasks, reminders in your own words), and «Ver suscripción» pinned at the bottom.',
+      [es1, es2, ca2],
       (p) async {
         final app = await _open(p, ScriptedMeetings(), pro: false);
         await app.tab(p.l.notes);

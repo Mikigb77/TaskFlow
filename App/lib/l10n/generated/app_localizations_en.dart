@@ -5325,5 +5325,35 @@ class AppLocalizationsEn extends AppLocalizations {
       'a summary, the decisions and the to-dos';
 
   @override
-  String get proBenefitMeetingNotes => 'Notes from your recorded meetings';
+  String proBenefitMeetingNotes(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'Notes from your recorded meetings, up to $hours hours a month',
+      one: 'Notes from your recorded meetings, up to 1 hour a month',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get meetingAudioDeleted =>
+      'The audio is sent to make the notes, then deleted.';
+
+  @override
+  String get meetingNotifyAsk =>
+      'Turn on notifications to stop the recording from there and to know when the notes are ready.';
+
+  @override
+  String get meetingNotifyAskContinue => 'Continue';
+
+  @override
+  String billingReasonMeetingNotesLimit(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'Up to $hours hours of meetings a month.',
+      one: 'Up to 1 hour of meetings a month.',
+    );
+    return '$_temp0';
+  }
 }

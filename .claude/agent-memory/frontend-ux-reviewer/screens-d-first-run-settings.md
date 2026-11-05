@@ -102,3 +102,4 @@ Current as of 2026-10-13 (whole-app run, slice D). Paths are under `App/`.
 - **Language sheet** closes at once; reminders rewritten in the background (device check owed).
 
 Related: [[ui-patterns]], [[screens-a-voice-capture]].
+- **Pro screen, meeting reason (2026-11-04):** heading «Con Pro, tus reuniones se convierten en notas:» → example (no final period, completes the colon) → «Hasta 20 horas de reuniones al mes.» → status; gaps 4 / 8 / 12 dp (`subscription_screen.dart:123-142`). The hours appear once per screen: with the meeting reason the benefit line is hidden; otherwise the benefits list ends «…, hasta 20 horas al mes» (`proBenefitMeetingNotes`). Notes-ready notification is `NotificationVisibility.private` (Android's default: title still shows on a default lock screen).

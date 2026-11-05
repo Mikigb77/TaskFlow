@@ -8,13 +8,14 @@ import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/models/reminder_plan.dart';
 import 'package:agenda/models/task.dart';
 import 'package:agenda/services/android_database_factory.dart';
+import 'package:agenda/services/meeting_note.dart';
 import 'package:agenda/services/reminder_copy.dart';
 
 /// Why this phone gives no reminder for a task ([TaskDatabase.reminderBlock]).
 enum ReminderBlock { archived, muted, notForAccount }
 
 class TaskDatabase {
-  static const schemaVersion = 22;
+  static const schemaVersion = 23;
   static final TaskDatabase _instance = TaskDatabase._internal();
   Database? _database;
   Future<Database>? _opening;
@@ -272,6 +273,24 @@ class TaskDatabase {
       // Recorded meetings and their pieces (App/docs/MEETING_NOTES.md).
       // New tables only: nothing saved before changes.
       await createMeetingTables(db);
+    }
+    if (oldVersion < 23 && newVersion >= 23) {
+      // Notes saved before meeting notes were marked (D1, UX-2905) keep
+      // «Crear tarea» when their meeting row still links them. Notes whose
+      // row is already gone can't be told apart and stay unmarked, by
+      // design: never guess from a note's text.
+      final rows = await db.rawQuery(
+        'SELECT DISTINCT m.owner_key, m.note_id FROM meetings m '
+        'JOIN tasks t ON t.id = m.note_id AND t.owner_key = m.owner_key '
+        'WHERE m.note_id IS NOT NULL',
+      );
+      for (final row in rows) {
+        await MeetingNoteMarks.add(
+          db,
+          row['owner_key'] as String,
+          row['note_id'] as int,
+        );
+      }
     }
   }
 

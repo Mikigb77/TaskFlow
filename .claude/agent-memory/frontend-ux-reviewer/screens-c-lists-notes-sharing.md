@@ -96,3 +96,10 @@ Current as of 2026-10-13 (whole-app run, slice C). Paths are under `App/lib/`.
 - **«Novedades del proyecto»** (`showProjectPreferences`, opened from `list_sharing_screen.dart`, `task_lists_screen.dart` and the muted reminder line in `reminder_control.dart`): heading + project name line, 70%-cap picker shape (2026-11-01).
 
 Related: [[ui-patterns]], [[screens-b-calendar-tasks]].
+
+## Meeting notes (run 2026-11-04-screens; widget level, device checks owed)
+- **Ways in:** Notas › «Grabar una reunión» (free account → Pro screen with the meeting reason; held-back recording's «Ver Pro» → same screen). The notes-ready notification opens its note (`main_shell.dart` `_openMeetingAction`, marks the meeting seen).
+- **Recording screen** (`meeting_screen.dart`): 3 targets (Atrás, Parar 312×84 dp, Descartar 92×48 dp, both in `bottomNavigationBar`); D5's audio line is last and falls below the fold at 2× with a warning (intended). Stop → «Preparando tus notas…».
+- **First meeting, notifications off (D3):** a title-less card, one sentence + «Continuar», asked once per phone (`setMeetingNotificationsAsked`). Flow: microphone dialog → card → Android dialog = up to 3 dialogs before the phone can be put down.
+- **Meeting note page:** filled «Crear tarea» above outlined «Editar nota» (same height) for a marked note with an open step (`noteMakesTask`); a recipe-style note with steps shows one filled «Editar nota». «Crear tarea» › review › «Añadir tarea» = 3 taps.
+- Renders: `App/build/ux/meetings/` (recording.*, recording.notify-ask.*, note.create-task.*, pro.reason.*, pro.held-back.*), `notes/note.with-steps.*`.

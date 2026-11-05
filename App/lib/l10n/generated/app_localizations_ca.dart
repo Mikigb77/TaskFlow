@@ -5411,5 +5411,36 @@ class AppLocalizationsCa extends AppLocalizations {
       'un resum, les decisions i les coses per fer';
 
   @override
-  String get proBenefitMeetingNotes => 'Notes de les reunions que enregistres';
+  String proBenefitMeetingNotes(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other:
+          'Notes de les reunions que enregistres, fins a $hours hores al mes',
+      one: 'Notes de les reunions que enregistres, fins a 1 hora al mes',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get meetingAudioDeleted =>
+      'L’àudio s’envia per fer les notes i després s’esborra.';
+
+  @override
+  String get meetingNotifyAsk =>
+      'Activa les notificacions per aturar l’enregistrament des d’allà i saber quan les notes estan llestes.';
+
+  @override
+  String get meetingNotifyAskContinue => 'Continua';
+
+  @override
+  String billingReasonMeetingNotesLimit(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'Fins a $hours hores de reunions al mes.',
+      one: 'Fins a 1 hora de reunions al mes.',
+    );
+    return '$_temp0';
+  }
 }

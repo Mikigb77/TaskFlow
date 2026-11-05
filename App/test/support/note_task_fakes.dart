@@ -1,12 +1,15 @@
 // P318: «Crear tarea» from a note, in memory: a task list that saving adds
 // to, editing changes, and Deshacer or Eliminar take from, and the phone's
 // note → task links.
+import 'dart:convert';
+
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/note_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
+import 'package:sqflite/sqflite.dart';
 
 import 'design_fixtures.dart';
 
@@ -69,7 +72,83 @@ class MemoryNoteTaskLinks extends NoteTaskLinks {
       links[noteId] = taskId;
 }
 
-/// The overrides for [NoteTaskList] and [MemoryNoteTaskLinks].
-List<Override> noteTaskOverrides(MemoryNoteTaskLinks links) => [
+/// The overrides for [NoteTaskList] and [MemoryNoteTaskLinks]. Every note
+/// in the task list counts as made from a meeting on this phone, unless
+/// [meetingNotes] names them (D1); they are read once [meetingNotesReady]
+/// completes, if given (UX-2903).
+List<Override> noteTaskOverrides(
+  MemoryNoteTaskLinks links, {
+  Set<int>? meetingNotes,
+  Future<void>? meetingNotesReady,
+}) => [
   noteTaskLinksProvider.overrideWithValue(links),
+  meetingNotesOverride(meetingNotes, meetingNotesReady),
 ];
+
+/// [meetingNotesProvider] in memory: [ids], or every note in the task list,
+/// once [ready] completes, if given.
+Override meetingNotesOverride([Set<int>? ids, Future<void>? ready]) =>
+    meetingNotesProvider.overrideWith((ref) async {
+      final tasks = ref.watch(taskProvider).value ?? const <Task>[];
+      if (ready != null) await ready;
+      return ids ??
+          {
+            for (final task in tasks)
+              if (task.isNote && task.id != null) task.id!,
+          };
+    });
+
+/// This phone's meeting-note marks (D1) in memory, for the real
+/// [meetingNotesProvider] to read: [ids], and how many times it read them.
+class MemoryMeetingNoteMarks implements TaskDatabase {
+  MemoryMeetingNoteMarks([Set<int>? ids]) : ids = {...?ids};
+  final Set<int> ids;
+  int reads = 0;
+
+  @override
+  Future<Database> get database async => _MarksTable(this);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// The one table [MeetingNoteMarks.read] queries.
+class _MarksTable implements Database {
+  _MarksTable(this.marks);
+  final MemoryMeetingNoteMarks marks;
+
+  @override
+  Future<List<Map<String, Object?>>> query(
+    String table, {
+    bool? distinct,
+    List<String>? columns,
+    String? where,
+    List<Object?>? whereArgs,
+    String? groupBy,
+    String? having,
+    String? orderBy,
+    int? limit,
+    int? offset,
+  }) async {
+    final scope = whereArgs?.firstOrNull;
+    if (table != 'app_preferences' ||
+        scope is! String ||
+        !scope.startsWith('meetingNotes:')) {
+      return const [];
+    }
+    marks.reads++;
+    return [
+      {
+        'scope': scope,
+        'data': jsonEncode([...marks.ids]),
+      },
+    ];
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// The real [meetingNotesProvider], reading [marks].
+Override meetingNoteMarksOverride(MemoryMeetingNoteMarks marks) =>
+    meetingNoteMarksDatabaseProvider.overrideWithValue(marks);
