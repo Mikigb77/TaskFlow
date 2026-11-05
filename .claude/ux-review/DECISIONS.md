@@ -17,6 +17,7 @@ The owner asked for notes from a recorded conversation, then a task with a check
   - D5 (UX-2721): one quiet line on the recording screen, «El audio se envía para hacer las notas y después se borra.»; no consent reminder. The website's privacy page must say the same (MN-34).
   - D6 (UX-2814): the "notes ready" notification is private on the lock screen (Android hides its text where the phone hides private content); the title shows once unlocked.
   - D7 (UX-2815): the owner adds «Notas de las reuniones que grabas» to the RevenueCat paywall in its dashboard.
+- 2026-11-05, the owner chose "Keep as built" on a decision card (UX-3004, run 2026-11-04-screens): the notes-ready notification stays `private` and keeps the meeting's title. It shows on the lock screen unless the phone hides sensitive content; no title-free lock-screen version, and not secret.
 
 ## 2026-11-01 — The UX loop as fast as the machine allows
 After the 2026-10-28-app plan took about 19 hours, the owner: "it cannot be that we are running for 19 hours … We should deploy all the agents that can be possibly deployed at the same time, if needed." What the main session put in place for it, reported to the owner (`.claude/skills/ux/references/speed-2026-11-01.md`):
