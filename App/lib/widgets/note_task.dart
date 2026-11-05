@@ -21,14 +21,30 @@ import 'package:agenda/services/quick_schedule_parser.dart';
 import 'package:agenda/services/task_database.dart';
 
 /// Whether [note] offers «Crear tarea»: a note made from a meeting on this
-/// phone ([meetingNotes], its ids) with steps still open, its to-dos
-/// (MN-22). Other notes with a checklist, such as a recipe, don't: the
-/// owner's decision of 2026-11-04 (D1, UX-2722).
-bool noteMakesTask(Task note, Set<int> meetingNotes) =>
+/// phone ([meetingNotes], its ids) with lines (its tasks) still open that
+/// made no task yet ([made], by line id, from [NoteTaskLinks]) (MN-22).
+/// Other notes with a checklist, such as a recipe, don't: the owner's
+/// decision of 2026-11-04 (D1, UX-2722).
+bool noteMakesTask(
+  Task note,
+  Set<int> meetingNotes, [
+  Map<String, int> made = const {},
+]) =>
     note.isNote &&
     note.id != null &&
     meetingNotes.contains(note.id) &&
-    note.checklist.any((step) => !step.done());
+    noteLinesToMake(note, made).isNotEmpty;
+
+/// [note]'s open lines that made no task yet ([made], by line id): the ones
+/// «Crear tareas» turns into tasks (UX-3102). A note that made one task
+/// from all its lines, before lines were tasks, has none left.
+List<ChecklistItem> noteLinesToMake(Task note, Map<String, int> made) =>
+    made.containsKey(NoteTaskLinks.wholeNote)
+    ? const []
+    : [
+        for (final line in note.checklist)
+          if (!line.done() && !made.containsKey(line.id)) line,
+      ];
 
 /// The signed-in account's notes made from a meeting on this phone. Kept,
 /// and read before any note's page opens (main_shell.dart), so the page's
@@ -59,16 +75,19 @@ final meetingNotesProvider = FutureProvider<Set<int>>((ref) async {
 /// The database [meetingNotesProvider] reads; tests replace it.
 final meetingNoteMarksDatabaseProvider = Provider((ref) => TaskDatabase());
 
-/// The tasks «Crear tareas» made from [note] on this phone that still exist
-/// (done or not): the note then offers «Ver tarea» or «Ver tareas»
-/// (UX-2702).
-List<Task> noteMadeTasks(WidgetRef ref, Task note) {
-  final ids = ref.watch(noteTasksProvider).value?[note.id];
-  if (ids == null || ids.isEmpty) return const [];
+/// The tasks «Crear tareas» made from [note] on this phone that still
+/// exist (done or not), by the line that made each ([NoteTaskLinks.wholeNote]
+/// for a note's one task from before lines were tasks): the note then shows
+/// each line's task, and offers «Ver tarea» or «Ver tareas» (UX-2702,
+/// UX-3101).
+Map<String, Task> noteMadeTasks(WidgetRef ref, Task note) {
+  final links = ref.watch(noteTasksProvider).value?[note.id];
+  if (links == null || links.isEmpty) return const {};
   final tasks = ref.watch(taskProvider).value ?? const <Task>[];
-  return [
-    for (final id in ids) ?tasks.firstWhereOrNull((task) => task.id == id),
-  ];
+  return {
+    for (final entry in links.entries)
+      entry.key: ?tasks.firstWhereOrNull((task) => task.id == entry.value),
+  };
 }
 
 /// «Ver tareas»: Calendar, on the earliest day of [tasks], with them lit,
@@ -99,9 +118,13 @@ class NoteTaskLinks {
   // account erases this too.
   static String _scope(String owner) => 'noteTasks:$owner';
 
-  /// Each note's id, with the ids of the tasks it made (one, before notes
-  /// made several).
-  Future<Map<int, List<int>>> read(String owner) async {
+  /// The line key of a note's one task, made from all its lines before
+  /// lines were tasks.
+  static const wholeNote = '';
+
+  /// Each note's id, with the task each of its lines made, by line id
+  /// ([wholeNote] for a note's one task from before).
+  Future<Map<int, Map<String, int>>> read(String owner) async {
     final rows = await (await database.database).query(
       'app_preferences',
       where: 'scope = ?',
@@ -114,16 +137,22 @@ class NoteTaskLinks {
       for (final entry in data.entries)
         if (int.tryParse('${entry.key}') case final note?)
           if (entry.value is int)
-            note: [entry.value as int]
-          else if (entry.value is List)
-            note: [
-              for (final id in entry.value as List)
-                if (id is int) id,
-            ],
+            note: {wholeNote: entry.value as int}
+          else if (entry.value is Map)
+            note: {
+              for (final line in (entry.value as Map).entries)
+                if (line.value is int) '${line.key}': line.value as int,
+            },
     };
   }
 
-  Future<void> link(String owner, int noteId, List<int> taskIds) async {
+  /// Adds the tasks [lineTasks] (by line id) made from note [noteId] to
+  /// those it made before.
+  Future<void> link(
+    String owner,
+    int noteId,
+    Map<String, int> lineTasks,
+  ) async {
     final db = await database.database;
     await db.transaction((tx) async {
       final rows = await tx.query(
@@ -136,7 +165,14 @@ class NoteTaskLinks {
           : jsonDecode(rows.single['data'] as String);
       await tx.insert('app_preferences', {
         'scope': _scope(owner),
-        'data': jsonEncode({if (data is Map) ...data, '$noteId': taskIds}),
+        'data': jsonEncode({
+          if (data is Map) ...data,
+          '$noteId': {
+            if (data is Map && data['$noteId'] is Map)
+              ...data['$noteId'] as Map,
+            ...lineTasks,
+          },
+        }),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     });
   }
@@ -145,7 +181,9 @@ class NoteTaskLinks {
 final noteTaskLinksProvider = Provider((ref) => NoteTaskLinks(TaskDatabase()));
 
 /// The signed-in account's note → tasks links on this phone.
-final noteTasksProvider = FutureProvider<Map<int, List<int>>>((ref) async {
+final noteTasksProvider = FutureProvider<Map<int, Map<String, int>>>((
+  ref,
+) async {
   try {
     return await ref
         .watch(noteTaskLinksProvider)
@@ -165,7 +203,12 @@ final noteTasksProvider = FutureProvider<Map<int, List<int>>>((ref) async {
 /// holds everything, and the capture never waits in `Sin guardar` (source
 /// 'note', UX-2706). Once saved, a single new task's page opens over the
 /// note, which then offers «Ver tarea» («Ver tareas» for several).
-Future<void> createTaskFromNote(BuildContext context, Task note) async {
+Future<void> createTaskFromNote(
+  BuildContext context,
+  Task note, {
+  // The lines to make into tasks: by default every open line.
+  List<ChecklistItem>? lines,
+}) async {
   final container = ProviderScope.containerOf(context, listen: false);
   final store = container.read(captureStoreProvider);
   final owner = container.read(captureOwnerProvider);
@@ -197,19 +240,24 @@ Future<void> createTaskFromNote(BuildContext context, Task note) async {
     projectId: projectId,
     source: 'note',
   );
-  final drafts = [
-    for (final line in note.checklist)
-      if (!line.done())
-        CaptureDraft(
-          id: const Uuid().v4(),
-          task: noteLineTask(
-            line,
-            tasks?.tasks[line.id],
-            day: tasks?.day,
-            projectId: projectId,
-          ),
+  // Each card's line, so the note knows which line made which task.
+  final lineOf = <String, String>{};
+  final drafts = <CaptureDraft>[];
+  for (final line in lines ?? noteLinesToMake(note, const {})) {
+    final id = const Uuid().v4();
+    lineOf[id] = line.id;
+    drafts.add(
+      CaptureDraft(
+        id: id,
+        task: noteLineTask(
+          line,
+          tasks?.tasks[line.id],
+          day: tasks?.day,
+          projectId: projectId,
         ),
-  ];
+      ),
+    );
+  }
   await store.update(
     session.copyWith(
       status: 'ready',
@@ -232,44 +280,56 @@ Future<void> createTaskFromNote(BuildContext context, Task note) async {
   if (noteId == null) return;
   try {
     final saved = await store.read(session.id, owner);
-    final taskIds = saved?.status == 'saved'
-        ? saved!.drafts.map((d) => d.savedTaskId).nonNulls.toList()
-        : const <int>[];
-    if (taskIds.isEmpty) return;
-    await container.read(noteTaskLinksProvider).link(owner, noteId, taskIds);
+    final made = saved?.status == 'saved'
+        ? {
+            for (final draft in saved!.drafts)
+              if ((lineOf[draft.id], draft.savedTaskId) case (
+                final line?,
+                final task?,
+              ))
+                line: task,
+          }
+        : const <String, int>{};
+    if (made.isEmpty) return;
+    await container.read(noteTaskLinksProvider).link(owner, noteId, made);
     container.invalidate(noteTasksProvider);
   } catch (_) {
     /* The note offers «Crear tareas» again. */
   }
 }
 
-/// The task one of a meeting note's lines becomes: its [task] as the server
-/// wrote it when the line still reads as it did, with its steps ticked to go
-/// in, and the day its «when» says, read against the meeting's [day]. The
-/// words of a day read whole leave the title; any others stay. A line the
-/// person reworded, or one with no [task] (a note from before tasks had
-/// steps), keeps its words and has no steps.
+/// The task one of a meeting note's lines becomes: the line's words, with
+/// the day they say read against the meeting's [day] and left out of the
+/// title, and its [task]'s steps (as the server wrote them, kept by the
+/// line's id even when the person reworded it), ticked to go in (UX-3106).
+/// A day already gone by [today] is not set: the words stay in the title,
+/// so a task made a week later isn't saved overdue (UX-3105). A bare hour
+/// («a las 5») stays in the title; its day still applies (UX-3104).
 Task noteLineTask(
   ChecklistItem line,
   MeetingTask? task, {
   DateTime? day,
+  DateTime? today,
   String? projectId,
 }) {
-  final asSaved = task != null && line.title == meetingTaskLine(task);
-  final when = asSaved ? task.when : null;
-  final found = when == null
-      ? null
-      : QuickScheduleParser.parse(when, day ?? DateTime.now());
-  // A bare «a las 5» could be morning or afternoon: no day is guessed.
-  final dated = found != null && found.ambiguousHour == null;
+  final now = Task.day(today ?? DateTime.now());
+  final found = QuickScheduleParser.parse(
+    line.title,
+    day ?? now,
+    keepAmbiguousHour: true,
+  );
+  final dated = found != null && !Task.day(found.date).isBefore(now);
   final deadline = dated && found.isDeadline;
-  final title = !asSaved
-      ? line.title
-      : dated && found.title.trim().isEmpty
-      ? [task.title, ?task.who].join(' · ')
-      : line.title;
+  // The words left once the day's are out, without a dangling « · ».
+  final rest = !dated
+      ? ''
+      : found.title
+            .replaceAll(RegExp(r'(\s*·\s*)+$'), '')
+            .replaceAll(RegExp(r'^(\s*·\s*)+'), '')
+            .replaceAll(RegExp(r'\s*·\s*(·\s*)+'), ' · ')
+            .trim();
   return Task(
-    title: title,
+    title: rest.isEmpty ? line.title : rest,
     priority: 1,
     listId: projectId,
     dueDate: dated && !deadline ? found.date : null,
@@ -278,10 +338,9 @@ Task noteLineTask(
     deadlineHasTime: deadline && found.hasTime,
     reminderAnchor: deadline ? 'deadline' : 'planned',
     checklist: [
-      if (asSaved)
-        for (final step in task.steps)
-          // Ticked: chosen to go in. Saved as steps still to do.
-          ChecklistItem(title: step, completed: true),
+      for (final step in task?.steps ?? const <String>[])
+        // Ticked: chosen to go in. Saved as steps still to do.
+        ChecklistItem(title: step, completed: true),
     ],
   );
 }

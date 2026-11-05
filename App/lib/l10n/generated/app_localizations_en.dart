@@ -5219,6 +5219,22 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String meetingNoteTaskSemantics(int done, int total) {
+    return 'Tasks: $done of $total done';
+  }
+
+  @override
+  String reviewStepCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count steps',
+      one: '1 step',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get meetingNoteStartMissing =>
       'The start of this recording expired, so these notes cover only the rest.';
 

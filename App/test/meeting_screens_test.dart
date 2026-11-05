@@ -3880,11 +3880,16 @@ void main() {
       Size size = const Size(360, 800),
       // false: only the first frame is drawn.
       bool settle = true,
+      // Tasks already made from the note's lines, by line id.
+      Map<String, Task> lineTasks = const {},
     }) async {
       final captures = MemoryCaptures();
-      final links = MemoryNoteTaskLinks();
+      final links = MemoryNoteTaskLinks(null, {
+        if (lineTasks.isNotEmpty)
+          95: {for (final e in lineTasks.entries) e.key: e.value.id!},
+      });
       final container = designContainer(
-        tasks: () => NoteTaskList([shown ?? note()]),
+        tasks: () => NoteTaskList([shown ?? note(), ...lineTasks.values]),
         pendingCaptures: [kept],
         overrides: [
           meetingsOverride(ScriptedMeetings()),
@@ -4137,6 +4142,15 @@ void main() {
       expect(es.meetingCreateTask(2), 'Crear tareas');
       await createTask(tester);
       expect(app.captures.current!.drafts.length, 2);
+      // A folded card says how many steps it brings (UX-3103).
+      final first = app.captures.current!.drafts.first.id;
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey('draft-steps-$first')),
+          matching: find.text(es.reviewStepCount(steps.length)),
+        ),
+        findsOneWidget,
+      );
       await addTask(tester);
       final made = tasks(app.container).where((task) => !task.isNote).toList();
       expect(made.map((task) => task.title), [
@@ -4147,7 +4161,11 @@ void main() {
       expect(made.last.checklist, isEmpty);
       // No task's page opens: the note stays in front.
       expect(front(tester), 95);
-      expect(app.links.links[95], unorderedEquals(made.map((t) => t.id)));
+      expect(app.links.links[95], {'p0': made.first.id, 'p1': made.last.id});
+      // Each line shows its task, and opens it (UX-3101).
+      expect(find.byKey(const ValueKey('note-line-task-p0')), findsOneWidget);
+      expect(find.byKey(const ValueKey('note-line-task-p1')), findsOneWidget);
+      expect(find.text(es.meetingNoteTaskCount(0, 2).toUpperCase()), findsOneWidget);
       expect(filledButtonWithText(es.meetingViewTask(2)), findsOneWidget);
       expect(es.meetingViewTask(2), 'Ver tareas');
       await tester.tap(filledButtonWithText(es.meetingViewTask(2)));
@@ -4156,6 +4174,38 @@ void main() {
       expect(focus.taskIds, made.map((t) => t.id).toSet());
       expect(focus.showCalendar, isTrue);
       expect(focus.undated, isTrue);
+    });
+
+    testWidgets('UX-3101/3102: a line whose task exists shows it and opens '
+        'it; «Crear tarea» makes only the line still to make', (tester) async {
+      final two = note().copyWith(
+        checklist: [
+          ChecklistItem(id: 'p0', title: line),
+          ChecklistItem(id: 'p1', title: 'Llamar al cliente por el retraso'),
+        ],
+      );
+      final front0 = Task(id: 200, title: 'Acabar el front-end', priority: 1);
+      final app = await open(tester, shown: two, lineTasks: {'p0': front0});
+      expect(find.byKey(const ValueKey('note-line-task-p0')), findsOneWidget);
+      expect(find.byKey(const ValueKey('note-line-task-p1')), findsNothing);
+      expect(filledButtonWithText(es.meetingCreateTask(1)), findsOneWidget);
+      expect(find.text(es.meetingViewTask(1)), findsNothing);
+      await createTask(tester);
+      expect(
+        app.captures.current!.drafts.map((draft) => draft.task.title),
+        ['Llamar al cliente por el retraso'],
+      );
+      await addTask(tester);
+      expect(app.links.links[95]!.keys, unorderedEquals(['p0', 'p1']));
+      expect(app.links.links[95]!['p0'], 200);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(front(tester), 95);
+      // Both lines made: «Ver tareas».
+      expect(filledButtonWithText(es.meetingViewTask(2)), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('note-line-task-p0')));
+      await tester.pumpAndSettle();
+      expect(front(tester), 200);
     });
 
     testWidgets('UX-2702: back on the note, «Ver tarea» and no «Crear tarea»; '
@@ -4191,6 +4241,8 @@ void main() {
       expect(find.byType(TaskDetailScreen), findsOneWidget);
       expect(filledButtonWithText(es.meetingCreateTask(1)), findsOneWidget);
       expect(find.text(es.meetingViewTask(1)), findsNothing);
+      // Said, back on the note (UX-3108).
+      expect(find.text(es.commandTasksDeleted(1)), findsOneWidget);
       // Nothing waits in «Sin guardar» for it.
       expect(app.captures.current!.status, 'discarded');
     });

@@ -5305,6 +5305,22 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
+  String meetingNoteTaskSemantics(int done, int total) {
+    return 'Tasques: $done de $total fetes';
+  }
+
+  @override
+  String reviewStepCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count passos',
+      one: '1 pas',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get meetingNoteStartMissing =>
       'L’inici d’aquest enregistrament va caducar, així que aquestes notes només en cobreixen la resta.';
 

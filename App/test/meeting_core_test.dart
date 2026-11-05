@@ -917,10 +917,12 @@ void main() {
     });
 
     test('«Crear tareas»: a line becomes its task, its steps and the day its words say, from the meeting\'s day', () {
-      // Thursday 5 November 2026.
+      // Thursday 5 November 2026, the meeting's day and today.
       final day = DateTime(2026, 11, 5);
+      Task make(ChecklistItem line, MeetingTask? task, {DateTime? today}) =>
+          noteLineTask(line, task, day: day, today: today ?? day);
       const front = MeetingTask(title: 'Acabar el front-end', when: 'dilluns', steps: ['El bàner', 'El backlog']);
-      final made = noteLineTask(ChecklistItem(id: 'a', title: meetingTaskLine(front)), front, day: day, projectId: 'p1');
+      final made = noteLineTask(ChecklistItem(id: 'a', title: meetingTaskLine(front)), front, day: day, today: day, projectId: 'p1');
       expect(made.title, 'Acabar el front-end');
       expect(made.dueDate, DateTime(2026, 11, 9));
       expect(made.hasTime, isFalse);
@@ -930,25 +932,33 @@ void main() {
       expect(made.checklist.every((step) => step.completed), isTrue);
       // Who stays in the title; the words of a day read whole leave it.
       const call = MeetingTask(title: 'Trucar al client', who: 'jo', when: 'el dimarts');
-      final called = noteLineTask(ChecklistItem(title: meetingTaskLine(call)), call, day: day);
+      final called = make(ChecklistItem(title: meetingTaskLine(call)), call);
       expect(called.title, 'Trucar al client · jo');
       expect(called.dueDate, DateTime(2026, 11, 10));
       // Words beyond the day stay, and the day still applies.
       const buy = MeetingTask(title: 'Comprar coixins', when: 'dissabte al matí');
-      final bought = noteLineTask(ChecklistItem(title: meetingTaskLine(buy)), buy, day: day);
-      expect(bought.title, 'Comprar coixins · dissabte al matí');
+      final bought = make(ChecklistItem(title: meetingTaskLine(buy)), buy);
+      expect(bought.title, 'Comprar coixins · al matí');
       expect(bought.dueDate, DateTime(2026, 11, 7));
-      // Words that aren't a day, or a bare hour, give no day.
+      // Words that aren't a day give none.
       const later = MeetingTask(title: 'Revisar-ho', when: 'la setmana que ve');
-      expect(noteLineTask(ChecklistItem(title: meetingTaskLine(later)), later, day: day).dueDate, isNull);
+      expect(make(ChecklistItem(title: meetingTaskLine(later)), later).dueDate, isNull);
+      // A day with a bare hour keeps the day, and the hour as words
+      // (UX-3104).
       const five = MeetingTask(title: 'Trucar', when: 'demà a les 5');
-      expect(noteLineTask(ChecklistItem(title: meetingTaskLine(five)), five, day: day).dueDate, isNull);
-      // A line the person reworded keeps their words, with no steps or day.
-      final reworded = noteLineTask(ChecklistItem(title: 'Acabar la web'), front, day: day);
-      expect((reworded.title, reworded.dueDate, reworded.checklist.length), ('Acabar la web', null, 0));
-      // A note from before tasks had steps: the line as it is.
-      final old = noteLineTask(ChecklistItem(title: 'Send the quote · Friday'), null, day: day);
-      expect((old.title, old.dueDate, old.checklist.length), ('Send the quote · Friday', null, 0));
+      final called5 = make(ChecklistItem(title: meetingTaskLine(five)), five);
+      expect(called5.dueDate, DateTime(2026, 11, 6));
+      // A line the person reworded keeps their words and its steps; its
+      // own words give the day (UX-3106).
+      final reworded = make(ChecklistItem(title: 'Acabar la web'), front);
+      expect((reworded.title, reworded.dueDate, reworded.checklist.length), ('Acabar la web', null, 2));
+      // A note from before tasks had steps: its line's words still give the
+      // day.
+      final old = make(ChecklistItem(title: 'Send the quote · Friday'), null);
+      expect((old.title, old.dueDate, old.checklist.length), ('Send the quote', DateTime(2026, 11, 6), 0));
+      // Made a week later, a day already past isn't set (UX-3105).
+      final late = make(ChecklistItem(title: meetingTaskLine(call)), call, today: DateTime(2026, 11, 12));
+      expect((late.title, late.dueDate), ('Trucar al client · jo · el dimarts', null));
     });
 
     test('a saved meeting note keeps its tasks\' steps on this phone, by line', () async {

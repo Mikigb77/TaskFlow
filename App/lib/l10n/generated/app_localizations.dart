@@ -7198,6 +7198,18 @@ abstract class AppLocalizations {
   /// **'Tasks · {done}/{total}'**
   String meetingNoteTaskCount(int done, int total);
 
+  /// Read aloud by TalkBack on a note made from a meeting: how many of its tasks are done.
+  ///
+  /// In en, this message translates to:
+  /// **'Tasks: {done} of {total} done'**
+  String meetingNoteTaskSemantics(int done, int total);
+
+  /// On a task's card in the review before saving, when it is folded: how many steps it has.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 step} other{{count} steps}}'**
+  String reviewStepCount(int count);
+
   /// The first line of a note made from a meeting whose first part was deleted from the server after 30 days without signal.
   ///
   /// In en, this message translates to:

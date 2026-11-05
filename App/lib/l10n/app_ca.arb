@@ -1183,6 +1183,8 @@
   "meetingNoteChapters": "Parts de la reunió",
   "meetingNoteSteps": "Passos de cada tasca",
   "meetingNoteTaskCount": "Tasques · {done}/{total}",
+  "meetingNoteTaskSemantics": "Tasques: {done} de {total} fetes",
+  "reviewStepCount": "{count, plural, =1{1 pas} other{{count} passos}}",
   "meetingNoteStartMissing": "L’inici d’aquest enregistrament va caducar, així que aquestes notes només en cobreixen la resta.",
   "meetingNoteUntitled": "Notes de la reunió",
   "meetingNoteHeader": "Reunió del {date} · {length}",

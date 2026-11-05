@@ -451,6 +451,41 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
     },
   );
 
+  /// A collapsed card's steps, in the date line's style: how many go in
+  /// (ticked, from a note) or how many it has; a tap opens the card, where
+  /// they are (UX-3103).
+  Widget _stepsLine() {
+    final count = widget.choosingSteps
+        ? task.checklist.where((step) => step.done()).length
+        : task.checklist.length;
+    final text = context.l10n.reviewStepCount(count);
+    final onTap = widget.enabled ? widget.onExpand : null;
+    return Semantics(
+      label: text,
+      button: true,
+      enabled: onTap != null,
+      excludeSemantics: true,
+      onTap: onTap,
+      child: ListTile(
+        key: ValueKey('draft-steps-${widget.draft.id}'),
+        contentPadding: EdgeInsets.zero,
+        horizontalTitleGap: 8,
+        minLeadingWidth: 0,
+        leading: Icon(
+          Icons.checklist_rounded,
+          color: Theme.of(context).colorScheme.primary,
+          size: 18,
+        ),
+        title: Text(text),
+        titleTextStyle: Theme.of(context).textTheme.bodyMedium,
+        trailing: onTap == null
+            ? null
+            : const Icon(Icons.chevron_right_rounded, size: 20),
+        onTap: onTap,
+      ),
+    );
+  }
+
   /// A reminder said for a task with no day: one line under the date, in
   /// the reminder line's style, whose tap opens the date.
   Widget _needsDayLine() {
@@ -961,6 +996,7 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
                         ReminderPlans.active(task) != null)) ||
                 reminderInOptions)
               _reminderLine(),
+            if (task.checklist.isNotEmpty) _stepsLine(),
           ],
           ...repair,
           if (!widget.draft.assignmentReviewed || newProject != null)

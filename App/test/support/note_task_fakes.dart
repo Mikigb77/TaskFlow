@@ -62,19 +62,25 @@ class NoteTaskList extends TaskNotifier {
 
 /// The phone's note → task links, in memory.
 class MemoryNoteTaskLinks extends NoteTaskLinks {
-  /// [links]: each note's one task; [several]: notes that made several.
-  MemoryNoteTaskLinks([Map<int, int>? links, Map<int, List<int>>? several])
-    : links = {
-        for (final entry in {...?links}.entries) entry.key: [entry.value],
-        ...?several,
-      },
-      super(TaskDatabase());
-  final Map<int, List<int>> links;
+  /// [links]: each note's one task, for the whole note; [lines]: notes
+  /// whose lines made tasks, each line's task by its id (UX-3101).
+  MemoryNoteTaskLinks([
+    Map<int, int>? links,
+    Map<int, Map<String, int>>? lines,
+  ]) : links = {
+         for (final entry in {...?links}.entries)
+           entry.key: {NoteTaskLinks.wholeNote: entry.value},
+         for (final entry in {...?lines}.entries) entry.key: {...entry.value},
+       },
+       super(TaskDatabase());
+  final Map<int, Map<String, int>> links;
   @override
-  Future<Map<int, List<int>>> read(String owner) async => {...links};
+  Future<Map<int, Map<String, int>>> read(String owner) async => {
+    for (final entry in links.entries) entry.key: {...entry.value},
+  };
   @override
-  Future<void> link(String owner, int noteId, List<int> taskIds) async =>
-      links[noteId] = taskIds;
+  Future<void> link(String owner, int noteId, Map<String, int> lineTasks) async =>
+      links[noteId] = {...?links[noteId], ...lineTasks};
 }
 
 /// The overrides for [NoteTaskList] and [MemoryNoteTaskLinks]. Every note

@@ -20,6 +20,8 @@ import 'package:agenda/widgets/task_assignment_picker.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:agenda/widgets/note_text.dart';
 import 'package:agenda/widgets/note_task.dart';
+import 'package:agenda/models/checklist_item.dart';
+import 'package:agenda/widgets/task_schedule_label.dart';
 
 /// A task's page as a route named `/task` with the task's id, so the pages
 /// that show a task can be told apart from others on the stack: Deshacer
@@ -278,8 +280,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                 Navigator.pushNamed(context, '/editTask', arguments: taskId);
             void reschedule() =>
                 TaskInteractions.reschedule(context, ref, task);
-            // The tasks this note made with «Crear tareas» that still exist.
-            final made = task.isNote ? noteMadeTasks(ref, task) : const <Task>[];
+            // The tasks this note made with «Crear tareas» that still exist,
+            // by the line that made each.
+            final madeByLine = task.isNote
+                ? noteMadeTasks(ref, task)
+                : const <String, Task>{};
+            final made = madeByLine.values.toList();
             // Until this phone's note → task links are read, the main
             // button can't know its label (R1-P318-1).
             final linksRead =
@@ -292,6 +298,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                 noteMakesTask(
                   task,
                   ref.watch(meetingNotesProvider).value ?? const <int>{},
+                  {
+                    for (final e in madeByLine.entries) e.key: e.value.id!,
+                  },
                 );
             // While either is read, a note with open steps may offer «Crear
             // tarea»: its place is held, so «Editar nota» neither moves nor
@@ -300,10 +309,14 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                 !linksRead &&
                 task.isNote &&
                 task.checklist.any((step) => !step.done());
-            // One task for each open line of a meeting's note.
-            final openLines = task.checklist
-                .where((step) => !step.done())
-                .length;
+            // One task for each open line of a meeting's note that made
+            // none yet (UX-3102).
+            final toMake = noteLinesToMake(task, {
+              for (final e in madeByLine.entries) e.key: e.value.id!,
+            });
+            final openLines = holds
+                ? task.checklist.where((step) => !step.done()).length
+                : toMake.length;
             // Inert while Completar closes it: nothing on the page opens in
             // the hold (UX-2633).
             return AbsorbPointer(
@@ -593,6 +606,21 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                                     ),
                                   ),
                                 )
+                              // Lines still to make come first: a line
+                              // left out can still become a task (UX-3102).
+                              else if (makesTask)
+                                FilledButton.icon(
+                                  key: const ValueKey('note-create-task'),
+                                  onPressed: () => createTaskFromNote(
+                                    context,
+                                    task,
+                                    lines: toMake,
+                                  ),
+                                  icon: const Icon(Icons.add_task_rounded),
+                                  label: Text(
+                                    context.l10n.meetingCreateTask(openLines),
+                                  ),
+                                )
                               else if (made.isNotEmpty)
                                 FilledButton.icon(
                                   key: const ValueKey('note-view-task'),
@@ -607,16 +635,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                                   icon: const Icon(Icons.task_alt_rounded),
                                   label: Text(
                                     context.l10n.meetingViewTask(made.length),
-                                  ),
-                                )
-                              else if (makesTask)
-                                FilledButton.icon(
-                                  key: const ValueKey('note-create-task'),
-                                  onPressed: () =>
-                                      createTaskFromNote(context, task),
-                                  icon: const Icon(Icons.add_task_rounded),
-                                  label: Text(
-                                    context.l10n.meetingCreateTask(openLines),
                                   ),
                                 ),
                               if (holds || made.isNotEmpty || makesTask)
@@ -740,33 +758,63 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   }
 
   /// The steps and their progress, when there are any.
-  List<Widget> _steps(BuildContext context, Task task, bool canEdit) => [
+  List<Widget> _steps(BuildContext context, Task task, bool canEdit) {
+    // A meeting's note: each line is a task (D1), and a line that made one
+    // shows it (UX-3101).
+    final meeting =
+        task.isNote &&
+        (ref.watch(meetingNotesProvider).value ?? const <int>{}).contains(
+          task.id,
+        );
+    final made = meeting ? noteMadeTasks(ref, task) : const <String, Task>{};
+    bool done(ChecklistItem item) =>
+        made[item.id]?.isCompleted ??
+        item.done(occurrence: task.checklistOccurrence);
+    final complete = meeting
+        ? task.checklist.where(done).length
+        : task.checklistDone;
+    final total = task.checklist.length;
+    return [
     if (task.checklist.isNotEmpty) ...[
       SectionLabel(
-        // A meeting's note: each line is a task (D1).
-        task.isNote &&
-                (ref.watch(meetingNotesProvider).value ?? const <int>{})
-                    .contains(task.id)
-            ? context.l10n.meetingNoteTaskCount(
-                task.checklistDone,
-                task.checklist.length,
-              )
-            : context.l10n.checklistCount(
-                task.checklistDone,
-                task.checklist.length,
-              ),
+        meeting
+            ? context.l10n.meetingNoteTaskCount(complete, total)
+            : context.l10n.checklistCount(complete, total),
       ),
       AppSurface(
         child: Column(
           children: [
             LinearProgressIndicator(
-              value: task.checklistDone / task.checklist.length,
-              semanticsLabel: context.l10n.checklistSemantics(
-                task.checklistDone,
-                task.checklist.length,
-              ),
+              value: complete / total,
+              semanticsLabel: meeting
+                  ? context.l10n.meetingNoteTaskSemantics(complete, total)
+                  : context.l10n.checklistSemantics(complete, total),
             ),
             for (final item in task.checklist)
+              if (made[item.id] case final line?)
+                // The task this line made: its state and day; a tap opens
+                // it over the note. Its ticks are the task's own.
+                ListTile(
+                  key: ValueKey('note-line-task-${item.id}'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Icon(
+                      line.isCompleted
+                          ? Icons.check_circle_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  title: Text(line.title),
+                  subtitle: Text(taskDayLine(context, line)),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.push(
+                    context,
+                    taskPageRoute(line.id!),
+                  ),
+                )
+              else
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 key: ValueKey('check-step-${item.id}'),
@@ -800,6 +848,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       const SizedBox(height: 24),
     ],
   ];
+  }
 
   Widget _body(BuildContext context, Task task, {VoidCallback? onTap}) {
     final surface = AppSurface(

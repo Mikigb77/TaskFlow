@@ -137,6 +137,7 @@ List<Task> _madeTasks() => [
     title: 'Enviar el presupuesto · Miki',
     priority: 1,
     dueDate: DateTime(2026, 11, 6),
+    hasTime: false,
     checklist: [
       ChecklistItem(id: 't1', title: 'Precio por usuario'),
       ChecklistItem(id: 't2', title: 'Descuento de los tres primeros meses'),
@@ -155,7 +156,7 @@ Future<PreviewApp> _open(
   List<Task> tasks = const [],
   bool notificationsAllowed = true,
   bool notificationsAsked = true,
-  Map<int, List<int>>? noteTasks,
+  Map<int, Map<String, int>>? noteTasks,
 }) => PreviewApp.open(
   p,
   pro: pro,
@@ -700,7 +701,7 @@ void meetingPreviews() {
     preview(
       meetingNote,
       'after-task',
-      'The meeting’s note once two of its tasks exist: a filled «Ver tareas», which shows them on Calendar, first, and an outlined Editar nota; no Crear tareas.',
+      'The meeting’s note once two of its three tasks exist: under «TAREAS · 0/3», each of their lines shows the task with its day and a round mark, and opens it; the third line keeps its checkbox, and a filled «Crear tarea» makes only it, before an outlined Editar nota.',
       [es1],
       (p) async {
         final app = await _open(
@@ -708,7 +709,7 @@ void meetingPreviews() {
           ScriptedMeetings(),
           tasks: [_meetingNoteTask(), ..._madeTasks()],
           noteTasks: {
-            120: [121, 122],
+            120: {'m1': 121, 'm2': 122},
           },
         );
         await app.tab(p.l.notes);

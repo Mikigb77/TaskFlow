@@ -3642,6 +3642,16 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                 }
                 if (page != null && page.isActive) navigator.removeRoute(page);
               }
+              // The note shows again, unchanged: say what went (UX-3108).
+              if (messenger.mounted) {
+                unawaited(
+                  showFeedback(
+                    messenger,
+                    strings.commandTasksDeleted(undoIds.length),
+                    margin: margin(),
+                  ),
+                );
+              }
             } else if (mounted) {
               setState(() {
                 _session = restored;
