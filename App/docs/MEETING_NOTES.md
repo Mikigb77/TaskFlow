@@ -50,11 +50,11 @@ The rule that makes recovery work: **the phone deletes a piece only after the se
 - **MN-20.** The final step reads all chapter notes plus the full transcript and returns, as structured data:
   - a title;
   - a summary of three to five sentences;
-  - the to-dos, with who and when if they were said;
+  - the tasks, one per goal, each with its own steps and with who and when if they were said (2026-11-05);
   - decisions and open questions;
   - chapters: one line per half hour with its time range ("0:30–1:00 Pricing for the pilot"), which opens to that part's notes.
 - **MN-21.** The result is saved as an ordinary note (the existing Note type), in the language of the meeting.
-- **MN-22.** One tap turns the to-dos into a task with a checklist, through the existing review screen, so the person can untick what they don't want before saving.
+- **MN-22.** One tap turns the tasks into tasks, each with its steps as its checklist and its day read from the words said, through the existing review screen, so the person can untick a step or remove a task before saving (one task each since 2026-11-05).
 - **MN-23.** Long meetings: four hours is about 36,000 words, or 50,000 tokens. Gemini 3.5 Flash-Lite reads up to 1,048,576 tokens in one call, so length isn't the limit; the chapter notes keep a long summary from turning vague.
 
 ## 5. Cleanup and abandoned recordings
@@ -92,4 +92,6 @@ Not chosen: live streaming (Gemini 3.5 Transcribe Live, about $0.55 an hour, 10-
 ## Decisions taken after the build
 
 - 2026-11-04: staging's dictations run on Vertex only too (`AI_ROUTE=vertex` in the staging deploy), off the free AI Studio tier.
+- 2026-11-05: a meeting gives one task per goal, each with its own steps (MN-20, MN-22 now): the server's `tasks`, one line each in the note, and «Crear tareas» makes one task per open line, with its steps and the day its words say. The notes steps write the word meant where speech recognition misheard one and the context makes it clear, at no extra cost. Both in `.claude/ux-review/DECISIONS.md` (2026-11-03 entry).
+- 2026-11-06: a task said for someone named reads with the name first, «Ana: Pedir el contacto de compras · el viernes»; the speaker's own tasks show no name (UX-3109).
 - 2026-11-04: meeting notes are Pro only, with up to 20 hours of meetings a month, stated on the Pro screen. That costs at most about US$1.60 a user a month on Flash-Lite. There is no consent reminder; the recording screen says the audio is sent to make the notes and then deleted. The 7-day (MN-26) and 30-day (MN-27) limits stay. The rest is in `.claude/ux-review/DECISIONS.md` (2026-11-03 entry).

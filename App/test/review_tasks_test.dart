@@ -104,6 +104,7 @@ Future<(ProviderContainer, _SavingStore)> openResultIn(
         language: language,
         clock: ClockFormat.twentyFour,
         weekStart: 1,
+        speechOnline: false,
       ),
     ),
     projects: projects,
@@ -210,7 +211,7 @@ void main() {
         ], preview: preview);
         await container
             .read(regionalProvider.notifier)
-            .set(const RegionalPreferences(language: 'es'));
+            .set(const RegionalPreferences(language: 'es', speechOnline: false));
         for (final mode in [ThemeMode.light, ThemeMode.dark]) {
           await setAppearance(container, mode);
           await tester.pumpAndSettle();
@@ -286,7 +287,7 @@ void main() {
         ], preview: preview);
         await container
             .read(regionalProvider.notifier)
-            .set(const RegionalPreferences(language: 'es'));
+            .set(const RegionalPreferences(language: 'es', speechOnline: false));
         await tester.pumpAndSettle();
         if (batch) {
           await tester.tap(find.text('Comprar pan'));
@@ -512,7 +513,7 @@ void main() {
       for (final language in ['es', 'ca', 'en']) {
         await container
             .read(regionalProvider.notifier)
-            .set(RegionalPreferences(language: language));
+            .set(RegionalPreferences(language: language, speechOnline: false));
         for (final theme in [ThemeMode.light, ThemeMode.dark]) {
           await setAppearance(container, theme);
           await tester.pumpAndSettle();
@@ -590,6 +591,7 @@ void main() {
             language: 'es',
             clock: ClockFormat.twentyFour,
             weekStart: 1,
+            speechOnline: false,
           ),
         ),
         overrides: [
@@ -690,7 +692,7 @@ void main() {
       final store = _SavingStore();
       final container = designContainer(
         regionalStore: MemoryRegionalStore(
-          const RegionalPreferences(language: 'es'),
+          const RegionalPreferences(language: 'es', speechOnline: false),
         ),
         overrides: [
           captureStoreProvider.overrideWithValue(store),

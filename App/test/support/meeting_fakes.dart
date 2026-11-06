@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:agenda/models/meeting.dart';
 import 'package:agenda/services/api_client.dart';
 import 'package:agenda/services/meeting_api.dart';
@@ -152,9 +153,14 @@ class FakeMeetingApi implements MeetingApi {
   MeetingResult result = const MeetingResult(
     title: 'Pilot pricing with Acme',
     summary: 'We agreed the pilot. Pricing comes next.',
-    todos: [
-      MeetingTodo(text: 'Send the pilot quote', who: 'Miki', when: 'Friday'),
-      MeetingTodo(text: 'Book the room'),
+    tasks: [
+      MeetingTask(
+        title: 'Send the pilot quote',
+        who: 'Miki',
+        when: 'Friday',
+        steps: ['Price for 20 seats', 'Start date'],
+      ),
+      MeetingTask(title: 'Book the room'),
     ],
     decisions: ['Start the pilot in December'],
     openQuestions: ['Who signs for Acme?'],

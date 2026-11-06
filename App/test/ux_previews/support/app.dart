@@ -193,6 +193,10 @@ class PreviewApp {
               weekStart: 1,
               privacyShown: privacyShown,
               reminderPrivacyShown: reminderPrivacyShown,
+              // The listening previews show the on-device path, as chosen
+              // in Voz; online is the default since 2026-11-05, and its
+              // own previews say «online».
+              speechOnline: false,
             ),
           ),
         ),

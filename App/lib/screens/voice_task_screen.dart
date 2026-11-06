@@ -3550,10 +3550,11 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       // The landing Deshacer takes back, if any.
       CalendarFocus? focus;
       if (remaining == 0 && _fromNote) {
-        // From a note, the new task's page opens over it, so Back returns
-        // to the note (UX-2702).
+        // From a note, a single new task's page opens over it, so Back
+        // returns to the note (UX-2702). Several leave the note in view,
+        // which then offers «Ver tareas».
         Navigator.pop(context);
-        final id = undoIds.values.firstOrNull;
+        final id = undoIds.length == 1 ? undoIds.values.single : null;
         if (id != null) {
           taskPage = taskPageRoute(id);
           unawaited(navigator.push(taskPage));
@@ -3640,6 +3641,16 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                   if (top) navigator.pop();
                 }
                 if (page != null && page.isActive) navigator.removeRoute(page);
+              }
+              // The note shows again, unchanged: say what went (UX-3108).
+              if (messenger.mounted) {
+                unawaited(
+                  showFeedback(
+                    messenger,
+                    strings.commandTasksDeleted(undoIds.length),
+                    margin: margin(),
+                  ),
+                );
               }
             } else if (mounted) {
               setState(() {

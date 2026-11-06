@@ -5308,6 +5308,30 @@ class AppLocalizationsEs extends AppLocalizations {
   String get meetingNoteChapters => 'Partes de la reunión';
 
   @override
+  String get meetingNoteSteps => 'Pasos de cada tarea';
+
+  @override
+  String meetingNoteTaskCount(int done, int total) {
+    return 'Tareas · $done/$total';
+  }
+
+  @override
+  String meetingNoteTaskSemantics(int done, int total) {
+    return 'Tareas: $done de $total hechas';
+  }
+
+  @override
+  String reviewStepCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pasos',
+      one: '1 paso',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get meetingNoteStartMissing =>
       'El principio de esta grabación caducó, así que estas notas cubren solo el resto.';
 
@@ -5325,13 +5349,29 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get meetingCreateTask => 'Crear tarea';
+  String meetingCreateTask(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Crear tareas',
+      one: 'Crear tarea',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get meetingStepsToAdd => 'Pasos que se añaden';
 
   @override
-  String get meetingViewTask => 'Ver tarea';
+  String meetingViewTask(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Ver tareas',
+      one: 'Ver tarea',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get meetingSignOutTitle => '¿Cerrar sesión?';

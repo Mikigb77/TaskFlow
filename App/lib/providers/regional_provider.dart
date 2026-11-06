@@ -18,7 +18,7 @@ class RegionalPreferences {
     this.weekStart,
     this.captureTimezone,
     this.speechLanguage = sameAsApp,
-    this.speechOnline = false,
+    this.speechOnline = true,
     this.privacyShown = false,
     this.reminderPrivacyShown = false,
   });
@@ -35,7 +35,9 @@ class RegionalPreferences {
   /// The language capture listens in: [sameAsApp], or an app language code.
   final String speechLanguage;
 
-  /// Saved audio, transcribed online, even where on-device speech works.
+  /// Saved audio, transcribed online, even where on-device speech works:
+  /// the default since 2026-11-05, as the phone's own recognizer mishears
+  /// too often (owner). False only once the person picks on-device speech.
   final bool speechOnline;
 
   /// The capture sheet has shown its privacy line, the first time the
@@ -51,7 +53,9 @@ class RegionalPreferences {
         'weekStart': weekStart,
         'captureTimezone': captureTimezone,
         'speechLanguage': speechLanguage,
-        'speechOnline': speechOnline,
+        // Its own key: `speechOnline: false` was saved for everyone before
+        // online became the default, so only a choice made since counts.
+        'speechOnDevice': !speechOnline,
         'privacyShown': privacyShown,
         'reminderPrivacyShown': reminderPrivacyShown,
       };
@@ -76,7 +80,7 @@ class RegionalPreferences {
                 AppLanguages.supports(json['speechLanguage'] as String)
             ? json['speechLanguage'] as String
             : sameAsApp,
-        speechOnline: json['speechOnline'] == true,
+        speechOnline: json['speechOnDevice'] != true,
         privacyShown: json['privacyShown'] == true,
         reminderPrivacyShown: json['reminderPrivacyShown'] == true,
       );

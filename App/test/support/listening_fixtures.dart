@@ -304,6 +304,9 @@ class ListeningApp {
               language: language,
               clock: ClockFormat.twentyFour,
               weekStart: 1,
+              // Online is Voz's default (2026-11-05): the on-device path is
+              // the person's choice.
+              speechOnline: online,
             ),
           ),
         ),

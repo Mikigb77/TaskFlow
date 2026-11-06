@@ -24,11 +24,12 @@ from .models import Meeting, MeetingChapter, MeetingPiece, User
 
 PASSWORD = "Meeting-notes-fixture-2026!"
 FINAL = {"title": "Pilot pricing with Acme", "summary": "They agreed the pilot. Miki sends the quote.",
-         "todos": [{"text": "Send the pilot quote", "who": "Miki", "when": "Friday"},
-                   {"text": "Book the room", "who": "", "when": None}],
+         "tasks": [{"title": "Send the pilot quote", "who": "Miki", "when": "Friday",
+                    "steps": ["Price for 20 seats", " ", "Price for 20 seats", "Start date"]},
+                   {"title": "Book the room", "who": "", "when": None, "steps": []}],
          "decisions": ["Start the pilot in December", " "], "open_questions": ["Who signs for Acme?"],
          "language": "en-GB"}
-RESULT_KEYS = {"title", "summary", "todos", "decisions", "open_questions", "chapters", "start_missing", "language"}
+RESULT_KEYS = {"title", "summary", "tasks", "todos", "decisions", "open_questions", "chapters", "start_missing", "language"}
 
 
 def response(text, finish_reason="STOP"):
@@ -298,6 +299,11 @@ class FinishTests(MeetingTestCase):
         result = ready.data["result"]
         self.assertEqual(set(result), RESULT_KEYS)
         self.assertEqual(result["title"], "Pilot pricing with Acme")
+        self.assertEqual(result["tasks"], [
+            {"title": "Send the pilot quote", "who": "Miki", "when": "Friday",
+             "steps": ["Price for 20 seats", "Start date"]},
+            {"title": "Book the room", "who": None, "when": None, "steps": []}])
+        # An app from before tasks had steps reads one line per task.
         self.assertEqual(result["todos"], [{"text": "Send the pilot quote", "who": "Miki", "when": "Friday"},
                                            {"text": "Book the room", "who": None, "when": None}])
         self.assertEqual(result["decisions"], ["Start the pilot in December"])
@@ -481,7 +487,7 @@ class FinishTests(MeetingTestCase):
         self.put(0)
         self.vertex.final = "not json"
         self.assertEqual(self.finish(0).status_code, 502)
-        self.vertex.final = {**FINAL, "todos": "Send it"}
+        self.vertex.final = {**FINAL, "tasks": "Send it"}
         self.assertEqual(self.finish(0).status_code, 502)
         self.vertex.final = FINAL
         self.assertEqual(self.finish(0).status_code, 200)
@@ -491,7 +497,8 @@ class FinishTests(MeetingTestCase):
         self.put(1, audio=b"silence 1")
         response = self.finish(1)
         self.assertEqual(response.data, {"status": "ready", "result": {
-            "title": "", "summary": "", "todos": [], "decisions": [], "open_questions": [], "chapters": [],
+            "title": "", "summary": "", "tasks": [], "todos": [], "decisions": [], "open_questions": [],
+            "chapters": [],
             "start_missing": False, "language": "ca"}})
         self.assertEqual(self.vertex.count("final") + self.vertex.count("chapter"), 0)
 
@@ -666,16 +673,31 @@ class NotesValidationTests(SimpleTestCase):
     def test_the_final_answer_is_normalized(self):
         notes = MeetingNotes.model_validate({
             "title": "  Kickoff ", "summary": "Short.", "language": "es_ES",
-            "todos": [{"text": " Call Ana ", "who": " ", "when": "null"}, {"text": "", "who": None, "when": None}],
+            "tasks": [{"title": " Call Ana ", "who": " ", "when": "null", "steps": None},
+                      {"title": "", "who": None, "when": None, "steps": []}],
             "decisions": ["Yes", "yes", ""], "open_questions": None})
         self.assertEqual(notes.model_dump(), {
             "title": "Kickoff", "summary": "Short.", "language": "es",
-            "todos": [{"text": "Call Ana", "who": None, "when": None}], "decisions": ["Yes"], "open_questions": []})
+            "tasks": [{"title": "Call Ana", "who": None, "when": None, "steps": []}], "decisions": ["Yes"],
+            "open_questions": []})
         self.assertEqual(MeetingNotes.model_validate({**FINAL, "language": "Spanish!"}).language, "")
 
     def test_the_schema_requires_every_field(self):
         from .ai import _vertex_schema
         schema = _vertex_schema(MeetingNotes)
         self.assertEqual(set(schema["required"]),
-                         {"title", "summary", "todos", "decisions", "open_questions", "language"})
+                         {"title", "summary", "tasks", "decisions", "open_questions", "language"})
+        task = schema["$defs"]["MeetingTask"]
+        self.assertEqual(set(task["required"]), {"title", "who", "when", "steps"})
         self.assertNotIn("chapters", schema["properties"])  # the server adds them
+
+    def test_the_prompts_split_tasks_and_read_through_misheard_words(self):
+        piece = SimpleNamespace(offset_seconds=0, duration_seconds=300,
+                                text="Dijous hi ha paga general, em quedo a casa.")
+        final = meetings.final_prompt([piece], [])
+        chapter = meetings.chapter_prompt([piece])
+        self.assertIn("one entry per separate task", final)
+        self.assertIn("never make unrelated actions the steps of one task", final)
+        for prompt in (final, chapter):
+            self.assertIn("speech recognition and can hold misheard words", prompt)
+            self.assertIn("Never change a name, figure, date or time on a guess", prompt)

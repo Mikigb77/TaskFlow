@@ -5297,6 +5297,30 @@ class AppLocalizationsCa extends AppLocalizations {
   String get meetingNoteChapters => 'Parts de la reunió';
 
   @override
+  String get meetingNoteSteps => 'Passos de cada tasca';
+
+  @override
+  String meetingNoteTaskCount(int done, int total) {
+    return 'Tasques · $done/$total';
+  }
+
+  @override
+  String meetingNoteTaskSemantics(int done, int total) {
+    return 'Tasques: $done de $total fetes';
+  }
+
+  @override
+  String reviewStepCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count passos',
+      one: '1 pas',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get meetingNoteStartMissing =>
       'L’inici d’aquest enregistrament va caducar, així que aquestes notes només en cobreixen la resta.';
 
@@ -5314,13 +5338,29 @@ class AppLocalizationsCa extends AppLocalizations {
   }
 
   @override
-  String get meetingCreateTask => 'Crea una tasca';
+  String meetingCreateTask(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Crea les tasques',
+      one: 'Crea una tasca',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get meetingStepsToAdd => 'Passos que s’afegeixen';
 
   @override
-  String get meetingViewTask => 'Mostra la tasca';
+  String meetingViewTask(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Mostra les tasques',
+      one: 'Mostra la tasca',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get meetingSignOutTitle => 'Vols tancar la sessió?';

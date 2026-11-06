@@ -21,6 +21,7 @@ MeetingNoteLabels meetingNoteLabels(String? language) {
     decisions: l.meetingNoteDecisions,
     openQuestions: l.meetingNoteOpenQuestions,
     chapters: l.meetingNoteChapters,
+    steps: l.meetingNoteSteps,
     startMissing: l.meetingNoteStartMissing,
     untitled: l.meetingNoteUntitled,
     chapterRange: (start, end) => end <= 60

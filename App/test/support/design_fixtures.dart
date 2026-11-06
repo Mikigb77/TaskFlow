@@ -26,6 +26,10 @@ class MemoryRegionalStore extends RegionalPreferenceStore {
       language: 'en',
       clock: ClockFormat.twentyFour,
       weekStart: 1,
+      // On-device speech, chosen: the capture tests written for that path.
+      // Online is the app's default since 2026-11-05 (regional and Voz
+      // tests).
+      speechOnline: false,
     ),
   ]);
   RegionalPreferences value;

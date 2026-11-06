@@ -5,6 +5,7 @@ import 'dart:convert';
 
 import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/task_provider.dart';
+import 'package:agenda/services/meeting_note.dart';
 import 'package:agenda/services/task_database.dart';
 import 'package:agenda/widgets/note_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -61,15 +62,25 @@ class NoteTaskList extends TaskNotifier {
 
 /// The phone's note → task links, in memory.
 class MemoryNoteTaskLinks extends NoteTaskLinks {
-  MemoryNoteTaskLinks([Map<int, int>? links])
-    : links = {...?links},
-      super(TaskDatabase());
-  final Map<int, int> links;
+  /// [links]: each note's one task, for the whole note; [lines]: notes
+  /// whose lines made tasks, each line's task by its id (UX-3101).
+  MemoryNoteTaskLinks([
+    Map<int, int>? links,
+    Map<int, Map<String, int>>? lines,
+  ]) : links = {
+         for (final entry in {...?links}.entries)
+           entry.key: {NoteTaskLinks.wholeNote: entry.value},
+         for (final entry in {...?lines}.entries) entry.key: {...entry.value},
+       },
+       super(TaskDatabase());
+  final Map<int, Map<String, int>> links;
   @override
-  Future<Map<int, int>> read(String owner) async => {...links};
+  Future<Map<int, Map<String, int>>> read(String owner) async => {
+    for (final entry in links.entries) entry.key: {...entry.value},
+  };
   @override
-  Future<void> link(String owner, int noteId, int taskId) async =>
-      links[noteId] = taskId;
+  Future<void> link(String owner, int noteId, Map<String, int> lineTasks) async =>
+      links[noteId] = {...?links[noteId], ...lineTasks};
 }
 
 /// The overrides for [NoteTaskList] and [MemoryNoteTaskLinks]. Every note
@@ -101,8 +112,13 @@ Override meetingNotesOverride([Set<int>? ids, Future<void>? ready]) =>
 /// This phone's meeting-note marks (D1) in memory, for the real
 /// [meetingNotesProvider] to read: [ids], and how many times it read them.
 class MemoryMeetingNoteMarks implements TaskDatabase {
-  MemoryMeetingNoteMarks([Set<int>? ids]) : ids = {...?ids};
+  MemoryMeetingNoteMarks([Set<int>? ids, Map<int, MeetingNoteTasks>? tasks])
+    : ids = {...?ids},
+      tasks = {...?tasks};
   final Set<int> ids;
+
+  /// Each note's tasks, for «Crear tareas».
+  final Map<int, MeetingNoteTasks> tasks;
   int reads = 0;
 
   @override
@@ -131,6 +147,20 @@ class _MarksTable implements Database {
     int? offset,
   }) async {
     final scope = whereArgs?.firstOrNull;
+    if (table == 'app_preferences' &&
+        scope is String &&
+        scope.startsWith('meetingTasks:')) {
+      return [
+        if (marks.tasks.isNotEmpty)
+          {
+            'scope': scope,
+            'data': jsonEncode({
+              for (final entry in marks.tasks.entries)
+                '${entry.key}': entry.value.toJson(),
+            }),
+          },
+      ];
+    }
     if (table != 'app_preferences' ||
         scope is! String ||
         !scope.startsWith('meetingNotes:')) {

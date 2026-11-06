@@ -204,13 +204,44 @@ class MeetingPiece {
   static const held = 'held';
 }
 
-class MeetingTodo {
-  const MeetingTodo({required this.text, this.who, this.when});
-  final String text;
+/// One task said in the meeting, with the steps that belong to it.
+class MeetingTask {
+  const MeetingTask({
+    required this.title,
+    this.who,
+    this.when,
+    this.steps = const [],
+  });
+  final String title;
   final String? who;
 
-  /// The words as said; the review step reads dates from them.
+  /// The words as said; «Crear tareas» reads the day from them against the
+  /// meeting's date.
   final String? when;
+
+  /// The parts of this same task that were said; unrelated ones are tasks
+  /// of their own.
+  final List<String> steps;
+
+  Map<String, Object?> toJson() => {
+    'title': title,
+    'who': who,
+    'when': when,
+    'steps': steps,
+  };
+
+  /// Null when [json] holds no title.
+  static MeetingTask? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final title = MeetingResult._text(json['title'] ?? json['text']);
+    if (title.isEmpty) return null;
+    return MeetingTask(
+      title: title,
+      who: MeetingResult._optional(json['who']),
+      when: MeetingResult._optional(json['when']),
+      steps: MeetingResult._lines(json['steps']),
+    );
+  }
 }
 
 class MeetingChapter {
@@ -231,7 +262,7 @@ class MeetingResult {
   const MeetingResult({
     this.title = '',
     this.summary = '',
-    this.todos = const [],
+    this.tasks = const [],
     this.decisions = const [],
     this.openQuestions = const [],
     this.chapters = const [],
@@ -241,7 +272,7 @@ class MeetingResult {
 
   final String title;
   final String summary;
-  final List<MeetingTodo> todos;
+  final List<MeetingTask> tasks;
   final List<String> decisions;
   final List<String> openQuestions;
   final List<MeetingChapter> chapters;
@@ -269,15 +300,12 @@ class MeetingResult {
   factory MeetingResult.fromJson(Map<String, dynamic> json) => MeetingResult(
     title: _text(json['title']),
     summary: _text(json['summary']),
-    todos: [
-      if (json['todos'] is List)
-        for (final item in json['todos'] as List)
-          if (item is Map && _text(item['text']).isNotEmpty)
-            MeetingTodo(
-              text: _text(item['text']),
-              who: _optional(item['who']),
-              when: _optional(item['when']),
-            ),
+    // `tasks`, each with its steps; a server from before them sends only
+    // `todos`, one line each.
+    tasks: [
+      if ((json['tasks'] is List ? json['tasks'] : json['todos'])
+          case final List items)
+        for (final item in items) ?MeetingTask.fromJson(item),
     ],
     decisions: _lines(json['decisions']),
     openQuestions: _lines(json['open_questions']),
