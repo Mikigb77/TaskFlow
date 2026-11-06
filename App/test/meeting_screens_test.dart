@@ -107,7 +107,7 @@ final _meetingNote = Task(
   notes: 'We agreed the pilot.',
   priority: 1,
   checklist: [
-    ChecklistItem(id: 's1', title: 'Send the pilot quote · Miki · Friday'),
+    ChecklistItem(id: 's1', title: 'Miki: Send the pilot quote · Friday'),
     ChecklistItem(id: 's2', title: 'Book the room'),
     ChecklistItem(id: 's3', title: 'Already done', completed: true),
   ],
@@ -951,7 +951,7 @@ void main() {
       expect(captures.current!.status, 'ready');
       expect(drafts.map((d) => d.task.kind), ['task', 'task']);
       expect(drafts.map((d) => d.task.title), [
-        'Send the pilot quote · Miki',
+        'Miki: Send the pilot quote',
         'Book the room',
       ]);
       // Each with its own steps, ticked: chosen to go in (UX-2701).
@@ -1519,7 +1519,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       final step = find.text(
-        'Enviar el presupuesto del piloto · Miki · el '
+        'Miki: Enviar el presupuesto del piloto · el '
         'viernes',
       );
       expect(step, findsOneWidget);

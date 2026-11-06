@@ -107,9 +107,9 @@ Task _meetingNoteTask() => Task(
       'meses.',
   priority: 1,
   checklist: [
-    ChecklistItem(id: 'm1', title: 'Enviar el presupuesto · Miki · el viernes'),
+    ChecklistItem(id: 'm1', title: 'Miki: Enviar el presupuesto · el viernes'),
     ChecklistItem(id: 'm2', title: 'Reservar la sala para la demo'),
-    ChecklistItem(id: 'm3', title: 'Pedir el contacto de compras · Ana'),
+    ChecklistItem(id: 'm3', title: 'Ana: Pedir el contacto de compras'),
   ],
 );
 
@@ -134,7 +134,7 @@ final _meetingNoteTasks = MeetingNoteTasks(
 List<Task> _madeTasks() => [
   Task(
     id: 121,
-    title: 'Enviar el presupuesto · Miki',
+    title: 'Miki: Enviar el presupuesto',
     priority: 1,
     dueDate: DateTime(2026, 11, 6),
     hasTime: false,
@@ -694,7 +694,7 @@ void meetingPreviews() {
         await p.shoot('review');
       },
       then: {
-        'review': 'Crear tareas: the review with one card per task: «Enviar el presupuesto · Miki» on Friday 6 November (the meeting’s «el viernes») with its two steps ticked under «Pasos que se añaden», with no ⋮; «Reservar la sala para la demo» and «Pedir el contacto de compras · Ana» with no day. Each can be removed, a step unticked, or a day set before saving.',
+        'review': 'Crear tareas: the review with one card per task: «Miki: Enviar el presupuesto» on Friday 6 November (the meeting’s «el viernes»), folded, with «2 pasos» under its day; «Reservar la sala para la demo» and «Ana: Pedir el contacto de compras» with no day. Each can be removed, opened to untick a step, or given a day before saving.',
       },
     );
 

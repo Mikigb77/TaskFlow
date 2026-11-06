@@ -483,7 +483,7 @@ void main() {
       expect(note.notes, contains('• Who signs for Acme?'));
       expect(note.notes, contains('Introductions and scope\nScope is the warehouse.'));
       expect(note.checklist.map((item) => item.title), [
-        'Send the pilot quote · Miki · Friday',
+        'Miki: Send the pilot quote · Friday',
         'Book the room',
       ]);
       final rows = await sql.query('tasks', where: 'id = ?', whereArgs: [note.id]);
@@ -894,7 +894,7 @@ void main() {
       );
       expect(note.checklist.map((line) => line.title), [
         'Acabar el front-end · dilluns',
-        'Trucar al client · jo · dilluns',
+        'Trucar al client · dilluns',
       ]);
       expect(
         note.notes,
@@ -930,10 +930,13 @@ void main() {
       expect(made.checklist.map((step) => step.title), ['El bàner', 'El backlog']);
       // Ticked: chosen to go in.
       expect(made.checklist.every((step) => step.completed), isTrue);
-      // Who stays in the title; the words of a day read whole leave it.
-      const call = MeetingTask(title: 'Trucar al client', who: 'jo', when: 'el dimarts');
+      // Someone named leads the title (UX-3109); the speaker needs no name;
+      // the words of a day read whole leave it.
+      const call = MeetingTask(title: 'Trucar al client', who: 'Ana', when: 'el dimarts');
       final called = make(ChecklistItem(title: meetingTaskLine(call)), call);
-      expect(called.title, 'Trucar al client · jo');
+      expect(called.title, 'Ana: Trucar al client');
+      const mine = MeetingTask(title: 'Trucar al client', who: 'jo', when: 'el dimarts');
+      expect(meetingTaskLine(mine), 'Trucar al client · el dimarts');
       expect(called.dueDate, DateTime(2026, 11, 10));
       // Words beyond the day stay, and the day still applies.
       const buy = MeetingTask(title: 'Comprar coixins', when: 'dissabte al matí');
@@ -958,7 +961,7 @@ void main() {
       expect((old.title, old.dueDate, old.checklist.length), ('Send the quote', DateTime(2026, 11, 6), 0));
       // Made a week later, a day already past isn't set (UX-3105).
       final late = make(ChecklistItem(title: meetingTaskLine(call)), call, today: DateTime(2026, 11, 12));
-      expect((late.title, late.dueDate), ('Trucar al client · jo · el dimarts', null));
+      expect((late.title, late.dueDate), ('Ana: Trucar al client · el dimarts', null));
     });
 
     test('a saved meeting note keeps its tasks\' steps on this phone, by line', () async {

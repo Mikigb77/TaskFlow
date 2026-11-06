@@ -91,10 +91,25 @@ class SavedMeetingNote {
   final String? language;
 }
 
-/// A task as a checklist line of its note: its words, then who and when if
-/// they were said (`Send the pilot quote · Miki · Friday`).
-String meetingTaskLine(MeetingTask task) =>
-    [task.title, ?task.who, ?task.when].join(' · ');
+/// A task as a checklist line of its note: who first, if it is someone
+/// named, then its words and when, if said
+/// (`Miki: Send the pilot quote · Friday`). The name leads, so «Ana: pedir
+/// el contacto» can't read as asking Ana (UX-3109).
+String meetingTaskLine(MeetingTask task) {
+  final who = task.who?.trim();
+  final named = who != null && who.isNotEmpty && !_speaker.hasMatch(who);
+  return [
+    named ? '$who: ${task.title}' : task.title,
+    ?task.when,
+  ].join(' · ');
+}
+
+/// The speaker as the server may write them, in the meeting's language: their
+/// own tasks need no name.
+final _speaker = RegExp(
+  r'^(yo|jo|i|me|myself|mí|mi|nosotros|nosotras|nosaltres|we|us)$',
+  caseSensitive: false,
+);
 
 /// The meeting's notes as an ordinary note (MN-21): the title the server
 /// wrote, a body of the meeting's date and length (from [startedAt], local,
