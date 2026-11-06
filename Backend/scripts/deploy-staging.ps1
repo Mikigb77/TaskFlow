@@ -60,6 +60,12 @@ foreach ($key in @('DATABASE_URL','DATABASE_URL_UNPOOLED','AWS_ACCESS_KEY_ID','A
 $taskflowResendPath = Join-Path $taskflowBackend '.credentials/staging-resend-key'
 if (-not (Test-Path -LiteralPath $taskflowResendPath)) { throw 'Configure the private Resend sending key before deploying.' }
 $taskflowValues.RESEND_API_KEY = (Get-Content -LiteralPath $taskflowResendPath -Raw).Trim()
+# The staging app's updater: a read-only GitHub token for the app repo's releases
+# (core/app_updates.py, Backend/docs/STAGING.md "Updates of the staging app").
+$taskflowUpdateTokenPath = Join-Path $taskflowBackend '.credentials/staging-github-token'
+if (Test-Path -LiteralPath $taskflowUpdateTokenPath) {
+    $taskflowValues.APP_UPDATE_GITHUB_TOKEN = (Get-Content -LiteralPath $taskflowUpdateTokenPath -Raw).Trim()
+}
 $taskflowPrivateJson = Join-Path $taskflowBackend '.credentials/staging-runtime.json'
 $taskflowValues | ConvertTo-Json | Set-Content -LiteralPath $taskflowPrivateJson
 Cloud @('services','enable','run.googleapis.com','cloudbuild.googleapis.com','artifactregistry.googleapis.com','secretmanager.googleapis.com','aiplatform.googleapis.com','cloudtasks.googleapis.com','cloudscheduler.googleapis.com','cloudresourcemanager.googleapis.com') | Out-Null

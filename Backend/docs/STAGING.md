@@ -52,6 +52,51 @@ rejects sandbox receipts. Authentication and staging invitation requirements
 remain in place. Test subscriptions use accelerated renewals/expiry (monthly
 renewals currently occur every five minutes), not a real month of access.
 
+### Updates of the staging app
+
+The staging app updates itself; the production app will update through Google
+Play and has none of this. The two are separate builds of the same code:
+`APP_ENV=staging` (from `App/config/staging.json`) makes the private
+**TaskFlow Staging** package, and only that release build carries the updater
+and Android's `REQUEST_INSTALL_PACKAGES` permission
+(`App/android/app/src/staging/AndroidManifest.xml`).
+
+- **Numbering.** Every build gets a higher versionCode: the build number in
+  `pubspec.yaml` plus the number of commits to the build's commit
+  (`App/scripts/ci-build-staging.sh`, and `build-staging.ps1` on the PC). The
+  version name still comes from `pubspec.yaml`.
+- **The check.** When it opens, and when it comes back to the front an hour
+  later, a signed-in staging app asks `GET /api/app/update/` for the newest
+  release. The API reads the newest GitHub release and its
+  `staging-build.json` (`core/app_updates.py`, cached for five minutes) and
+  answers its version, versionCode and SHA-256.
+- **The download.** Off mobile data the app downloads a newer build at once;
+  on mobile data, only when the person taps **Update**.
+  `GET /api/app/update/download/` answers a short-lived link to the APK on
+  GitHub's storage, so the APK never passes through Cloud Run and the token
+  never reaches the phone. The app checks the SHA-256 before installing.
+- **The install.** The app offers the build in a dialog, never while a meeting
+  is recording. **Update** hands it to Android's installer: the first time,
+  Android asks to let TaskFlow Staging install apps; on Android 12 and newer
+  an app updating itself then needs no confirmation. Android closes the app to
+  replace it, and the person opens it again.
+
+The API needs a read-only GitHub token for the private repository,
+`APP_UPDATE_GITHUB_TOKEN` in the `taskflow-api-staging-config` secret.
+Without it the API answers that there is no update, as production does. To
+set it up once:
+
+1. On GitHub, **Settings → Developer settings → Fine-grained tokens →
+   Generate new token**: resource owner Mikigb77, only the repository
+   `Mikigb77/TaskFlow`, permission **Contents: Read-only**, nothing else.
+2. In Git Bash from the repo root, or in Google Cloud Shell, run
+   `bash Backend/scripts/set-staging-update-token.sh` and paste the token. It
+   adds a new version of the secret, keeping every other value, and saves the
+   token in `Backend/.credentials/` so `deploy-staging.ps1` keeps it.
+3. Deploy the backend: **Actions → Deploy backend → Run workflow** on `main`.
+
+When the token expires, repeat the three steps with a new one.
+
 ### Complimentary owner access
 
 `mikigb77@gmail.com` has full Pro feature access without a purchase, renewal or

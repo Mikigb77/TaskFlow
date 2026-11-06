@@ -7,6 +7,7 @@ from core.task_views import TaskViewSet
 from core.list_views import TaskListViewSet, InvitationViewSet
 from core.attachment_views import AttachmentViewSet
 from core.group_views import TaskGroupViewSet, GroupInvitationViewSet, NotificationViewSet
+from core.app_updates import AppUpdateDownloadView, AppUpdateView
 from core.billing import BillingAccessView
 from core.meeting_views import MeetingFinishView, MeetingPieceView, MeetingView
 
@@ -25,6 +26,8 @@ urlpatterns = [
     path("api/health/", views.health),
     path("api/live/", views.live),
     path("api/billing/access/", BillingAccessView.as_view()),
+    path("api/app/update/", AppUpdateView.as_view()),
+    path("api/app/update/download/", AppUpdateDownloadView.as_view()),
     path("api/auth/register/", auth_views.RegisterView.as_view()),
     path("api/auth/login/", auth_views.LoginView.as_view()),
     path("api/auth/verify-email/", auth_views.VerifyEmailView.as_view()),

@@ -1,14 +1,19 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:agenda/providers/app_update_provider.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
 import 'package:agenda/providers/shell_tab_provider.dart';
 import 'package:agenda/screens/calendar_screen.dart';
 import 'package:agenda/screens/home_screen.dart';
 import 'package:agenda/screens/settings_screen.dart';
 import 'package:agenda/screens/notes_screen.dart';
+import 'package:agenda/services/app_update.dart';
+import 'package:agenda/services/meeting_controller.dart';
+import 'package:agenda/widgets/app_update_dialog.dart';
 import 'package:agenda/widgets/note_task.dart';
 
 // Mirrors Flutter's private `_kMaxLabelTextScaleFactor` in
@@ -73,6 +78,63 @@ class MainShell extends ConsumerStatefulWidget {
 class _MainShellState extends ConsumerState<MainShell> {
   late int _index = widget.initialIndex;
 
+  /// Only the private staging app updates itself (app_update.dart).
+  late final bool _updates = ref.read(appUpdaterProvider) != null;
+  AppLifecycleListener? _lifecycle;
+  StreamSubscription<AppInstallResult>? _installs;
+  final _offered = <int>{};
+  bool _offering = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!_updates) return;
+    _lifecycle = AppLifecycleListener(onResume: _checkUpdate);
+    // An install that didn't go through is offered again.
+    _installs = ref
+        .read(appUpdaterProvider)!
+        .installResults
+        .listen((_) => _offered.clear());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkUpdate());
+  }
+
+  @override
+  void dispose() {
+    _lifecycle?.dispose();
+    _installs?.cancel();
+    super.dispose();
+  }
+
+  void _checkUpdate() {
+    if (!mounted) return;
+    unawaited(ref.read(appUpdateProvider.notifier).check());
+    unawaited(_offerUpdate());
+  }
+
+  /// Offers a newer build once per build, on these tabs and never while a
+  /// meeting is recording: installing closes the app.
+  Future<void> _offerUpdate() async {
+    final update = ref.read(appUpdateProvider);
+    if (!mounted ||
+        _offering ||
+        update == null ||
+        _offered.contains(update.versionCode) ||
+        ref.read(meetingRecordingProvider) != null ||
+        !(ModalRoute.of(context)?.isCurrent ?? false)) {
+      return;
+    }
+    _offering = true;
+    _offered.add(update.versionCode);
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (_) => AppUpdateDialog(update: update),
+      );
+    } finally {
+      _offering = false;
+    }
+  }
+
   void _select(int index) {
     if (index != _index) {
       ProviderScope.containerOf(
@@ -90,6 +152,12 @@ class _MainShellState extends ConsumerState<MainShell> {
     // label from the start (R1-P318-1, UX-2903).
     ref.listen(noteTasksProvider, (_, _) {});
     ref.listen(meetingNotesProvider, (_, _) {});
+    if (_updates) {
+      ref.listen(appUpdateProvider, (_, _) => _offerUpdate());
+      ref.listen(meetingRecordingProvider, (_, recording) {
+        if (recording == null) _offerUpdate();
+      });
+    }
     // Tasks saved from the pending list land on Calendar.
     ref.listen<CalendarFocus?>(calendarFocusProvider, (_, focus) {
       if (focus?.showCalendar == true && _index != 0) {

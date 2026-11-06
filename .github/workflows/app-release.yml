@@ -53,6 +53,8 @@ jobs:
       sha256: ${{ steps.build.outputs.sha256 }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the build number counts the commits (ci-build-staging.sh)
       - uses: actions/setup-java@v6
         with:
           distribution: temurin

@@ -143,6 +143,11 @@ AI_GLOBAL_REQUESTS_PER_DAY = int(os.getenv("AI_GLOBAL_REQUESTS_PER_DAY", "200"))
 # AI dictations per UTC calendar month for accounts without Pro.
 FREE_VOICE_CAPTURES_PER_MONTH = int(os.getenv("FREE_VOICE_CAPTURES_PER_MONTH", "10"))
 DEPLOYMENT_ENVIRONMENT = os.getenv("DEPLOYMENT_ENVIRONMENT", "production")
+# The staging app's own updater reads the newest release of this repository
+# (core/app_updates.py). Off without a token, as in production, where Google
+# Play updates the app.
+APP_UPDATE_REPOSITORY = os.getenv("APP_UPDATE_REPOSITORY", "Mikigb77/TaskFlow")
+APP_UPDATE_GITHUB_TOKEN = os.getenv("APP_UPDATE_GITHUB_TOKEN", "")
 STAGING_ALLOWED_EMAILS = {email.strip().casefold() for email in os.getenv("STAGING_ALLOWED_EMAILS", "").split(",") if email.strip()}
 COMPLIMENTARY_PRO_EMAILS = {email.strip().casefold() for email in os.getenv("COMPLIMENTARY_PRO_EMAILS", "").split(",") if email.strip()}
 # Existing password accounts need an explicit server-approved, opaque identity.

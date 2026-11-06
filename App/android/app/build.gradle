@@ -78,6 +78,12 @@ android {
             }
         }
     }
+    // Only the private staging APK may install its own updates
+    // (AppUpdateBridge); the production app updates through Google Play, and
+    // Play restricts REQUEST_INSTALL_PACKAGES.
+    if (taskflowStaging) {
+        sourceSets.release.manifest.srcFile 'src/staging/AndroidManifest.xml'
+    }
     testBuildType = taskflowStaging ? 'release' : 'debug'
     buildTypes {
         debug {

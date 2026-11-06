@@ -4,6 +4,8 @@
 
 The download works for people with access to this private repository. The app installs as **TaskFlow Staging** beside the normal app, and it talks to the staging API. To install it, open the file on an Android phone and allow installs from that source.
 
+Once installed, TaskFlow Staging updates itself to each newer build: see [Updates of the staging app](Backend/docs/STAGING.md#updates-of-the-staging-app). The production app will update through Google Play.
+
 TaskFlow is a calendar-first task app for Android, built in Flutter, with a Django backend. You say or type a thought, and the app turns it into tasks on your calendar and reminds you about them.
 
 - [`App/`](App/README.md): the Flutter app.

@@ -1734,6 +1734,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get later => 'Later';
 
   @override
+  String get appUpdateTitle => 'Update available';
+
+  @override
+  String appUpdateBody(String version) {
+    return 'TaskFlow Staging $version is ready. The app closes to install it; open it again afterwards.';
+  }
+
+  @override
+  String get appUpdateInstall => 'Update';
+
+  @override
+  String get appUpdateDownloading => 'Downloading…';
+
+  @override
+  String get appUpdateAllow =>
+      'Allow TaskFlow Staging to install updates, then tap Update again.';
+
+  @override
+  String get appUpdateFailed =>
+      'The update couldn\'t be installed. Try again later.';
+
+  @override
   String get useOtherDevice => 'Use other device';
 
   @override
