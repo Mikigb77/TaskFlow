@@ -6874,11 +6874,17 @@ abstract class AppLocalizations {
   /// **'“a week before, and the day before at 8”'**
   String get billingReasonReminderPlansExample;
 
-  /// In the Notes tab, under “Add a note”: records a conversation (a meeting with a client, a class) and turns it into notes. Pro only; without Pro it opens the Pro screen.
+  /// In the Notes tab, the spoken name of the “Meeting” button beside “Add a note”, and the launcher shortcut: records a conversation (a meeting with a client, a class) and turns it into notes. Pro only; without Pro it opens the Pro screen.
   ///
   /// In en, this message translates to:
   /// **'Record a meeting'**
   String get meetingRecord;
+
+  /// In the Notes tab, the smaller outlined button beside “Add a note”: records a meeting into notes. One short word; TalkBack reads meetingRecord instead, which must contain this word.
+  ///
+  /// In en, this message translates to:
+  /// **'Meeting'**
+  String get meetingButton;
 
   /// The title of the screen that records a meeting and then prepares its notes.
   ///
@@ -7251,6 +7257,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{View task} other{View tasks}}'**
   String meetingViewTask(int count);
+
+  /// Heading of the sheet that opens when a meeting's notes are ready, and from “Create tasks” on its note: the tasks drafted from the meeting, each with a box.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested tasks'**
+  String get meetingSuggestedTitle;
+
+  /// Under “Suggested tasks”.
+  ///
+  /// In en, this message translates to:
+  /// **'From this meeting. Tick the ones to add.'**
+  String get meetingSuggestedHelp;
+
+  /// The sheet's main button: adds the ticked tasks at once. With none ticked it is disabled and says “Add tasks”.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Add tasks} =1{Add 1 task} other{Add {count} tasks}}'**
+  String meetingSuggestedAdd(int count);
+
+  /// Beside the main button while not every task is ticked: adds every suggested task in one go.
+  ///
+  /// In en, this message translates to:
+  /// **'Add all {count}'**
+  String meetingSuggestedAddAll(int count);
+
+  /// Under a suggested task that was only floated in the meeting, not said as a to-do; it starts unticked.
+  ///
+  /// In en, this message translates to:
+  /// **'Maybe'**
+  String get meetingSuggestedMaybe;
+
+  /// Tooltip and spoken name of the pencil on a suggested task: opens it in the review, to change its day or steps before adding it.
+  ///
+  /// In en, this message translates to:
+  /// **'Review before adding'**
+  String get meetingSuggestedReview;
+
+  /// When adding the suggested tasks fails; the note still has them.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t add the tasks. Try again.'**
+  String get meetingSuggestedFailed;
 
   /// Title of the question on Sign out when meeting recordings still wait on this phone.
   ///

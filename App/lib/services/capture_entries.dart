@@ -21,7 +21,7 @@ class CaptureEntry {
     final time = map['capturedAt'];
     if (id is! String ||
         !RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(id) ||
-        !['voice', 'text', 'share'].contains(kind) ||
+        !['voice', 'text', 'share', 'meeting'].contains(kind) ||
         text is! String ||
         text.length > 4000 ||
         time is! int ||

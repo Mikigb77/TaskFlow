@@ -114,7 +114,7 @@ void notesPreviews() {
     preview(
       notesTab,
       'empty',
-      'No notes yet: one line on what notes are for, no search, then a quieter Grabar una reunión just above Añadir nota.',
+      'No notes yet: one line on what notes are for, no search; at the bottom the filled Añadir nota with a smaller outlined «Reunión» beside it (under it at 2×), read as «Grabar una reunión».',
       everywhere,
       (p) async {
         final app = await PreviewApp.open(p, tasks: normalDay());
@@ -126,7 +126,7 @@ void notesPreviews() {
     preview(
       notesTab,
       'list',
-      'Five notes: one said in the sheet (its preview starts after its title), one with steps and one in a project; Grabar una reunión after the last note.',
+      'Five notes: one said in the sheet (its preview starts after its title), one with steps and one in a project; at the bottom Añadir nota with «Reunión» beside it.',
       [...mainScreen, ca2],
       (p) async {
         final app = await PreviewApp.open(
@@ -215,7 +215,7 @@ void notesPreviews() {
     preview(
       notesTab,
       'empty-with-project',
-      'No notes yet on an account with projects: no Proyecto filter and no search, just the empty line, Grabar una reunión and Añadir nota.',
+      'No notes yet on an account with projects: no Proyecto filter and no search, just the empty line, then Añadir nota and «Reunión» at the bottom.',
       [es1],
       (p) async {
         final app = await PreviewApp.open(

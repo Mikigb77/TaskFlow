@@ -24,7 +24,7 @@ from django.db.models import Max, Q
 from django.http import Http404
 from django.utils import timezone
 from google.genai import errors, types
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
 from . import ai
 from .models import Meeting, MeetingChapter, MeetingPiece
@@ -88,9 +88,19 @@ class MeetingTask(BaseModel):
     who: str | None = Field(max_length=200)
     when: str | None = Field(max_length=200)
     steps: list[str] = Field(max_length=50)
+    # Said as a to-do ("I'll send the quote on Friday"), not only floated: the app ticks it in
+    # «Tareas sugeridas». Required in the schema, so the model always says; read as true when it doesn't.
+    sure: bool
 
     _strip = field_validator("title", mode="before")(_text)
     _steps = field_validator("steps", mode="before")(_lines)
+
+    @model_validator(mode="before")
+    @classmethod
+    def sure_unless_said(cls, value):
+        if isinstance(value, dict) and not isinstance(value.get("sure"), bool):
+            return {**value, "sure": True}
+        return value
 
     @field_validator("who", "when", mode="before")
     @classmethod
@@ -291,7 +301,10 @@ def final_prompt(pieces, chapters):
             "task that were said, such as the banner and the backlog of \"finish the front end on Monday\"; [] "
             "when none. Something with its own goal is its own task, even when said right after another or on the "
             "same day, such as calling the client about a delay after talking about the front end: never make "
-            "unrelated actions the steps of one task, and never make a task only to group others.\n"
+            "unrelated actions the steps of one task, and never make a task only to group others. sure is true "
+            "when someone said it as something to do (\"I'll send the quote on Friday\", \"Ana, call the "
+            "supplier\"), false when it was only floated or might become a task (\"we should look at the "
+            "dates some time\").\n"
             "- decisions: what was agreed. open_questions: what was left unanswered.\n"
             "- language: the BCP-47 primary tag of the language mostly spoken, such as \"es\" or \"en\".\n"
             "Empty lists are [] when there is nothing to list.\n"

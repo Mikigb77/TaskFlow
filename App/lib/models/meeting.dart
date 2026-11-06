@@ -211,9 +211,15 @@ class MeetingTask {
     this.who,
     this.when,
     this.steps = const [],
+    this.sure = true,
   });
   final String title;
   final String? who;
+
+  /// Said as a to-do («I'll send the quote on Friday»), not only floated
+  /// («we should look at the dates some time»): «Tareas sugeridas» ticks
+  /// it. True when the server didn't say, as before it did.
+  final bool sure;
 
   /// The words as said; «Crear tareas» reads the day from them against the
   /// meeting's date.
@@ -228,6 +234,7 @@ class MeetingTask {
     'who': who,
     'when': when,
     'steps': steps,
+    'sure': sure,
   };
 
   /// Null when [json] holds no title.
@@ -240,6 +247,7 @@ class MeetingTask {
       who: MeetingResult._optional(json['who']),
       when: MeetingResult._optional(json['when']),
       steps: MeetingResult._lines(json['steps']),
+      sure: json['sure'] != false,
     );
   }
 }

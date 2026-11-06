@@ -5064,6 +5064,9 @@ class AppLocalizationsCa extends AppLocalizations {
   String get meetingRecord => 'Enregistra una reunió';
 
   @override
+  String get meetingButton => 'Reunió';
+
+  @override
   String get meetingScreenTitle => 'Reunió';
 
   @override
@@ -5361,6 +5364,40 @@ class AppLocalizationsCa extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get meetingSuggestedTitle => 'Tasques suggerides';
+
+  @override
+  String get meetingSuggestedHelp =>
+      'D’aquesta reunió. Marca les que vulguis afegir.';
+
+  @override
+  String meetingSuggestedAdd(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Afegeix $count tasques',
+      one: 'Afegeix 1 tasca',
+      zero: 'Afegeix tasques',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String meetingSuggestedAddAll(int count) {
+    return 'Afegeix-les totes ($count)';
+  }
+
+  @override
+  String get meetingSuggestedMaybe => 'Potser';
+
+  @override
+  String get meetingSuggestedReview => 'Revisa-la abans d’afegir-la';
+
+  @override
+  String get meetingSuggestedFailed =>
+      'No s’han pogut afegir les tasques. Torna-ho a provar.';
 
   @override
   String get meetingSignOutTitle => 'Vols tancar la sessió?';

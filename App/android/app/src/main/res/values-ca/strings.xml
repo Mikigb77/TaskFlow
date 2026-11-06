@@ -7,6 +7,10 @@
     <string name="capture_text">Escriu una tasca</string>
     <!-- Drecera del llançador, etiqueta curta: una paraula, uns 10 caràcters com a màxim. -->
     <string name="capture_text_short">Escriu</string>
+    <!-- Drecera del llançador, etiqueta llarga: enregistra una reunió en notes (Pro). Uns 25 caràcters com a màxim. -->
+    <string name="capture_meeting">Enregistra una reunió</string>
+    <!-- Drecera del llançador, etiqueta curta: una paraula, uns 10 caràcters com a màxim. -->
+    <string name="capture_meeting_short">Reunió</string>
     <!-- Giny de la pantalla d’inici: el text sota el micròfon, el seu nom per a TalkBack i el seu nom al selector de ginys. Dues línies curtes en una cel·la de 80 dp: uns 20 caràcters com a màxim. -->
     <string name="capture_widget_label">Dicta una tasca</string>
     <string name="capture_widget_description">Toca per dictar una tasca.</string>

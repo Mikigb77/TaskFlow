@@ -97,7 +97,7 @@ class SavedMeetingNote {
 /// el contacto» can't read as asking Ana (UX-3109).
 String meetingTaskLine(MeetingTask task) {
   final who = task.who?.trim();
-  final named = who != null && who.isNotEmpty && !_speaker.hasMatch(who);
+  final named = who != null && who.isNotEmpty && !meetingSpeakerWords.hasMatch(who);
   return [
     named ? '$who: ${task.title}' : task.title,
     ?task.when,
@@ -105,8 +105,8 @@ String meetingTaskLine(MeetingTask task) {
 }
 
 /// The speaker as the server may write them, in the meeting's language: their
-/// own tasks need no name.
-final _speaker = RegExp(
+/// own tasks need no name, and start ticked in «Tareas sugeridas».
+final meetingSpeakerWords = RegExp(
   r'^(yo|jo|i|me|myself|mí|mi|nosotros|nosotras|nosaltres|we|us)$',
   caseSensitive: false,
 );

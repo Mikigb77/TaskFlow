@@ -92,12 +92,19 @@ Widget _app(
 );
 
 class _Tasks extends TaskNotifier {
-  _Tasks(this.items) : super(MemoryTasks());
+  _Tasks(List<Task> items) : items = [...items], super(MemoryTasks());
   final List<Task> items;
+  int _next = 900;
   @override
-  Future<void> loadTasks() async => state = AsyncValue.data(items);
+  Future<void> loadTasks() async => state = AsyncValue.data([...items]);
   @override
   Future<void> showLocal() => loadTasks();
+  // Saving the suggested tasks adds them here.
+  @override
+  Future<void> addTasks(List<Task> tasks) async {
+    items.addAll([for (final task in tasks) task.copyWith(id: _next++)]);
+    await loadTasks();
+  }
 }
 
 final _meetingNote = Task(
@@ -630,13 +637,12 @@ void main() {
           size: const Size(320, 568),
         );
         final l = lookupAppLocalizations(Locale(language));
-        // The last thing in Notas, after the empty line (UX-2707).
-        await tester.scrollUntilVisible(
-          find.byKey(const ValueKey('record-meeting')),
-          100,
-          scrollable: find.byType(Scrollable).first,
+        // «Reunión», under «Añadir nota» at this size (2026-11-06).
+        expect(find.text(l.meetingButton), findsOneWidget);
+        expect(
+          tester.getRect(find.byKey(const ValueKey('record-meeting'))).top,
+          greaterThanOrEqualTo(tester.getRect(find.text(l.addNote)).bottom),
         );
-        expect(find.text(l.meetingRecord), findsOneWidget);
         await tester.tap(find.byKey(const ValueKey('record-meeting')));
         await tester.pumpAndSettle();
         expect(find.text(l.meetingStop), findsOneWidget);
@@ -945,32 +951,84 @@ void main() {
       expect(find.text('TASKS · 1/3'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('note-create-task')));
       await tester.pumpAndSettle();
-      expect(find.byType(CaptureResult), findsOneWidget);
-      // One card per open line; the line already ticked stays out.
-      final drafts = captures.current!.drafts;
-      expect(captures.current!.status, 'ready');
-      expect(drafts.map((d) => d.task.kind), ['task', 'task']);
-      expect(drafts.map((d) => d.task.title), [
+      // Several open lines: «Suggested tasks», one row per open line; the
+      // line already ticked stays out.
+      expect(find.text('Suggested tasks'), findsOneWidget);
+      expect(find.byKey(const ValueKey('suggested-s1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('suggested-s2')), findsOneWidget);
+      expect(find.byKey(const ValueKey('suggested-s3')), findsNothing);
+      // «Add all 2» when one starts unticked (for Miki, who isn't this
+      // account), else «Add 2 tasks».
+      final all = find.byKey(const ValueKey('suggested-add-all'));
+      await tester.tap(
+        all.evaluate().isNotEmpty
+            ? all
+            : find.byKey(const ValueKey('suggested-add')),
+      );
+      await tester.pumpAndSettle();
+      final made = [
+        for (final task in container.read(taskProvider).value ?? const <Task>[])
+          if (!task.isNote) task,
+      ];
+      expect(made.map((t) => t.title), [
         'Miki: Send the pilot quote',
         'Book the room',
       ]);
-      // Each with its own steps, ticked: chosen to go in (UX-2701).
-      expect(drafts.first.task.checklist.map((s) => s.title), [
+      // Each with its own steps, all going in, still to do.
+      expect(made.first.checklist.map((s) => s.title), [
         'Price for 20 seats',
         'Start date',
       ]);
-      expect(drafts.first.task.checklist.every((s) => s.completed), isTrue);
-      expect(drafts.last.task.checklist, isEmpty);
+      expect(made.first.checklist.every((s) => !s.done()), isTrue);
+      expect(made.last.checklist, isEmpty);
       // «Friday», from the meeting's Thursday.
-      expect(drafts.first.task.dueDate, DateTime(2026, 11, 6));
-      expect(drafts.last.task.dueDate, isNull);
-      expect(captures.current!.source, 'note');
-      expect(find.byType(CaptureReviewEditor), findsWidgets);
-      // The zone chosen in Settings, as the task form uses.
+      expect(made.first.dueDate, DateTime(2026, 11, 6));
+      expect(made.last.dueDate, isNull);
+      // The zone chosen in Settings, as the task form uses; nothing waits
+      // in Unsaved.
       expect(captures.current!.timezone, 'America/New_York');
+      expect(captures.current!.status, 'saved');
+    });
 
-      // Leaving closes at once, with no question: the note keeps it all,
-      // and nothing waits in Unsaved (UX-2706).
+    testWidgets('one open line opens its review card, with its steps ticked; '
+        'leaving closes it with no question', (tester) async {
+      final captures = MemoryCaptures();
+      final container = _container(
+        ScriptedMeetings(),
+        tasks: [
+          _meetingNote.copyWith(
+            checklist: [_meetingNote.checklist.first],
+          ),
+        ],
+        overrides: [
+          captureStoreProvider.overrideWithValue(captures),
+          ...captureSheetOverrides(),
+          meetingNotesOverride(),
+          meetingNoteMarksOverride(
+            MemoryMeetingNoteMarks({90}, {90: _meetingNoteTasks}),
+          ),
+        ],
+      );
+      captures.tasks = container;
+      final messenger = tester.binding.defaultBinaryMessenger;
+      const timezone = MethodChannel('flutter_timezone');
+      messenger.setMockMethodCallHandler(
+        timezone,
+        (_) async => 'Europe/Madrid',
+      );
+      addTearDown(() => messenger.setMockMethodCallHandler(timezone, null));
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        _app(container, const TaskDetailScreen(taskId: 90)),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('note-create-task')));
+      await tester.pumpAndSettle();
+      expect(find.byType(CaptureResult), findsOneWidget);
+      final drafts = captures.current!.drafts;
+      expect(drafts.single.task.checklist.every((s) => s.completed), isTrue);
+      expect(captures.current!.source, 'note');
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.byType(AlertDialog), findsNothing);
@@ -2901,7 +2959,7 @@ void main() {
           lessThanOrEqualTo(tester.getRect(record).top),
         );
         expect(
-          find.descendant(of: record, matching: find.text(es.meetingRecord)),
+          find.descendant(of: record, matching: find.text(es.meetingButton)),
           findsOneWidget,
         );
         recordIsLast(tester);
@@ -2939,6 +2997,24 @@ void main() {
         lessThanOrEqualTo(record.top),
       );
       recordIsLast(tester);
+    });
+
+    testWidgets('2026-11-06: «Reunión» sits beside «Añadir nota», smaller, '
+        'and TalkBack says «Grabar una reunión»', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await recordInEmptyNotes(tester, 1);
+      final record = tester.getRect(
+        find.byKey(const ValueKey('record-meeting')),
+      );
+      final add = tester.getRect(find.byType(FilledButton).last);
+      expect((record.center.dy - add.center.dy).abs(), lessThanOrEqualTo(1));
+      expect(record.left, greaterThan(add.right));
+      expect(record.width, lessThan(add.width));
+      expect(
+        find.bySemanticsLabel(RegExp(es.meetingRecord)),
+        findsOneWidget,
+      );
+      semantics.dispose();
     });
 
     testWidgets('UX-2707: at 2× the «Grabar una reunión» icon is larger than '
@@ -3848,7 +3924,7 @@ void main() {
       priority: 1,
       checklist: [if (withSteps) ChecklistItem(id: 'p0', title: line)],
     );
-    final noteTasks = MeetingNoteTasks(
+    final defaultTasks = MeetingNoteTasks(
       tasks: const {'p0': MeetingTask(title: line, steps: steps)},
       day: DateTime(2026, 11, 5),
     );
@@ -3882,6 +3958,10 @@ void main() {
       bool settle = true,
       // Tasks already made from the note's lines, by line id.
       Map<String, Task> lineTasks = const {},
+      // The note's tasks as the server wrote them; defaultTasks otherwise.
+      MeetingNoteTasks? noteTasks,
+      // Opened as the notes became ready.
+      bool suggest = false,
     }) async {
       final captures = MemoryCaptures();
       final links = MemoryNoteTaskLinks(null, {
@@ -3901,7 +3981,7 @@ void main() {
             meetingNotesReady: meetingNotesReady,
           ),
           meetingNoteMarksOverride(
-            MemoryMeetingNoteMarks({95}, {95: noteTasks}),
+            MemoryMeetingNoteMarks({95}, {95: noteTasks ?? defaultTasks}),
           ),
         ],
       );
@@ -3919,7 +3999,10 @@ void main() {
       await tester.pumpWidget(
         _app(
           container,
-          TaskDetailScreen(taskId: (shown ?? note()).id!),
+          TaskDetailScreen(
+            taskId: (shown ?? note()).id!,
+            suggestTasks: suggest,
+          ),
           language: language,
           scale: scale,
         ),
@@ -4129,8 +4212,9 @@ void main() {
       expect(app.container.read(calendarFocusProvider), isNull);
     });
 
-    testWidgets('Several tasks: «Crear tareas» makes both, leaves the note '
-        'in view, and «Ver tareas» shows them on Calendar', (tester) async {
+    testWidgets('Several tasks: «Crear tareas» opens «Tareas sugeridas», '
+        '«Añadir 2 tareas» makes both, leaves the note in view, and «Ver '
+        'tareas» shows them on Calendar', (tester) async {
       final two = note().copyWith(
         checklist: [
           ChecklistItem(id: 'p0', title: line),
@@ -4140,32 +4224,53 @@ void main() {
       final app = await open(tester, shown: two);
       expect(filledButtonWithText(es.meetingCreateTask(2)), findsOneWidget);
       expect(es.meetingCreateTask(2), 'Crear tareas');
-      await createTask(tester);
-      expect(app.captures.current!.drafts.length, 2);
-      // A folded card says how many steps it brings (UX-3103).
-      final first = app.captures.current!.drafts.first.id;
+      await tester.tap(find.byKey(const ValueKey('note-create-task')));
+      await tester.pumpAndSettle();
+      expect(find.text(es.meetingSuggestedTitle), findsOneWidget);
+      expect(find.byType(CaptureResult), findsNothing);
+      // Both ticked; the first says how many steps it brings.
+      for (final id in ['p0', 'p1']) {
+        expect(
+          tester.widget<CheckboxListTile>(
+            find.byKey(ValueKey('suggested-$id')),
+          ).value,
+          isTrue,
+        );
+      }
       expect(
         find.descendant(
-          of: find.byKey(ValueKey('draft-steps-$first')),
+          of: find.byKey(const ValueKey('suggested-p0')),
           matching: find.text(es.reviewStepCount(steps.length)),
         ),
         findsOneWidget,
       );
-      await addTask(tester);
+      // All ticked: no «Añadir las 2» beside the main button.
+      expect(find.byKey(const ValueKey('suggested-add-all')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('suggested-add')));
+      await tester.pumpAndSettle();
+      expect(find.text(es.meetingSuggestedTitle), findsNothing);
       final made = tasks(app.container).where((task) => !task.isNote).toList();
       expect(made.map((task) => task.title), [
         line,
         'Llamar al cliente por el retraso',
       ]);
+      // Every step goes in, still to do.
       expect(made.first.checklist.map((step) => step.title), steps);
+      expect(made.first.checklist.every((step) => !step.done()), isTrue);
       expect(made.last.checklist, isEmpty);
       // No task's page opens: the note stays in front.
       expect(front(tester), 95);
       expect(app.links.links[95], {'p0': made.first.id, 'p1': made.last.id});
+      expect(find.text(es.captureTasksAdded(2)), findsOneWidget);
+      // Nothing waits in «Sin guardar».
+      expect(app.captures.current!.status, 'saved');
       // Each line shows its task, and opens it (UX-3101).
       expect(find.byKey(const ValueKey('note-line-task-p0')), findsOneWidget);
       expect(find.byKey(const ValueKey('note-line-task-p1')), findsOneWidget);
-      expect(find.text(es.meetingNoteTaskCount(0, 2).toUpperCase()), findsOneWidget);
+      expect(
+        find.text(es.meetingNoteTaskCount(0, 2).toUpperCase()),
+        findsOneWidget,
+      );
       expect(filledButtonWithText(es.meetingViewTask(2)), findsOneWidget);
       expect(es.meetingViewTask(2), 'Ver tareas');
       await tester.tap(filledButtonWithText(es.meetingViewTask(2)));
@@ -4174,6 +4279,99 @@ void main() {
       expect(focus.taskIds, made.map((t) => t.id).toSet());
       expect(focus.showCalendar, isTrue);
       expect(focus.undated, isTrue);
+    });
+
+    testWidgets('2026-11-06: a maybe and a task for someone else start '
+        'unticked; «Añadir las 3» adds every one', (tester) async {
+      final three = note().copyWith(
+        checklist: [
+          ChecklistItem(id: 'p0', title: line),
+          ChecklistItem(id: 'p1', title: 'Mirar las fechas · Quizá'),
+          ChecklistItem(id: 'p2', title: 'Revisar el contrato · Ana'),
+        ],
+      );
+      final app = await open(
+        tester,
+        shown: three,
+        noteTasks: MeetingNoteTasks(
+          tasks: const {
+            'p0': MeetingTask(title: line, steps: steps),
+            'p1': MeetingTask(title: 'Mirar las fechas', sure: false),
+            'p2': MeetingTask(title: 'Revisar el contrato', who: 'Ana'),
+          },
+          day: DateTime(2026, 11, 5),
+        ),
+      );
+      await tester.tap(find.byKey(const ValueKey('note-create-task')));
+      await tester.pumpAndSettle();
+      bool ticked(String id) => tester
+          .widget<CheckboxListTile>(find.byKey(ValueKey('suggested-$id')))
+          .value!;
+      expect([ticked('p0'), ticked('p1'), ticked('p2')], [true, false, false]);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('suggested-p1')),
+          matching: find.text(es.meetingSuggestedMaybe),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(es.meetingSuggestedAdd(1)), findsOneWidget);
+      expect(find.text(es.meetingSuggestedAddAll(3)), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('suggested-add-all')));
+      await tester.pumpAndSettle();
+      final made = tasks(app.container).where((task) => !task.isNote).toList();
+      expect(made, hasLength(3));
+      expect(app.links.links[95]!.keys, unorderedEquals(['p0', 'p1', 'p2']));
+    });
+
+    testWidgets('2026-11-06: unticking all disables «Añadir»; the pencil '
+        'opens that one line in the review', (tester) async {
+      final two = note().copyWith(
+        checklist: [
+          ChecklistItem(id: 'p0', title: line),
+          ChecklistItem(id: 'p1', title: 'Llamar al cliente por el retraso'),
+        ],
+      );
+      final app = await open(tester, shown: two);
+      await tester.tap(find.byKey(const ValueKey('note-create-task')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('suggested-p0')));
+      await tester.tap(find.byKey(const ValueKey('suggested-p1')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const ValueKey('suggested-add')))
+            .onPressed,
+        isNull,
+      );
+      expect(find.text(es.meetingSuggestedAdd(0)), findsOneWidget);
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const ValueKey('suggested-p1')),
+          matching: find.byTooltip(es.meetingSuggestedReview),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(CaptureResult), findsOneWidget);
+      expect(
+        app.captures.current!.drafts.map((draft) => draft.task.title),
+        ['Llamar al cliente por el retraso'],
+      );
+    });
+
+    testWidgets('2026-11-06: opened as the notes became ready, «Tareas '
+        'sugeridas» shows over the note once', (tester) async {
+      await open(tester, suggest: true);
+      expect(find.text(es.meetingSuggestedTitle), findsOneWidget);
+      expect(find.text(es.meetingSuggestedAdd(1)), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text(es.meetingSuggestedTitle), findsNothing);
+      // The note is still there, and the sheet doesn't come back by itself.
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(find.text(es.meetingSuggestedTitle), findsNothing);
+      expect(front(tester), 95);
     });
 
     testWidgets('UX-3101/3102: a line whose task exists shows it and opens '
