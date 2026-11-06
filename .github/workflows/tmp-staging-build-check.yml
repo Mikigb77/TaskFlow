@@ -1,0 +1,51 @@
+# TEMPORARY: compiles the staging and production release APKs of this branch
+# with a throwaway key and fake config, to check the Kotlin and Gradle changes.
+# Removed before merging.
+name: Temporary staging build check
+on:
+  push:
+    branches: [claude/project-thread-c97ags]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: App
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "26"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+      - run: flutter pub get
+      - name: Staging release APK, throwaway key
+        run: |
+          mkdir -p .credentials config
+          keytool -genkeypair -keystore .credentials/staging.jks -storetype JKS -storepass throwaway -keypass throwaway \
+            -alias taskflow-staging -keyalg RSA -keysize 2048 -validity 1 -dname 'CN=Throwaway' -noprompt
+          printf 'storeFile=%s\nstorePassword=throwaway\nkeyPassword=throwaway\nkeyAlias=taskflow-staging\n' "$PWD/.credentials/staging.jks" > .credentials/staging-signing.properties
+          echo '{"APP_ENV":"staging","API_BASE_URL":"https://example.invalid","REVENUECAT_TEST_API_KEY":"test_throwaway","DEV_LOGIN_ENABLED":"false"}' > config/staging.json
+          base=$(sed -n 's/^version: *[^+]*+\([0-9][0-9]*\) *$/\1/p' pubspec.yaml)
+          number=$((base + $(git rev-list --count HEAD)))
+          flutter build apk --release --target=lib/main.dart --dart-define-from-file=config/staging.json --build-number="$number"
+          aapt2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
+          "$aapt2" dump badging build/app/outputs/flutter-apk/app-release.apk | grep -E "^package:|uses-permission"
+          "$aapt2" dump badging build/app/outputs/flutter-apk/app-release.apk | grep -q "REQUEST_INSTALL_PACKAGES"
+          "$aapt2" dump xmltree build/app/outputs/flutter-apk/app-release.apk --file AndroidManifest.xml | grep -A2 AppUpdateReceiver
+      - name: Production release APK has no install permission
+        run: |
+          rm -rf build/app/outputs
+          flutter build apk --release --target=lib/main.dart --dart-define=API_BASE_URL=https://example.invalid
+          aapt2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
+          "$aapt2" dump badging build/app/outputs/flutter-apk/app-release.apk | grep -E "^package:|uses-permission"
+          ! "$aapt2" dump badging build/app/outputs/flutter-apk/app-release.apk | grep -q "REQUEST_INSTALL_PACKAGES"
