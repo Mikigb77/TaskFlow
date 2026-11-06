@@ -1103,6 +1103,23 @@
     }
   },
   "later": "Later",
+  "appUpdateTitle": "Update available",
+  "@appUpdateTitle": {
+    "description": "Only in the private staging app: a newer build of the app can be installed."
+  },
+  "appUpdateBody": "TaskFlow Staging {version} is ready. The app closes to install it; open it again afterwards.",
+  "@appUpdateBody": {
+    "placeholders": {
+      "version": {
+        "type": "String",
+        "example": "1.0.6 (4130)"
+      }
+    }
+  },
+  "appUpdateInstall": "Update",
+  "appUpdateDownloading": "Downloading…",
+  "appUpdateAllow": "Allow TaskFlow Staging to install updates, then tap Update again.",
+  "appUpdateFailed": "The update couldn't be installed. Try again later.",
   "useOtherDevice": "Use other device",
   "useThisPhone": "Use this phone",
   "listResolveError": "Could not resolve this project. Please retry.",

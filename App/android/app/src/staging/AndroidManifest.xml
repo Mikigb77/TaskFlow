@@ -1,0 +1,8 @@
+<!-- Merged into the private staging release APK only (build.gradle): it updates
+     itself from the newest GitHub release (AppUpdateBridge). Never in a build
+     for Google Play, which updates the production app. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Downloads an update by itself only off mobile data. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+</manifest>

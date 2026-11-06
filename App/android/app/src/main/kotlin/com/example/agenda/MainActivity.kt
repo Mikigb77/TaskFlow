@@ -16,6 +16,7 @@ class MainActivity: FlutterFragmentActivity() {
     private var stagingBilling: StagingBillingBridge? = null
     private var accessibility: AccessibilityBridge? = null
     private var language: AppLanguageBridge? = null
+    private var update: AppUpdateBridge? = null
     private var locales: LocaleList? = null
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -25,6 +26,7 @@ class MainActivity: FlutterFragmentActivity() {
         stagingBilling = StagingBillingBridge(this, flutterEngine.dartExecutor.binaryMessenger)
         accessibility = AccessibilityBridge(this, flutterEngine.dartExecutor.binaryMessenger)
         language = AppLanguageBridge(this, flutterEngine.dartExecutor.binaryMessenger)
+        update = AppUpdateBridge(this, flutterEngine.dartExecutor.binaryMessenger)
         // TaskFlow's own notifications page, one switch away; Dart falls back to App info.
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "taskflow/app-settings").setMethodCallHandler { call, result ->
             if (call.method != "openNotificationSettings") return@setMethodCallHandler result.notImplemented()
@@ -61,5 +63,5 @@ class MainActivity: FlutterFragmentActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
     override fun onPause() { speech?.interrupt(); super.onPause() }
-    override fun onDestroy() { speech?.close(); speech = null; entries?.close(); entries = null; calendars?.close(); calendars = null; stagingBilling?.close(); stagingBilling = null; accessibility?.close(); accessibility = null; language?.close(); language = null; super.onDestroy() }
+    override fun onDestroy() { speech?.close(); speech = null; entries?.close(); entries = null; calendars?.close(); calendars = null; stagingBilling?.close(); stagingBilling = null; accessibility?.close(); accessibility = null; language?.close(); language = null; update?.close(); update = null; super.onDestroy() }
 }

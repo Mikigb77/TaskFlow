@@ -63,6 +63,9 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/capture_widget_info" />
         </receiver>
 
+        <!-- The installer's answer when the staging app updates itself (AppUpdateBridge). -->
+        <receiver android:name=".AppUpdateReceiver" android:exported="false" />
+
         <!-- flutter_local_notifications' foreground service, which keeps a meeting
              recording going (record 7 has none of its own). It stops with the app's
              task: the recording can't go on without the app. -->

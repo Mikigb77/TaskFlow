@@ -28,7 +28,13 @@ if (@($taskflowConfig.Keys | Where-Object { $_ -match 'E2E|PASSWORD|SECRET|TOKEN
 }
 Push-Location $taskflowApp
 try {
-    & flutter build apk --release --target=lib/main.dart --dart-define-from-file=config/staging.json
+    # The same build number as CI (ci-build-staging.sh): pubspec's plus the commits
+    # to this one, so the staging app can update from one build to the next.
+    $taskflowBase = [regex]::Match((Get-Content -LiteralPath 'pubspec.yaml' -Raw), '(?m)^version:\s*[^+\s]+\+(\d+)\s*$').Groups[1].Value
+    if (-not $taskflowBase) { throw 'pubspec.yaml needs a version such as 1.0.5+4007.' }
+    if ((& git rev-parse --is-shallow-repository).Trim() -ne 'false') { throw 'A shallow clone would number this build wrongly.' }
+    $taskflowNumber = [int]$taskflowBase + [int](& git rev-list --count HEAD).Trim()
+    & flutter build apk --release --target=lib/main.dart --dart-define-from-file=config/staging.json --build-number=$taskflowNumber
     if ($LASTEXITCODE -ne 0) { throw 'Staging APK build failed.' }
     $taskflowSdkLine = Get-Content -LiteralPath 'android/local.properties' | Where-Object { $_.StartsWith('sdk.dir=') } | Select-Object -First 1
     $taskflowSdk = $taskflowSdkLine.Substring(8).Replace('\\', '\').Replace('\:', ':')
@@ -41,11 +47,12 @@ try {
         throw 'The staging APK must be the isolated package and must not be debuggable.'
     }
     $taskflowVersion = [regex]::Match(($taskflowBadging -match '^package:')[0], "versionName='([^']+)'").Groups[1].Value
+    $taskflowCode = [regex]::Match(($taskflowBadging -match '^package:')[0], "versionCode='([^']+)'").Groups[1].Value
     $taskflowOutput = Join-Path $taskflowApp 'build/releases/taskflow-staging.apk'
     New-Item -ItemType Directory -Path (Split-Path -Parent $taskflowOutput) -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $taskflowApp 'build/app/outputs/flutter-apk/app-release.apk') -Destination $taskflowOutput
     $taskflowHash = (Get-FileHash -LiteralPath $taskflowOutput -Algorithm SHA256).Hash
-    @{file='taskflow-staging.apk'; sha256=$taskflowHash; applicationId='com.example.agenda.staging'; version=$taskflowVersion; debuggable=$false; billing='revenuecat-test-store'; built=(Get-Date).ToUniversalTime().ToString('o')} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $taskflowApp 'build/releases/staging-build.json')
+    @{file='taskflow-staging.apk'; sha256=$taskflowHash; applicationId='com.example.agenda.staging'; version=$taskflowVersion; versionCode=$taskflowCode; debuggable=$false; billing='revenuecat-test-store'; built=(Get-Date).ToUniversalTime().ToString('o')} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $taskflowApp 'build/releases/staging-build.json')
     Write-Output "Private staging APK: $taskflowOutput"
     Write-Output "SHA256: $taskflowHash"
 } finally { Pop-Location }

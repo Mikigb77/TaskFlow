@@ -6,6 +6,8 @@ EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 # No test may reach RevenueCat. Without a key only complimentary grants are Pro;
 # billing tests set a fixture key and mock the provider.
 REVENUECAT_API_KEY = ""
+# Nor GitHub: the app-update tests mock it (core/test_app_updates.py).
+APP_UPDATE_GITHUB_TOKEN = ""
 # Existing tests register and sign in at once, as before email verification. The
 # verification tests turn it on with override_settings.
 EMAIL_VERIFICATION_REQUIRED = False

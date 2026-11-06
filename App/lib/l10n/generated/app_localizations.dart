@@ -2914,6 +2914,42 @@ abstract class AppLocalizations {
   /// **'Later'**
   String get later;
 
+  /// Only in the private staging app: a newer build of the app can be installed.
+  ///
+  /// In en, this message translates to:
+  /// **'Update available'**
+  String get appUpdateTitle;
+
+  /// No description provided for @appUpdateBody.
+  ///
+  /// In en, this message translates to:
+  /// **'TaskFlow Staging {version} is ready. The app closes to install it; open it again afterwards.'**
+  String appUpdateBody(String version);
+
+  /// No description provided for @appUpdateInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get appUpdateInstall;
+
+  /// No description provided for @appUpdateDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading…'**
+  String get appUpdateDownloading;
+
+  /// No description provided for @appUpdateAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow TaskFlow Staging to install updates, then tap Update again.'**
+  String get appUpdateAllow;
+
+  /// No description provided for @appUpdateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The update couldn\'t be installed. Try again later.'**
+  String get appUpdateFailed;
+
   /// No description provided for @useOtherDevice.
   ///
   /// In en, this message translates to:

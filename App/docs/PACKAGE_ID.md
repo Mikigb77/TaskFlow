@@ -21,6 +21,7 @@ The app's Android package is still Flutter's placeholder, `com.example.agenda`, 
 - Move the Kotlin sources from `android/app/src/main/kotlin/com/example/agenda/` to `tech/garbar/taskflow/`, and change their `package` lines. That covers `MainActivity`, the speech, calendar, accessibility and capture bridges, and `CaptureWidget`. Do the same for `androidTest/…/StagingBillingReleaseTest.kt`.
 - `android/app/src/main/AndroidManifest.xml`: class names and any intent actions with the old prefix.
 - The launcher shortcuts need nothing: since 2026-10-19 they're published from code (`CaptureShortcuts.kt`) with an intent built from the app's own context. Only their action names, `com.example.agenda.CAPTURE_*` in `CaptureEntryBridge.kt`, may change for tidiness. Pinned shortcuts from the old app don't carry over.
+- The staging updater's package checks: `AppUpdateBridge.kt` and `Backend/core/app_updates.py` (`APPLICATION_ID`), which must match the new `staging-build.json`.
 - Tests and scripts that name it:
   - `App/test/native_resources_test.dart`;
   - `App/integration_test/projects_flow_test.dart`;

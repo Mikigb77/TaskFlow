@@ -41,16 +41,33 @@ if any(re.search("E2E|PASSWORD|SECRET|TOKEN", k) for k in c):
     sys.exit("Private test credentials must never be compiled into the distributable APK.")
 PY
 
+# Every build gets its own, higher versionCode, so the staging app can tell a
+# newer build and update to it (lib/services/app_update.dart): pubspec's build
+# number plus the number of commits to this one. Needs the whole history.
+if [ "$(git rev-parse --is-shallow-repository)" != false ]; then
+  echo 'A shallow clone would number this build wrongly: check out with fetch-depth: 0.' >&2
+  exit 1
+fi
+base=$(sed -n 's/^version: *[^+]*+\([0-9][0-9]*\) *$/\1/p' pubspec.yaml)
+[[ "$base" =~ ^[0-9]+$ ]] || { echo 'pubspec.yaml needs a version such as 1.0.5+4007.' >&2; exit 1; }
+number=$((base + $(git rev-list --count HEAD)))
+
 # Without --no-pub: only a build that runs pub regenerates the plugin registrant
 # for release, without dev-only plugins such as integration_test. With it, the
 # debug registrant from `flutter pub get` stays and the release compile fails.
-flutter build apk --release --target=lib/main.dart --dart-define-from-file=config/staging.json
+flutter build apk --release --target=lib/main.dart --dart-define-from-file=config/staging.json \
+  --build-number="$number"
 
 apk=build/app/outputs/flutter-apk/app-release.apk
 aapt2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
 badging=$("$aapt2" dump badging "$apk")
 if ! grep -q "^package: name='com.example.agenda.staging'" <<<"$badging" || grep -q '^application-debuggable' <<<"$badging"; then
   echo 'The staging APK must be the isolated package and must not be debuggable.' >&2
+  exit 1
+fi
+# Its own updater (AppUpdateBridge) needs the staging-only install permission.
+if ! grep -q "^uses-permission: name='android.permission.REQUEST_INSTALL_PACKAGES'" <<<"$badging"; then
+  echo 'The staging APK must be able to install its own updates (src/staging/AndroidManifest.xml).' >&2
   exit 1
 fi
 version=$(sed -n "s/^package: .*versionName='\([^']*\)'.*/\1/p" <<<"$badging")

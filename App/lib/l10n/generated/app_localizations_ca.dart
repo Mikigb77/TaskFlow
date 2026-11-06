@@ -1765,6 +1765,28 @@ class AppLocalizationsCa extends AppLocalizations {
   String get later => 'Més endavant';
 
   @override
+  String get appUpdateTitle => 'Actualització disponible';
+
+  @override
+  String appUpdateBody(String version) {
+    return 'TaskFlow Staging $version està a punt. L’app es tanca per instal·lar-la; torna-la a obrir després.';
+  }
+
+  @override
+  String get appUpdateInstall => 'Actualitza';
+
+  @override
+  String get appUpdateDownloading => 'S’està baixant…';
+
+  @override
+  String get appUpdateAllow =>
+      'Permet que TaskFlow Staging instal·li actualitzacions i torna a tocar Actualitza.';
+
+  @override
+  String get appUpdateFailed =>
+      'No s’ha pogut instal·lar l’actualització. Torna-ho a provar més tard.';
+
+  @override
   String get useOtherDevice => 'Utilitza l’altre dispositiu';
 
   @override
