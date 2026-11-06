@@ -164,6 +164,46 @@ class GroupTaskFlowTests(TestCase):
         history = self.miki.get(f"/api/tasks/{task['id']}/history/").data
         self.assertEqual([(row["action"], row["actor_name"]) for row in history],
                          [("created", "Miki"), ("completed", "Max")])
+        # Miki gave it to Max, so Miki is told he finished it. Laura isn't: it was never hers.
+        self.assertEqual(self.notified(self.miki), [(task["title"], "completed")])
+        self.assertEqual(self.notified(self.laura), [])
+
+    def test_whoever_hands_a_task_over_hears_when_it_is_done(self):
+        def complete(client, task, **changes):
+            current = client.get(f"/api/tasks/{task['id']}/").data
+            response = client.put(f"/api/tasks/{task['id']}/", {**current, **changes}, format="json")
+            self.assertEqual(response.status_code, 200, response.data)
+            return response.data
+
+        def completions(client):
+            return [title for title, action in self.notified(client) if action == "completed"]
+
+        def new_task(client, title, **fields):
+            response = client.put(f"/api/tasks/{uuid.uuid4()}/", {
+                "title": title, "list_id": self.presentation, "version": 0, **fields}, format="json")
+            self.assertEqual(response.status_code, 201, response.data)
+            return response.data
+
+        # Reassigned by Laura: Laura handed it to Max, so she hears, and Miki doesn't.
+        task = new_task(self.miki, "Check the sources", assignment="member", assignee_id=self.laura.user_id)
+        complete(self.laura, task, assignee_id=self.max.user_id)
+        complete(self.max, task, is_completed=True)
+        self.assertEqual(completions(self.laura), ["Check the sources"])
+        self.assertEqual(completions(self.miki), [])
+
+        # Taken by Max himself: nobody handed it over.
+        task = new_task(self.miki, "Print the poster")
+        complete(self.max, task, assignment="member", assignee_id=self.max.user_id)
+        complete(self.max, task, is_completed=True)
+        # A task that repeats would tell you every time: not those.
+        task = new_task(self.miki, "Water the lab plants", assignment="member", assignee_id=self.max.user_id,
+                        recurrence="daily", due_date="2026-11-09T09:00:00+01:00")
+        complete(self.max, task, completed_dates=["2026-11-09"])
+        # Nor in a project you muted.
+        self.miki.post(f"/api/lists/{self.presentation}/preferences/", {"notifications": "muted"}, format="json")
+        task = new_task(self.miki, "Send the draft", assignment="member", assignee_id=self.max.user_id)
+        complete(self.max, task, is_completed=True)
+        self.assertEqual(completions(self.miki), [])
 
     def test_a_task_for_the_whole_group_reaches_everyone_in_it(self):
         [draft] = self.dictate(self.miki, "We all need to rehearse the presentation on Friday", {

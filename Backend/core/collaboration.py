@@ -16,18 +16,36 @@ def record_event(task, actor, action, *, details=None, previous_assignee=None):
         return event
     people = project_people(project)
     preferences = dict(ProjectPreference.objects.filter(task_list=project).values_list("user_id", "notifications"))
+    # Whoever handed a one-off task to someone hears when that person completes it.
+    handed_over_by = assigner(task) if action == "completed" and task.recurrence == "none" else None
     recipients = []
     for person in people:
         user_id = person["user_id"]
         preference = preferences.get(user_id, "assigned")
         if user_id == getattr(actor, "pk", None) or preference == "muted":
             continue
-        responsible = (task.assignment == "group" or task.assignee_id == user_id or previous_assignee == user_id)
+        responsible = (task.assignment == "group" or task.assignee_id == user_id or previous_assignee == user_id
+                       or handed_over_by == user_id)
         needs_assignment = task.assignment == "unassigned" and person["role"] in ("owner", "admin")
         if preference == "all" or responsible or needs_assignment:
             recipients.append(TaskNotification(recipient_id=user_id, event=event))
     TaskNotification.objects.bulk_create(recipients)
     return event
+
+
+def assigner(task):
+    """Who gave the task to its assignee: whoever last assigned it to them, else the creator who
+    made it already theirs. None when nobody is assigned, or it's the assignee's own doing."""
+    if task.assignment != "member" or not task.assignee_id:
+        return None
+    event = task.events.filter(action="assigned").order_by("-version").first()
+    if event is None:
+        given_by = task.created_by_id
+    elif event.details.get("assignee_id", task.assignee_id) == task.assignee_id:
+        given_by = event.actor_id
+    else:
+        return None
+    return given_by if given_by != task.assignee_id else None
 
 
 def clear_assignments(project_ids, user_id, actor):

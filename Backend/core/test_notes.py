@@ -1,4 +1,5 @@
 import io
+import json
 import uuid
 import wave
 from tempfile import TemporaryDirectory
@@ -7,6 +8,7 @@ from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
+from .ai import AIUnavailable
 from .models import User, TaskList, ListMembership
 
 
@@ -77,10 +79,11 @@ class NoteTests(TestCase):
             self.assertEqual(self.b.get(f'/api/tasks/{key}/').status_code, 404)
             self.assertEqual(self.b.get(f'/api/attachments/{fid}/content/').status_code, 404)
 
+    @patch('core.ai._note_title_once', return_value='{"title": "Ideas for Friday"}')
     @patch('core.ai.extract_tasks')
     @patch('core.ai.transcribe')
     @patch("core.views.has_pro", new=lambda user: True)
-    def test_note_capture_keeps_words_and_never_extracts_commitments(self, transcribe, extract):
+    def test_note_capture_keeps_words_and_never_extracts_commitments(self, transcribe, extract, title):
         words = 'Ideas for Friday at 17:00\nBring up the reference next month.'
         text = self.a.post('/api/ai/drafts/', {'text': words, 'timezone': 'Europe/Madrid', 'capture_type': 'note'}, format='json')
         self.assertEqual(text.status_code, 200, text.data)
@@ -99,8 +102,26 @@ class NoteTests(TestCase):
         voice = self.a.post('/api/ai/drafts/', {'audio': SimpleUploadedFile('note.wav', wav.getvalue(), content_type='audio/wav'), 'timezone': 'UTC', 'capture_type': 'note'}, format='multipart')
         self.assertEqual(voice.status_code, 200, voice.data)
         self.assertEqual(voice.data['tasks'][0]['notes'], words)
+        self.assertEqual(voice.data['tasks'][0]['title'], 'Ideas for Friday')
         transcribe.assert_called_once()
         extract.assert_not_called()
+
+    def test_a_dictated_note_gets_a_short_title_and_keeps_every_word(self):
+        from .ai import note_title
+        words = ("Bueno, lo que me dijo el mecánico es que hay que cambiar las pastillas de freno "
+                 "y también el aceite antes del verano, y que mire la rueda de atrás.")
+        with patch('core.ai._note_title_once', return_value='{"title": "revisión del coche."}') as model:
+            self.assertEqual(note_title(words), 'Revisión del coche')
+        self.assertIn(json.dumps(words, ensure_ascii=False), model.call_args.args[0])
+        first_line = words  # One line: as before, the whole of it up to 160 characters.
+        for answer in ('{"title": ""}', '{"title": "' + 'muy ' * 15 + '"}', 'not json',
+                       RuntimeError('provider down'), AIUnavailable('Vertex AI is not configured.')):
+            with self.subTest(answer=answer), patch('core.ai._note_title_once', side_effect=[answer]):
+                self.assertEqual(note_title(words), first_line[:160])
+        # A short note is its own title, with no call.
+        with patch('core.ai._note_title_once') as model:
+            self.assertEqual(note_title('  Comprar sellos  '), 'Comprar sellos')
+            model.assert_not_called()
 
     @patch('core.ai.transcribe')
     def test_invalid_note_input_cannot_be_silently_truncated(self, transcribe):
