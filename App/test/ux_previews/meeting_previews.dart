@@ -7,7 +7,6 @@ import 'dart:async';
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/meeting.dart';
 import 'package:agenda/models/task.dart';
-import 'package:agenda/screens/notes_screen.dart';
 import 'package:agenda/services/meeting_controller.dart';
 import 'package:agenda/services/meeting_note.dart';
 import 'package:agenda/services/meeting_recorder.dart';
@@ -55,10 +54,11 @@ const meetingLines = Screen(
 const meetingNote = Screen(
   'meetings',
   'note',
-  'A note made from a meeting, with one line per task and Crear tareas, the review it opens with one card per task, and Ver tareas once they exist',
+  'A note made from a meeting, with one line per task and Crear tareas, «Tareas sugeridas» it opens with a box per task, the review a task’s pencil opens, and Ver tareas once they exist',
   sources: [
     'lib/screens/task_detail_screen.dart',
     'lib/widgets/note_task.dart',
+    'lib/widgets/suggested_tasks_sheet.dart',
     'lib/widgets/capture_review_editor.dart',
     'lib/screens/voice_task_screen.dart',
   ],
@@ -174,7 +174,7 @@ Future<PreviewApp> _open(
   ],
 );
 
-/// Notas, then «Grabar una reunión».
+/// Notas, then «Reunión».
 Future<PreviewApp> _record(
   Preview p,
   ScriptedMeetings meetings, {
@@ -192,21 +192,11 @@ Future<PreviewApp> _record(
   return app;
 }
 
-/// In Notas, «Grabar una reunión»: the last thing there (UX-2707), below the
-/// fold at large text.
+/// In Notas, «Reunión», beside «Añadir nota» (2026-11-06).
 Future<void> _tapRecord(Preview p) async {
-  await p.tester.scrollUntilVisible(
-    find.byKey(const ValueKey('record-meeting')),
-    200,
-    scrollable: find
-        .descendant(
-          of: find.byType(NotesScreen),
-          matching: find.byType(Scrollable),
-        )
-        .first,
+  await p.tester.tap(
+    find.byKey(const ValueKey('record-meeting')).hitTestable(),
   );
-  await p.tester.pumpAndSettle();
-  await p.tester.tap(find.text(p.l.meetingRecord).hitTestable());
   await p.tester.pumpAndSettle();
 }
 
@@ -629,7 +619,7 @@ void meetingPreviews() {
     preview(
       meetingLines,
       'recording',
-      'The recording screen left while it records: Notas says «Grabando una reunión · 12 min» with Abrir (read as «Abrir la grabación»), and Grabar una reunión gives way.',
+      'The recording screen left while it records: Notas says «Grabando una reunión · 12 min» with Abrir (read as «Abrir la grabación»), and «Reunión» beside Añadir nota gives way: Añadir nota fills the bar.',
       [es1, es2],
       (p) async {
         final app = await _record(p, ScriptedMeetings());
@@ -689,12 +679,23 @@ void meetingPreviews() {
         await app.tap('Precio del piloto con Acme');
         await p.shoot();
         await p.tester.tap(find.text(p.l.meetingCreateTask(3)).hitTestable());
+        await p.tester.pumpAndSettle();
+        await p.shoot('suggested');
+        await p.tester.tap(
+          find
+              .descendant(
+                of: find.byKey(const ValueKey('suggested-m1')),
+                matching: find.byTooltip(p.l.meetingSuggestedReview),
+              )
+              .hitTestable(),
+        );
         await p.frames(10, const Duration(milliseconds: 100));
         await p.tester.pumpAndSettle();
         await p.shoot('review');
       },
       then: {
-        'review': 'Crear tareas: the review with one card per task: «Miki: Enviar el presupuesto» on Friday 6 November (the meeting’s «el viernes»), folded, with «2 pasos» under its day; «Reservar la sala para la demo» and «Ana: Pedir el contacto de compras» with no day. Each can be removed, opened to untick a step, or given a day before saving.',
+        'suggested': 'Crear tareas: «Tareas sugeridas» over the note, «De esta reunión. Marca las que quieras añadir.», one row per task with a box at the start and a pencil at the end: «Miki: Enviar el presupuesto · el viernes» with «2 pasos» (ticked only if Miki is this account; a task for someone else starts unticked), «Reservar la sala para la demo» ticked, «Ana: Pedir el contacto de compras» unticked; then «Añadir las 3» (outlined) and «Añadir n tareas» (filled) at the bottom.',
+        'review': 'The first task’s pencil: the review with that one card, «Miki: Enviar el presupuesto» on Friday 6 November (the meeting’s «el viernes») with its two steps ticked under «Pasos que se añaden», with no ⋮. Its day can be set or a step unticked before saving.',
       },
     );
 
@@ -721,7 +722,7 @@ void meetingPreviews() {
     preview(
       meetingPro,
       'reason',
-      'A free account taps Grabar una reunión: the Pro screen says first, as a heading, «Con Pro, tus reuniones se convierten en notas:», then «un resumen, las decisiones y las cosas por hacer», then, 8 dp under it, «Hasta 20 horas de reuniones al mes.», then the plan with its price, then what else Pro gives (dictation and file space without limit, typed sentences turned into tasks, reminders in your own words), and «Ver suscripción» pinned at the bottom.',
+      'A free account taps «Reunión»: the Pro screen says first, as a heading, «Con Pro, tus reuniones se convierten en notas:», then «un resumen, las decisiones y las cosas por hacer», then, 8 dp under it, «Hasta 20 horas de reuniones al mes.», then the plan with its price, then what else Pro gives (dictation and file space without limit, typed sentences turned into tasks, reminders in your own words), and «Ver suscripción» pinned at the bottom.',
       [es1, es2, ca2],
       (p) async {
         final app = await _open(p, ScriptedMeetings(), pro: false);

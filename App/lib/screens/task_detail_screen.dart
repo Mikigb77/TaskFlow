@@ -20,6 +20,7 @@ import 'package:agenda/widgets/task_assignment_picker.dart';
 import 'package:agenda/widgets/attachment_panel.dart';
 import 'package:agenda/widgets/note_text.dart';
 import 'package:agenda/widgets/note_task.dart';
+import 'package:agenda/widgets/suggested_tasks_sheet.dart';
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/widgets/task_schedule_label.dart';
 
@@ -48,8 +49,13 @@ class TaskDetailScreen extends ConsumerStatefulWidget {
     this.occurrenceKey,
     this.showFiles = false,
     this.doneAt,
+    this.suggestTasks = false,
   });
   final int taskId;
+
+  /// Opened as a meeting's notes became ready: «Tareas sugeridas» opens
+  /// over the note once, when it has lines still to make (2026-11-06).
+  final bool suggestTasks;
   final DateTime? occurrenceDate;
   final String? occurrenceKey;
 
@@ -78,6 +84,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   /// Completar was tapped: the page holds until it pops, its buttons off
   /// and the whole page taking no taps (UX-2633).
   bool _closing = false;
+
+  /// «Tareas sugeridas» opened by itself already ([suggestTasks]).
+  bool _suggested = false;
 
   @override
   void initState() {
@@ -317,6 +326,18 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             final openLines = holds
                 ? task.checklist.where((step) => !step.done()).length
                 : toMake.length;
+            if (widget.suggestTasks &&
+                !_suggested &&
+                linksRead &&
+                makesTask &&
+                toMake.isNotEmpty) {
+              _suggested = true;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
+                  unawaited(showSuggestedTasks(context, task, lines: toMake));
+                }
+              });
+            }
             // Inert while Completar closes it: nothing on the page opens in
             // the hold (UX-2633).
             return AbsorbPointer(
@@ -611,11 +632,20 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                               else if (makesTask)
                                 FilledButton.icon(
                                   key: const ValueKey('note-create-task'),
-                                  onPressed: () => createTaskFromNote(
-                                    context,
-                                    task,
-                                    lines: toMake,
-                                  ),
+                                  // Several lines: «Tareas sugeridas», to
+                                  // tick and add at once; one: its review
+                                  // card, as before (2026-11-06).
+                                  onPressed: () => toMake.length > 1
+                                      ? showSuggestedTasks(
+                                          context,
+                                          task,
+                                          lines: toMake,
+                                        )
+                                      : createTaskFromNote(
+                                          context,
+                                          task,
+                                          lines: toMake,
+                                        ),
                                   icon: const Icon(Icons.add_task_rounded),
                                   label: Text(
                                     context.l10n.meetingCreateTask(openLines),

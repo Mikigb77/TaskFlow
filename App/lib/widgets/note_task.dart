@@ -235,7 +235,7 @@ Future<void> createTaskFromNote(
   }
   final session = await store.create(
     owner,
-    _zone(container),
+    noteCaptureZone(container),
     text: note.title,
     projectId: projectId,
     source: 'note',
@@ -347,7 +347,7 @@ Task noteLineTask(
 
 /// The capture's zone, as the task form picks it: the one chosen in
 /// Ajustes, then the account's, then UTC.
-String _zone(ProviderContainer container) {
+String noteCaptureZone(ProviderContainer container) {
   final chosen = container.read(regionalProvider).captureTimezone;
   if (CaptureTimezone.valid(chosen)) return chosen!;
   final account = container.read(authProvider).account?.timezone;

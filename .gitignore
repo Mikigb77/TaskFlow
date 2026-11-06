@@ -7,3 +7,6 @@
 .env.*
 !.env.example
 !.env.ci
+
+# Meeting-note checks on real recordings (Backend/scripts/check_meetings.py): private.
+Backend/.meeting-checks/

@@ -19,14 +19,14 @@ from . import meetings
 from .account_deletion import delete_account
 from .ai import client as REAL_CLIENT
 from .meeting_views import MeetingFinishView, MeetingPieceView, MeetingView
-from .meetings import MeetingNotes, last_sentence
+from .meetings import MeetingNotes, MeetingTask, last_sentence
 from .models import Meeting, MeetingChapter, MeetingPiece, User
 
 PASSWORD = "Meeting-notes-fixture-2026!"
 FINAL = {"title": "Pilot pricing with Acme", "summary": "They agreed the pilot. Miki sends the quote.",
          "tasks": [{"title": "Send the pilot quote", "who": "Miki", "when": "Friday",
-                    "steps": ["Price for 20 seats", " ", "Price for 20 seats", "Start date"]},
-                   {"title": "Book the room", "who": "", "when": None, "steps": []}],
+                    "steps": ["Price for 20 seats", " ", "Price for 20 seats", "Start date"], "sure": True},
+                   {"title": "Book the room", "who": "", "when": None, "steps": [], "sure": False}],
          "decisions": ["Start the pilot in December", " "], "open_questions": ["Who signs for Acme?"],
          "language": "en-GB"}
 RESULT_KEYS = {"title", "summary", "tasks", "todos", "decisions", "open_questions", "chapters", "start_missing", "language"}
@@ -301,8 +301,8 @@ class FinishTests(MeetingTestCase):
         self.assertEqual(result["title"], "Pilot pricing with Acme")
         self.assertEqual(result["tasks"], [
             {"title": "Send the pilot quote", "who": "Miki", "when": "Friday",
-             "steps": ["Price for 20 seats", "Start date"]},
-            {"title": "Book the room", "who": None, "when": None, "steps": []}])
+             "steps": ["Price for 20 seats", "Start date"], "sure": True},
+            {"title": "Book the room", "who": None, "when": None, "steps": [], "sure": False}])
         # An app from before tasks had steps reads one line per task.
         self.assertEqual(result["todos"], [{"text": "Send the pilot quote", "who": "Miki", "when": "Friday"},
                                            {"text": "Book the room", "who": None, "when": None}])
@@ -678,9 +678,16 @@ class NotesValidationTests(SimpleTestCase):
             "decisions": ["Yes", "yes", ""], "open_questions": None})
         self.assertEqual(notes.model_dump(), {
             "title": "Kickoff", "summary": "Short.", "language": "es",
-            "tasks": [{"title": "Call Ana", "who": None, "when": None, "steps": []}], "decisions": ["Yes"],
+            "tasks": [{"title": "Call Ana", "who": None, "when": None, "steps": [], "sure": True}],
+            "decisions": ["Yes"],
             "open_questions": []})
         self.assertEqual(MeetingNotes.model_validate({**FINAL, "language": "Spanish!"}).language, "")
+
+    def test_a_task_floated_is_not_sure_and_one_unsaid_is(self):
+        base = {"title": "Look at the dates", "who": None, "when": None, "steps": []}
+        self.assertFalse(MeetingTask.model_validate({**base, "sure": False}).sure)
+        self.assertTrue(MeetingTask.model_validate(base).sure)
+        self.assertTrue(MeetingTask.model_validate({**base, "sure": "maybe"}).sure)
 
     def test_the_schema_requires_every_field(self):
         from .ai import _vertex_schema
@@ -688,7 +695,7 @@ class NotesValidationTests(SimpleTestCase):
         self.assertEqual(set(schema["required"]),
                          {"title", "summary", "tasks", "decisions", "open_questions", "language"})
         task = schema["$defs"]["MeetingTask"]
-        self.assertEqual(set(task["required"]), {"title", "who", "when", "steps"})
+        self.assertEqual(set(task["required"]), {"title", "who", "when", "steps", "sure"})
         self.assertNotIn("chapters", schema["properties"])  # the server adds them
 
     def test_the_prompts_split_tasks_and_read_through_misheard_words(self):

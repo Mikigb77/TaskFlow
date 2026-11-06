@@ -5001,6 +5001,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get meetingRecord => 'Record a meeting';
 
   @override
+  String get meetingButton => 'Meeting';
+
+  @override
   String get meetingScreenTitle => 'Meeting';
 
   @override
@@ -5297,6 +5300,38 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get meetingSuggestedTitle => 'Suggested tasks';
+
+  @override
+  String get meetingSuggestedHelp => 'From this meeting. Tick the ones to add.';
+
+  @override
+  String meetingSuggestedAdd(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Add $count tasks',
+      one: 'Add 1 task',
+      zero: 'Add tasks',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String meetingSuggestedAddAll(int count) {
+    return 'Add all $count';
+  }
+
+  @override
+  String get meetingSuggestedMaybe => 'Maybe';
+
+  @override
+  String get meetingSuggestedReview => 'Review before adding';
+
+  @override
+  String get meetingSuggestedFailed => 'Couldn’t add the tasks. Try again.';
 
   @override
   String get meetingSignOutTitle => 'Sign out?';

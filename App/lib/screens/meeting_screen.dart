@@ -504,7 +504,8 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen>
       // The note takes this screen's place: Back returns to Notes.
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
-          builder: (_) => TaskDetailScreen(taskId: ready!.noteId!),
+          builder: (_) =>
+              TaskDetailScreen(taskId: ready!.noteId!, suggestTasks: true),
         ),
       );
       return;

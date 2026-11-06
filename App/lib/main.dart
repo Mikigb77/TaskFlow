@@ -193,6 +193,19 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         }
         final entry = pending.first;
         final owner = ref.read(captureOwnerProvider);
+        // The «Grabar una reunión» shortcut: the recording screen, the one
+        // recording now if a meeting records, over whatever shows. A
+        // dictation that holds the mic stops first. Without Pro, the screen
+        // opens the Pro screen, as the Notes button does.
+        if (entry.kind == 'meeting') {
+          await entries.acknowledge(entry.id);
+          if (!mounted || owner != ref.read(captureOwnerProvider)) continue;
+          await CaptureInterruption.stop();
+          final shown = _navigator.currentContext;
+          if (!mounted || shown == null || !shown.mounted) continue;
+          unawaited(openMeetingRecorder(shown));
+          continue;
+        }
         // Only shared text brings words to keep. The widget and the shortcuts
         // open an empty sheet, which keeps nothing until something is said or
         // typed.
@@ -409,7 +422,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           _navigator.currentState != null) {
         _navigator.currentState!.push(
           MaterialPageRoute<void>(
-            builder: (_) => TaskDetailScreen(taskId: request.noteId),
+            builder: (_) =>
+                TaskDetailScreen(taskId: request.noteId, suggestTasks: true),
           ),
         );
       }

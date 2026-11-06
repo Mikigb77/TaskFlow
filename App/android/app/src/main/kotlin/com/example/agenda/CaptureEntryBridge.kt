@@ -19,6 +19,7 @@ class CaptureEntryBridge(private val activity: Activity, messenger: BinaryMessen
     companion object {
         const val VOICE = "com.example.agenda.CAPTURE_VOICE"
         const val TEXT = "com.example.agenda.CAPTURE_TEXT"
+        const val MEETING = "com.example.agenda.CAPTURE_MEETING"
     }
     init {
         channel.setMethodCallHandler { call, result ->
@@ -58,6 +59,7 @@ class CaptureEntryBridge(private val activity: Activity, messenger: BinaryMessen
         val kind = when (intent.action) {
             VOICE -> "voice"
             TEXT -> "text"
+            MEETING -> "meeting"
             Intent.ACTION_SEND -> if (intent.type == "text/plain") "share" else return
             else -> return
         }
