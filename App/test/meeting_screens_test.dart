@@ -3001,6 +3001,9 @@ void main() {
 
     testWidgets('2026-11-06: «Reunión» sits beside «Añadir nota», smaller, '
         'and TalkBack says «Grabar una reunión»', (tester) async {
+      // In the app's font: the test font's square letters make «Reunión»
+      // wider than it is.
+      await loadManrope();
       final semantics = tester.ensureSemantics();
       await recordInEmptyNotes(tester, 1);
       final record = tester.getRect(
