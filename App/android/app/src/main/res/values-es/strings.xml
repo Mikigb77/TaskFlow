@@ -7,13 +7,13 @@
     <string name="capture_text">Escribir una tarea</string>
     <!-- Atajo del lanzador, etiqueta corta: una palabra, unos 10 caracteres como máximo. -->
     <string name="capture_text_short">Escribir</string>
+    <!-- Widget de la pantalla de inicio: el texto bajo el micrófono, su nombre para TalkBack y su nombre en el selector de widgets. Dos líneas cortas en una celda de 80 dp: unos 20 caracteres como máximo. -->
+    <string name="capture_widget_label">Dictar una tarea</string>
+    <string name="capture_widget_description">Toca para dictar una tarea.</string>
     <!-- Atajo del lanzador, etiqueta larga: graba una reunión en notas (Pro). Unos 25 caracteres como máximo. -->
     <string name="capture_meeting">Grabar una reunión</string>
     <!-- Atajo del lanzador, etiqueta corta: una palabra, unos 10 caracteres como máximo. -->
     <string name="capture_meeting_short">Reunión</string>
-    <!-- Widget de la pantalla de inicio: el texto bajo el micrófono, su nombre para TalkBack y su nombre en el selector de widgets. Dos líneas cortas en una celda de 80 dp: unos 20 caracteres como máximo. -->
-    <string name="capture_widget_label">Dictar una tarea</string>
-    <string name="capture_widget_description">Toca para dictar una tarea.</string>
     <!-- Avisos al compartir: Android muestra dos líneas. 50 caracteres como máximo. -->
     <string name="share_empty">No hay texto que añadir.</string>
     <string name="share_too_long">Texto demasiado largo. Comparte uno más corto.</string>

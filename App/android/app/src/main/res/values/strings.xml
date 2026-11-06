@@ -7,13 +7,13 @@
     <string name="capture_text">Type a new task</string>
     <!-- Launcher shortcut, short label: one word, shown at large text. About 10 characters at most. -->
     <string name="capture_text_short">Type</string>
+    <!-- Home-screen widget: the label under the mic, its TalkBack name and its name in the widget picker. Two short lines in an 80 dp cell: about 20 characters at most. -->
+    <string name="capture_widget_label">Dictate a task</string>
+    <string name="capture_widget_description">Tap to dictate a task.</string>
     <!-- Launcher shortcut, long label: records a meeting into notes (Pro). In English keep it at 13-16 characters, as for capture_voice. -->
     <string name="capture_meeting">Record a meeting</string>
     <!-- Launcher shortcut, short label: one word, shown at large text. About 10 characters at most. -->
     <string name="capture_meeting_short">Meeting</string>
-    <!-- Home-screen widget: the label under the mic, its TalkBack name and its name in the widget picker. Two short lines in an 80 dp cell: about 20 characters at most. -->
-    <string name="capture_widget_label">Dictate a task</string>
-    <string name="capture_widget_description">Tap to dictate a task.</string>
     <!-- Share toasts: Android shows two lines of a toast. 50 characters at most, the action first. -->
     <string name="share_empty">No text to add.</string>
     <string name="share_too_long">That text is too long. Share a shorter one.</string>

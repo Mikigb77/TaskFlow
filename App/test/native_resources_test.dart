@@ -1100,6 +1100,40 @@ void main() {
     },
   );
 
+  // ---- 2026-11-06: a third shortcut records a meeting, in the app's words ----
+  test(
+    '2026-11-06: the meeting shortcut reads Record a meeting / Grabar una reunión / Enregistra una reunió, with one-word short labels, as the app\'s meetingRecord and meetingButton',
+    () {
+      for (final (strings, app) in [(en, 'en'), (es, 'es'), (ca, 'ca')]) {
+        final catalog = arb(app);
+        expect(strings['capture_meeting'], catalog['meetingRecord'], reason: app);
+        expect(
+          strings['capture_meeting_short'],
+          catalog['meetingButton'],
+          reason: app,
+        );
+        expect(strings['capture_meeting_short']!.length, lessThanOrEqualTo(10));
+        expect(strings['capture_meeting_short'], isNot(contains(' ')));
+      }
+      final shortcuts = File(
+        'android/app/src/main/kotlin/com/example/agenda/CaptureShortcuts.kt',
+      ).readAsStringSync();
+      expect(
+        shortcuts,
+        contains(
+          '"capture_meeting", R.string.capture_meeting_short, '
+          'R.string.capture_meeting, R.drawable.capture_shortcut_meeting, '
+          'CaptureEntryBridge.MEETING',
+        ),
+      );
+      expect(
+        File('$_res/drawable-anydpi-v26/capture_shortcut_meeting.xml')
+            .existsSync(),
+        isTrue,
+      );
+    },
+  );
+
   test(
     'UX-1657: nothing changed in Spanish and Catalan, nor in the English shortcut and share strings',
     () {
@@ -1110,6 +1144,8 @@ void main() {
         'capture_text_short': 'Escribir',
         'capture_widget_label': 'Dictar una tarea',
         'capture_widget_description': 'Toca para dictar una tarea.',
+        'capture_meeting': 'Grabar una reunión',
+        'capture_meeting_short': 'Reunión',
         'share_empty': 'No hay texto que añadir.',
         'share_too_long': 'Texto demasiado largo. Comparte uno más corto.',
         'share_queue_full': 'Abre TaskFlow y acaba lo que ya has compartido.',
@@ -1122,6 +1158,8 @@ void main() {
         'capture_text_short': 'Escriu',
         'capture_widget_label': 'Dicta una tasca',
         'capture_widget_description': 'Toca per dictar una tasca.',
+        'capture_meeting': 'Enregistra una reunió',
+        'capture_meeting_short': 'Reunió',
         'share_empty': 'No hi ha cap text per afegir.',
         'share_too_long': 'Text massa llarg. Comparteix-ne un de més curt.',
         'share_queue_full': 'Obre TaskFlow i acaba el que ja has compartit.',

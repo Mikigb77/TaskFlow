@@ -7,7 +7,6 @@ import 'dart:async';
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/meeting.dart';
 import 'package:agenda/models/task.dart';
-import 'package:agenda/screens/notes_screen.dart';
 import 'package:agenda/services/meeting_controller.dart';
 import 'package:agenda/services/meeting_note.dart';
 import 'package:agenda/services/meeting_recorder.dart';
