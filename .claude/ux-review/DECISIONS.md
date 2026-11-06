@@ -2,6 +2,11 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-11-06 — Reopen a task by voice
+
+- The owner: a task marked done by mistake («complete all the tasks for today», then «the doctor one isn't done, uncheck it») must be reopenable by voice. The app's tick already reopens by touch, so no new button: only the voice command.
+- Built as a new command kind, `reopen` (`Backend/docs/VOICE_COMMANDS.md`): one task or a set («desmarca todas las de hoy»), with the same card, «Marcar como pendiente», and Deshacer, as `complete`.
+
 ## 2026-11-06 — Meeting recording: more visible, speakers, minutes, suggested tasks, two plans
 The owner: "we need to make more important the part of meeting recording … but most of the time the user would want to have simple note recording". He then said "let's do that" to the plan in the doc «Better meeting recordings: options for discussion» (https://claude.ai/artifact/DSsSR3FvvgRL1D5FyqRR1k), so its recommendations are his decisions:
 - **Entry point:** on Notes, a smaller outlined «Reunión» button beside the filled «Añadir nota» replaces the quiet «Grabar una reunión» line under the notes. «Añadir nota» stays the main action. Notes only, not Calendar or Tareas. A third launcher shortcut, «Grabar una reunión», joins «Dictar» and «Escribir». Later: offering to record when the phone's calendar has an event happening now.

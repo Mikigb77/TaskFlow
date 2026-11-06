@@ -32,15 +32,16 @@ class AppliedUpdate {
   final Task? landed;
 }
 
-/// A task the confirming tap marked done, with what puts it back.
+/// A task the confirming tap marked done, or not done (`reopen`), with what
+/// puts it back.
 class AppliedCompletion {
   AppliedCompletion(this.before, this.keys, {this.days = const []});
 
   /// The task as it was stored.
   final Task before;
 
-  /// A repeating task's repetitions marked done, by their keys; empty for
-  /// a task that doesn't repeat.
+  /// A repeating task's repetitions marked done (or not done), by their
+  /// keys; empty for a task that doesn't repeat.
   final List<String> keys;
 
   /// The days Calendar shows what was marked on: each repetition's, else
@@ -57,6 +58,9 @@ class AppliedCommands {
   /// Tasks marked done.
   final completed = <AppliedCompletion>[];
 
+  /// Tasks marked not done again («desmárcala»).
+  final reopened = <AppliedCompletion>[];
+
   /// Tasks deleted, as they were stored.
   final deleted = <Task>[];
 
@@ -66,10 +70,17 @@ class AppliedCommands {
     (count, done) => count + (done.keys.isEmpty ? 1 : done.keys.length),
   );
 
+  /// How many tasks were marked not done: each repetition counts.
+  int get reopenedCount => reopened.fold(
+    0,
+    (count, done) => count + (done.keys.isEmpty ? 1 : done.keys.length),
+  );
+
   bool get isEmpty =>
       projects.isEmpty &&
       updates.isEmpty &&
       completed.isEmpty &&
+      reopened.isEmpty &&
       deleted.isEmpty;
 }
 
@@ -209,9 +220,56 @@ class CommandRunner {
     applied.completed.add(AppliedCompletion(stored, keys, days: days));
   }
 
-  /// Puts back the deleted tasks, the tasks marked done and the changed
-  /// fields, newest first. False when something had changed again since,
-  /// and was left as it is.
+  /// Marks [shown] not done again, as unticking it does: the task, or for a
+  /// repeating [stored] task the repetitions [shown] (all in one write).
+  /// One that isn't done is left as it is.
+  Future<void> reopen(
+    Task stored,
+    Iterable<Task> shown,
+    AppliedCommands applied,
+  ) async {
+    if (!stored.isRecurring) {
+      if (!stored.isCompleted) return;
+      await tasks.updateTask(
+        stored.copyWith(isCompleted: false, completedAt: null),
+      );
+      applied.reopened.add(
+        AppliedCompletion(
+          stored,
+          const [],
+          days: [?(stored.dueDate ?? stored.deadline)],
+        ),
+      );
+      return;
+    }
+    final keys = <String>{
+      for (final repetition in shown)
+        if (repetition.occurrenceId case final key?
+            when stored.completedDates.contains(key))
+          key,
+    }.toList();
+    if (keys.isEmpty) return;
+    final days = [
+      for (final key in keys) ?stored.completedOccurrence(key)?.displayDate,
+    ];
+    await tasks.updateTask(
+      stored.copyWith(
+        completedDates: [
+          for (final key in stored.completedDates)
+            if (!keys.contains(key)) key,
+        ],
+        completedTimes: {
+          for (final MapEntry(:key, :value) in stored.completedTimes.entries)
+            if (!keys.contains(key)) key: value,
+        },
+      ),
+    );
+    applied.reopened.add(AppliedCompletion(stored, keys, days: days));
+  }
+
+  /// Puts back the deleted tasks, the tasks marked done or not done and the
+  /// changed fields, newest first. False when something had changed again
+  /// since, and was left as it is.
   Future<bool> undoChanges(AppliedCommands applied) async {
     var whole = true;
     if (applied.deleted.isNotEmpty) {
@@ -241,6 +299,36 @@ class CommandRunner {
                     for (final key in now.completedDates)
                       if (!done.keys.contains(key)) key,
                   ],
+                ),
+        );
+      } catch (_) {
+        whole = false;
+      }
+    }
+    for (final open in applied.reopened.reversed) {
+      try {
+        final now = current()
+            .where((task) => task.id == open.before.id)
+            .firstOrNull;
+        if (now == null) {
+          whole = false;
+          continue;
+        }
+        // Done again, at the time it was done before.
+        await tasks.updateTask(
+          open.keys.isEmpty
+              ? now.copyWith(
+                  isCompleted: true,
+                  completedAt: open.before.completedAt,
+                )
+              : now.copyWith(
+                  completedDates: {...now.completedDates, ...open.keys}.toList()
+                    ..sort(),
+                  completedTimes: {
+                    ...now.completedTimes,
+                    for (final key in open.keys)
+                      key: ?open.before.completedTimes[key],
+                  },
                 ),
         );
       } catch (_) {

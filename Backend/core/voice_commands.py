@@ -1,4 +1,4 @@
-"""Voice commands: create a project, find tasks, and change, complete or delete one task or many.
+"""Voice commands: create a project, find tasks, and change, complete, reopen or delete one task or many.
 
 The contract with the app is docs/VOICE_COMMANDS.md. The model says what the person
 asked; the server validates it and resolves spoken names to ids from the person's own
@@ -12,9 +12,9 @@ from pydantic import BaseModel, Field, model_validator
 
 from .capture_context import lenient_matches, match_people, normalized, project_candidates, ranked, resolve_project
 
-COMMAND_KINDS = ("project", "find", "update", "delete", "complete")
+COMMAND_KINDS = ("project", "find", "update", "delete", "complete", "reopen")
 # The kinds with a target: one existing task, or many with "all" (Bulk commands).
-TARGET_KINDS = ("update", "delete", "complete")
+TARGET_KINDS = ("update", "delete", "complete", "reopen")
 # Other names the model may give the same kinds. Anything else stays invalid.
 KIND_ALIASES = {
     "create_project": "project", "new_project": "project", "group": "project", "list": "project",
@@ -23,6 +23,10 @@ KIND_ALIASES = {
     "remove": "delete", "erase": "delete",
     "done": "complete", "mark_done": "complete", "mark_as_done": "complete", "mark_complete": "complete",
     "finish": "complete", "complete_task": "complete", "completed": "complete",
+    "uncomplete": "reopen", "un_complete": "reopen", "undo_complete": "reopen", "incomplete": "reopen",
+    "mark_incomplete": "reopen", "mark_undone": "reopen", "mark_not_done": "reopen", "not_done": "reopen",
+    "undone": "reopen", "uncheck": "reopen", "untick": "reopen", "reopen_task": "reopen", "mark_open": "reopen",
+    "mark_pending": "reopen", "unfinish": "reopen",
 }
 STATUS_ALIASES = {"all": "any", "pending": "open", "todo": "open", "done": "completed", "finished": "completed",
                   "complete": "completed"}
@@ -118,7 +122,7 @@ def is_command(item):
 
 
 class CommandTarget(BaseModel):
-    """Which existing task an update, a deletion or a completion is about. With all, which
+    """Which existing task an update, a deletion, a completion or a reopening is about. With all, which
     tasks: a set, with find's filters and a period instead of a day."""
     words: list[Word] = Field(default_factory=list, max_length=8)
     project_name: Name | None = None
@@ -194,7 +198,7 @@ class CommandChanges(BaseModel):
 
 class ExtractedCommand(BaseModel):
     """One command as the model returns it. Each kind uses only its own fields."""
-    kind: Literal["project", "find", "update", "delete", "complete"]
+    kind: Literal["project", "find", "update", "delete", "complete", "reopen"]
     name: Name | None = None  # project
     words: list[Word] = Field(default_factory=list, max_length=8)  # find
     project_name: Name | None = None  # find
@@ -203,7 +207,7 @@ class ExtractedCommand(BaseModel):
     status: Literal["any", "open", "completed"] = "any"  # find
     from_date: Date | None = None  # find
     to_date: Date | None = None  # find
-    target: CommandTarget | None = None  # update, delete, complete
+    target: CommandTarget | None = None  # update, delete, complete, reopen
     changes: CommandChanges | None = None  # update
 
     @model_validator(mode="before")
@@ -232,7 +236,7 @@ class ExtractedCommand(BaseModel):
             beside["member_name"] = data["member_name"]
         data["status"] = _status(data.get("status"), "any")
         # A flat command, such as {"kind": "delete", "words": ["médico"]}. In a flat update a
-        # date is the new one, so only a deletion or a completion takes its date as the task's day.
+        # date is the new one, so only a deletion, a completion or a reopening takes its date as the task's day.
         if kind == "update" and data.get("changes") is None:
             moved = CHANGE_KEYS + (("member_name",) if "assignee" in data else ())
             data["changes"] = {key: data[key] for key in moved if data.get(key) is not None}
@@ -255,6 +259,8 @@ class ExtractedCommand(BaseModel):
             self.from_date, self.to_date = self.to_date, self.from_date
         if self.kind == "complete" and self.target and self.target.all:
             self.target.status = "open"  # Only pending tasks can be marked done, whatever «hechas» suggested.
+        if self.kind == "reopen" and self.target and self.target.all:
+            self.target.status = "completed"  # Only done tasks can be reopened.
         return self
 
 
@@ -439,8 +445,8 @@ def commands_prompt(today, day_of_month):
     twelfth = day_of_month(12)
     deadline = f'"deadline_date":"{twelfth.isoformat()}"' if twelfth else '"deadline_date":null'
     return (
-        "Commands: the words may also ask to create a project, find tasks, or change, complete or delete one task or "
-        "many. Return each of these as one item of the commands array, in the order said, and never also as a task. "
+        "Commands: the words may also ask to create a project, find tasks, or change, complete, reopen or delete one "
+        "task or many. Return each of these as one item of the commands array, in the order said, and never also as a task. "
         "In the user's words 'grupo', 'proyecto' and 'lista' (Catalan 'grup', 'projecte', 'llista'; English 'group', "
         "'project', 'list') all mean a project. "
         "kind 'project' creates a project when the user asks for one: name is its name as said, starting with a capital, "
@@ -489,9 +495,20 @@ def commands_prompt(today, day_of_month):
         '{"kind":"complete","target":{"words":["dentista"]}}; '
         "'Mark the report as done' is "
         '{"kind":"complete","target":{"words":["report"]}}. '
+        "kind 'reopen' marks one existing task that was done as pending again, when the user asks to uncheck, "
+        "untick, uncomplete or reopen it, or says a task marked done isn't done ('desmarca', 'no está hecha', "
+        "'márcala como pendiente'; Catalan 'desmarca', 'no està feta'; English 'uncheck', 'it isn't done', "
+        "'reopen'): target as for update. It is never 'complete'. A thing still to do said without pointing at a "
+        "task done ('todavía tengo que llamar a Marta') stays a new task. "
+        "Example: 'La tarea del médico no está hecha, desmárcala' is "
+        '{"kind":"reopen","target":{"words":["médico"]}}; '
+        "'Desmarca la tasca de comprar el pa' is "
+        '{"kind":"reopen","target":{"words":["pa"]}}; '
+        "'Oh wait, the doctor one isn't done yet, uncheck it' is "
+        '{"kind":"reopen","target":{"words":["doctor"]}}. '
         "Many tasks at once ('todas', 'todo lo de', 'las tareas de ayer'; Catalan 'totes', 'tot'; English 'all', "
-        "'every', 'everything'): update, delete and complete act on a set, and target has \"all\":true with words "
-        "(usually none; in the singular), project_name, person ('me', or 'member' with member_name), status "
+        "'every', 'everything'): update, delete, complete and reopen act on a set, and target has \"all\":true with "
+        "words (usually none; in the singular), project_name, person ('me', or 'member' with member_name), status "
         "('completed' only for tasks already done, as in 'las completadas'; 'any' for done and pending alike; otherwise "
         "leave it out), from_date and to_date (inclusive; one day is both; weeks run Monday to Sunday; overdue is "
         "to_date yesterday without from_date), or undated true for tasks without a date, and never date. A task said in "
@@ -514,6 +531,8 @@ def commands_prompt(today, day_of_month):
         '"changes":{"priority":3}}; '
         "'Marca como hechas todas las de hoy' is "
         f'{{"kind":"complete","target":{{"all":true,"from_date":"{day(0)}","to_date":"{day(0)}"}}}}; '
+        "'Desmarca todas las de hoy' is "
+        f'{{"kind":"reopen","target":{{"all":true,"from_date":"{day(0)}","to_date":"{day(0)}"}}}}; '
         "'Borra todas las completadas de la semana pasada' is "
         f'{{"kind":"delete","target":{{"all":true,"status":"completed","from_date":"{day(monday - 7)}",'
         f'"to_date":"{day(monday - 1)}"}}}}. '

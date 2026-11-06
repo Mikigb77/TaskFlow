@@ -406,9 +406,9 @@ Future<bool?> _askToKeep(BuildContext context, {required bool spoken}) =>
       ),
     );
 
-/// A set's ticked tasks, each changed, deleted or marked done the way a
-/// single command does it, into [applied] for one `Deshacer`. A repeating
-/// task's repetitions marked done go in one write.
+/// A set's ticked tasks, each changed, deleted or marked done or not done
+/// the way a single command does it, into [applied] for one `Deshacer`. A
+/// repeating task's repetitions marked done or not done go in one write.
 Future<void> _applySet(
   CommandRunner runner,
   CommandKind kind,
@@ -432,6 +432,16 @@ Future<void> _applySet(
       }
       for (final same in byTask.values) {
         await runner.complete(same.first.stored, [
+          for (final item in same) item.shown,
+        ], applied);
+      }
+    case CommandKind.reopen:
+      final byTask = <int, List<BulkItem>>{};
+      for (final item in items) {
+        (byTask[item.stored.id!] ??= []).add(item);
+      }
+      for (final same in byTask.values) {
+        await runner.reopen(same.first.stored, [
           for (final item in same) item.shown,
         ], applied);
       }
@@ -3075,7 +3085,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       // alone; a set's names its action.
       final titleOnly =
           (view.kind == CommandKind.update ||
-              view.kind == CommandKind.complete) &&
+              view.kind == CommandKind.complete ||
+              view.kind == CommandKind.reopen) &&
           view.bulk == null &&
           !view.notFound &&
           !view.choosing &&
@@ -3771,6 +3782,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
           CommandKind.delete => l.commandWontDelete(count),
           CommandKind.update => l.commandWontChange(count),
           CommandKind.complete => l.commandWontComplete(count),
+          CommandKind.reopen => l.commandWontReopen(count),
           // A search has no ✕.
           CommandKind.project || CommandKind.find => l.commandWontCreate,
         },
@@ -3937,6 +3949,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
           await runner.delete(view.stored!, applied);
         } else if (view.kind == CommandKind.complete) {
           await runner.complete(view.stored!, [view.target!], applied);
+        } else if (view.kind == CommandKind.reopen) {
+          await runner.reopen(view.stored!, [view.target!], applied);
         }
       }
       // Done with: what was applied, and changes, completions or deletions
@@ -3948,7 +3962,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
               (!view.blocking &&
                   (view.kind == CommandKind.update ||
                       view.kind == CommandKind.delete ||
-                      view.kind == CommandKind.complete)))
+                      view.kind == CommandKind.complete ||
+                      view.kind == CommandKind.reopen)))
             view.command.id,
       };
       written = _session.copyWith(
@@ -4036,9 +4051,10 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       // only a deadline, where Calendar lists it.
       DateTime? landing(Task task) => task.displayDate ?? task.deadline;
       // Tasks marked done land where they are, ticked; one with no day
-      // lands nowhere, as the no-date row lists only open tasks.
+      // lands nowhere, as the no-date row lists only open tasks. Tasks
+      // marked not done land where they are too, unticked.
       final done = [
-        for (final completion in applied.completed)
+        for (final completion in [...applied.completed, ...applied.reopened])
           if (completion.days.isNotEmpty) completion,
       ];
       // The overdue tasks a «hoy» set took were listed on Today: changed in
@@ -4194,6 +4210,13 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                   applied.completed.single.before.title,
                 )
               : strings.commandTasksCompleted(applied.completedCount),
+        // One task marked not done is named: «Pendiente: Ir al médico».
+        if (applied.reopened.isNotEmpty)
+          applied.reopenedCount == 1
+              ? strings.commandReopenedTitle(
+                  applied.reopened.single.before.title,
+                )
+              : strings.commandTasksReopened(applied.reopenedCount),
         // One task deleted is named too: «Eliminada: Dentista».
         if (applied.deleted.isNotEmpty)
           applied.deleted.length == 1
@@ -4621,7 +4644,8 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
       ),
       CommandKind.update ||
       CommandKind.delete ||
-      CommandKind.complete when view.bulk != null => BulkCommandCard(
+      CommandKind.complete ||
+      CommandKind.reopen when view.bulk != null => BulkCommandCard(
         key: ValueKey(command.id),
         view: view,
         enabled: !_busy,
@@ -4642,7 +4666,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         onChanged: changed,
         onRemove: remove,
       ),
-      CommandKind.complete => CompleteCommandCard(
+      CommandKind.complete || CommandKind.reopen => CompleteCommandCard(
         key: ValueKey(command.id),
         view: view,
         enabled: !_busy,
@@ -4669,12 +4693,13 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
     final blocked =
         pending.any((d) => !_draftReady(d, undecided)) ||
         views.any((view) => view.blocking);
-    // Marking done is a change too.
+    // Marking done, or not done, is a change too.
     final changes = actionable
         .where(
           (view) =>
               view.kind == CommandKind.update ||
-              view.kind == CommandKind.complete,
+              view.kind == CommandKind.complete ||
+              view.kind == CommandKind.reopen,
         )
         .length;
     final deletes = actionable
@@ -4703,6 +4728,15 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
             actionable.every((view) => view.kind == CommandKind.complete)
         ? actionable.fold(0, (total, view) => total + (view.bulk?.count ?? 1))
         : 0;
+    // The same for marking tasks not done: «Marcar 2 tareas como
+    // pendientes».
+    final unmarking =
+        commands &&
+            ready == 0 &&
+            actionable.isNotEmpty &&
+            actionable.every((view) => view.kind == CommandKind.reopen)
+        ? actionable.fold(0, (total, view) => total + (view.bulk?.count ?? 1))
+        : 0;
     // Only things to read (a search, a task not found): nothing to tap.
     final readOnly =
         commands && cards > 0 && ready == 0 && actionable.isEmpty && !blocked;
@@ -4723,7 +4757,9 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
         views.every(
           (view) =>
               !view.asksProject &&
-              ((view.notFound && view.kind != CommandKind.complete) ||
+              ((view.notFound &&
+                      view.kind != CommandKind.complete &&
+                      view.kind != CommandKind.reopen) ||
                   (view.kind == CommandKind.find && view.found.isEmpty)),
         ) &&
         (_session.transcript.trim().isNotEmpty ||
@@ -4754,10 +4790,16 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
               ? bulkButton(context, soleSet)
               : sole?.kind == CommandKind.complete && sole!.actionable
               ? l.commandMarkDone
+              : sole?.kind == CommandKind.reopen && sole!.actionable
+              ? l.commandMarkNotDone
               : marking > 1
               ? l.commandBulkComplete(marking)
               : marking == 1
               ? l.commandMarkDone
+              : unmarking > 1
+              ? l.commandBulkReopen(unmarking)
+              : unmarking == 1
+              ? l.commandMarkNotDone
               : ready == 0 && actionable.isEmpty
               ? l.captureCheckDetails
               : ready > 0 && changes > 0 && deletes > 0

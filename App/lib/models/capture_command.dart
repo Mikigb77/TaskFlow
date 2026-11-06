@@ -1,11 +1,11 @@
 import 'package:uuid/uuid.dart';
 
 /// What a dictation asked for besides tasks and notes: create a project, find
-/// tasks, or change, delete or complete one, or many at once
+/// tasks, or change, delete, complete or reopen one, or many at once
 /// (Backend/docs/VOICE_COMMANDS.md). Commands are data: the phone finds the
-/// tasks itself, and nothing is created, changed, completed or deleted until
-/// the person's tap.
-enum CommandKind { project, find, update, delete, complete }
+/// tasks itself, and nothing is created, changed, completed, reopened or
+/// deleted until the person's tap.
+enum CommandKind { project, find, update, delete, complete, reopen }
 
 /// A day as the server writes it, `YYYY-MM-DD`; null for anything else.
 DateTime? _day(Object? value) {
@@ -177,6 +177,23 @@ class CommandTarget {
       projectCandidates: _candidates(json['project_candidates']),
     );
   }
+
+  /// This target holding only tasks with [status]: a set to reopen holds
+  /// only done ones, whatever came.
+  CommandTarget withStatus(String status) => CommandTarget(
+    words: words,
+    listId: listId,
+    projectName: projectName,
+    date: date,
+    all: all,
+    personId: personId,
+    personName: personName,
+    status: status,
+    from: from,
+    to: to,
+    undated: undated,
+    projectCandidates: projectCandidates,
+  );
 
   /// This target, as if the project [listId] had been said.
   CommandTarget withProject(String listId) => CommandTarget(
@@ -410,8 +427,8 @@ class CaptureCommand {
   final DateTime? from;
   final DateTime? to;
 
-  /// `update`, `delete` and `complete`: which task, or which set of them,
-  /// and what changes.
+  /// `update`, `delete`, `complete` and `reopen`: which task, or which set
+  /// of them, and what changes.
   final CommandTarget target;
   final TaskChanges changes;
 
@@ -424,7 +441,8 @@ class CaptureCommand {
       target.all &&
       (kind == CommandKind.update ||
           kind == CommandKind.delete ||
-          kind == CommandKind.complete);
+          kind == CommandKind.complete ||
+          kind == CommandKind.reopen);
 
   /// The card was taken out (✕): nothing happens for it.
   final bool removed;
@@ -485,6 +503,7 @@ class CaptureCommand {
       'update' => CommandKind.update,
       'delete' => CommandKind.delete,
       'complete' => CommandKind.complete,
+      'reopen' => CommandKind.reopen,
       _ => null,
     };
     if (kind == null) return null;
@@ -526,7 +545,12 @@ class CaptureCommand {
       case CommandKind.update:
       case CommandKind.delete:
       case CommandKind.complete:
-        final target = CommandTarget.fromJson(json['target']);
+      case CommandKind.reopen:
+        var target = CommandTarget.fromJson(json['target']);
+        // Only done tasks can be reopened (the server says so too).
+        if (kind == CommandKind.reopen && target.all) {
+          target = target.withStatus('completed');
+        }
         final changes = kind == CommandKind.update
             ? TaskChanges.fromJson(json['changes'])
             : const TaskChanges();

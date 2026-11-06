@@ -22,6 +22,9 @@ enum BulkAction {
   /// «Marcar 4 tareas como hechas».
   complete,
 
+  /// «Marcar 4 tareas como pendientes»: done ones, to do again.
+  reopen,
+
   /// «Eliminar 6 tareas».
   delete,
 }
@@ -150,6 +153,8 @@ BulkAction bulkAction(CaptureCommand command) {
       return BulkAction.delete;
     case CommandKind.complete:
       return BulkAction.complete;
+    case CommandKind.reopen:
+      return BulkAction.reopen;
     case CommandKind.update:
     case CommandKind.project:
     case CommandKind.find:
@@ -180,7 +185,11 @@ BulkPlan planBulk(
     command.target,
     accountId: accountId,
     projects: projects,
-    completing: command.kind == CommandKind.complete,
+    // Marking done or not done: one day's repeating tasks come as that
+    // day's repetitions.
+    completing:
+        command.kind == CommandKind.complete ||
+        command.kind == CommandKind.reopen,
     now: now,
   );
   final today = Task.day(now ?? DateTime.now());
@@ -238,6 +247,10 @@ BulkPlan planBulk(
         }
       case CommandKind.complete:
         if (!TaskMatcher.done(shown)) {
+          items.add(BulkItem(shown: shown, stored: stored, overdue: overdue));
+        }
+      case CommandKind.reopen:
+        if (TaskMatcher.done(shown)) {
           items.add(BulkItem(shown: shown, stored: stored, overdue: overdue));
         }
       case CommandKind.delete:

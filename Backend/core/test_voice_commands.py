@@ -305,14 +305,14 @@ class CommandPromptAndSchemaTests(SimpleTestCase):
         self.assertEqual(set(old["properties"]), {"tasks"})
         self.assertEqual(set(new["properties"]), {"tasks", "commands"})
         command = new["$defs"]["ExtractedCommand"]["properties"]
-        self.assertEqual(command["kind"]["enum"], ["project", "find", "update", "delete", "complete"])
+        self.assertEqual(command["kind"]["enum"], ["project", "find", "update", "delete", "complete", "reopen"])
         self.assertIn("from_date", command)
         self.assertNotIn("enum", new["$defs"]["CommandChanges"]["properties"]["priority"]["anyOf"][0])
         for schema in (old, new):
             converted = _transformers.t_schema(None, deepcopy(schema))
             self.assertEqual(converted.type.value, "OBJECT")
         commands = _transformers.t_schema(None, deepcopy(new)).properties["commands"]
-        self.assertEqual(commands.items.properties["kind"].enum, ["project", "find", "update", "delete", "complete"])
+        self.assertEqual(commands.items.properties["kind"].enum, ["project", "find", "update", "delete", "complete", "reopen"])
 
 
 @override_settings(FREE_VOICE_CAPTURES_PER_MONTH=10)

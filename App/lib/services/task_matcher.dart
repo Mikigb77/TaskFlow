@@ -181,9 +181,25 @@ abstract final class TaskMatcher {
   /// (marking one done with no day said), a repeating task comes as today's
   /// repetition, as ticking it on Today does, or else the one Today lists as
   /// overdue.
-  static Task? _shown(Task task, DateTime? date, {DateTime? today}) {
+  static Task? _shown(
+    Task task,
+    DateTime? date, {
+    DateTime? today,
+    bool reopening = false,
+  }) {
     if (date == null) {
       if (!task.isRecurring) return task;
+      if (reopening) {
+        // To mark one not done: today's repetition if it is done, else the
+        // latest one done.
+        final todays = today == null ? null : task.occurrenceOn(today);
+        if (todays != null && todays.isCompleted) return todays;
+        final done = [...task.completedDates]..sort();
+        for (final key in done.reversed) {
+          if (task.completedOccurrence(key) case final shown?) return shown;
+        }
+        return task.nextOpenOccurrence() ?? task;
+      }
       if (today != null) {
         final shown = task.occurrenceOn(today) ?? task.overdueOn(today);
         if (shown != null) return shown;
@@ -204,13 +220,16 @@ abstract final class TaskMatcher {
   /// `update`, `delete` and `complete`: the tasks [target] may mean, among
   /// those the person can edit, open ones first. A repeating task comes as
   /// the repetition meant; [completing] with no day said, today's (see
-  /// [_shown]). Words, a project or a day are needed: with none, nothing is
-  /// found.
+  /// [_shown]). [reopening] (`reopen`) looks for done ones first instead,
+  /// and a repeating task with no day said comes as today's repetition if
+  /// done, else its latest one done. Words, a project or a day are needed:
+  /// with none, nothing is found.
   static List<Task> targets(
     Iterable<Task> tasks,
     CommandTarget target, {
     required bool Function(String? listId) canEdit,
     bool completing = false,
+    bool reopening = false,
     DateTime? now,
   }) {
     if (target.projectName != null) return const [];
@@ -219,18 +238,27 @@ abstract final class TaskMatcher {
         target.listId == null) {
       return const [];
     }
-    final today = completing ? Task.day(now ?? DateTime.now()) : null;
+    final today = completing || reopening
+        ? Task.day(now ?? DateTime.now())
+        : null;
     final found = <Task>[];
     for (final task in tasks) {
       if (task.isNote || !canEdit(task.listId)) continue;
       if (target.listId != null && task.listId != target.listId) continue;
-      final shown = _shown(task, target.date, today: today);
+      final shown = _shown(
+        task,
+        target.date,
+        today: today,
+        reopening: reopening,
+      );
       if (shown != null) found.add(shown);
     }
     found.sort(_newestFirst);
     final best = _ranked(found, target.words, best: true);
-    final open = best.where((task) => !_done(task)).toList();
-    return open.isNotEmpty ? open : best;
+    final preferred = best
+        .where((task) => reopening ? _done(task) : !_done(task))
+        .toList();
+    return preferred.isNotEmpty ? preferred : best;
   }
 
   /// A repetition is done when it is completed; a repeating task shown as a

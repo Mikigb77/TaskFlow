@@ -4668,15 +4668,22 @@ class AppLocalizationsEs extends AppLocalizations {
     String _temp2 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
+      other: '$count tareas que se repiten no se reabren',
+      one: '$title se repite: no se reabre',
+    );
+    String _temp3 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
       other: '$count tareas que se repiten no cambian',
       one: '$title se repite: no cambia',
     );
-    String _temp3 = intl.Intl.selectLogic(action, {
+    String _temp4 = intl.Intl.selectLogic(action, {
       'delete': '$_temp0',
       'complete': '$_temp1',
-      'other': '$_temp2',
+      'reopen': '$_temp2',
+      'other': '$_temp3',
     });
-    return '$_temp3';
+    return '$_temp4';
   }
 
   @override
@@ -4752,6 +4759,61 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get commandAlreadyDone => 'Ya estaba hecha.';
+
+  @override
+  String get commandMarkNotDone => 'Marcar como pendiente';
+
+  @override
+  String get commandWhichToReopen => '¿Cuál quieres marcar como pendiente?';
+
+  @override
+  String commandDontReopen(String title) {
+    return 'No reabrir $title';
+  }
+
+  @override
+  String get commandDontReopenAny => 'No reabrir ninguna';
+
+  @override
+  String commandWontReopen(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'No se reabrirán',
+      one: 'No se reabrirá',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get commandNotDoneYet => 'No estaba hecha.';
+
+  @override
+  String commandBulkReopen(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Marcar $count tareas como pendientes',
+      one: 'Marcar 1 tarea como pendiente',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String commandReopenedTitle(String title) {
+    return 'Pendiente: $title';
+  }
+
+  @override
+  String commandTasksReopened(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tareas reabiertas',
+      one: 'Tarea reabierta',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get reminderPlanUntilDay => 'Hasta la fecha límite';

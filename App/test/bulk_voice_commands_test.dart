@@ -134,6 +134,7 @@ void main() {
   _p240DeadlineRow();
   _p267CommandCards();
   _p274AfterTheTap();
+  _reopen();
 }
 
 // ---------------------------------------------------------------- parsing
@@ -7057,5 +7058,281 @@ void _p274AfterTheTap() {
       expect(app.tasks.byId(2)!.dueDate, day(-1, 12));
       expect(app.tasks.byId(3)!.dueDate, day(-1));
     });
+  });
+}
+
+// ------------------------------------------------------------------ reopen
+
+/// «La tarea del médico no está hecha, desmárcala»: a task marked done by
+/// mistake, marked not done again by voice (Backend/docs/VOICE_COMMANDS.md,
+/// «reopen», asked for by the owner on 2026-11-06).
+void _reopen() {
+  group('reopen', () {
+    test('«reopen» is a command of its own; a set holds only done tasks', () {
+      final one = command({
+        'kind': 'reopen',
+        'target': {
+          'words': ['médico'],
+          'list_id': null,
+          'project_name': null,
+          'date': null,
+        },
+      });
+      expect(one.kind, CommandKind.reopen);
+      expect(one.bulk, isFalse);
+      expect(one.target.words, ['médico']);
+      expect(one.pending, isTrue);
+      final back = CaptureCommand.fromJson(
+        jsonDecode(jsonEncode(one.toJson())) as Map<String, dynamic>,
+      )!;
+      expect(back.kind, CommandKind.reopen);
+      // Whatever status came, a set to reopen holds done tasks.
+      final set = command({'kind': 'reopen', 'target': setTarget(from: day(0))});
+      expect(set.bulk, isTrue);
+      expect(set.target.status, 'completed');
+      expect(bulkAction(set), BulkAction.reopen);
+    });
+
+    test('the matcher prefers done tasks; a repeating one comes as its '
+        'repetition done today, else its latest one done', () {
+      final tasks = [
+        Task(id: 1, title: 'Ir al médico', priority: 1, dueDate: day(1, 9)),
+        Task(
+          id: 2,
+          title: 'Ir al médico',
+          priority: 1,
+          dueDate: day(0, 10),
+          isCompleted: true,
+        ),
+        Task(
+          id: 3,
+          title: 'Clase de yoga',
+          priority: 1,
+          dueDate: day(-7, 19),
+          recurrence: 'daily',
+          completedDates: [key(day(-3)), key(day(-2))],
+        ),
+      ];
+      List<Task> targets(List<String> words, {DateTime? now}) =>
+          TaskMatcher.targets(
+            tasks,
+            CommandTarget(words: words),
+            canEdit: (_) => true,
+            reopening: true,
+            now: now,
+          );
+      expect(ids(targets(['médico'])), [2]);
+      final yoga = targets(['yoga']).single;
+      expect(yoga.occurrenceId, key(day(-2)));
+      expect(TaskMatcher.done(yoga), isTrue);
+      // Marking done still prefers the open one.
+      expect(
+        ids(
+          TaskMatcher.targets(
+            tasks,
+            const CommandTarget(words: ['médico']),
+            canEdit: (_) => true,
+            completing: true,
+          ),
+        ),
+        [1],
+      );
+    });
+
+    testWidgets('one task: «Marcar como pendiente», then «Pendiente: …» '
+        'with Deshacer, which marks it done again', (tester) async {
+      final done = day(0, 9);
+      final app = await _App.open(
+        tester,
+        tasks: [
+          Task(
+            id: 1,
+            title: 'Ir al médico',
+            priority: 1,
+            dueDate: day(0, 10),
+            isCompleted: true,
+            completedAt: done,
+          ),
+          Task(id: 2, title: 'Comprar pan', priority: 1, isCompleted: true),
+        ],
+      );
+      await app.showResult(tester, [
+        command({
+          'kind': 'reopen',
+          'target': {
+            'words': ['médico'],
+          },
+        }),
+      ]);
+      expect(_headline(tester), 'Ir al médico');
+      expect(_buttonLabel(tester), es.commandMarkNotDone);
+      expect(es.commandMarkNotDone, 'Marcar como pendiente');
+      expect(app.tasks.byId(1)!.isCompleted, isTrue);
+      await _confirm(tester);
+      expect(app.tasks.byId(1)!.isCompleted, isFalse);
+      expect(app.tasks.byId(1)!.completedAt, isNull);
+      expect(app.tasks.byId(2)!.isCompleted, isTrue);
+      expect(
+        find.text(es.commandReopenedTitle('Ir al médico')),
+        findsOneWidget,
+      );
+      expect(
+        es.commandReopenedTitle('Ir al médico'),
+        'Pendiente: Ir al médico',
+      );
+      await tester.tap(find.text(es.undo));
+      await tester.pumpAndSettle();
+      expect(app.tasks.byId(1)!.isCompleted, isTrue);
+      expect(app.tasks.byId(1)!.completedAt, done);
+    });
+
+    testWidgets('a repeating task: today’s repetition done is unticked', (
+      tester,
+    ) async {
+      final app = await _App.open(
+        tester,
+        tasks: [
+          Task(
+            id: 1,
+            title: 'Clase de yoga',
+            priority: 1,
+            dueDate: day(-7, 19),
+            recurrence: 'daily',
+            completedDates: [key(day(-1)), key(day(0))],
+          ),
+        ],
+      );
+      await app.showResult(tester, [
+        command({
+          'kind': 'reopen',
+          'target': {
+            'words': ['yoga'],
+          },
+        }),
+      ]);
+      expect(_inResult(find.text('${es.today} · 19:00')), findsOneWidget);
+      await _confirm(tester);
+      expect(app.tasks.byId(1)!.completedDates, [key(day(-1))]);
+      await tester.tap(find.text(es.undo));
+      await tester.pumpAndSettle();
+      expect(app.tasks.byId(1)!.completedDates, [key(day(-1)), key(day(0))]);
+    });
+
+    testWidgets('not done: «No estaba hecha», and nothing to tap', (
+      tester,
+    ) async {
+      final app = await _App.open(
+        tester,
+        tasks: [
+          Task(id: 1, title: 'Ir al médico', priority: 1, dueDate: day(0, 10)),
+        ],
+      );
+      await app.showResult(tester, [
+        command({
+          'kind': 'reopen',
+          'target': {
+            'words': ['médico'],
+          },
+        }),
+      ]);
+      expect(find.text(es.commandNotDoneYet), findsOneWidget);
+      expect(find.byKey(const ValueKey('save-drafts')), findsNothing);
+    });
+
+    testWidgets('all of today’s, marked done by mistake: «Marcar 3 tareas '
+        'como pendientes»; untick one to keep it done; Deshacer marks them '
+        'done again', (tester) async {
+      final app = await _App.open(
+        tester,
+        tasks: [
+          Task(
+            id: 1,
+            title: 'Ir al médico',
+            priority: 1,
+            dueDate: day(0, 10),
+            isCompleted: true,
+          ),
+          Task(
+            id: 2,
+            title: 'Comprar pan',
+            priority: 1,
+            dueDate: day(0, 12),
+            isCompleted: true,
+          ),
+          Task(
+            id: 3,
+            title: 'Llamar a Marta',
+            priority: 1,
+            dueDate: day(0, 18),
+            isCompleted: true,
+          ),
+          // Still to do: nothing to reopen.
+          Task(id: 4, title: 'Regar', priority: 1, dueDate: day(0, 20)),
+          // Another day's.
+          Task(
+            id: 5,
+            title: 'Enviar informe',
+            priority: 1,
+            dueDate: day(-1, 9),
+            isCompleted: true,
+          ),
+        ],
+      );
+      await app.showResult(tester, [
+        command({'kind': 'reopen', 'target': setTarget(from: day(0))}),
+      ]);
+      expect(_headline(tester), es.commandBulkReopen(3));
+      expect(_headline(tester), 'Marcar 3 tareas como pendientes');
+      expect(_inResult(find.text('Regar')), findsNothing);
+      expect(_inResult(find.text('Enviar informe')), findsNothing);
+      await tester.tap(_inResult(find.text('Comprar pan')));
+      await tester.pumpAndSettle();
+      expect(_buttonLabel(tester), es.commandBulkReopen(2));
+      await _confirm(tester);
+      expect(app.tasks.byId(1)!.isCompleted, isFalse);
+      expect(app.tasks.byId(3)!.isCompleted, isFalse);
+      expect(app.tasks.byId(2)!.isCompleted, isTrue);
+      expect(app.tasks.byId(5)!.isCompleted, isTrue);
+      expect(find.text(es.commandTasksReopened(2)), findsOneWidget);
+      expect(es.commandTasksReopened(2), '2 tareas reabiertas');
+      await tester.tap(find.text(es.undo));
+      await tester.pumpAndSettle();
+      expect(app.tasks.byId(1)!.isCompleted, isTrue);
+      expect(app.tasks.byId(3)!.isCompleted, isTrue);
+    });
+
+    for (final (language, strings) in [('en', en), ('ca', ca), ('es', es)]) {
+      testWidgets('$language at 2× text: the card and its button fit', (
+        tester,
+      ) async {
+        final app = await _App.open(
+          tester,
+          language: language,
+          textScale: 2,
+          tasks: [
+            Task(
+              id: 1,
+              title: 'Ir al médico',
+              priority: 1,
+              dueDate: day(0, 10),
+              isCompleted: true,
+            ),
+            Task(
+              id: 2,
+              title: 'Comprar pan',
+              priority: 1,
+              dueDate: day(0, 12),
+              isCompleted: true,
+            ),
+          ],
+        );
+        await app.showResult(tester, [
+          command({'kind': 'reopen', 'target': setTarget(from: day(0))}),
+        ]);
+        expect(_headline(tester), strings.commandBulkReopen(2));
+        expect(_buttonLabel(tester), strings.commandBulkReopen(2));
+        expect(tester.takeException(), isNull);
+      });
+    }
   });
 }

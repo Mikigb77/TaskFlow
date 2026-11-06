@@ -3547,9 +3547,9 @@
       }
     }
   },
-  "commandBulkLeftRepeating": "{action, select, delete{{count, plural, =1{{title} repeats: it won’t be deleted} other{{count} repeating tasks won’t be deleted}}} complete{{count, plural, =1{{title} repeats: it won’t be completed} other{{count} repeating tasks won’t be completed}}} other{{count, plural, =1{{title} repeats: it won’t change} other{{count} repeating tasks won’t change}}}}",
+  "commandBulkLeftRepeating": "{action, select, delete{{count, plural, =1{{title} repeats: it won’t be deleted} other{{count} repeating tasks won’t be deleted}}} complete{{count, plural, =1{{title} repeats: it won’t be completed} other{{count} repeating tasks won’t be completed}}} reopen{{count, plural, =1{{title} repeats: it won’t be reopened} other{{count} repeating tasks won’t be reopened}}} other{{count, plural, =1{{title} repeats: it won’t change} other{{count} repeating tasks won’t change}}}}",
   "@commandBulkLeftRepeating": {
-    "description": "On a dictation's card for a set of tasks: repeating tasks that matched are left out. {count} is how many; {action} is delete, complete or other (a change); {title} is the one task's title when only one is left out (a repeating task's series title).",
+    "description": "On a dictation's card for a set of tasks: repeating tasks that matched are left out. {count} is how many; {action} is delete, complete, reopen (marking done tasks as not done again) or other (a change); {title} is the one task's title when only one is left out (a repeating task's series title).",
     "placeholders": {
       "count": {
         "type": "int"
@@ -3650,6 +3650,67 @@
   "commandAlreadyDone": "It was already done.",
   "@commandAlreadyDone": {
     "description": "On a dictation's card that marks one task as done: the task was already done, so nothing changes."
+  },
+  "commandMarkNotDone": "Mark as not done",
+  "@commandMarkNotDone": {
+    "description": "The confirming button of a dictation's result whose only command marks one done task as not done again (“the doctor task isn't done, uncheck it”). After the tap, commandReopenedTitle shows with Undo."
+  },
+  "commandWhichToReopen": "Which one do you want to mark as not done?",
+  "@commandWhichToReopen": {
+    "description": "A dictation asked to mark a done task as not done again and several match: a short list to tap one follows."
+  },
+  "commandDontReopen": "Don’t reopen {title}",
+  "@commandDontReopen": {
+    "description": "Tooltip and screen-reader label of the ✕ on a card that marks a done task as not done again in a dictation's result: the task stays done. {title} is the task's title.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "commandDontReopenAny": "Don’t reopen any",
+  "@commandDontReopenAny": {
+    "description": "Tooltip and screen-reader label of the ✕ on a card that marks done tasks as not done again, while it asks which one (commandWhichToReopen) or lists a set of them: none is reopened."
+  },
+  "commandWontReopen": "{count, plural, =1{Won’t be reopened} other{Won’t be reopened}}",
+  "@commandWontReopen": {
+    "description": "Message, with Undo, after the ✕ on a card that marks done tasks as not done again in a dictation's result: nothing changes. {count} is how many tasks the card would have reopened: a set's ticked tasks, or 1.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandNotDoneYet": "It wasn’t done.",
+  "@commandNotDoneYet": {
+    "description": "On a dictation's card that marks one task as not done again: the task wasn't done, so nothing changes."
+  },
+  "commandBulkReopen": "{count, plural, =1{Mark 1 task as not done} other{Mark {count} tasks as not done}}",
+  "@commandBulkReopen": {
+    "description": "Heading, and confirming button, of a dictation's card that marks a set of done tasks as not done again (“uncheck all of today's”). Also the button when several single cards all do so. {count} is how many are still ticked.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commandReopenedTitle": "Not done: {title}",
+  "@commandReopenedTitle": {
+    "description": "Brief message after a dictation marked one task as not done again, with Undo. {title} is the task's title. Mirrors notificationCompleted (“Completed: {title}”).",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "commandTasksReopened": "{count, plural, =1{Task reopened} other{{count} tasks reopened}}",
+  "@commandTasksReopened": {
+    "description": "Brief message after a dictation marked two or more tasks as not done again, with Undo. For one task, commandReopenedTitle names it instead.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "reminderPlanUntilDay": "Until the deadline",
   "@reminderPlanUntilDay": {
