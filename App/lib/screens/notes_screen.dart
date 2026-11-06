@@ -154,6 +154,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     // voice control finds it by what it shows.
     final meeting = OutlinedButton.icon(
         key: const ValueKey('record-meeting'),
+        // As tall as «Añadir nota», as on a note's page.
+        style: OutlinedButton.styleFrom(
+            minimumSize: const Size(48, 48),
+            visualDensity: const VisualDensity(vertical: 3)),
         // Grows with the text, up to the notes' own icons (UX-2707).
         icon: Icon(Icons.record_voice_over_outlined,
             size: math.min(24.0, MediaQuery.textScalerOf(context).scale(18))),
