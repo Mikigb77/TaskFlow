@@ -311,6 +311,15 @@ def prompt_context(context, words):
     return result
 
 
+def project_of_person(member_name, projects):
+    """With no project said or open: the one shared project where the name finds someone, so
+    «Laura has to finish the conclusion» said from the calendar goes to the project Laura is in.
+    None when the name finds nobody, or people in several projects: the card then asks which.
+    Two people with that name in the one project stay ambiguous_member, as when it is said."""
+    found = [project for project in projects if project["shared"] and match_people(member_name, project["people"])]
+    return found[0] if len(found) == 1 else None
+
+
 def resolve_targets(payload, context, new_projects=None):
     """Turn the spoken project, group and person into ids from the directory.
 
@@ -332,6 +341,8 @@ def resolve_targets(payload, context, new_projects=None):
             issues.append(issue)
     elif context and context.get("default_project_id"):
         selected = next((project for project in projects if project["id"] == context["default_project_id"]), None)
+    elif member_name and request != "group":
+        selected = project_of_person(member_name, projects)
     # A project created in the same dictation: personal, with nobody else in it yet.
     created = selected is not None and selected["id"] is None
 

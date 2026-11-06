@@ -66,10 +66,31 @@ class AssignmentResolutionTests(SimpleTestCase):
         self.assertEqual(self.resolve()["assignment"], "group")
 
     def test_request_for_a_person_needs_a_shared_project(self):
-        self.assertEqual(self.resolve(member_name="Ana", assignment_request="member")["assignment_issues"], ["choose_project"])
+        # Nobody by that name in any shared project: the card asks for one.
+        self.assertEqual(self.resolve(member_name="Pau", assignment_request="member")["assignment_issues"], ["choose_project"])
         result = self.resolve(project_name="Languages", member_name="Ana", assignment_request="member")
         self.assertEqual(result["assignment_issues"], ["shared_project_required"])
         self.assertIsNone(result["assignee_id"])
+
+    def test_a_name_alone_finds_the_one_shared_project_with_that_person(self):
+        result = self.resolve(member_name="Anita", assignment_request="member")
+        self.assertEqual((result["list_id"], result["assignee_id"], result["assignment_issues"]), ("physics", 2, []))
+        # Without assignment_request too, as the model may leave it out.
+        self.assertEqual(self.resolve(member_name="Ana")["assignee_id"], 2)
+        # A project said, or the one open, still decides.
+        self.assertEqual(self.resolve(project_name="Languages", member_name="Ana")["assignment_issues"], ["shared_project_required"])
+        self.context["default_project_id"] = "personal"
+        self.assertEqual(self.resolve(member_name="Ana")["assignment_issues"], ["shared_project_required"])
+        self.context["default_project_id"] = None
+        # «Everyone» isn't a person, and the speaker alone doesn't narrow it either.
+        self.assertEqual(self.resolve(member_name="Ana", assignment_request="group")["assignment_issues"], ["choose_project"])
+        # In two shared projects, or two people of that name in one: never a guess.
+        self.context["projects"].append({**self.project, "id": "chemistry", "name": "Química"})
+        self.assertEqual(self.resolve(member_name="Ana")["assignment_issues"], ["choose_project"])
+        self.context["projects"].pop()
+        self.project["people"].append({"user_id": 3, "name": "Ana López", "voice_name": ""})
+        result = self.resolve(member_name="Ana")
+        self.assertEqual((result["list_id"], result["assignee_id"], result["assignment_issues"]), ("physics", None, ["ambiguous_member"]))
 
     def test_bounded_prompt_can_resolve_a_project_outside_hint_window(self):
         self.context["projects"].extend({**self.project, "id": f"project-{number}", "name": f"Project {number:03}"} for number in range(80))
