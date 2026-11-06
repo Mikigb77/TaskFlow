@@ -54,6 +54,8 @@ Each draft has every field it has today: `title`, `date`, `time`, `due_date`, `s
 
 A note dictation (`"capture_type": "note"`) with the flag gets `"commands": []`, and its draft has both fields set to null.
 
+A note dictation's `title` is a short heading the model writes from the words, 2 to 6 words in their language («Revisión del coche»), and `notes` holds every word, as before (owner's request, 2026-11-06). A note of one line and at most 7 words is its own title, with no model call. If the model fails or gives an unusable title (empty, over 80 characters or 10 words), the title is the note's first line, as before; a title never costs the note. Code: `note_title` in `core/ai.py`. Notes typed, or transcribed on the phone, never reach the server and keep their first words as the title.
+
 ### Commands
 
 Every command has `kind` and `issues`. The kinds are `project`, `find`, `update`, `delete` and `complete`. `update`, `delete` and `complete` act on one task, or on many with `"all": true` (see [Bulk commands](#bulk-commands), decided 2026-10-21).
@@ -456,7 +458,9 @@ Near midnight the daily refusal's wait is short: 30 seconds before 00:00 UTC it 
 - Someone who assigns a task to themselves is both `actor_name` and `assignee_name`.
 - **What an update changed (UX-2508, 2026-10-31):** an entry whose `action` is `"updated"` also has `fields`, the task fields it changed (as `core/collaboration.py` records them: `title`, `scheduled_date`, `due_date`, `notes` and so on). The app says «Ana ha movido: …» when they're only the day or the time. Older entries have no `fields`, and keep «ha actualizado».
 
-Code: `NotificationSerializer` in `core/group_views.py`. Tests: `core/test_assignment_activity.py`.
+- **Completed by the person you gave it to (owner's decision, 2026-11-06):** whoever assigned a one-off task to someone else gets its `"completed"` entry when that person completes it: the app's «Ha completado una tarea», under their name. That's whoever last assigned it to them, or its creator when it was made already theirs. Not for tasks that repeat, which would tell them every time, nor for someone who took a task themselves, nor in a project they muted.
+
+Code: `NotificationSerializer` in `core/group_views.py`, and `record_event` in `core/collaboration.py`. Tests: `core/test_assignment_activity.py`, `core/test_group_flow.py`.
 
 ### The invitation email's language
 
