@@ -100,11 +100,12 @@ class CommandView {
   /// Several tasks match and none was tapped yet.
   bool get choosing => target == null && matches.length > 1;
 
-  /// The task to change, delete or complete isn't on the phone.
+  /// The task to change, delete, complete or reopen isn't on the phone.
   bool get notFound =>
       (kind == CommandKind.update ||
           kind == CommandKind.delete ||
-          kind == CommandKind.complete) &&
+          kind == CommandKind.complete ||
+          kind == CommandKind.reopen) &&
       bulk == null &&
       target == null &&
       !choosing &&
@@ -117,6 +118,13 @@ class CommandView {
       target != null &&
       TaskMatcher.done(target!);
 
+  /// `reopen`: the task meant isn't done: there is nothing to reopen.
+  bool get notDone =>
+      kind == CommandKind.reopen &&
+      bulk == null &&
+      target != null &&
+      !TaskMatcher.done(target!);
+
   /// The confirming tap does something for it.
   bool get actionable => switch (kind) {
     CommandKind.project =>
@@ -126,6 +134,8 @@ class CommandView {
     CommandKind.delete => bulk != null ? bulk!.count > 0 : stored != null,
     CommandKind.complete =>
       bulk != null ? bulk!.count > 0 : stored != null && !alreadyDone,
+    CommandKind.reopen =>
+      bulk != null ? bulk!.count > 0 : stored != null && !notDone,
     CommandKind.find => false,
   };
 
@@ -139,7 +149,7 @@ class CommandView {
                 choosing ||
                 plan?.needsDay == true ||
                 plan?.asksMember == true,
-    CommandKind.delete || CommandKind.complete =>
+    CommandKind.delete || CommandKind.complete || CommandKind.reopen =>
       bulk != null ? bulk!.waits : choosingProject || choosing,
     CommandKind.find => false,
   };
@@ -193,7 +203,10 @@ List<TaskListInfo> _projectChoices(
   if (!command.ambiguous) return const [];
   final (said, ids) = switch (command.kind) {
     CommandKind.find => (command.projectName, command.projectCandidates),
-    CommandKind.update || CommandKind.delete || CommandKind.complete => (
+    CommandKind.update ||
+    CommandKind.delete ||
+    CommandKind.complete ||
+    CommandKind.reopen => (
       command.target.projectName,
       command.target.projectCandidates,
     ),
@@ -243,6 +256,7 @@ CommandView _resolve(
     case CommandKind.update:
     case CommandKind.delete:
     case CommandKind.complete:
+    case CommandKind.reopen:
       if (command.bulk) {
         return CommandView(
           command,
@@ -260,11 +274,13 @@ CommandView _resolve(
       bool canEdit(String? id) =>
           id == null || projects.any((p) => p.id == id && p.canEdit);
       final completing = command.kind == CommandKind.complete;
+      final reopening = command.kind == CommandKind.reopen;
       final matches = TaskMatcher.targets(
         tasks,
         asked.target,
         canEdit: canEdit,
         completing: completing,
+        reopening: reopening,
         now: now,
       );
       // None to edit: the same search among all, for the line saying why.
@@ -275,6 +291,7 @@ CommandView _resolve(
               asked.target,
               canEdit: (_) => true,
               completing: completing,
+              reopening: reopening,
               now: now,
             ).where((task) => !canEdit(task.listId)).firstOrNull;
       final chosen = command.taskId == null
@@ -559,6 +576,7 @@ IconData _kindIcon(CommandKind kind) => switch (kind) {
   CommandKind.update => Icons.edit_outlined,
   CommandKind.delete => Icons.delete_outline_rounded,
   CommandKind.complete => Icons.task_alt_rounded,
+  CommandKind.reopen => Icons.radio_button_unchecked_rounded,
 };
 
 /// «¿Qué proyecto?», with one chip for each project the one said matched,
@@ -650,6 +668,7 @@ Widget _askingProject(
         removeLabel: switch (command.kind) {
           CommandKind.delete => l.commandDontDeleteAny,
           CommandKind.complete => l.commandDontCompleteAny,
+          CommandKind.reopen => l.commandDontReopenAny,
           _ => l.commandDontChangeAny,
         },
         enabled: enabled,
@@ -1864,7 +1883,8 @@ class DeleteCommandCard extends StatelessWidget {
 /// `complete`: the task with its day, which the confirming tap marks done
 /// («Marcar como hecha»), as ticking it does: a repeating task's repetition.
 /// Or the list to choose it from, or that it wasn't found, or that it is
-/// done already.
+/// done already. `reopen` uses it too: the tap marks the task not done
+/// again («Marcar como pendiente»), as unticking it does.
 class CompleteCommandCard extends StatelessWidget {
   const CompleteCommandCard({
     super.key,
@@ -1878,11 +1898,12 @@ class CompleteCommandCard extends StatelessWidget {
   final VoidCallback onRemove;
   final bool enabled;
 
-  static const _icon = Icons.task_alt_rounded;
-
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
+    // `reopen`: the same card, marking the task not done again.
+    final reopen = view.kind == CommandKind.reopen;
+    final icon = _kindIcon(view.kind);
     if (view.choosingProject) {
       return _askingProject(
         context,
@@ -1907,10 +1928,12 @@ class CompleteCommandCard extends StatelessWidget {
         question: question,
         children: [
           _Header(
-            icon: _icon,
-            text: l.commandWhichToComplete,
+            icon: icon,
+            text: reopen ? l.commandWhichToReopen : l.commandWhichToComplete,
             onRemove: onRemove,
-            removeLabel: l.commandDontCompleteAny,
+            removeLabel: reopen
+                ? l.commandDontReopenAny
+                : l.commandDontCompleteAny,
             enabled: enabled,
           ),
           _Choice(view: view, onChanged: onChanged, enabled: enabled),
@@ -1922,14 +1945,17 @@ class CompleteCommandCard extends StatelessWidget {
       question: question,
       children: [
         _Header(
-          icon: _icon,
+          icon: icon,
           text: shown.title,
           onRemove: onRemove,
-          removeLabel: l.commandDontComplete(shown.title),
+          removeLabel: reopen
+              ? l.commandDontReopen(shown.title)
+              : l.commandDontComplete(shown.title),
           enabled: enabled,
         ),
         _Note(_dayOf(context, shown)),
         if (view.alreadyDone) _Note(l.commandAlreadyDone),
+        if (view.notDone) _Note(l.commandNotDoneYet),
         if (view.matches.length > 1)
           _another(context, view, onChanged, enabled),
       ],
@@ -1999,6 +2025,8 @@ String bulkHeading(
       return l.commandBulkChange(count);
     case BulkAction.complete:
       return l.commandBulkComplete(count);
+    case BulkAction.reopen:
+      return l.commandBulkReopen(count);
     case BulkAction.delete:
       return l.commandBulkDelete(count);
   }
@@ -2014,6 +2042,7 @@ String bulkButton(BuildContext context, BulkPlan bulk) {
     BulkAction.assign => l.commandBulkAssign(count),
     BulkAction.change => l.commandBulkChange(count),
     BulkAction.complete => l.commandBulkComplete(count),
+    BulkAction.reopen => l.commandBulkReopen(count),
     BulkAction.delete => l.commandBulkDelete(count),
   };
 }
@@ -2089,6 +2118,7 @@ String? _bulkLeftOut(
       l.commandBulkLeftRepeating(bulk.repeating, switch (view.kind) {
         CommandKind.delete => 'delete',
         CommandKind.complete => 'complete',
+        CommandKind.reopen => 'reopen',
         _ => 'change',
       }, title(bulk.repeatingTasks)),
     if (bulk.unassignable > 0)
@@ -2180,11 +2210,7 @@ class BulkCommandCard extends ConsumerWidget {
     final projects = ref.watch(taskListsProvider).value ?? const [];
     final accountId = ref.watch(authProvider).account?.id;
     final delete = command.kind == CommandKind.delete;
-    final icon = switch (command.kind) {
-      CommandKind.delete => Icons.delete_outline_rounded,
-      CommandKind.complete => Icons.task_alt_rounded,
-      _ => Icons.edit_outlined,
-    };
+    final icon = _kindIcon(command.kind);
     // A move's day is a chip: a day picked is as if it had been said.
     final moveTo = bulk.action == BulkAction.move ? command.changes.date : null;
     Widget? dayChip() {
@@ -2219,6 +2245,7 @@ class BulkCommandCard extends ConsumerWidget {
       removeLabel: switch (command.kind) {
         CommandKind.delete => l.commandDontDeleteAny,
         CommandKind.complete => l.commandDontCompleteAny,
+        CommandKind.reopen => l.commandDontReopenAny,
         _ => l.commandDontChangeAny,
       },
       enabled: enabled,

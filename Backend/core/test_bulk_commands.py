@@ -169,14 +169,14 @@ class SchemaAndToleranceTests(SimpleTestCase):
     def test_vertex_accepts_the_new_fields(self):
         schema = vertex_response_schema(True)
         self.assertEqual(schema["$defs"]["ExtractedCommand"]["properties"]["kind"]["enum"],
-                         ["project", "find", "update", "delete", "complete"])
+                         ["project", "find", "update", "delete", "complete", "reopen"])
         target = schema["$defs"]["CommandTarget"]["properties"]
         self.assertTrue({"all", "person", "member_name", "status", "from_date", "to_date", "undated"} <= set(target))
         self.assertEqual(target["all"], {"type": "boolean"})
         self.assertEqual(schema["$defs"]["CommandChanges"]["properties"]["shift_days"],
                          {"anyOf": [{"type": "integer"}, {"type": "null"}]})
         converted = _transformers.t_schema(None, deepcopy(schema)).properties["commands"].items
-        self.assertEqual(converted.properties["kind"].enum, ["project", "find", "update", "delete", "complete"])
+        self.assertEqual(converted.properties["kind"].enum, ["project", "find", "update", "delete", "complete", "reopen"])
         self.assertEqual(converted.properties["target"].properties["undated"].type.value, "BOOLEAN")
         self.assertEqual(vertex_response_schema()["properties"].keys(), {"tasks"})  # Older apps: unchanged.
 
@@ -474,7 +474,8 @@ class PromptTests(SimpleTestCase):
             value, index = decoder.raw_decode(section, start)
             kinds.append(ExtractedCommand.model_validate(value).kind)
         self.assertEqual(kinds.count("complete"), 3)
-        self.assertEqual(len(kinds), 22)
+        self.assertEqual(kinds.count("reopen"), 4)
+        self.assertEqual(len(kinds), 26)
 
     def test_overdue_always_means_pending(self):
         section = self.section(date(2026, 10, 21))

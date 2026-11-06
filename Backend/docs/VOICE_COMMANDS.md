@@ -1,6 +1,6 @@
 # Voice commands
 
-One dictation can create a project, add tasks, find tasks, change a task and delete a task. The owner approved this on 2026-10-18 (`.claude/ux-review/voice-commands-plan.md`, `.claude/ux-review/DECISIONS.md`).
+One dictation can create a project, add tasks, find tasks, change a task, mark one done or not done, and delete a task. The owner approved this on 2026-10-18 (`.claude/ux-review/voice-commands-plan.md`, `.claude/ux-review/DECISIONS.md`).
 
 This is the contract between the server and the app.
 - **The server** asks the model what was said, validates the answer and turns spoken names into ids from the person's own projects.
@@ -56,7 +56,7 @@ A note dictation (`"capture_type": "note"`) with the flag gets `"commands": []`,
 
 ### Commands
 
-Every command has `kind` and `issues`. The kinds are `project`, `find`, `update`, `delete` and `complete`. `update`, `delete` and `complete` act on one task, or on many with `"all": true` (see [Bulk commands](#bulk-commands), decided 2026-10-21).
+Every command has `kind` and `issues`. The kinds are `project`, `find`, `update`, `delete`, `complete` and `reopen`. `update`, `delete`, `complete` and `reopen` act on one task, or on many with `"all": true` (see [Bulk commands](#bulk-commands), decided 2026-10-21).
 
 **`project`**: create a project, group or list (all three are a project).
 
@@ -169,11 +169,24 @@ How the app should search its own copy:
 - Show the matched task with «Marcar como hecha». Then «Tarea completada · Deshacer».
 - A repeating task completes the occurrence of the day said, or of today when no day was said, as ticking it on that day does.
 
+**`reopen`**: «desmarca», «no está hecha», «márcala como pendiente»; «uncheck it», «it isn't done». Asked for by the owner on 2026-11-06: after «marca como hechas todas las de hoy», «oh no, the doctor one isn't done yet, uncheck it».
+
+```json
+{"kind": "reopen", "target": {"words": ["médico"], "list_id": null, "project_name": null, "date": null}, "issues": []}
+```
+
+- `target` is as for `update`, and the task is found the same way, preferring done tasks over open ones.
+- Show the matched task with «Marcar como pendiente». Then «Pendiente: Ir al médico · Deshacer», and «Deshacer» marks it done again, at the time it was done before.
+- A repeating task reopens the occurrence of the day said; with no day said, today's occurrence if it is done, else its latest one done. That is what unticking it does.
+- A task that isn't done: «No estaba hecha», and nothing to tap.
+- Older apps don't know the kind and leave it out, as for any unknown kind.
+- The model's other names for it (`uncomplete`, `uncheck`, `untick`, `not_done`, `mark_undone`, `mark_pending` and the like) are read as `reopen`.
+
 ### Bulk commands
 
 Decided by the owner on 2026-10-21: «pasa todas las tareas de ayer a mañana», «pasa lo de esta semana a la semana que viene», «asigna a Paul todo lo del viernes de Matemáticas», «marca como hechas todas las de hoy», «borra todas las completadas de la semana pasada».
 
-`update`, `delete` and `complete` act on many tasks when `target` has `"all": true`. The target then describes a set, with the same filters as `find`:
+`update`, `delete`, `complete` and `reopen` act on many tasks when `target` has `"all": true`. The target then describes a set, with the same filters as `find`:
 
 ```json
 {"kind": "update",
@@ -189,7 +202,7 @@ Decided by the owner on 2026-10-21: «pasa todas las tareas de ayer a mañana»,
 | `words` | list of strings, 0–8 | As for `find`. Usually empty: «todas las tareas de ayer». |
 | `list_id`, `project_name`, `project_candidates` | as for `find` | The project named. |
 | `person_id`, `person_name` | as for `find` | «Todas las de Paul». «Las mías» gives the person's own id. |
-| `status` | `"open"`, `"completed"` or `"any"` | `"open"` unless the person said completed («las completadas») or all of them. A `complete` set is always `"open"`: only pending tasks can be marked done. |
+| `status` | `"open"`, `"completed"` or `"any"` | `"open"` unless the person said completed («las completadas») or all of them. A `complete` set is always `"open"`: only pending tasks can be marked done. A `reopen` set is always `"completed"`: only done tasks can be reopened. |
 | `from`, `to` | `"YYYY-MM-DD"` or null | An inclusive period on the task's planned day, or its deadline day when it has none. «Ayer» gives the same day twice. «Lo atrasado» gives `"to"` = yesterday and `"from"` = null. `from` is never after `to`. |
 | `undated` | boolean | `true`: only tasks with no day («las tareas sin fecha»). `from` and `to` are then null. |
 | `date` | always `null` with `all` | A day said for the set goes in `from` and `to`. When a period was said too, the period stays and the day is dropped. |
@@ -207,11 +220,11 @@ The person, the project and their issues are resolved as for `find`: the person 
 - Only tasks the person can edit, never deleted ones.
 - `status` as above: pending ones by default.
 - **«Hoy»:** a set whose period is exactly today (`from` = `to` = today) also takes the open tasks Today lists under «Atrasadas», listed first with «Atrasada» and ticked, so any can be unticked (the owner's D2, 2026-10-21). This applies to pending sets only, so it never adds to «las completadas de hoy». Moved by days («retrasa todo lo de hoy un día»), those overdue tasks count from today, like the rest, so they all land on the same day (the owner's D4, 2026-10-22).
-- **Repeating tasks** are never moved, changed or deleted in bulk; the card says how many were left out. A bulk `complete` whose period is one day (`from` = `to`) completes each repeating task's occurrence that day. With a longer period, it leaves them out too.
+- **Repeating tasks** are never moved, changed or deleted in bulk; the card says how many were left out. A bulk `complete` whose period is one day (`from` = `to`) completes each repeating task's occurrence that day, and a bulk `reopen` reopens each one done that day. With a longer period, they leave them out too.
 - **Assigning** reaches only tasks in shared projects where the person named can edit. The others are left as they are and counted.
 
 **The card** (app):
-- **The heading:** the action, with the count and the target: «Mover 5 tareas a mañana, jue 22», «Mover 3 tareas una semana después», «Asignar 4 tareas a Paul», «Marcar 4 tareas como hechas», «Eliminar 6 tareas».
+- **The heading:** the action, with the count and the target: «Mover 5 tareas a mañana, jue 22», «Mover 3 tareas una semana después», «Asignar 4 tareas a Paul», «Marcar 4 tareas como hechas», «Marcar 3 tareas como pendientes», «Eliminar 6 tareas».
   - The day in a move's heading is a chip («mañana, jue 22 ▾») that opens «Elegir día», so a misheard day is fixed by touch, without dictating again. One task's change card has the same chip for its new day (the owner's D3, 2026-10-21).
 - **The list:** the matched tasks, each with its current day and ticked; untick one to leave it out. A long list scrolls inside the card.
 - **What was left out:** one line, for example «2 tareas que se repiten no cambian».
@@ -236,14 +249,14 @@ Tasks keep two more codes from today: `choose_project` and `shared_project_requi
 
 ### Project candidates
 
-Wherever `ambiguous_project` is reported, `project_candidates` sits beside it: on a task draft, on a `project` or `find` command, and in the `target` of an `update`, `delete` or `complete`, for one task or a set. The card can then offer exactly those projects, «¿Matemáticas o Matemáticas II?», instead of guessing from names (UX-1315, decided 2026-10-20).
+Wherever `ambiguous_project` is reported, `project_candidates` sits beside it: on a task draft, on a `project` or `find` command, and in the `target` of an `update`, `delete`, `complete` or `reopen`, for one task or a set. The card can then offer exactly those projects, «¿Matemáticas o Matemáticas II?», instead of guessing from names (UX-1315, decided 2026-10-20).
 
 ```json
 "project_candidates": [{"id": "7d1c0a52-3c1e-4b8e-9f1a-1f6b2b8f0c11", "name": "Matemáticas"},
                        {"id": "0b8e4a1f-6c2d-4e57-9a3b-5f1d2c7e8a90", "name": "Matemáticas II"}]
 ```
 
-- **Which projects:** the ones that matched the name said, at the tier that decided (see Matching), among the candidates of that place: projects the person can edit for tasks and `project` commands, or edit or only view for `find`, `update`, `delete` and `complete`. A group name that matched several projects gives those projects.
+- **Which projects:** the ones that matched the name said, at the tier that decided (see Matching), among the candidates of that place: projects the person can edit for tasks and `project` commands, or edit or only view for `find`, `update`, `delete`, `complete` and `reopen`. A group name that matched several projects gives those projects.
 - **Best first:** the fewest letters to change from what was said, then the shorter name, then the directory's order (by name). So «Mates» gives «Matemáticas» before «Matemáticas II».
 - **At most 3.** Each is `{"id": <uuid string>, "name": <the project's name>}`. Two projects in different groups can share a name: their ids tell them apart, and the app knows each one's group.
 - **Projects created in the same answer** have no id yet, so they're never listed. If only such projects matched, the list is empty.
@@ -345,7 +358,7 @@ What a match gives:
 - **Two or more:** `ambiguous_project`.
 - **None:** a directory group with that name selects its project when it holds exactly one. «grupo», «proyecto» and «lista» all mean a project, but a group still points to its only project. A group with several projects gives `ambiguous_project`. Otherwise the answer is `project_not_available`.
 
-The same rules and limits apply everywhere a project is named: a task's project, a `project` command's `existing_list_id`, and the `list_id` of `find` and of the target of `update`, `delete` and `complete`.
+The same rules and limits apply everywhere a project is named: a task's project, a `project` command's `existing_list_id`, and the `list_id` of `find` and of the target of `update`, `delete`, `complete` and `reopen`.
 
 Which projects are candidates:
 
@@ -353,7 +366,7 @@ Which projects are candidates:
 |---|---|
 | A task's project | The projects the person can edit, and the projects created in the same dictation. |
 | A `project` command | The projects the person can edit. |
-| `find`, and the target of `update`, `delete` and `complete` | The projects the person can edit or only view. |
+| `find`, and the target of `update`, `delete`, `complete` and `reopen` | The projects the person can edit or only view. |
 
 Cross-language names («math» for «Matemáticas») come from the model, which sees the project names.
 
@@ -481,7 +494,7 @@ The model fills `ExtractedCapture`: the `tasks` array of today, plus a `commands
 |---|---|
 | `project` | `name` |
 | `find` | `words`, `project_name`, `person` (`"me"` or `"member"`), `member_name`, `status`, `from_date`, `to_date` |
-| `update`, `delete`, `complete` | `target` (`words`, `project_name`, `date`; for a set also `all`, `person` as `"me"` or `"member"`, `member_name`, `status`, `from_date`, `to_date`, `undated`) |
+| `update`, `delete`, `complete`, `reopen` | `target` (`words`, `project_name`, `date`; for a set also `all`, `person` as `"me"` or `"member"`, `member_name`, `status`, `from_date`, `to_date`, `undated`) |
 | `update` | `changes` (`title`, `date`, `shift_days`, `time`, `deadline_date`, `deadline_time`, `priority`, `notes_append`, `assignee` as `"me"`, `"member"` or `"nobody"`, `member_name`, and `clear`, a list of `"date"`, `"time"`, `"deadline"` and `"deadline_time"`) |
 
 Nulls mean "unchanged", so a model that fills every key with null changes nothing.

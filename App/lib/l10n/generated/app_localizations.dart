@@ -6550,10 +6550,10 @@ abstract class AppLocalizations {
   /// **'{label}: {value}'**
   String commandBulkField(String label, String value);
 
-  /// On a dictation's card for a set of tasks: repeating tasks that matched are left out. {count} is how many; {action} is delete, complete or other (a change); {title} is the one task's title when only one is left out (a repeating task's series title).
+  /// On a dictation's card for a set of tasks: repeating tasks that matched are left out. {count} is how many; {action} is delete, complete, reopen (marking done tasks as not done again) or other (a change); {title} is the one task's title when only one is left out (a repeating task's series title).
   ///
   /// In en, this message translates to:
-  /// **'{action, select, delete{{count, plural, =1{{title} repeats: it won’t be deleted} other{{count} repeating tasks won’t be deleted}}} complete{{count, plural, =1{{title} repeats: it won’t be completed} other{{count} repeating tasks won’t be completed}}} other{{count, plural, =1{{title} repeats: it won’t change} other{{count} repeating tasks won’t change}}}}'**
+  /// **'{action, select, delete{{count, plural, =1{{title} repeats: it won’t be deleted} other{{count} repeating tasks won’t be deleted}}} complete{{count, plural, =1{{title} repeats: it won’t be completed} other{{count} repeating tasks won’t be completed}}} reopen{{count, plural, =1{{title} repeats: it won’t be reopened} other{{count} repeating tasks won’t be reopened}}} other{{count, plural, =1{{title} repeats: it won’t change} other{{count} repeating tasks won’t change}}}}'**
   String commandBulkLeftRepeating(int count, String action, String title);
 
   /// On a dictation's card that assigns a set of tasks: tasks outside a shared project, or in one {name} can't edit, keep their assignee. {count} is how many; {title} is the one task's title when only one is left out.
@@ -6609,6 +6609,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'It was already done.'**
   String get commandAlreadyDone;
+
+  /// The confirming button of a dictation's result whose only command marks one done task as not done again (“the doctor task isn't done, uncheck it”). After the tap, commandReopenedTitle shows with Undo.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as not done'**
+  String get commandMarkNotDone;
+
+  /// A dictation asked to mark a done task as not done again and several match: a short list to tap one follows.
+  ///
+  /// In en, this message translates to:
+  /// **'Which one do you want to mark as not done?'**
+  String get commandWhichToReopen;
+
+  /// Tooltip and screen-reader label of the ✕ on a card that marks a done task as not done again in a dictation's result: the task stays done. {title} is the task's title.
+  ///
+  /// In en, this message translates to:
+  /// **'Don’t reopen {title}'**
+  String commandDontReopen(String title);
+
+  /// Tooltip and screen-reader label of the ✕ on a card that marks done tasks as not done again, while it asks which one (commandWhichToReopen) or lists a set of them: none is reopened.
+  ///
+  /// In en, this message translates to:
+  /// **'Don’t reopen any'**
+  String get commandDontReopenAny;
+
+  /// Message, with Undo, after the ✕ on a card that marks done tasks as not done again in a dictation's result: nothing changes. {count} is how many tasks the card would have reopened: a set's ticked tasks, or 1.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Won’t be reopened} other{Won’t be reopened}}'**
+  String commandWontReopen(int count);
+
+  /// On a dictation's card that marks one task as not done again: the task wasn't done, so nothing changes.
+  ///
+  /// In en, this message translates to:
+  /// **'It wasn’t done.'**
+  String get commandNotDoneYet;
+
+  /// Heading, and confirming button, of a dictation's card that marks a set of done tasks as not done again (“uncheck all of today's”). Also the button when several single cards all do so. {count} is how many are still ticked.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Mark 1 task as not done} other{Mark {count} tasks as not done}}'**
+  String commandBulkReopen(int count);
+
+  /// Brief message after a dictation marked one task as not done again, with Undo. {title} is the task's title. Mirrors notificationCompleted (“Completed: {title}”).
+  ///
+  /// In en, this message translates to:
+  /// **'Not done: {title}'**
+  String commandReopenedTitle(String title);
+
+  /// Brief message after a dictation marked two or more tasks as not done again, with Undo. For one task, commandReopenedTitle names it instead.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Task reopened} other{{count} tasks reopened}}'**
+  String commandTasksReopened(int count);
 
   /// In the reminder sheet: the choice of a plan of reminders that come more often as the task's day approaches, counted back from its deadline, or from its own day when it has none. Suave, Normal and Intenso sit under it.
   ///
