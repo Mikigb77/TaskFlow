@@ -376,6 +376,8 @@ Whose people are candidates:
 
 «Para mí», «mis tareas» and «asígnamela» are the person themselves.
 
+A task with a person named but no project said, dictated outside a project («Max tiene que acabar la introducción para el jueves a las 3», from the calendar), goes to the one shared project the person can edit where that name finds someone: its `list_id` and assignee are set as if the project had been said. When the name finds people in several such projects, or in none, nothing is guessed and the issue stays `choose_project`. This holds with or without the `commands` flag, and «para todos» (`assignment_request` `"group"`) never narrows the project this way.
+
 ## Dates
 
 - **Relative dates** («mañana», «dentro de una semana», «el viernes») are resolved against `reference_time` in the request's `timezone`, as for tasks.
