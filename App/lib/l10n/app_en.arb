@@ -2126,9 +2126,9 @@
     }
   },
   "taskflowPro": "TaskFlow Pro",
-  "proBenefitDictation": "Unlimited dictation and file space",
+  "proBenefitDictation": "Unlimited dictation, and 500 MB of files a month",
   "@proBenefitDictation": {
-    "description": "The Pro screen's list of what Pro gives, first line: what Pro adds to the free tier (unlimited dictations and file space). The app bar already says TaskFlow Pro. Only this line promises anything without limit."
+    "description": "The Pro screen's list of what Pro gives, first line: what Pro adds to the free tier: unlimited dictations, and 500 MB of file uploads each calendar month (Backend PRO_ATTACHMENT_MB_PER_MONTH; free accounts get 200 MB in all). The app bar already says TaskFlow Pro. Only dictation is promised without limit. A no-break space keeps 500 with MB."
   },
   "proBenefitTyping": "Sentences you type become tasks",
   "@proBenefitTyping": {
@@ -2141,7 +2141,7 @@
   "billingComplimentary": "Complimentary Pro access. All Pro features are included, with no payment or renewal.",
   "billingStatus": "{status, select, active{Pro is active} inactive{No active Pro subscription} other{Subscription status unavailable}}",
   "billingUntil": "{kind, select, renews{Renews on {date}} other{Access until {date}}}",
-  "billingTestMode": "Test purchases only. No real payment will be taken. An active test subscription gives unlimited dictation and file space in this development build.",
+  "billingTestMode": "Test purchases only. No real payment will be taken. An active test subscription gives what Pro gives in this development build.",
   "billingGuestHelp": "Sign in to link purchases to your TaskFlow account and recover Pro on your other devices.",
   "billingSignIn": "Sign in to TaskFlow",
   "billingWorking": "Updating subscription",
@@ -2558,9 +2558,9 @@
   "@freeVoiceNoticeCreate": {
     "description": "That sheet's main button: opens the task form. Its other button is voiceProAction."
   },
-  "storageUsage": "Files: {used} of {limit} MB used",
+  "storageUsage": "Files uploaded: {used} of {limit} MB",
   "@storageUsage": {
-    "description": "Atop a task's attachments, for an account without Pro, only once its file space is 80% used or more; and on the Pro screen, for an account without Pro. Whole megabytes. A no-break space keeps {used} with the word after it, and {limit} with MB.",
+    "description": "Atop a task's attachments, for an account without Pro, only once 80% or more of its uploads are used; and on the Pro screen, for an account without Pro. Without Pro an account can upload 200 MB in all: removed files, and the files deleted 15 days after their task is completed, still count, so this never goes down. Whole megabytes. A no-break space keeps {used} with the word after it, and {limit} with MB.",
     "placeholders": {
       "used": {
         "type": "int"
@@ -2570,46 +2570,55 @@
       }
     }
   },
-  "storageFull": "Your file space is full ({limit} MB).",
+  "storageFull": "You’ve used the {limit} MB of files included for free.",
   "@storageFull": {
-    "description": "Under an attachment the server refused because the user's own free file space is full. The card's buttons below it offer Pro and the list of tasks with files. {limit} is the free cap in whole megabytes.",
+    "description": "Under an attachment the server refused because the user, without Pro, has uploaded all the files the free tier allows (200 MB in all, and removing files doesn't give any back). The card's button below it offers Pro. {limit} is the free allowance in whole megabytes.",
     "placeholders": {
       "limit": {
         "type": "int"
       }
     }
   },
-  "storageFullShared": "This project’s file space is full. Its owner can remove files to make room.",
+  "storageFullShared": "This project’s owner can’t upload more files right now.",
   "@storageFullShared": {
-    "description": "Under an attachment the server refused because the file space of the shared project's owner is full."
+    "description": "Under an attachment the server refused because the shared project's owner has used their uploads: all of them without Pro, or this month's with Pro. Files in a shared project count for its owner."
   },
-  "storageSeeTasks": "Show tasks with files",
-  "@storageSeeTasks": {
-    "description": "Button beside Explore Pro, only while the user's own free file space is full: under a file refused for it, and on the Pro screen under the usage line. Opens the list of tasks with files."
-  },
-  "tasksWithFiles": "Tasks with files",
-  "@tasksWithFiles": {
-    "description": "Title of the screen listing the tasks and notes whose files use this account's file space, largest first."
-  },
-  "tasksWithFilesHelp": "Open a task to remove the files you no longer need.",
-  "@tasksWithFilesHelp": {
-    "description": "One line above the rows of the Tasks with files screen."
-  },
-  "tasksWithFilesRow": "{count, plural, =1{1 file} other{{count} files}} · {size} MB",
-  "@tasksWithFilesRow": {
-    "description": "Under a task's title on the Tasks with files screen: how many files it holds and their total size. {size} is already formatted in the app's locale, to one decimal (12.4).",
+  "storageUsageMonth": "Files uploaded this month: {used} of {limit} MB",
+  "@storageUsageMonth": {
+    "description": "Atop a task's attachments, for an account with Pro, only once 80% or more of this calendar month's uploads (500 MB) are used. Removed files still count. Whole megabytes. A no-break space keeps {used} with the word after it, and {limit} with MB.",
     "placeholders": {
-      "count": {
+      "used": {
         "type": "int"
       },
-      "size": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "storageMonthFull": "You’ve used this month’s {limit} MB of files. You can add more from {date}.",
+  "@storageMonthFull": {
+    "description": "Under an attachment the server refused because the user, with Pro, has uploaded this calendar month's 500 MB. A Retry button follows. {limit} is in whole megabytes; {date} is the first day of next month (UTC), short, like 1 Dec.",
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      },
+      "date": {
         "type": "String"
       }
     }
   },
-  "tasksWithFilesEmpty": "No tasks have files.",
-  "@tasksWithFilesEmpty": {
-    "description": "The Tasks with files screen when no task holds files in this account's space."
+  "filesDeletedOn": "These files will be deleted on {date}, 15 days after the task was completed.",
+  "@filesDeletedOn": {
+    "description": "Atop a completed task's backed-up attachments: the server deletes a completed task's files 15 days after it was completed, for every account (Backend ATTACHMENT_RETENTION_DAYS). The task itself stays. Reopening the task before then keeps them. {date} is short, like 23 Nov.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "filesDeletedAfterDone": "Files on a completed task are deleted 15 days after it was completed.",
+  "@filesDeletedAfterDone": {
+    "description": "Instead of filesDeletedOn, for a task completed before the app kept completion times, whose date isn't known."
   },
   "projectPinned": "Pinned",
   "@projectPinned": {

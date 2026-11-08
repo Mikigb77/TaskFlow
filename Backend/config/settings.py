@@ -100,9 +100,15 @@ DATA_UPLOAD_MAX_NUMBER_FILES = 1
 FILE_UPLOAD_HANDLERS = ["core.attachment_views.BoundedUploadHandler", "django.core.files.uploadhandler.MemoryFileUploadHandler", "django.core.files.uploadhandler.TemporaryFileUploadHandler"]
 MEDIA_ROOT = BASE_DIR / "private_media"
 ATTACHMENT_MAX_BYTES = 6 * 1024 * 1024
-# Total file storage of an account or project owner without Pro, in MiB like the
-# per-file limit. Pro has no total cap; the 1,000-file bound applies to everyone.
-FREE_ATTACHMENT_BYTES = int(os.getenv("FREE_ATTACHMENT_MB", "100")) * 1024 * 1024
+# What an account or project owner may upload, in MiB like the per-file limit
+# (core.models.AttachmentUsage). Without Pro: this much in the account's whole
+# history, so removed and cleaned-up files still count. With Pro: this much each
+# UTC calendar month. The 1,000-file bound applies to everyone.
+FREE_ATTACHMENT_BYTES = int(os.getenv("FREE_ATTACHMENT_MB", "200")) * 1024 * 1024
+PRO_ATTACHMENT_BYTES_PER_MONTH = int(os.getenv("PRO_ATTACHMENT_MB_PER_MONTH", "500")) * 1024 * 1024
+# A completed task's files are deleted from storage this many days after it was
+# completed, for every account (maintain_staging; core.attachment_views.sweep).
+ATTACHMENT_RETENTION_DAYS = int(os.getenv("ATTACHMENT_RETENTION_DAYS", "15"))
 if os.getenv("AWS_ENDPOINT_URL_S3"):
     from botocore.config import Config as S3Config
     STORAGES = {

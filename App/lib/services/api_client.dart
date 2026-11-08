@@ -76,18 +76,39 @@ class FreeVoice {
   }
 }
 
-/// The account's file space: what its own files use, and the free cap.
+/// What the account has uploaded as files, against its allowance. Removed
+/// and cleaned-up files still count. Without Pro: everything ever uploaded,
+/// against [limitBytes]. With Pro: this UTC month's, against
+/// [monthLimitBytes], until [resetsAt]. An older server sends only the first.
 class AccountStorage {
-  const AccountStorage({required this.usedBytes, required this.limitBytes});
+  const AccountStorage({
+    required this.usedBytes,
+    required this.limitBytes,
+    this.monthUsedBytes,
+    this.monthLimitBytes,
+    this.resetsAt,
+  });
   final int usedBytes;
   final int limitBytes;
+  final int? monthUsedBytes;
+  final int? monthLimitBytes;
+  final DateTime? resetsAt;
 
   static AccountStorage? fromJson(Object? data) {
     if (data is! Map) return null;
     final used = data['used_bytes'];
     final limit = data['limit_bytes'];
     if (used is! num || limit is! num) return null;
-    return AccountStorage(usedBytes: used.toInt(), limitBytes: limit.toInt());
+    final monthUsed = data['month_used_bytes'];
+    final monthLimit = data['month_limit_bytes'];
+    final resets = data['resets_at'];
+    return AccountStorage(
+      usedBytes: used.toInt(),
+      limitBytes: limit.toInt(),
+      monthUsedBytes: monthUsed is num ? monthUsed.toInt() : null,
+      monthLimitBytes: monthLimit is num ? monthLimit.toInt() : null,
+      resetsAt: resets is String ? DateTime.tryParse(resets) : null,
+    );
   }
 }
 

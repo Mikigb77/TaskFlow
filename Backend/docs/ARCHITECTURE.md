@@ -74,24 +74,26 @@ Cloud Run free allowances are shared across the billing account, including the m
 
 Set alerts for cost, database/file growth, connections, API failures and payment problems. Maintain headroom and review limits before promotions. Ordinary billing alerts do not impose a hard cap. Protect expensive optional operations with explicit per-account quotas, bounded AI reservations, upload rate limits and feature-specific emergency controls. A storage or AI limit must not deliberately disable login, task editing, synchronization or existing-file access.
 
-## Proposed customer storage and retention policy
+## Customer storage and retention policy
 
-These are proposals, not enabled product promises or deletion jobs. Current code has a 6 MiB per-file limit and 1,000 files per account for everyone. Without Pro, an account or list owner has a 100 MiB total allowance (`FREE_ATTACHMENT_MB`); Pro has no total allowance.
+The owner's decision, 2026-11-08, enforced:
 
-| Policy | Free proposal | Pro proposal |
+| Policy | Free | Pro |
 | --- | --- | --- |
-| Individual file | 6 MiB | 25 MiB |
-| Total cloud attachments | 100 MiB (enforced) | No total cap (enforced) |
-| Task text and completed history | Retain by default, subject to abuse controls | Retain by default, subject to abuse controls |
-| Completed-task cloud attachments | Eligible for cleanup 30 days after completion | Retain within quota; offer optional 90-day cleanup |
+| Individual file | 6 MiB | 6 MiB |
+| Uploads | 200 MiB in the account's whole history (`FREE_ATTACHMENT_MB`) | 500 MiB each UTC calendar month (`PRO_ATTACHMENT_MB_PER_MONTH`) |
+| Files of a completed task | Deleted from storage 15 days after completion | The same |
+| Task text and completed history | Kept | Kept |
 
-Prefer preserving task text and deleting only old cloud attachments. Do not unexpectedly erase paying users' files after 90 days. If automatic cleanup becomes policy, obtain a clear product decision, publish it before uploads, notify users in advance (for example seven days), allow export and a grace/recovery period, and display the exact deletion date. Do not infer completion age from last modification or due date; record `completed_at` and eligibility explicitly. Reopening cancels eligibility. Active tasks, unscheduled tasks, notes, recurring series with future occurrences, shared-list access and owner changes need separate rules.
+Usage is a ledger of bytes uploaded (`AttachmentUsage`), never lowered: a removed or cleaned-up file still counts, so a Free account that has uploaded 200 MiB can't upload more. Uploads made with Pro count towards the Free allowance too. A move between projects uploads nothing and charges nobody; the 1,000-file bound still applies.
+
+The daily `maintain_staging` job deletes the files of tasks completed over `ATTACHMENT_RETENTION_DAYS` (15) ago, for every account and in shared projects too (`sweep()` in `core/attachment_views.py`). A file added after its task was completed gets 15 days from when it was added. Completions from before 2026-10-31 have no `completed_at` and count from the task's last change. Reopening a task before then keeps its files. The rows stay as tombstones, so devices drop their copies on the next sync and an old offline device can't upload them again. Recurring series and notes are never completed, so their files stay. The app shows the date on a completed task's files.
 
 Personal quota is measured and enforced server-side; storage for a shared list is charged to its owner. Count pending uploads with atomic reservations, verify actual object size, and reconcile failures/orphan objects. Derive Pro from verified server-side RevenueCat state, never a client-supplied flag. RevenueCat is asked only when an addition would go above the free allowance; if it can't be reached, the answer is HTTP 503, never "full". On downgrade, existing content is preserved and downloads and deletion keep working; additions above the free allowance are refused straight away. Whether to add a communicated grace period first is the owner's decision.
 
 Cleanup should be an idempotent scheduled job, not a web-process timer. Mark deletions transactionally, retain synchronization tombstones long enough for offline clients, retry physical blob deletion, and prevent an old offline device from silently restoring deleted cloud files. Distinguish cloud deletion from local device copies in the UI. Measure recovery-window storage too: soft deletion alone does not free physical bytes. Backup expiry and actual object purge must be specified and verified.
 
-At the free allowance, 1,000 fully used Free accounts represent roughly 105 GB of object bytes. Pro has no total allowance, so a Pro account is bounded only by 1,000 files of up to 6 MiB each (about 6.3 GB); 1,000 such accounts would hold about 6.3 TB. Storage, download traffic, API load and AI together determine sustainable pricing. Do not promise unlimited uploads.
+At most, 1,000 Free accounts upload about 210 GB in their whole lives, and 1,000 Pro accounts about 525 GB a month; the 15-day cleanup removes completed tasks' files, so what is held at once is smaller. Storage, download traffic, API load and AI together determine sustainable pricing. Do not promise unlimited uploads.
 
 ## Ordered delivery checklist
 
@@ -106,7 +108,8 @@ At the free allowance, 1,000 fully used Free accounts represent roughly 105 GB o
 - [x] Make the staging container stateless, configure secrets/email/proxy settings, separate health checks and deploy migrations safely.
 - [x] Connect an isolated Neon staging branch; verify PostgreSQL compatibility and private attachment storage.
 - [x] Replace staging shared-limit dependencies and run concurrent quota/auth tests.
-- [x] Verify RevenueCat entitlements server-side and enforce the free storage allowance; Pro has no total allowance.
+- [x] Verify RevenueCat entitlements server-side and enforce the upload allowances: 200 MiB for life without Pro, 500 MiB a month with it.
+- [x] Delete completed tasks' files 15 days after completion, in the daily maintenance job.
 - [ ] Approve and publish retention policy; implement warnings, export, tombstones, cleanup and restore tests before enabling deletion.
 - [ ] Exercise login, offline sync, file access isolation, wake-up latency, load spikes, provider failure, backup and restore.
 - [ ] Enable production billing, monitoring and release configuration; deploy the tested API and then configure Flutter's production API URL.

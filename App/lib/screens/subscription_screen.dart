@@ -4,7 +4,6 @@ import 'package:agenda/l10n/meeting_copy.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/subscription_provider.dart';
-import 'package:agenda/screens/tasks_with_files_screen.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 
@@ -221,8 +220,8 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                           ],
                         ),
                       ),
-                  // Without Pro, the file space after what Pro gives: at 2×
-                  // in Catalan, the first benefit stays above the pinned
+                  // Without Pro, the uploads used after what Pro gives: at
+                  // 2× in Catalan, the first benefit stays above the pinned
                   // «Ver suscripción».
                   if (storageLine != null) ...[
                     const SizedBox(height: 20),
@@ -230,15 +229,6 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                       storageLine,
                       style: TextStyle(color: colors.onPrimaryContainer),
                     ),
-                    // A full space: which tasks use it, to make room.
-                    if (storage!.usedBytes >= storage.limitBytes)
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          foregroundColor: colors.onPrimaryContainer,
-                        ),
-                        onPressed: () => TasksWithFilesScreen.open(context),
-                        child: Text(l10n.storageSeeTasks),
-                      ),
                   ],
                 ],
               ),

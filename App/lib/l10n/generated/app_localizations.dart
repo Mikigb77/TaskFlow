@@ -4924,10 +4924,10 @@ abstract class AppLocalizations {
   /// **'TaskFlow Pro'**
   String get taskflowPro;
 
-  /// The Pro screen's list of what Pro gives, first line: what Pro adds to the free tier (unlimited dictations and file space). The app bar already says TaskFlow Pro. Only this line promises anything without limit.
+  /// The Pro screen's list of what Pro gives, first line: what Pro adds to the free tier: unlimited dictations, and 500 MB of file uploads each calendar month (Backend PRO_ATTACHMENT_MB_PER_MONTH; free accounts get 200 MB in all). The app bar already says TaskFlow Pro. Only dictation is promised without limit. A no-break space keeps 500 with MB.
   ///
   /// In en, this message translates to:
-  /// **'Unlimited dictation and file space'**
+  /// **'Unlimited dictation, and 500 MB of files a month'**
   String get proBenefitDictation;
 
   /// The Pro screen's list of what Pro gives, second line: with Pro, a sentence typed in the capture sheet becomes tasks, as a dictation does (without Pro, typing opens the form).
@@ -5746,53 +5746,47 @@ abstract class AppLocalizations {
   /// **'Create a task'**
   String get freeVoiceNoticeCreate;
 
-  /// Atop a task's attachments, for an account without Pro, only once its file space is 80% used or more; and on the Pro screen, for an account without Pro. Whole megabytes. A no-break space keeps {used} with the word after it, and {limit} with MB.
+  /// Atop a task's attachments, for an account without Pro, only once 80% or more of its uploads are used; and on the Pro screen, for an account without Pro. Without Pro an account can upload 200 MB in all: removed files, and the files deleted 15 days after their task is completed, still count, so this never goes down. Whole megabytes. A no-break space keeps {used} with the word after it, and {limit} with MB.
   ///
   /// In en, this message translates to:
-  /// **'Files: {used} of {limit} MB used'**
+  /// **'Files uploaded: {used} of {limit} MB'**
   String storageUsage(int used, int limit);
 
-  /// Under an attachment the server refused because the user's own free file space is full. The card's buttons below it offer Pro and the list of tasks with files. {limit} is the free cap in whole megabytes.
+  /// Under an attachment the server refused because the user, without Pro, has uploaded all the files the free tier allows (200 MB in all, and removing files doesn't give any back). The card's button below it offers Pro. {limit} is the free allowance in whole megabytes.
   ///
   /// In en, this message translates to:
-  /// **'Your file space is full ({limit} MB).'**
+  /// **'You’ve used the {limit} MB of files included for free.'**
   String storageFull(int limit);
 
-  /// Under an attachment the server refused because the file space of the shared project's owner is full.
+  /// Under an attachment the server refused because the shared project's owner has used their uploads: all of them without Pro, or this month's with Pro. Files in a shared project count for its owner.
   ///
   /// In en, this message translates to:
-  /// **'This project’s file space is full. Its owner can remove files to make room.'**
+  /// **'This project’s owner can’t upload more files right now.'**
   String get storageFullShared;
 
-  /// Button beside Explore Pro, only while the user's own free file space is full: under a file refused for it, and on the Pro screen under the usage line. Opens the list of tasks with files.
+  /// Atop a task's attachments, for an account with Pro, only once 80% or more of this calendar month's uploads (500 MB) are used. Removed files still count. Whole megabytes. A no-break space keeps {used} with the word after it, and {limit} with MB.
   ///
   /// In en, this message translates to:
-  /// **'Show tasks with files'**
-  String get storageSeeTasks;
+  /// **'Files uploaded this month: {used} of {limit} MB'**
+  String storageUsageMonth(int used, int limit);
 
-  /// Title of the screen listing the tasks and notes whose files use this account's file space, largest first.
+  /// Under an attachment the server refused because the user, with Pro, has uploaded this calendar month's 500 MB. A Retry button follows. {limit} is in whole megabytes; {date} is the first day of next month (UTC), short, like 1 Dec.
   ///
   /// In en, this message translates to:
-  /// **'Tasks with files'**
-  String get tasksWithFiles;
+  /// **'You’ve used this month’s {limit} MB of files. You can add more from {date}.'**
+  String storageMonthFull(int limit, String date);
 
-  /// One line above the rows of the Tasks with files screen.
+  /// Atop a completed task's backed-up attachments: the server deletes a completed task's files 15 days after it was completed, for every account (Backend ATTACHMENT_RETENTION_DAYS). The task itself stays. Reopening the task before then keeps them. {date} is short, like 23 Nov.
   ///
   /// In en, this message translates to:
-  /// **'Open a task to remove the files you no longer need.'**
-  String get tasksWithFilesHelp;
+  /// **'These files will be deleted on {date}, 15 days after the task was completed.'**
+  String filesDeletedOn(String date);
 
-  /// Under a task's title on the Tasks with files screen: how many files it holds and their total size. {size} is already formatted in the app's locale, to one decimal (12.4).
+  /// Instead of filesDeletedOn, for a task completed before the app kept completion times, whose date isn't known.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 file} other{{count} files}} · {size} MB'**
-  String tasksWithFilesRow(int count, String size);
-
-  /// The Tasks with files screen when no task holds files in this account's space.
-  ///
-  /// In en, this message translates to:
-  /// **'No tasks have files.'**
-  String get tasksWithFilesEmpty;
+  /// **'Files on a completed task are deleted 15 days after it was completed.'**
+  String get filesDeletedAfterDone;
 
   /// Spoken label of the pin icon before a pinned project's name in Projects.
   ///

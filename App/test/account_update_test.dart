@@ -353,7 +353,7 @@ void main() {
   }
 
   testWidgets(
-      'UX-511: after an upload, Task details keeps its app bar — no spinner replaces it, the task list never reloads, no second sync — and shows Files: 82 of 100 MB used',
+      'UX-511: after an upload, Task details keeps its app bar — no spinner replaces it, the task list never reloads, no second sync — and shows Files uploaded: 82 of 100 MB',
       (tester) async {
     final screen = await openScrolledToFiles(tester);
     final repository = screen.container.read(taskRepositoryProvider);
@@ -368,7 +368,7 @@ void main() {
     expect(api.meRequests, 1);
     expect(c.read(authProvider).account!.storage!.usedBytes, 82 * _megabyte);
     expect(c.read(taskRepositoryProvider), same(repository));
-    expect(find.text('Files: 82 of 100 MB used'), findsOneWidget);
+    expect(find.text('Files uploaded: 82\u00a0of 100\u00a0MB'), findsOneWidget);
     expect(find.text(en.storageUsage(82, 100)).hitTestable(), findsOneWidget,
         reason: 'the usage line shows where the user is');
     expect(

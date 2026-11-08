@@ -14,10 +14,12 @@ class TaskAttachment {
       this.error});
   static const maxBytes = 6 * 1024 * 1024;
 
-  /// Stable [error] tokens for an upload the server refused because the file
-  /// space is full: the user's own, or a shared project owner's. Sync doesn't
-  /// re-send these until Retry, a removal, or Pro turning on.
+  /// Stable [error] tokens for an upload the server refused because the
+  /// uploads allowance is used up: the user's own without Pro, this month's
+  /// with Pro, or a shared project owner's. Sync doesn't re-send these until
+  /// Retry, a removal, or Pro turning on.
   static const storageFull = 'attachment_problem:storage_full';
+  static const storageMonthFull = 'attachment_problem:storage_month_full';
   static const storageFullShared = 'attachment_problem:storage_full_shared';
   final String id;
   final String taskId;
@@ -34,7 +36,10 @@ class TaskAttachment {
   final bool deleted;
   final String? error;
 
-  bool get refused => error == storageFull || error == storageFullShared;
+  bool get refused =>
+      error == storageFull ||
+      error == storageMonthFull ||
+      error == storageFullShared;
 
   factory TaskAttachment.fromMap(Map<String, dynamic> row) => TaskAttachment(
       id: row['id'] as String,

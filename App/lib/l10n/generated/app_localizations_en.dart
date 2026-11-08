@@ -3170,7 +3170,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taskflowPro => 'TaskFlow Pro';
 
   @override
-  String get proBenefitDictation => 'Unlimited dictation and file space';
+  String get proBenefitDictation =>
+      'Unlimited dictation, and 500 MB of files a month';
 
   @override
   String get proBenefitTyping => 'Sentences you type become tasks';
@@ -3729,41 +3730,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String storageUsage(int used, int limit) {
-    return 'Files: $used of $limit MB used';
+    return 'Files uploaded: $used of $limit MB';
   }
 
   @override
   String storageFull(int limit) {
-    return 'Your file space is full ($limit MB).';
+    return 'You’ve used the $limit MB of files included for free.';
   }
 
   @override
   String get storageFullShared =>
-      'This project’s file space is full. Its owner can remove files to make room.';
+      'This project’s owner can’t upload more files right now.';
 
   @override
-  String get storageSeeTasks => 'Show tasks with files';
-
-  @override
-  String get tasksWithFiles => 'Tasks with files';
-
-  @override
-  String get tasksWithFilesHelp =>
-      'Open a task to remove the files you no longer need.';
-
-  @override
-  String tasksWithFilesRow(int count, String size) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count files',
-      one: '1 file',
-    );
-    return '$_temp0 · $size MB';
+  String storageUsageMonth(int used, int limit) {
+    return 'Files uploaded this month: $used of $limit MB';
   }
 
   @override
-  String get tasksWithFilesEmpty => 'No tasks have files.';
+  String storageMonthFull(int limit, String date) {
+    return 'You’ve used this month’s $limit MB of files. You can add more from $date.';
+  }
+
+  @override
+  String filesDeletedOn(String date) {
+    return 'These files will be deleted on $date, 15 days after the task was completed.';
+  }
+
+  @override
+  String get filesDeletedAfterDone =>
+      'Files on a completed task are deleted 15 days after it was completed.';
 
   @override
   String get projectPinned => 'Pinned';

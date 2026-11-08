@@ -158,7 +158,7 @@ class SharingTests(TestCase):
             self.assertEqual(client.get(f'/api/attachments/{attachment}/content/').status_code, 404)
 
     @override_settings(FREE_ATTACHMENT_BYTES=20)
-    def test_group_files_use_list_owner_quota_and_moves_cannot_bypass_it(self):
+    def test_group_files_use_list_owner_quota_and_moves_charge_nobody(self):
         self.join(self.editor, self.b, 'editor')
         key, _ = self.task(self.b)
         attachment = self.upload(self.b, key)
@@ -168,10 +168,11 @@ class SharingTests(TestCase):
         created = self.b.put(f'/api/tasks/{personal}/', {'title': 'Private', 'version': 0}, format='json')
         self.assertEqual(created.status_code, 201)
         self.upload(self.b, personal)  # The group upload did not consume this member's private quota.
-        moved = self.b.put(f'/api/tasks/{personal}/', {**created.data, 'list_id': str(self.list.pk)}, format='json')
-        self.assertEqual(moved.status_code, 400)
-        self.assertIsNone(Task.objects.get(pk=personal).task_list_id)
-        with self.captureOnCommitCallbacks(execute=True):
-            self.assertEqual(self.a.delete(f'/api/attachments/{attachment}/').status_code, 204)
+        # A move uploads nothing: its bytes were charged to the member when uploaded.
         moved = self.b.put(f'/api/tasks/{personal}/', {**created.data, 'list_id': str(self.list.pk)}, format='json')
         self.assertEqual(moved.status_code, 200, moved.data)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.assertEqual(self.a.delete(f'/api/attachments/{attachment}/').status_code, 204)
+        # Removing a file keeps what was used.
+        again = self.a.put(f'/api/attachments/{uuid.uuid4()}/', {'task_id': str(key), 'name': 'Third', 'file': SimpleUploadedFile('file', b'Household recipe')}, format='multipart')
+        self.assertEqual(again.status_code, 400)

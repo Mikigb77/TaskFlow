@@ -3238,7 +3238,8 @@ class AppLocalizationsCa extends AppLocalizations {
   String get taskflowPro => 'TaskFlow Pro';
 
   @override
-  String get proBenefitDictation => 'Dictats i espai per a fitxers sense límit';
+  String get proBenefitDictation =>
+      'Dictats sense límit i 500 MB de fitxers al mes';
 
   @override
   String get proBenefitTyping =>
@@ -3807,41 +3808,36 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String storageUsage(int used, int limit) {
-    return 'Fitxers: $used de $limit MB utilitzats';
+    return 'Fitxers pujats: $used de $limit MB';
   }
 
   @override
   String storageFull(int limit) {
-    return 'El teu espai per a fitxers és ple ($limit MB).';
+    return 'Has fet servir els $limit MB de fitxers inclosos de franc.';
   }
 
   @override
   String get storageFullShared =>
-      'L’espai per a fitxers d’aquest projecte és ple. El seu propietari pot treure fitxers per fer lloc.';
+      'El propietari d’aquest projecte no pot pujar més fitxers ara mateix.';
 
   @override
-  String get storageSeeTasks => 'Mostra les tasques amb fitxers';
-
-  @override
-  String get tasksWithFiles => 'Tasques amb fitxers';
-
-  @override
-  String get tasksWithFilesHelp =>
-      'Obre una tasca per treure els fitxers que ja no necessitis.';
-
-  @override
-  String tasksWithFilesRow(int count, String size) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count fitxers',
-      one: '1 fitxer',
-    );
-    return '$_temp0 · $size MB';
+  String storageUsageMonth(int used, int limit) {
+    return 'Fitxers pujats aquest mes: $used de $limit MB';
   }
 
   @override
-  String get tasksWithFilesEmpty => 'Cap tasca no té fitxers.';
+  String storageMonthFull(int limit, String date) {
+    return 'Has fet servir els $limit MB de fitxers d’aquest mes. En podràs afegir més a partir del $date.';
+  }
+
+  @override
+  String filesDeletedOn(String date) {
+    return 'Aquests fitxers s’eliminaran el $date, 15 dies després de completar la tasca.';
+  }
+
+  @override
+  String get filesDeletedAfterDone =>
+      'Els fitxers d’una tasca completada s’eliminen 15 dies després de completar-la.';
 
   @override
   String get projectPinned => 'Fixat';

@@ -8,7 +8,7 @@ import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
-import 'package:agenda/screens/tasks_with_files_screen.dart';
+import 'package:agenda/services/api_client.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -168,43 +168,66 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
       }
       if (!mounted) return;
       ref.invalidate(attachmentEntriesProvider(widget.task.id!));
+      // Removing a file gives back no uploads, so the usage line stays.
       await ref.read(taskProvider.notifier).loadTasks();
-      // The sync removed it from the server: show the space it freed.
-      if (mounted && entry.item != null) {
-        unawaited(ref.read(authProvider.notifier).refreshAccount());
-      }
     });
   }
 
   static const _megabyte = 1024 * 1024;
 
-  /// The usage line, for an account without Pro once its file space is 80%
-  /// used or more; null otherwise.
+  /// The usage line, once 80% or more of the uploads allowance is used:
+  /// everything ever uploaded without Pro, this month's with Pro. Null
+  /// otherwise, and with Pro from an older server that sends no month.
   String? _usage() {
     final storage = ref.watch(authProvider.select((s) => s.account?.storage));
-    if (storage == null ||
-        storage.limitBytes <= 0 ||
-        storage.usedBytes * 5 < storage.limitBytes * 4 ||
-        ref.watch(hasProProvider)) {
+    if (storage == null) return null;
+    final pro = ref.watch(hasProProvider);
+    final used = pro ? storage.monthUsedBytes : storage.usedBytes;
+    final limit = pro ? storage.monthLimitBytes : storage.limitBytes;
+    if (used == null || limit == null || limit <= 0 || used * 5 < limit * 4) {
       return null;
     }
-    return context.l10n.storageUsage(
-      (storage.usedBytes / _megabyte).round(),
-      (storage.limitBytes / _megabyte).round(),
-    );
+    final mb = ((used / _megabyte).round(), (limit / _megabyte).round());
+    return pro
+        ? context.l10n.storageUsageMonth(mb.$1, mb.$2)
+        : context.l10n.storageUsage(mb.$1, mb.$2);
   }
 
-  /// Why the server refused this file: the user's own file space is full, or
-  /// a shared project owner's.
+  /// Why the server refused this file: the user's own uploads without Pro
+  /// are used up, or this month's with Pro, or a shared project owner's.
   String _refused(TaskAttachment item) {
     if (item.error == TaskAttachment.storageFullShared) {
       return context.l10n.storageFullShared;
     }
-    final limit = ref.watch(
-      authProvider.select((s) => s.account?.storage?.limitBytes),
-    );
+    final storage = ref.watch(authProvider.select((s) => s.account?.storage));
+    if (item.error == TaskAttachment.storageMonthFull) {
+      final resets =
+          storage?.resetsAt ?? FreeVoice.nextReset(DateTime.now());
+      return context.l10n.storageMonthFull(
+        ((storage?.monthLimitBytes ?? 500 * _megabyte) / _megabyte).round(),
+        context.shortDate(resets.toLocal()),
+      );
+    }
     return context.l10n.storageFull(
-      ((limit ?? 100 * _megabyte) / _megabyte).round(),
+      ((storage?.limitBytes ?? 200 * _megabyte) / _megabyte).round(),
+    );
+  }
+
+  /// On a completed task's backed-up files: when they're deleted, 15 days
+  /// after it was completed (Backend ATTACHMENT_RETENTION_DAYS). A file
+  /// added later goes 15 days after it was added; a completion without a
+  /// time gets the rule without a date.
+  String? _deletion(List<AttachmentEntry> entries) {
+    final task = widget.task;
+    if (!task.isCompleted ||
+        task.isRecurring ||
+        !entries.any((e) => e.item?.remote == true && e.item?.deleted != true)) {
+      return null;
+    }
+    final done = task.completedAt;
+    if (done == null) return context.l10n.filesDeletedAfterDone;
+    return context.l10n.filesDeletedOn(
+      context.shortDate(done.toLocal().add(const Duration(days: 15))),
     );
   }
 
@@ -226,6 +249,9 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
     final colors = Theme.of(context).colorScheme;
     final attachments = ref.watch(attachmentEntriesProvider(widget.task.id!));
     final usage = attachments.value?.isNotEmpty == true ? _usage() : null;
+    final deletion = attachments.value == null
+        ? null
+        : _deletion(attachments.value!);
     // A task without files shows no Attachments section at all.
     if (!_busy &&
         _error == null &&
@@ -250,6 +276,14 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
             padding: const EdgeInsets.only(bottom: 12),
             child: Text(
               usage,
+              style: TextStyle(color: colors.onSurfaceVariant),
+            ),
+          ),
+        if (deletion != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              deletion,
               style: TextStyle(color: colors.onSurfaceVariant),
             ),
           ),
@@ -388,8 +422,9 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
                                 ),
                                 label: Text(context.l10n.fileDownload),
                               ),
-                            // A full file space of one's own: a removal
-                            // or Pro sends the file again, not a retry.
+                            // Uploads of one's own used up without Pro: Pro
+                            // sends the file again, not a retry. This
+                            // month's with Pro: Retry, once it resets.
                             if ((entry.item?.uploadPending == true ||
                                     entry.item?.deletePending == true) &&
                                 entry.item?.error != TaskAttachment.storageFull)
@@ -413,7 +448,7 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
                               ),
                             if (entry.item?.error ==
                                     TaskAttachment.storageFull &&
-                                !ref.watch(hasProProvider)) ...[
+                                !ref.watch(hasProProvider))
                               TextButton(
                                 onPressed: () => Navigator.pushNamed(
                                   context,
@@ -421,13 +456,6 @@ class _AttachmentPanelState extends ConsumerState<AttachmentPanel> {
                                 ),
                                 child: Text(context.l10n.voiceProAction),
                               ),
-                              // Which tasks use the space, to make room.
-                              TextButton(
-                                onPressed: () =>
-                                    TasksWithFilesScreen.open(context),
-                                child: Text(context.l10n.storageSeeTasks),
-                              ),
-                            ],
                           ],
                         ),
                         // Last and apart from the others: it deletes.

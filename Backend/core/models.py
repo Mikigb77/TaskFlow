@@ -309,6 +309,19 @@ class Attachment(models.Model):
         indexes = [models.Index(fields=["owner", "updated_at"], name="attachment_owner_updated")]
 
 
+class AttachmentUsage(models.Model):
+    """Bytes uploaded as attachments in one UTC calendar month, charged to the quota owner
+    (the project's owner, or the uploader for a personal task). Rows are never lowered:
+    removing a file, or the cleanup 15 days after its task is done, keeps what was used.
+    Without Pro the allowance is every month together; with Pro, the current month's."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="attachment_usage")
+    period = models.CharField(max_length=7)  # "2026-11", like FreeDictation.period
+    bytes = models.BigIntegerField(default=0)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["user", "period"], name="attachment_usage_month")]
+
+
 class LoginSession(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)

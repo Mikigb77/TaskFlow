@@ -122,7 +122,9 @@ final _meetingNote = Task(
 
 /// [_meetingNote]'s tasks as the server wrote them, kept on this phone: the
 /// quote with its two steps, on Friday of the meeting's week (Thursday 5
-/// November 2026).
+/// November 2099). A day already gone isn't set (UX-3105), so the meeting is
+/// in the future: with a past one this test stopped passing once its Friday
+/// had gone by.
 final _meetingNoteTasks = MeetingNoteTasks(
   tasks: const {
     's1': MeetingTask(
@@ -134,7 +136,7 @@ final _meetingNoteTasks = MeetingNoteTasks(
     's2': MeetingTask(title: 'Book the room'),
     's3': MeetingTask(title: 'Already done'),
   },
-  day: DateTime(2026, 11, 5),
+  day: DateTime(2099, 11, 5),
 );
 
 ProviderContainer _container(
@@ -982,7 +984,7 @@ void main() {
       expect(made.first.checklist.every((s) => !s.done()), isTrue);
       expect(made.last.checklist, isEmpty);
       // «Friday», from the meeting's Thursday.
-      expect(made.first.dueDate, DateTime(2026, 11, 6));
+      expect(made.first.dueDate, DateTime(2099, 11, 6));
       expect(made.last.dueDate, isNull);
       // The zone chosen in Settings, as the task form uses; nothing waits
       // in Unsaved.

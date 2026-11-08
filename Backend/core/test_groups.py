@@ -1,3 +1,4 @@
+from unittest.mock import patch
 import uuid
 from datetime import timedelta
 from tempfile import TemporaryDirectory
@@ -201,15 +202,20 @@ class GroupTests(TestCase):
         self.assertEqual(self.a.get(self.project_path).status_code, 404)
 
     @override_settings(FREE_ATTACHMENT_BYTES=20)
-    def test_transfer_cannot_overfill_new_owners_storage(self):
+    def test_a_transfer_charges_no_allowance_but_keeps_the_file_bound(self):
         group_task = self.task()
         self.upload(group_task["id"])
         private = self.c.put(f"/api/tasks/{uuid.uuid4()}/", {"title": "Private"}, format="json")
         self.upload(private.data["id"], self.c)
-        response = self.a.post(self.path + "transfer/", {"user_id": self.ana.pk, "version": 1}, format="json")
+        with patch("core.group_views.files_allowed", return_value=False):
+            response = self.a.post(self.path + "transfer/", {"user_id": self.ana.pk, "version": 1}, format="json")
         self.assertEqual(response.status_code, 400, response.data)
         self.group.refresh_from_db()
         self.assertEqual(self.group.owner_id, self.owner.pk)
+        response = self.a.post(self.path + "transfer/", {"user_id": self.ana.pk, "version": 1}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.owner_id, self.ana.pk)
 
     def test_shared_project_cannot_be_moved_and_private_share_requires_confirmation(self):
         response = self.a.put(self.project_path, {"name": "Physics", "group_id": None, "version": 1}, format="json")

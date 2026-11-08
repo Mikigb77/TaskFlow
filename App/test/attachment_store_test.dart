@@ -450,7 +450,7 @@ void main() {
   });
 
   testWidgets(
-      'UX-505: after an upload, the attachment panel shows Files: 82 of 100 MB used without reopening the task, from one auth/me/ request',
+      'UX-505: after an upload, the attachment panel shows Files uploaded: 82 of 100 MB without reopening the task, from one auth/me/ request',
       (tester) async {
     final en = lookupAppLocalizations(const Locale('en'));
     await tester.runAsync(() => saveAccount(78));
@@ -490,7 +490,7 @@ void main() {
     await tester.runAsync(() => store.sync(api, 1));
     await tester.pumpAndSettle();
     expect(find.text(en.storageUsage(82, 100)), findsOneWidget);
-    expect(find.text('Files: 82 of 100 MB used'), findsOneWidget);
+    expect(find.text('Files uploaded: 82\u00a0of 100\u00a0MB'), findsOneWidget);
     expect(api.meRequests, 1);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());

@@ -2,6 +2,12 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-11-08 — Attachment allowances, and completed tasks' files go after 15 days
+
+- The owner: "Every user: attachment files on a task are deleted 15 days after the task is completed […] but we will still keep the count on how many megabytes you have used." Free accounts: 200 MB per account, for life: "once across all your history, you have expended those 200 megabytes, then you can no longer attach files." Paying users: 500 MB per month.
+- Built as: `AttachmentUsage`, bytes uploaded per UTC month, never lowered (removing a file gives nothing back); 200 MiB in all without Pro, 500 MiB this month with Pro; uploads made with Pro count towards the free 200 too. A move between projects charges nobody. The daily `maintain_staging` job deletes the files (the task stays); a file added after completion gets 15 days from when it was added.
+- In the app: a completed task's backed-up files say «Estos archivos se eliminarán el …»; a refused file says the free 200 MB are used (with «Ver Pro») or this month's 500 MB (with «Reintentar» and the date more come). «Tareas con archivos» and «Ver tareas con archivos» are gone: removing files no longer makes room. The Pro benefit reads «Dictados sin límite y 500 MB de archivos al mes».
+
 ## 2026-11-06 — Reopen a task by voice
 
 - The owner: a task marked done by mistake («complete all the tasks for today», then «the doctor one isn't done, uncheck it») must be reopenable by voice. The app's tick already reopens by touch, so no new button: only the voice command.

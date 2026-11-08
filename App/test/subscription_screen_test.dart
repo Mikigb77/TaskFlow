@@ -315,10 +315,10 @@ void main() {
     );
   }
 
-  // ---- Run 2026-10-18-commands, b4 · P154 (UX-1223) ----
+  // ---- 2026-11-08: uploads count for life, so a full allowance has no files list ----
 
   testWidgets(
-    'UX-1223: a free account’s Pro screen at 100 of 100 MB shows «Ver tareas con archivos» under «Archivos: 100 de 100 MB usados»; at 80 of 100 MB it doesn’t; with Pro it doesn’t',
+    'A free account’s Pro screen at 200 of 200 MB shows «Archivos subidos: 200 de 200 MB» and no button to remove files; with Pro, no usage line',
     (tester) async {
       tester.view.physicalSize = const Size(390, 1600);
       tester.view.devicePixelRatio = 1;
@@ -326,38 +326,20 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       final es = lookupAppLocalizations(const Locale('es'));
       Map<String, dynamic> used(int mb) => {
-        'storage': {'used_bytes': mb * megabyte, 'limit_bytes': 100 * megabyte},
+        'storage': {'used_bytes': mb * megabyte, 'limit_bytes': 200 * megabyte},
       };
-      final see = find.widgetWithText(TextButton, es.storageSeeTasks);
-
-      await openPro(tester, sdk: _CountingRevenueCat(), user: used(100));
-      final usage = find.text(es.storageUsage(100, 100));
-      expect(es.storageUsage(100, 100), 'Archivos: 100 de 100 MB usados');
-      expect(usage, findsOneWidget);
-      expect(see, findsOneWidget);
-      expect(
-        tester.getRect(see).top,
-        greaterThanOrEqualTo(tester.getRect(usage).bottom - 0.5),
-        reason: 'under the usage line',
-      );
-      final colors = Theme.of(tester.element(find.byType(SubscriptionScreen)))
-          .colorScheme;
-      final label = tester.renderObject<RenderParagraph>(
-        find.descendant(of: see, matching: find.byType(RichText)),
-      );
-      expect(label.text.style?.color, colors.onPrimaryContainer);
+      await openPro(tester, sdk: _CountingRevenueCat(), user: used(200));
+      expect(es.storageUsage(200, 200), 'Archivos subidos: 200\u00a0de 200\u00a0MB');
+      expect(find.text(es.storageUsage(200, 200)), findsOneWidget);
+      expect(find.textContaining('tareas con archivos'), findsNothing);
       expect(tester.takeException(), isNull);
-
-      await openPro(tester, sdk: _CountingRevenueCat(), user: used(80));
-      expect(find.text(es.storageUsage(80, 100)), findsOneWidget);
-      expect(see, findsNothing);
 
       await openPro(
         tester,
         sdk: _CountingRevenueCat()..info = billingInfo(active: true),
-        user: used(100),
+        user: used(200),
       );
-      expect(see, findsNothing);
+      expect(find.text(es.storageUsage(200, 200)), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     },
@@ -538,12 +520,18 @@ void main() {
     final en = lookupAppLocalizations(const Locale('en'));
     final es = lookupAppLocalizations(const Locale('es'));
     final ca = lookupAppLocalizations(const Locale('ca'));
-    expect(en.proBenefitDictation, 'Unlimited dictation and file space');
+    expect(
+      en.proBenefitDictation,
+      'Unlimited dictation, and 500\u00a0MB of files a month',
+    );
     expect(
       es.proBenefitDictation,
-      'Dictados y espacio para archivos sin límite',
+      'Dictados sin límite y 500\u00a0MB de archivos al mes',
     );
-    expect(ca.proBenefitDictation, 'Dictats i espai per a fitxers sense límit');
+    expect(
+      ca.proBenefitDictation,
+      'Dictats sense límit i 500\u00a0MB de fitxers al mes',
+    );
     for (final reason in ['store', 'other']) {
       expect(
         en.billingError(reason),
@@ -810,7 +798,7 @@ void main() {
       expect(
         [en.proBenefitDictation, en.proBenefitTyping, en.proBenefitReminders],
         [
-          'Unlimited dictation and file space',
+          'Unlimited dictation, and 500\u00a0MB of files a month',
           'Sentences you type become tasks',
           'Ask for reminders in your own words',
         ],
@@ -818,7 +806,7 @@ void main() {
       expect(
         [es.proBenefitDictation, es.proBenefitTyping, es.proBenefitReminders],
         [
-          'Dictados y espacio para archivos sin límite',
+          'Dictados sin límite y 500\u00a0MB de archivos al mes',
           'Tus frases escritas se convierten en tareas',
           'Pide los recordatorios con tus palabras',
         ],
@@ -826,7 +814,7 @@ void main() {
       expect(
         [ca.proBenefitDictation, ca.proBenefitTyping, ca.proBenefitReminders],
         [
-          'Dictats i espai per a fitxers sense límit',
+          'Dictats sense límit i 500\u00a0MB de fitxers al mes',
           'Les frases que escrius es converteixen en tasques',
           'Demana els recordatoris amb les teves paraules',
         ],
@@ -939,9 +927,9 @@ void main() {
         es.billingRenewalHelp,
         'Se renueva automáticamente cada mes hasta que la canceles. Revisa el precio final y las condiciones de cualquier prueba antes de confirmar.',
       );
-      expect(es.storageUsage(42, 100), 'Archivos: 42 de 100 MB usados');
-      expect(en.storageUsage(42, 100), 'Files: 42 of 100 MB used');
-      expect(ca.storageUsage(42, 100), 'Fitxers: 42 de 100 MB utilitzats');
+      expect(es.storageUsage(42, 100), 'Archivos subidos: 42\u00a0de 100\u00a0MB');
+      expect(en.storageUsage(42, 100), 'Files uploaded: 42\u00a0of 100\u00a0MB');
+      expect(ca.storageUsage(42, 100), 'Fitxers pujats: 42\u00a0de 100\u00a0MB');
     });
 
     testWidgets(

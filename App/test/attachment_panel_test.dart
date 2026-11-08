@@ -169,6 +169,8 @@ void main() {
       {String language = 'en',
       bool pro = false,
       int? usedMb,
+      int? monthUsedMb,
+      Task? on,
       List<AttachmentEntry>? entries,
       double textScale = 1}) async {
     final repository = _Repository();
@@ -185,7 +187,10 @@ void main() {
                   ? null
                   : {
                       'used_bytes': usedMb * megabyte,
-                      'limit_bytes': 100 * megabyte
+                      'limit_bytes': 100 * megabyte,
+                      'month_used_bytes': (monthUsedMb ?? usedMb) * megabyte,
+                      'month_limit_bytes': 500 * megabyte,
+                      'resets_at': '2026-12-01T00:00:00Z',
                     })),
           hasProProvider.overrideWithValue(pro),
           taskRepositoryProvider.overrideWithValue(repository),
@@ -205,7 +210,7 @@ void main() {
             home: Scaffold(
                 body: SingleChildScrollView(
                     padding: const EdgeInsets.all(16),
-                    child: AttachmentPanel(task: task))))));
+                    child: AttachmentPanel(task: on ?? task))))));
     await tester.pumpAndSettle();
     return repository;
   }
@@ -228,6 +233,18 @@ void main() {
 
       await pumpPanel(tester, language: language, usedMb: 95, pro: true);
       expect(find.text(l.storageUsage(95, 100)), findsNothing);
+      expect(find.text(l.storageUsageMonth(95, 500)), findsNothing);
+      expect(tester.takeException(), isNull);
+
+      // With Pro, this month's uploads: at 80% of 500 MB.
+      await pumpPanel(tester,
+          language: language,
+          usedMb: 900,
+          monthUsedMb: 400,
+          pro: true,
+          textScale: 2);
+      expect(find.text(l.storageUsageMonth(400, 500)), findsOneWidget);
+      expect(find.text(l.storageUsage(900, 100)), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });
@@ -340,39 +357,90 @@ void main() {
     });
   }
 
-  // ---- Run 2026-10-18-commands, b4 · P154 (UX-1223) ----
+  // ---- 2026-11-08: uploads count for life without Pro, monthly with it ----
 
   testWidgets(
-      'UX-1223: at 100 of 100 MB, a file refused for the account’s own full space shows «Ver tareas con archivos» beside «Ver Pro»; one refused for a shared project owner’s space shows neither',
+      'A file refused without Pro offers only «Ver Pro», since removing files gives no uploads back; one refused for this month with Pro says when more come, with Retry; a shared owner’s shows neither',
       (tester) async {
     final es = lookupAppLocalizations(const Locale('es'));
-    expect(es.storageSeeTasks, 'Ver tareas con archivos');
     await pumpPanel(tester, language: 'es', usedMb: 100, entries: [
       AttachmentEntry('Scan.pdf', '/local/scan.pdf', true, item: refused())
     ]);
-    final see = find.widgetWithText(TextButton, es.storageSeeTasks);
-    final pro = find.widgetWithText(TextButton, es.voiceProAction);
-    expect(see, findsOneWidget);
-    expect(pro, findsOneWidget);
-    // In the file's row of actions, next to each other.
-    final actions = find.ancestor(of: pro, matching: find.byType(Wrap)).first;
-    expect(find.descendant(of: actions, matching: see), findsOneWidget);
-    final buttons = tester
-        .widgetList<TextButton>(
-            find.descendant(of: actions, matching: find.byType(TextButton)))
-        .toList();
-    final proAt = buttons.indexOf(tester.widget<TextButton>(pro));
-    expect(buttons[proAt + 1], tester.widget<TextButton>(see),
-        reason: 'right after Ver Pro');
+    expect(find.widgetWithText(TextButton, es.voiceProAction), findsOneWidget);
+    expect(find.widgetWithText(TextButton, es.fileRetry), findsNothing);
     expect(tester.takeException(), isNull);
+
+    const month = TaskAttachment(
+        id: 'refused-month',
+        taskId: 'task',
+        name: 'Scan.pdf',
+        size: 100,
+        sha256: '',
+        uploadPending: true,
+        error: TaskAttachment.storageMonthFull);
+    final repository = await pumpPanel(tester,
+        language: 'es',
+        pro: true,
+        usedMb: 900,
+        monthUsedMb: 500,
+        entries: [
+          const AttachmentEntry('Scan.pdf', '/local/scan.pdf', true, item: month)
+        ]);
+    expect(
+        find.text('Has usado los 500\u00a0MB de archivos de este mes. '
+            'Podrás añadir más a partir del 1 dic.'),
+        findsOneWidget);
+    expect(find.widgetWithText(TextButton, es.voiceProAction), findsNothing);
+    final retry = find.widgetWithText(TextButton, es.fileRetry);
+    await tester.ensureVisible(retry);
+    await tester.pumpAndSettle();
+    await tester.tap(retry);
+    await tester.pumpAndSettle();
+    expect(repository.store.retried, [month.id]);
 
     await pumpPanel(tester, language: 'es', usedMb: 100, entries: [
       AttachmentEntry('Scan.pdf', '/local/scan.pdf', true,
           item: refused(shared: true))
     ]);
     expect(find.text(es.storageFullShared), findsOneWidget);
-    expect(find.widgetWithText(TextButton, es.storageSeeTasks), findsNothing);
     expect(find.widgetWithText(TextButton, es.voiceProAction), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets(
+      'A completed task’s backed-up files say when they’re deleted: 15 days after completion; an open task’s and a local-only file’s say nothing',
+      (tester) async {
+    final es = lookupAppLocalizations(const Locale('es'));
+    const backedUp = TaskAttachment(
+        id: 'up', taskId: 'task', name: 'Scan.pdf', size: 100, sha256: '',
+        remote: true);
+    final done = Task(
+        id: 1,
+        title: 'Appointment',
+        priority: 3,
+        isCompleted: true,
+        completedAt: DateTime(2026, 11, 8, 12));
+    final entries = [
+      const AttachmentEntry('Scan.pdf', '/local/scan.pdf', true, item: backedUp)
+    ];
+    await pumpPanel(tester, language: 'es', on: done, entries: entries);
+    expect(
+        find.text('Estos archivos se eliminarán el 23 nov, 15 días después de '
+            'completar la tarea.'),
+        findsOneWidget);
+
+    await pumpPanel(tester,
+        language: 'es',
+        on: Task(id: 1, title: 'Appointment', priority: 3, isCompleted: true),
+        entries: entries);
+    expect(find.text(es.filesDeletedAfterDone), findsOneWidget);
+
+    await pumpPanel(tester, language: 'es', entries: entries);
+    expect(find.textContaining('se eliminarán'), findsNothing);
+    await pumpPanel(tester, language: 'es', on: done);
+    expect(find.textContaining('se eliminarán'), findsNothing);
+    expect(find.text(es.filesDeletedAfterDone), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -381,13 +449,14 @@ void main() {
     final en = lookupAppLocalizations(const Locale('en'));
     final es = lookupAppLocalizations(const Locale('es'));
     final ca = lookupAppLocalizations(const Locale('ca'));
-    expect(es.storageFull(100),
-        'Tu espacio para archivos está lleno (100\u00a0MB).');
-    expect(en.storageFull(100), 'Your file space is full (100\u00a0MB).');
-    expect(ca.storageFull(100),
-        'El teu espai per a fitxers és ple (100\u00a0MB).');
+    expect(es.storageFull(200),
+        'Has usado los 200\u00a0MB de archivos incluidos gratis.');
+    expect(en.storageFull(200),
+        'You’ve used the 200\u00a0MB of files included for free.');
+    expect(ca.storageFull(200),
+        'Has fet servir els 200\u00a0MB de fitxers inclosos de franc.');
     for (final l in [en, es, ca]) {
-      expect(l.storageFull(100), isNot(contains('Remove a file')));
+      expect(l.storageFull(200), isNot(contains('Remove a file')));
     }
   });
 
@@ -407,7 +476,7 @@ void main() {
       final usage = find.text(l.storageUsage(85, 100));
       expect(usage, findsOneWidget);
       if (language == 'es') {
-        expect(find.text('Archivos: 85 de 100 MB usados'), findsOneWidget);
+        expect(find.text('Archivos subidos: 85\u00a0de 100\u00a0MB'), findsOneWidget);
       }
       expect(
           tester.getTopLeft(find.text(heading.toUpperCase())).dy,
@@ -657,7 +726,7 @@ void main() {
           find.descendant(
               of: file,
               matching:
-                  find.text('Tu espacio para archivos está lleno (100\u00a0MB).')),
+                  find.text('Has usado los 100\u00a0MB de archivos incluidos gratis.')),
           findsOneWidget);
       final buttons = find.descendant(
           of: file,
@@ -674,7 +743,6 @@ void main() {
       expect(labels, [
         es.fileOpen,
         es.voiceProAction,
-        es.storageSeeTasks,
         es.fileRemove,
       ]);
       expect(find.descendant(of: file, matching: find.text(es.fileRetry)),

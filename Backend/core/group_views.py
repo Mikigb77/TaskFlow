@@ -4,7 +4,6 @@ import secrets
 import uuid
 
 from django.db import IntegrityError, transaction
-from django.db.models import Sum
 from django.utils import timezone
 from django.utils.crypto import constant_time_compare, salted_hmac
 from rest_framework import mixins, serializers, viewsets
@@ -12,7 +11,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.response import Response
 
-from .attachment_views import quota_files, storage_allows
+from .attachment_views import files_allowed, quota_files
 from .collaboration import clear_assignments
 from .list_access import visible_groups, require_group, group_role, group_people, visible_tasks, display_name
 from .models import TaskGroup, GroupMembership, GroupInvitation, TaskList, User, TaskNotification
@@ -227,11 +226,10 @@ class TaskGroupViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewset
             # Uploads lock project then quota owner. Keep that order here as well.
             list(User.objects.select_for_update().filter(pk__in=[group.owner_id, user_id]).order_by("pk"))
             from .models import Attachment
+            # A transfer charges no allowance (the bytes were counted when uploaded); only the file bound.
             moving = Attachment.objects.filter(task__task_list__group=group, task__is_deleted=False, is_deleted=False)
-            existing = quota_files(user_id).exclude(task__task_list__group=group)
-            total = (moving.aggregate(n=Sum("size"))["n"] or 0) + (existing.aggregate(n=Sum("size"))["n"] or 0)
-            if not storage_allows(user_id, total, moving.count() + existing.count()):
-                raise ValidationError("The new owner needs enough storage for this group's files.")
+            if not files_allowed(moving.count() + quota_files(user_id).exclude(task__task_list__group=group).count()):
+                raise ValidationError("The new owner already holds as many files as they can.")
             GroupMembership.objects.update_or_create(group=group, user_id=group.owner_id, defaults={"role": "admin"})
             group.memberships.filter(user_id=user_id).delete()
             group.owner_id = user_id
