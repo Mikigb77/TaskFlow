@@ -60,7 +60,9 @@ Map<String, dynamic> account({
   if (storageMb != null)
     'storage': {
       'used_bytes': storageMb * 1024 * 1024,
-      'limit_bytes': 100 * 1024 * 1024,
+      'limit_bytes': 200 * 1024 * 1024,
+      'month_used_bytes': storageMb * 1024 * 1024,
+      'month_limit_bytes': 500 * 1024 * 1024,
     },
   if (freeLeft != null)
     'free_voice': {

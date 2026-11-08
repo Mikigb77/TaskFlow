@@ -3250,7 +3250,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get proBenefitDictation =>
-      'Dictados y espacio para archivos sin límite';
+      'Dictados sin límite y 500 MB de archivos al mes';
 
   @override
   String get proBenefitTyping => 'Tus frases escritas se convierten en tareas';
@@ -3817,41 +3817,36 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String storageUsage(int used, int limit) {
-    return 'Archivos: $used de $limit MB usados';
+    return 'Archivos subidos: $used de $limit MB';
   }
 
   @override
   String storageFull(int limit) {
-    return 'Tu espacio para archivos está lleno ($limit MB).';
+    return 'Has usado los $limit MB de archivos incluidos gratis.';
   }
 
   @override
   String get storageFullShared =>
-      'El espacio para archivos de este proyecto está lleno. Su propietario puede eliminar archivos para hacer sitio.';
+      'El propietario de este proyecto no puede subir más archivos por ahora.';
 
   @override
-  String get storageSeeTasks => 'Ver tareas con archivos';
-
-  @override
-  String get tasksWithFiles => 'Tareas con archivos';
-
-  @override
-  String get tasksWithFilesHelp =>
-      'Abre una tarea para eliminar los archivos que ya no necesites.';
-
-  @override
-  String tasksWithFilesRow(int count, String size) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count archivos',
-      one: '1 archivo',
-    );
-    return '$_temp0 · $size MB';
+  String storageUsageMonth(int used, int limit) {
+    return 'Archivos subidos este mes: $used de $limit MB';
   }
 
   @override
-  String get tasksWithFilesEmpty => 'No hay tareas con archivos.';
+  String storageMonthFull(int limit, String date) {
+    return 'Has usado los $limit MB de archivos de este mes. Podrás añadir más a partir del $date.';
+  }
+
+  @override
+  String filesDeletedOn(String date) {
+    return 'Estos archivos se eliminarán el $date, 15 días después de completar la tarea.';
+  }
+
+  @override
+  String get filesDeletedAfterDone =>
+      'Los archivos de una tarea completada se eliminan 15 días después de completarla.';
 
   @override
   String get projectPinned => 'Fijado';

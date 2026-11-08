@@ -135,7 +135,7 @@ resume and subscription refresh. Logout/account switches clear the grant.
 | Migrations | `taskflow-api-staging-migrate` Cloud Run job, direct DB connection |
 | Email maintenance | `taskflow-api-staging-maintain` Cloud Run job |
 | Retry delivery | Cloud Tasks `taskflow-staging-email`, one concurrent dispatch; scheduled after reserving an outbox message |
-| Daily maintenance | Scheduler at 03:17 Europe/Madrid; cleans expired runtime/auth/outbox records, **not customer tasks or files** |
+| Daily maintenance | Scheduler at 03:17 Europe/Madrid; cleans expired runtime/auth/outbox records and old meetings, and deletes the files of tasks completed over 15 days ago from the bucket (owner, 2026-11-08). **Never deletes tasks** |
 
 Database traffic uses full certificate/hostname verification. Psycopg's bundled
 OpenSSL needs the explicit container trust bundle

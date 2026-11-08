@@ -20,7 +20,7 @@ from . import views
 from .ai import AIUnavailable
 from .billing import BillingUnavailable
 from .free_tier import month
-from .models import Attachment, FreeDictation, ListMembership, Task, TaskList, User
+from .models import Attachment, AttachmentUsage, FreeDictation, ListMembership, Task, TaskList, User
 
 PASSWORD = "Free-tier-fixture-2026!"
 NO_PRO = {"entitlements": {}}
@@ -299,7 +299,8 @@ class FreeVoiceTests(TestCase):
 
     def test_register_login_and_me_include_both_blocks(self):
         voice = {"limit": 10, "left": 10, "resets_at": month(timezone.now())[1].isoformat().replace("+00:00", "Z")}
-        storage = {"used_bytes": 0, "limit_bytes": settings.FREE_ATTACHMENT_BYTES}
+        storage = {"used_bytes": 0, "limit_bytes": settings.FREE_ATTACHMENT_BYTES, "month_used_bytes": 0,
+                   "month_limit_bytes": settings.PRO_ATTACHMENT_BYTES_PER_MONTH, "resets_at": voice["resets_at"]}
         credentials = {"email": "blocks@example.invalid", "password": "Unique-blocks-passphrase-2026!"}
         client = APIClient()
         registered = client.post("/api/auth/register/", credentials, format="json")
@@ -347,7 +348,7 @@ class FreeStorageTests(TestCase):
         cache.clear()
         self.files = TemporaryDirectory(prefix="taskflow-free-storage-")
         self.addCleanup(self.files.cleanup)
-        limits = override_settings(MEDIA_ROOT=self.files.name, FREE_ATTACHMENT_BYTES=10)
+        limits = override_settings(MEDIA_ROOT=self.files.name, FREE_ATTACHMENT_BYTES=10, PRO_ATTACHMENT_BYTES_PER_MONTH=20)
         limits.enable()
         self.addCleanup(limits.disable)
         self.owner = User.objects.create_user("storage-owner@example.invalid", PASSWORD)
@@ -371,33 +372,53 @@ class FreeStorageTests(TestCase):
     def pro_only(self, user):
         return lambda billing_id: pro_customer() if billing_id == user.billing_id else NO_PRO
 
+    def storage(self, used, month_used=None):
+        return {"used_bytes": used, "limit_bytes": 10, "month_used_bytes": used if month_used is None else month_used,
+                "month_limit_bytes": 20, "resets_at": month(timezone.now())[1].isoformat().replace("+00:00", "Z")}
+
     def test_a_free_owner_over_the_cap_gets_storage_full_with_numbers(self):
         self.assertEqual(self.upload(b"x" * 8).status_code, 201)
         refused = self.upload(b"x" * 3)
         self.assertEqual(refused.status_code, 400)
         body = refused.json()
         self.assertEqual(body["code"], "storage_full")
+        self.assertEqual(body["limit"], "lifetime")
         self.assertIs(body["shared"], False)
-        self.assertEqual(body["storage"], {"used_bytes": 8, "limit_bytes": 10})
+        self.assertEqual(body["storage"], self.storage(8))
         self.assertIsInstance(body["detail"], str)
         self.assertEqual(Attachment.objects.count(), 1)
         self.assertEqual(len(list(Path(self.files.name).rglob("*.blob"))), 1)
-        self.assertEqual(self.a.get("/api/auth/me/").json()["storage"], {"used_bytes": 8, "limit_bytes": 10})
+        self.assertEqual(self.a.get("/api/auth/me/").json()["storage"], self.storage(8))
         self.assertEqual(self.upload(b"x" * 2).status_code, 201)  # Exactly at the cap is allowed.
+
+    def test_a_retry_of_the_same_upload_is_not_counted_twice(self):
+        id = uuid.uuid4()
+        self.assertEqual(self.upload(b"x" * 6, id=id).status_code, 201)
+        self.assertEqual(self.upload(b"x" * 6, id=id).status_code, 200)
+        self.assertEqual(self.a.get("/api/auth/me/").json()["storage"]["used_bytes"], 6)
 
     @override_settings(REVENUECAT_API_KEY="goog_fixture")
     @patch("core.billing._customer")
-    def test_a_pro_owner_has_no_cap_and_billing_is_asked_only_above_it(self, customer):
+    def test_a_pro_owner_has_a_monthly_allowance_and_billing_is_asked_only_above_the_free_one(self, customer):
         customer.return_value = pro_customer()
         self.assertEqual(self.upload(b"x" * 8).status_code, 201)
         customer.assert_not_called()
         self.assertEqual(self.upload(b"x" * 8).status_code, 201)
         customer.assert_called_once_with(self.owner.billing_id)
-        self.assertEqual(Attachment.objects.count(), 2)
+        refused = self.upload(b"x" * 5)  # 21 bytes this month, over Pro's 20.
+        self.assertEqual(refused.status_code, 400)
+        self.assertEqual(refused.json()["limit"], "month")
+        self.assertEqual(refused.json()["storage"], self.storage(16))
+        self.assertEqual(self.upload(b"x" * 4).status_code, 201)  # Exactly at Pro's cap.
+        self.assertEqual(Attachment.objects.count(), 3)
+        # Next month the Pro allowance starts again; the free one never does.
+        AttachmentUsage.objects.filter(user=self.owner).update(period="2000-01")
+        self.assertEqual(self.upload(b"x" * 8).status_code, 201)
+        self.assertEqual(self.a.get("/api/auth/me/").json()["storage"], self.storage(28, 8))
 
     @override_settings(REVENUECAT_API_KEY="goog_fixture")
     @patch("core.billing._customer")
-    def test_a_shared_project_uses_its_owners_space(self, customer):
+    def test_a_shared_project_uses_its_owners_allowance(self, customer):
         task = self.shared_task()
         customer.side_effect = self.pro_only(self.member)  # A Pro member can't lift a free owner's cap.
         self.assertEqual(self.upload(b"x" * 8, self.b, task).status_code, 201)
@@ -406,21 +427,21 @@ class FreeStorageTests(TestCase):
         self.assertEqual(refused.json()["code"], "storage_full")
         self.assertIs(refused.json()["shared"], True)
         self.assertNotIn("storage", refused.json())
+        self.assertEqual(self.b.get("/api/auth/me/").json()["storage"]["used_bytes"], 0)  # Charged to the owner.
         cache.clear()
         customer.side_effect = self.pro_only(self.owner)  # A Pro owner accepts a free member's file.
         self.assertEqual(self.upload(b"x" * 3, self.b, task).status_code, 201)
 
-    def test_removing_a_file_or_a_task_frees_space_immediately(self):
+    def test_removing_a_file_or_a_task_keeps_what_was_used(self):
         first = uuid.uuid4()
         self.assertEqual(self.upload(b"x" * 8, id=first).status_code, 201)
-        self.assertEqual(self.upload(b"x" * 8).status_code, 400)
         self.assertEqual(self.a.delete(f"/api/attachments/{first}/").status_code, 204)
-        self.assertEqual(self.upload(b"x" * 8).status_code, 201)
-        other = Task.objects.create(owner=self.owner, title="Other paperwork")
-        self.assertEqual(self.upload(b"x" * 8, task=other).status_code, 400)
+        self.assertEqual(self.upload(b"x" * 8).status_code, 400)
         self.assertEqual(self.a.delete(f"/api/tasks/{self.task.pk}/", {"version": self.task.version}, format="json").status_code, 204)
-        self.assertEqual(self.upload(b"x" * 8, task=other).status_code, 201)
-        self.assertEqual(self.a.get("/api/auth/me/").json()["storage"]["used_bytes"], 8)
+        other = Task.objects.create(owner=self.owner, title="Other paperwork")
+        self.assertEqual(self.upload(b"x" * 3, task=other).status_code, 400)
+        self.assertEqual(self.upload(b"x" * 2, task=other).status_code, 201)
+        self.assertEqual(self.a.get("/api/auth/me/").json()["storage"]["used_bytes"], 10)
 
     @override_settings(REVENUECAT_API_KEY="goog_fixture")
     @patch("core.billing._customer")
@@ -436,27 +457,25 @@ class FreeStorageTests(TestCase):
         self.assertEqual(b"".join(download.streaming_content), b"a" * 8)
         refused = self.upload(b"c")
         self.assertEqual(refused.status_code, 400)
-        self.assertEqual(refused.json()["storage"], {"used_bytes": 16, "limit_bytes": 10})
+        self.assertEqual(refused.json()["limit"], "lifetime")  # Uploads made with Pro count too.
+        self.assertEqual(refused.json()["storage"], self.storage(16))
         self.assertEqual(self.a.delete(f"/api/attachments/{second}/").status_code, 204)
-        self.assertEqual(self.upload(b"c").status_code, 201)
+        self.assertEqual(self.upload(b"c").status_code, 400)
 
     @override_settings(REVENUECAT_API_KEY="goog_fixture")
-    @patch("core.billing._customer")
-    def test_a_task_can_move_into_a_pro_owners_space(self, customer):
-        customer.return_value = NO_PRO
+    @patch("core.billing._customer", return_value=NO_PRO)
+    def test_a_move_charges_no_allowance(self, customer):
         shared = self.shared_task()
         self.assertEqual(self.upload(b"x" * 8, self.b, shared).status_code, 201)
         personal = self.b.put(f"/api/tasks/{uuid.uuid4()}/", {"title": "Private", "version": 0}, format="json")
         self.assertEqual(personal.status_code, 201)
         self.assertEqual(self.upload(b"y" * 8, self.b, Task.objects.get(pk=personal.data["id"])).status_code, 201)
         move = {**personal.data, "list_id": str(shared.task_list_id)}
-        refused = self.b.put(f"/api/tasks/{personal.data['id']}/", move, format="json")
-        self.assertEqual(refused.status_code, 400)
-        self.assertIn("list_id", refused.data)  # The free owner's space is full.
-        cache.clear()
-        customer.side_effect = self.pro_only(self.owner)
         moved = self.b.put(f"/api/tasks/{personal.data['id']}/", move, format="json")
         self.assertEqual(moved.status_code, 200, moved.data)
+        self.assertEqual(self.a.get("/api/auth/me/").json()["storage"]["used_bytes"], 8)
+        self.assertEqual(self.b.get("/api/auth/me/").json()["storage"]["used_bytes"], 8)
+        customer.assert_not_called()
 
     @override_settings(REVENUECAT_API_KEY="goog_fixture")
     @patch("core.billing._customer", side_effect=BillingUnavailable())

@@ -2,11 +2,13 @@ import hashlib
 import logging
 import unicodedata
 import uuid
+from datetime import timedelta
 
 from django.conf import settings
 from django.core.files.uploadhandler import FileUploadHandler, StopUpload
 from django.db import IntegrityError, transaction
-from django.db.models import Sum, Q
+from django.db.models import F, Q, Sum
+from django.db.models.functions import Coalesce
 from django.http import FileResponse
 from django.utils import timezone
 from rest_framework import mixins, serializers, viewsets
@@ -15,7 +17,8 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.response import Response
 
-from .models import Attachment, Task, User
+from .models import Attachment, AttachmentUsage, Task, User
+from .free_tier import month
 from .list_access import visible_tasks, lock_task
 from .billing import BillingUnavailable, has_pro
 
@@ -95,38 +98,96 @@ def quota_files(user_id):
         is_deleted=False, task__is_deleted=False)
 
 
+def quota_owner_id(task):
+    return task.task_list.owner_id if task.task_list_id else task.owner_id
+
+
+def uploaded(user_id, now=None):
+    """(bytes ever uploaded, bytes uploaded this UTC month, when the month resets).
+    Removed and cleaned-up files still count: AttachmentUsage is never lowered."""
+    period, resets_at = month(now or timezone.now())
+    rows = AttachmentUsage.objects.filter(user_id=user_id)
+    total = rows.aggregate(total=Sum("bytes"))["total"] or 0
+    this_month = rows.filter(period=period).values_list("bytes", flat=True).first() or 0
+    return total, this_month, resets_at
+
+
 def storage_usage(user):
-    used = quota_files(user.pk).aggregate(total=Sum("size"))["total"] or 0
-    return {"used_bytes": used, "limit_bytes": settings.FREE_ATTACHMENT_BYTES}
+    # Both allowances and never a billing call; the app knows whether the account has Pro.
+    total, this_month, resets_at = uploaded(user.pk)
+    return {"used_bytes": total, "limit_bytes": settings.FREE_ATTACHMENT_BYTES,
+            "month_used_bytes": this_month, "month_limit_bytes": settings.PRO_ATTACHMENT_BYTES_PER_MONTH,
+            "resets_at": resets_at.isoformat().replace("+00:00", "Z")}
 
 
-def storage_allows(owner_id, total_bytes, file_count):
-    # The cap follows the quota owner. When Pro ends, files stay readable and
-    # removable; only additions above the free cap are refused.
-    if file_count > 1000:
-        return False  # A technical bound for every tier.
-    if total_bytes <= settings.FREE_ATTACHMENT_BYTES:
-        return True
-    pro = has_pro(User.objects.get(pk=owner_id))  # Billing is asked only above the free cap.
-    if pro is None:
-        raise BillingUnavailable()  # 503: the app retries later.
-    return pro
+def files_allowed(file_count):
+    return file_count <= 1000  # A technical bound for every tier.
 
 
 class StorageFull(Exception):
     """Raised inside the upload transaction and answered outside it."""
+    def __init__(self, limit):
+        super().__init__(limit)
+        self.limit = limit  # "lifetime" without Pro, "month" with it, "files" at the file bound
+
+
+def check_upload(owner_id, size):
+    """Raises StorageFull when the quota owner can't upload `size` more bytes. Within the
+    free allowance nobody is over Pro's either, so billing is asked only above it. When Pro
+    ends, files stay readable and removable; only uploads over the free allowance are refused."""
+    if not files_allowed(quota_files(owner_id).count() + 1):
+        raise StorageFull("files")
+    total, this_month, _ = uploaded(owner_id)
+    if total + size <= settings.FREE_ATTACHMENT_BYTES:
+        return
+    pro = has_pro(User.objects.get(pk=owner_id))
+    if pro is None:
+        raise BillingUnavailable()  # 503: the app retries later.
+    if not pro:
+        raise StorageFull("lifetime")
+    if this_month + size > settings.PRO_ATTACHMENT_BYTES_PER_MONTH:
+        raise StorageFull("month")
+
+
+def charge_upload(owner_id, size):
+    """Adds an upload to its owner's usage, inside the upload's transaction and lock."""
+    period, _ = month(timezone.now())
+    usage, _ = AttachmentUsage.objects.get_or_create(user_id=owner_id, period=period)
+    AttachmentUsage.objects.filter(pk=usage.pk).update(bytes=F("bytes") + size)
 
 
 def check_list_transfer(task, destination):
+    # A move uploads nothing, so it charges nobody's allowance: its bytes were counted
+    # when they were uploaded. Only the file bound applies.
     if task is None or (destination.pk if destination else None) == task.task_list_id:
         return
     owner_id = destination.owner_id if destination else task.owner_id
     list(User.objects.select_for_update().filter(pk__in={owner_id, task.owner_id}).order_by('pk'))
-    moving = task.attachments.filter(is_deleted=False)
-    existing = quota_files(owner_id).exclude(task=task)
-    size = (moving.aggregate(total=Sum('size'))['total'] or 0) + (existing.aggregate(total=Sum('size'))['total'] or 0)
-    if not storage_allows(owner_id, size, moving.count() + existing.count()):
-        raise ValidationError({'list_id': 'This destination does not have enough file storage. Remove a backed-up file before moving the task.'})
+    moving = task.attachments.filter(is_deleted=False).count()
+    if not files_allowed(moving + quota_files(owner_id).exclude(task=task).count()):
+        raise ValidationError({'list_id': 'This destination already holds as many files as it can. Remove a backed-up file before moving the task.'})
+
+
+def sweep(now=None):
+    """Delete the files of tasks completed over ATTACHMENT_RETENTION_DAYS ago, for every account,
+    from storage. A file added after its task was completed gets the same days from when it was
+    added. Completions from before the server kept times count from the task's last change.
+    Usage stays counted. Run daily by maintain_staging; returns how many files went."""
+    cutoff = (now or timezone.now()) - timedelta(days=settings.ATTACHMENT_RETENTION_DAYS)
+    expired = Attachment.objects.annotate(done_at=Coalesce("task__completed_at", "task__updated_at")).filter(
+        is_deleted=False, task__is_completed=True, done_at__lte=cutoff, created_at__lte=cutoff)
+    removed = 0
+    while ids := list(expired.values_list("pk", flat=True)[:200]):
+        with transaction.atomic():
+            # Checked again under the lock: a task reopened meanwhile keeps its files.
+            rows = list(expired.filter(pk__in=ids).select_for_update(of=("self",)))
+            Attachment.objects.filter(pk__in=[row.pk for row in rows]).update(is_deleted=True, updated_at=timezone.now())
+            for row in rows:
+                transaction.on_commit(lambda file=row.file: _remove_blob(file))
+        if not rows:
+            break  # Reopened meanwhile; nothing else matched.
+        removed += len(rows)
+    return removed
 
 
 class AttachmentViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -166,7 +227,7 @@ class AttachmentViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewse
                 task, _ = lock_task(data["task_id"], request.user)
                 if task is None or task.is_deleted:
                     raise NotFound()
-                quota_owner = task.task_list.owner_id if task.task_list_id else task.owner_id
+                quota_owner = quota_owner_id(task)
                 list(User.objects.select_for_update().filter(pk__in={quota_owner, request.user.pk}).order_by('pk'))
                 existing = Attachment.objects.select_for_update().filter(pk=pk).first()
                 if existing is not None:
@@ -183,21 +244,22 @@ class AttachmentViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewse
                         stored = existing.file
                         existing.save(update_fields=["file", "updated_at"])
                     return Response(self.get_serializer(existing).data)
-                rows = quota_files(quota_owner)
-                used = rows.aggregate(total=Sum("size"))["total"] or 0
-                if not storage_allows(quota_owner, used + upload.size, rows.count() + 1):
-                    raise StorageFull()
                 if Attachment.objects.filter(task=task, is_deleted=False).count() >= 20:
                     raise ValidationError({"file": "Use at most 20 backed-up attachments per task."})
+                check_upload(quota_owner, upload.size)
                 item = Attachment(id=pk, owner=request.user, task=task, name=data["name"], size=upload.size, sha256=checksum)
                 item.file.save("upload.blob", upload, save=False)
                 stored = item.file
                 item.save(force_insert=True)
+                charge_upload(quota_owner, upload.size)
             return Response(self.get_serializer(item).data, status=201)
-        except StorageFull:
-            # Numbers only for the user's own storage: a member can't free the owner's space.
-            body = {"code": "storage_full", "shared": quota_owner != request.user.pk,
-                    "detail": "The account or list owner's file storage is full. Remove a backed-up file before uploading another."}
+        except StorageFull as full:
+            # Numbers only for the user's own allowance: a member can't change the owner's.
+            detail = {"lifetime": "The account or project owner has used all the file uploads included without Pro.",
+                      "month": "The account or project owner has used this month's file uploads. More are available next month.",
+                      "files": "The account or project owner holds as many files as it can. Remove a backed-up file first."}
+            body = {"code": "storage_full", "shared": quota_owner != request.user.pk, "limit": full.limit,
+                    "detail": detail[full.limit]}
             if not body["shared"]:
                 body["storage"] = storage_usage(request.user)
             return Response(body, status=400)

@@ -2,13 +2,14 @@ from datetime import timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+from core.attachment_views import sweep as sweep_attachments
 from core.email_delivery import deliver_email
 from core.meetings import sweep as sweep_meetings
 from core.models import EmailDelivery, PasswordReset, RuntimeState
 
 
 class Command(BaseCommand):
-    help = "Retry pending transactional email and remove expired operational state. Never deletes tasks or attachments."
+    help = "Retry pending transactional email, remove expired operational state, and delete the files of tasks completed over 15 days ago. Never deletes tasks."
 
     def handle(self, *args, **options):
         now = timezone.now()
@@ -24,4 +25,7 @@ class Command(BaseCommand):
         PasswordReset.objects.filter(expires_at__lt=now - timedelta(hours=1)).delete()
         # Meetings whose last piece arrived over 30 days ago, finished or not (MN-27).
         meetings = sweep_meetings(now)
-        self.stdout.write(f"Maintenance complete; {processed} pending messages processed; {meetings} old meetings deleted.")
+        # Files of tasks completed over ATTACHMENT_RETENTION_DAYS ago, for every account. Usage stays counted.
+        files = sweep_attachments(now)
+        self.stdout.write(f"Maintenance complete; {processed} pending messages processed; {meetings} old meetings deleted; "
+                          f"{files} files of completed tasks deleted.")

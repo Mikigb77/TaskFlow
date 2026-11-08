@@ -1495,7 +1495,7 @@ void main() {
   );
 
   test(
-    'UX-1638: storageFull keeps «(100 MB).» together with a non-breaking space, in EN, ES and CA',
+    'UX-1638: storageFull keeps «200 MB» together with a non-breaking space, in EN, ES and CA',
     () {
       for (final language in ['en', 'es', 'ca']) {
         expect(
@@ -1510,16 +1510,16 @@ void main() {
         );
       }
       expect(
-        lookupAppLocalizations(const Locale('en')).storageFull(100),
-        'Your file space is full (100 MB).',
+        lookupAppLocalizations(const Locale('en')).storageFull(200),
+        'You’ve used the 200\u00a0MB of files included for free.',
       );
       expect(
-        lookupAppLocalizations(const Locale('es')).storageFull(100),
-        'Tu espacio para archivos está lleno (100 MB).',
+        lookupAppLocalizations(const Locale('es')).storageFull(200),
+        'Has usado los 200\u00a0MB de archivos incluidos gratis.',
       );
       expect(
-        lookupAppLocalizations(const Locale('ca')).storageFull(100),
-        'El teu espai per a fitxers és ple (100 MB).',
+        lookupAppLocalizations(const Locale('ca')).storageFull(200),
+        'Has fet servir els 200\u00a0MB de fitxers inclosos de franc.',
       );
     },
   );

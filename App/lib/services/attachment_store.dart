@@ -7,13 +7,6 @@ import 'package:agenda/services/task_database.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
-/// How many files a task holds, and their total size in bytes.
-class TaskFileUsage {
-  const TaskFileUsage(this.count, this.bytes);
-  final int count;
-  final int bytes;
-}
-
 /// File transfers have their own durable identities and never advance the
 /// task's content version. A failed transfer cannot undo a saved task.
 class AttachmentStore {
@@ -38,26 +31,6 @@ class AttachmentStore {
             orderBy: 'rowid'))
         .map(TaskAttachment.fromMap)
         .toList();
-  }
-
-  /// The files each task holds on the server, by the task's local id:
-  /// uploaded, not deleted, not waiting to be removed, and not refused for a
-  /// full file space. A file still waiting to upload uses none of the space
-  /// yet.
-  Future<Map<int, TaskFileUsage>> usageByTask() async {
-    final rows = await (await database.database).rawQuery('''
-      SELECT t.id AS task, COUNT(*) AS files, SUM(a.size) AS bytes
-      FROM task_attachments a
-      JOIN tasks t ON t.owner_key = a.owner_key AND t.sync_id = a.task_id
-      WHERE a.owner_key = ? AND t.is_deleted = 0 AND a.is_deleted = 0
-        AND a.remote = 1 AND a.delete_pending = 0
-        AND (a.error IS NULL OR a.error NOT IN (?, ?))
-      GROUP BY t.id''', [owner, ..._refusedArgs]);
-    return {
-      for (final row in rows)
-        row['task'] as int:
-            TaskFileUsage(row['files'] as int, row['bytes'] as int? ?? 0),
-    };
   }
 
   Future<TaskAttachment?> _get(String id) async {
@@ -134,9 +107,10 @@ class AttachmentStore {
     });
   }
 
-  static const _refused = 'error IN (?, ?)';
+  static const _refused = 'error IN (?, ?, ?)';
   static const _refusedArgs = [
     TaskAttachment.storageFull,
+    TaskAttachment.storageMonthFull,
     TaskAttachment.storageFullShared
   ];
 
@@ -145,8 +119,8 @@ class AttachmentStore {
           where: 'owner_key = ? AND $_refused${id == null ? '' : ' AND id = ?'}',
           whereArgs: [owner, ..._refusedArgs, ?id]);
 
-  /// Sync again an upload the server refused for a full file space: one file
-  /// on its Retry, or every one when Pro turns on.
+  /// Sync again an upload the server refused for a used-up allowance: one
+  /// file on its Retry, or every one when Pro turns on.
   Future<void> retryRefused([String? id]) async =>
       _releaseRefused(await database.database, id);
 
@@ -219,9 +193,10 @@ class AttachmentStore {
   String _error(Object error) {
     // A full file space is kept as a token, never the server's English text.
     if (_storageFull(error)) {
-      final shared = (error as ApiException).body!['shared'] == true;
-      return shared
-          ? TaskAttachment.storageFullShared
+      final body = (error as ApiException).body!;
+      if (body['shared'] == true) return TaskAttachment.storageFullShared;
+      return body['limit'] == 'month'
+          ? TaskAttachment.storageMonthFull
           : TaskAttachment.storageFull;
     }
     return error is ApiException

@@ -336,22 +336,19 @@ void settingsPreviews() {
     preview(
       pro,
       'file-space-full',
-      'The file space full, 100 of 100 MB: after what Pro gives, «Ver tareas con archivos» under the usage line.',
+      'A free account has uploaded its 200 MB: «Archivos subidos: 200 de 200 MB» after what Pro gives.',
       [es1, es2, ca2],
       (p) async {
         final app = await PreviewApp.open(
           p,
           tasks: normalDay(),
           pro: false,
-          user: account(freeLeft: 4, storageMb: 100),
+          user: account(freeLeft: 4, storageMb: 200),
           billing: FakeRevenueCat()..info = billingInfo(),
         );
         await app.push('/subscription');
-        // At large text the button sits below the fold: show it with the
-        // usage line above it.
-        await p.tester.ensureVisible(find.text(p.l.storageSeeTasks));
-        await p.tester.pumpAndSettle();
-        await p.tester.drag(app.mainScroll(), const Offset(0, 200));
+        // At large text the line sits below the fold.
+        await p.tester.ensureVisible(find.text(p.l.storageUsage(200, 200)));
         await p.tester.pumpAndSettle();
         await p.shoot();
       },
