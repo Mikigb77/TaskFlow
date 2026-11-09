@@ -1,5 +1,6 @@
 import 'package:agenda/l10n/region.dart';
 import 'package:flutter/material.dart';
+import 'package:agenda/widgets/ambient.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/providers/theme_provider.dart';
 import 'package:agenda/providers/auth_provider.dart';
@@ -76,6 +77,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
         ? null
         : context.l10n.freeVoiceLeft(freeLeft);
     return Scaffold(
+      backgroundColor: AmbientBackdrop.scaffoldColor(context),
       appBar: CustomAppBar(title: context.l10n.settings, isRoot: true),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 10),

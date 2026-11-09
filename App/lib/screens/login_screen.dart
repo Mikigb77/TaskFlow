@@ -15,6 +15,7 @@ import 'package:agenda/services/invitation_links.dart';
 import 'package:agenda/services/development_login.dart';
 import 'package:agenda/services/pending_verification.dart';
 import 'package:agenda/services/site_links.dart';
+import 'package:agenda/widgets/ambient.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/google_login_button.dart';
 import 'package:agenda/widgets/language_selector.dart';
@@ -525,609 +526,680 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         value: Theme.of(context).appBarTheme.systemOverlayStyle!,
         child: Scaffold(
           key: const ValueKey('login-screen'),
-          body: SafeArea(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 488),
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  children: [
-                    Row(
-                      children: [
-                        const Expanded(child: AuthBrand()),
-                        IconButton(
-                          tooltip: strings.language,
-                          onPressed: () => showLanguageSelector(context),
-                          icon: const Icon(Icons.translate_rounded, size: 21),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 32),
-                    // Right after deleting the account; gone on the next try.
-                    if (auth.deleted) ...[
-                      MessageBanner(
-                        strings.accountDeleted,
-                        key: const ValueKey('account-deleted'),
-                        liveRegion: true,
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    DecoratedBox(
-                      decoration: authCardDecoration(colors),
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            AuthHeading(
-                              _recover
-                                  ? strings.recoveryHeading
-                                  : _register
-                                  ? strings.registerHeading
-                                  : folded
-                                  // New and returning people alike start here.
-                                  ? strings.signInOrUpHeading
-                                  : strings.signInHeading,
-                            ),
-                            const SizedBox(height: 10),
-                            // Its own node, read after the heading.
-                            Semantics(
-                              container: true,
-                              child: Text(
-                                _recover
-                                    ? strings.recoveryHelp
-                                    : widget.signInAgain
-                                    ? strings.signInAgainReason
-                                    : strings.authPitch,
-                                style: TextStyle(
-                                  color: colors.onSurfaceVariant,
-                                  height: 1.55,
+          // Colour drifts behind sign-in and motes of light rise through it,
+          // as on the website and Lucid Saga (ambient.dart).
+          body: AmbientBackdrop(
+            child: Stack(
+              children: [
+                const Positioned.fill(child: Motes()),
+                SafeArea(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 488),
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        children: [
+                          Row(
+                            children: [
+                              const Expanded(child: AuthBrand()),
+                              IconButton(
+                                tooltip: strings.language,
+                                onPressed: () => showLanguageSelector(context),
+                                icon: const Icon(
+                                  Icons.translate_rounded,
+                                  size: 21,
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 24),
-                            if (invitation && !_recover) ...[
-                              MessageBanner(
-                                strings.invitationWaitingSignIn,
-                                key: const ValueKey('invitation-waiting'),
-                                icon: Icons.mail_outline_rounded,
-                              ),
-                              const SizedBox(height: 16),
                             ],
-                            if (!_recover && google.supported) ...[
-                              GoogleLoginButton(
-                                key: const ValueKey('google-sign-in'),
-                                label: strings.continueWithGoogle,
-                                onPressed: busy || !google.configured
-                                    ? null
-                                    : _googleSignIn,
-                              ),
-                              if (!google.configured)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 12),
-                                  child: Text(
-                                    strings.googleSignInSetupPending,
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: colors.onSurfaceVariant,
-                                      fontSize: 12,
+                          ),
+                          const SizedBox(height: 32),
+                          // Right after deleting the account; gone on the next try.
+                          if (auth.deleted) ...[
+                            MessageBanner(
+                              strings.accountDeleted,
+                              key: const ValueKey('account-deleted'),
+                              liveRegion: true,
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          DecoratedBox(
+                            decoration: authCardDecoration(colors),
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  AuthHeading(
+                                    _recover
+                                        ? strings.recoveryHeading
+                                        : _register
+                                        ? strings.registerHeading
+                                        : folded
+                                        // New and returning people alike start here.
+                                        ? strings.signInOrUpHeading
+                                        : strings.signInHeading,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  // Its own node, read after the heading.
+                                  Semantics(
+                                    container: true,
+                                    child: Text(
+                                      _recover
+                                          ? strings.recoveryHelp
+                                          : widget.signInAgain
+                                          ? strings.signInAgainReason
+                                          : strings.authPitch,
+                                      style: TextStyle(
+                                        color: colors.onSurfaceVariant,
+                                        height: 1.55,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              if (folded) ...[
-                                const SizedBox(height: 12),
-                                TextButton(
-                                  key: const ValueKey('continue-with-email'),
-                                  onPressed: busy ? null : _openEmail,
-                                  child: Text(
-                                    strings.continueWithEmail,
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ] else ...[
-                                const SizedBox(height: 20),
-                                // Seen, not read: «o» alone means nothing.
-                                ExcludeSemantics(
-                                  child: Row(
-                                    children: [
-                                      const Expanded(child: Divider()),
+                                  const SizedBox(height: 24),
+                                  if (invitation && !_recover) ...[
+                                    MessageBanner(
+                                      strings.invitationWaitingSignIn,
+                                      key: const ValueKey('invitation-waiting'),
+                                      icon: Icons.mail_outline_rounded,
+                                    ),
+                                    const SizedBox(height: 16),
+                                  ],
+                                  if (!_recover && google.supported) ...[
+                                    GoogleLoginButton(
+                                      key: const ValueKey('google-sign-in'),
+                                      label: strings.continueWithGoogle,
+                                      onPressed: busy || !google.configured
+                                          ? null
+                                          : _googleSignIn,
+                                    ),
+                                    if (!google.configured)
                                       Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 14,
-                                        ),
+                                        padding: const EdgeInsets.only(top: 12),
                                         child: Text(
-                                          strings.authOr,
+                                          strings.googleSignInSetupPending,
+                                          textAlign: TextAlign.center,
                                           style: TextStyle(
                                             color: colors.onSurfaceVariant,
                                             fontSize: 12,
                                           ),
                                         ),
                                       ),
-                                      const Expanded(child: Divider()),
+                                    if (folded) ...[
+                                      const SizedBox(height: 12),
+                                      TextButton(
+                                        key: const ValueKey(
+                                          'continue-with-email',
+                                        ),
+                                        onPressed: busy ? null : _openEmail,
+                                        child: Text(
+                                          strings.continueWithEmail,
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    ] else ...[
+                                      const SizedBox(height: 20),
+                                      // Seen, not read: «o» alone means nothing.
+                                      ExcludeSemantics(
+                                        child: Row(
+                                          children: [
+                                            const Expanded(child: Divider()),
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 14,
+                                                  ),
+                                              child: Text(
+                                                strings.authOr,
+                                                style: TextStyle(
+                                                  color:
+                                                      colors.onSurfaceVariant,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ),
+                                            const Expanded(child: Divider()),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(height: 20),
                                     ],
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-                              ],
-                            ],
-                            if (!folded)
-                              Form(
-                                key: _form,
-                                child: AutofillGroup(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      if (_showsEmail) ...[
-                                        KeyedSubtree(
-                                          key: _emailField,
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.stretch,
-                                            children: [
-                                              TextFormField(
-                                                key: const ValueKey(
-                                                  'account-email',
-                                                ),
-                                                controller: _email,
-                                                focusNode: _emailFocus,
-                                                enabled: !busy,
-                                                keyboardType:
-                                                    TextInputType.emailAddress,
-                                                autocorrect: false,
-                                                autofillHints: const [
-                                                  AutofillHints.username,
-                                                ],
-                                                textInputAction:
-                                                    _recover &&
-                                                        !_hasRecoveryCode
-                                                    ? TextInputAction.done
-                                                    : TextInputAction.next,
-                                                onFieldSubmitted:
-                                                    _recover &&
-                                                        !_hasRecoveryCode
-                                                    ? (_) => _submit()
-                                                    : null,
-                                                onChanged: (_) {
-                                                  if (_accountExists) {
-                                                    setState(
-                                                      () => _accountExists =
-                                                          false,
-                                                    );
-                                                  }
-                                                  if (emailError != null) {
-                                                    _clearProblem();
-                                                  }
-                                                },
-                                                decoration: InputDecoration(
-                                                  labelText: strings.email,
-                                                  // Above the field, at its
-                                                  // smaller size: whole at 2×.
-                                                  floatingLabelBehavior:
-                                                      FloatingLabelBehavior
-                                                          .always,
-                                                  errorText: emailError,
-                                                  errorMaxLines: 4,
-                                                ),
-                                                validator: (value) =>
-                                                    value == null ||
-                                                        !value.contains('@')
-                                                    ? strings.enterEmail
-                                                    : null,
-                                              ),
-                                              if (emailUsed) ...[
-                                                const SizedBox(height: 12),
-                                                OutlinedButton(
-                                                  key: const ValueKey(
-                                                    'sign-in-with-email',
-                                                  ),
-                                                  onPressed: busy
-                                                      ? null
-                                                      : () => _mode(
-                                                          accountExists: true,
+                                  ],
+                                  if (!folded)
+                                    Form(
+                                      key: _form,
+                                      child: AutofillGroup(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: [
+                                            if (_showsEmail) ...[
+                                              KeyedSubtree(
+                                                key: _emailField,
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment
+                                                          .stretch,
+                                                  children: [
+                                                    TextFormField(
+                                                      key: const ValueKey(
+                                                        'account-email',
+                                                      ),
+                                                      controller: _email,
+                                                      focusNode: _emailFocus,
+                                                      enabled: !busy,
+                                                      keyboardType:
+                                                          TextInputType
+                                                              .emailAddress,
+                                                      autocorrect: false,
+                                                      autofillHints: const [
+                                                        AutofillHints.username,
+                                                      ],
+                                                      textInputAction:
+                                                          _recover &&
+                                                              !_hasRecoveryCode
+                                                          ? TextInputAction.done
+                                                          : TextInputAction
+                                                                .next,
+                                                      onFieldSubmitted:
+                                                          _recover &&
+                                                              !_hasRecoveryCode
+                                                          ? (_) => _submit()
+                                                          : null,
+                                                      onChanged: (_) {
+                                                        if (_accountExists) {
+                                                          setState(
+                                                            () =>
+                                                                _accountExists =
+                                                                    false,
+                                                          );
+                                                        }
+                                                        if (emailError !=
+                                                            null) {
+                                                          _clearProblem();
+                                                        }
+                                                      },
+                                                      decoration: InputDecoration(
+                                                        labelText:
+                                                            strings.email,
+                                                        // Above the field, at its
+                                                        // smaller size: whole at 2×.
+                                                        floatingLabelBehavior:
+                                                            FloatingLabelBehavior
+                                                                .always,
+                                                        errorText: emailError,
+                                                        errorMaxLines: 4,
+                                                      ),
+                                                      validator: (value) =>
+                                                          value == null ||
+                                                              !value.contains(
+                                                                '@',
+                                                              )
+                                                          ? strings.enterEmail
+                                                          : null,
+                                                    ),
+                                                    if (emailUsed) ...[
+                                                      const SizedBox(
+                                                        height: 12,
+                                                      ),
+                                                      OutlinedButton(
+                                                        key: const ValueKey(
+                                                          'sign-in-with-email',
                                                         ),
-                                                  child: Text(
-                                                    strings.signInWithEmail,
-                                                    textAlign: TextAlign.center,
-                                                  ),
+                                                        onPressed: busy
+                                                            ? null
+                                                            : () => _mode(
+                                                                accountExists:
+                                                                    true,
+                                                              ),
+                                                        child: Text(
+                                                          strings
+                                                              .signInWithEmail,
+                                                          textAlign:
+                                                              TextAlign.center,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ],
                                                 ),
+                                              ),
+                                              const SizedBox(height: 16),
+                                            ],
+                                            if (_recover &&
+                                                _hasRecoveryCode) ...[
+                                              if (_sentTo
+                                                  case final sentTo?) ...[
+                                                MessageBanner(
+                                                  _codeRenewed
+                                                      ? strings
+                                                            .recoveryCodeRenewed(
+                                                              breakableAddress(
+                                                                sentTo,
+                                                              ),
+                                                            )
+                                                      : strings
+                                                            .recoveryEmailRequested(
+                                                              breakableAddress(
+                                                                sentTo,
+                                                              ),
+                                                            ),
+                                                  key: _sent,
+                                                  icon: Icons
+                                                      .mail_outline_rounded,
+                                                  // The answer to the code typed:
+                                                  // read out as it appears.
+                                                  liveRegion: _codeRenewed,
+                                                ),
+                                                const SizedBox(height: 16),
                                               ],
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                      ],
-                                      if (_recover && _hasRecoveryCode) ...[
-                                        if (_sentTo case final sentTo?) ...[
-                                          MessageBanner(
-                                            _codeRenewed
-                                                ? strings.recoveryCodeRenewed(
-                                                    breakableAddress(sentTo),
-                                                  )
-                                                : strings
-                                                      .recoveryEmailRequested(
-                                                        breakableAddress(
-                                                          sentTo,
-                                                        ),
+                                              KeyedSubtree(
+                                                key: _codeField,
+                                                child: TextFormField(
+                                                  key: const ValueKey(
+                                                    'account-recovery-code',
+                                                  ),
+                                                  controller: _code,
+                                                  focusNode: _codeFocus,
+                                                  enabled: !busy,
+                                                  // The verify screen's setup: the
+                                                  // number pad, the code autofilled.
+                                                  keyboardType:
+                                                      TextInputType.number,
+                                                  autofillHints: const [
+                                                    AutofillHints.oneTimeCode,
+                                                  ],
+                                                  autocorrect: false,
+                                                  enableSuggestions: false,
+                                                  inputFormatters: [
+                                                    FilteringTextInputFormatter
+                                                        .digitsOnly,
+                                                    LengthLimitingTextInputFormatter(
+                                                      VerifyEmailScreen
+                                                          .codeLength,
+                                                    ),
+                                                  ],
+                                                  onChanged: (_) {
+                                                    if (_codeWrong) {
+                                                      setState(
+                                                        () =>
+                                                            _codeWrong = false,
+                                                      );
+                                                    }
+                                                  },
+                                                  textInputAction:
+                                                      TextInputAction.next,
+                                                  decoration: InputDecoration(
+                                                    // On the border like the other
+                                                    // fields. At large text it is the
+                                                    // longest label: it shrinks to
+                                                    // stay whole rather than cut.
+                                                    label: FittedBox(
+                                                      fit: BoxFit.scaleDown,
+                                                      alignment:
+                                                          AlignmentDirectional
+                                                              .centerStart,
+                                                      child: Text(
+                                                        strings.recoveryCode,
                                                       ),
-                                            key: _sent,
-                                            icon: Icons.mail_outline_rounded,
-                                            // The answer to the code typed:
-                                            // read out as it appears.
-                                            liveRegion: _codeRenewed,
-                                          ),
-                                          const SizedBox(height: 16),
-                                        ],
-                                        KeyedSubtree(
-                                          key: _codeField,
-                                          child: TextFormField(
-                                            key: const ValueKey(
-                                              'account-recovery-code',
-                                            ),
-                                            controller: _code,
-                                            focusNode: _codeFocus,
-                                            enabled: !busy,
-                                            // The verify screen's setup: the
-                                            // number pad, the code autofilled.
-                                            keyboardType: TextInputType.number,
-                                            autofillHints: const [
-                                              AutofillHints.oneTimeCode,
-                                            ],
-                                            autocorrect: false,
-                                            enableSuggestions: false,
-                                            inputFormatters: [
-                                              FilteringTextInputFormatter
-                                                  .digitsOnly,
-                                              LengthLimitingTextInputFormatter(
-                                                VerifyEmailScreen.codeLength,
-                                              ),
-                                            ],
-                                            onChanged: (_) {
-                                              if (_codeWrong) {
-                                                setState(
-                                                  () => _codeWrong = false,
-                                                );
-                                              }
-                                            },
-                                            textInputAction:
-                                                TextInputAction.next,
-                                            decoration: InputDecoration(
-                                              // On the border like the other
-                                              // fields. At large text it is the
-                                              // longest label: it shrinks to
-                                              // stay whole rather than cut.
-                                              label: FittedBox(
-                                                fit: BoxFit.scaleDown,
-                                                alignment: AlignmentDirectional
-                                                    .centerStart,
-                                                child: Text(
-                                                  strings.recoveryCode,
+                                                    ),
+                                                    floatingLabelBehavior:
+                                                        FloatingLabelBehavior
+                                                            .always,
+                                                    errorText: _codeWrong
+                                                        ? strings
+                                                              .verifyEmailCodeInvalid
+                                                        : null,
+                                                    errorMaxLines: 4,
+                                                  ),
+                                                  validator: (value) =>
+                                                      value == null ||
+                                                          value.length !=
+                                                              VerifyEmailScreen
+                                                                  .codeLength
+                                                      ? strings
+                                                            .verifyEmailCodeLength
+                                                      : null,
                                                 ),
                                               ),
-                                              floatingLabelBehavior:
-                                                  FloatingLabelBehavior.always,
-                                              errorText: _codeWrong
-                                                  ? strings
-                                                        .verifyEmailCodeInvalid
-                                                  : null,
-                                              errorMaxLines: 4,
-                                            ),
-                                            validator: (value) =>
-                                                value == null ||
-                                                    value.length !=
-                                                        VerifyEmailScreen
-                                                            .codeLength
-                                                ? strings.verifyEmailCodeLength
-                                                : null,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                      ],
-                                      if (_showsPassword)
-                                        KeyedSubtree(
-                                          key: _passwordField,
-                                          child: TextFormField(
-                                            key: const ValueKey(
-                                              'account-password',
-                                            ),
-                                            controller: _password,
-                                            enabled: !busy,
-                                            obscureText: !_showPassword,
-                                            enableSuggestions: false,
-                                            autocorrect: false,
-                                            textInputAction:
-                                                TextInputAction.done,
-                                            onFieldSubmitted: (_) => _submit(),
-                                            onChanged: (_) {
-                                              if (passwordError != null) {
-                                                _clearProblem();
-                                              }
-                                            },
-                                            autofillHints: [
-                                              _register || _recover
-                                                  ? AutofillHints.newPassword
-                                                  : AutofillHints.password,
+                                              const SizedBox(height: 16),
                                             ],
-                                            decoration: InputDecoration(
-                                              labelText: _recover
-                                                  ? strings.newPassword
-                                                  : strings.password,
-                                              floatingLabelBehavior:
-                                                  FloatingLabelBehavior.always,
-                                              errorText: passwordError,
-                                              errorMaxLines: 6,
-                                              helperMaxLines: 3,
-                                              helperText: _register || _recover
-                                                  ? strings.passwordHelp
-                                                  : null,
-                                              suffixIcon: IconButton(
-                                                tooltip: _showPassword
-                                                    ? strings.hidePassword
-                                                    : strings.showPassword,
-                                                onPressed: busy
-                                                    ? null
-                                                    : () => setState(
-                                                        () => _showPassword =
-                                                            !_showPassword,
+                                            if (_showsPassword)
+                                              KeyedSubtree(
+                                                key: _passwordField,
+                                                child: TextFormField(
+                                                  key: const ValueKey(
+                                                    'account-password',
+                                                  ),
+                                                  controller: _password,
+                                                  enabled: !busy,
+                                                  obscureText: !_showPassword,
+                                                  enableSuggestions: false,
+                                                  autocorrect: false,
+                                                  textInputAction:
+                                                      TextInputAction.done,
+                                                  onFieldSubmitted: (_) =>
+                                                      _submit(),
+                                                  onChanged: (_) {
+                                                    if (passwordError != null) {
+                                                      _clearProblem();
+                                                    }
+                                                  },
+                                                  autofillHints: [
+                                                    _register || _recover
+                                                        ? AutofillHints
+                                                              .newPassword
+                                                        : AutofillHints
+                                                              .password,
+                                                  ],
+                                                  decoration: InputDecoration(
+                                                    labelText: _recover
+                                                        ? strings.newPassword
+                                                        : strings.password,
+                                                    floatingLabelBehavior:
+                                                        FloatingLabelBehavior
+                                                            .always,
+                                                    errorText: passwordError,
+                                                    errorMaxLines: 6,
+                                                    helperMaxLines: 3,
+                                                    helperText:
+                                                        _register || _recover
+                                                        ? strings.passwordHelp
+                                                        : null,
+                                                    suffixIcon: IconButton(
+                                                      tooltip: _showPassword
+                                                          ? strings.hidePassword
+                                                          : strings
+                                                                .showPassword,
+                                                      onPressed: busy
+                                                          ? null
+                                                          : () => setState(
+                                                              () => _showPassword =
+                                                                  !_showPassword,
+                                                            ),
+                                                      icon: Icon(
+                                                        _showPassword
+                                                            ? Icons
+                                                                  .visibility_off_outlined
+                                                            : Icons
+                                                                  .visibility_outlined,
+                                                        size: 20,
                                                       ),
-                                                icon: Icon(
-                                                  _showPassword
-                                                      ? Icons
-                                                            .visibility_off_outlined
-                                                      : Icons
-                                                            .visibility_outlined,
-                                                  size: 20,
+                                                    ),
+                                                  ),
+                                                  // Length rules are for new passwords;
+                                                  // signing in only needs one typed.
+                                                  validator: (value) =>
+                                                      !_register && !_recover
+                                                      ? value == null ||
+                                                                value.isEmpty
+                                                            ? strings
+                                                                  .enterPassword
+                                                            : null
+                                                      : value == null ||
+                                                            value.length < 12
+                                                      ? strings.passwordTooShort
+                                                      : null,
+                                                ),
+                                              ),
+                                            // Hidden while the banner offers the same
+                                            // recovery as a button (UX-495).
+                                            if (!_recover &&
+                                                !_register &&
+                                                !(unknownAccount &&
+                                                    _accountExists))
+                                              Padding(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      vertical: 8,
+                                                    ),
+                                                child: Align(
+                                                  alignment:
+                                                      Alignment.centerRight,
+                                                  child: TextButton(
+                                                    onPressed: busy
+                                                        ? null
+                                                        : () => _mode(
+                                                            recover: true,
+                                                          ),
+                                                    child: Text(
+                                                      strings.forgotPassword,
+                                                      textAlign: TextAlign.end,
+                                                    ),
+                                                  ),
+                                                ),
+                                              )
+                                            else
+                                              const SizedBox(height: 20),
+                                            FilledButton(
+                                              key: const ValueKey(
+                                                'account-submit',
+                                              ),
+                                              onPressed: busy ? null : _submit,
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      vertical: 12,
+                                                    ),
+                                                child: Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    if (busy) ...[
+                                                      const SizedBox(
+                                                        width: 18,
+                                                        height: 18,
+                                                        child:
+                                                            CircularProgressIndicator(
+                                                              strokeWidth: 2,
+                                                            ),
+                                                      ),
+                                                      const SizedBox(width: 10),
+                                                    ],
+                                                    Flexible(
+                                                      child: Text(
+                                                        submitLabel,
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
                                               ),
                                             ),
-                                            // Length rules are for new passwords;
-                                            // signing in only needs one typed.
-                                            validator: (value) =>
-                                                !_register && !_recover
-                                                ? value == null || value.isEmpty
-                                                      ? strings.enterPassword
-                                                      : null
-                                                : value == null ||
-                                                      value.length < 12
-                                                ? strings.passwordTooShort
-                                                : null,
-                                          ),
+                                          ],
                                         ),
-                                      // Hidden while the banner offers the same
-                                      // recovery as a button (UX-495).
-                                      if (!_recover &&
-                                          !_register &&
-                                          !(unknownAccount && _accountExists))
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 8,
-                                          ),
-                                          child: Align(
-                                            alignment: Alignment.centerRight,
-                                            child: TextButton(
+                                      ),
+                                    ),
+                                  if (_message != null ||
+                                      (error != null && field == null))
+                                    Padding(
+                                      key: _outcome,
+                                      padding: const EdgeInsets.only(top: 16),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          if (_replaced && error == null)
+                                            MessageBanner(
+                                              _message!,
+                                              key: const ValueKey(
+                                                'signup-replaced',
+                                              ),
+                                              liveRegion: true,
+                                            )
+                                          else
+                                            MessageBanner(
+                                              problem ?? _message!,
+                                              isError: error != null,
+                                            ),
+                                          if (unknownAccount &&
+                                              _accountExists) ...[
+                                            const SizedBox(height: 12),
+                                            OutlinedButton(
+                                              key: const ValueKey(
+                                                'recover-with-email',
+                                              ),
                                               onPressed: busy
                                                   ? null
                                                   : () => _mode(recover: true),
                                               child: Text(
                                                 strings.forgotPassword,
-                                                textAlign: TextAlign.end,
+                                                textAlign: TextAlign.center,
                                               ),
                                             ),
-                                          ),
-                                        )
-                                      else
-                                        const SizedBox(height: 20),
-                                      FilledButton(
-                                        key: const ValueKey('account-submit'),
-                                        onPressed: busy ? null : _submit,
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 12,
-                                          ),
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              if (busy) ...[
-                                                const SizedBox(
-                                                  width: 18,
-                                                  height: 18,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                        strokeWidth: 2,
-                                                      ),
-                                                ),
-                                                const SizedBox(width: 10),
-                                              ],
-                                              Flexible(
-                                                child: Text(
-                                                  submitLabel,
-                                                  textAlign: TextAlign.center,
-                                                ),
+                                          ] else if (unknownAccount) ...[
+                                            const SizedBox(height: 12),
+                                            OutlinedButton(
+                                              key: const ValueKey(
+                                                'create-account-with-email',
                                               ),
-                                            ],
-                                          ),
-                                        ),
+                                              onPressed: busy
+                                                  ? null
+                                                  : () => _mode(register: true),
+                                              child: Text(
+                                                strings.createAccountWithEmail,
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            if (_message != null ||
-                                (error != null && field == null))
-                              Padding(
-                                key: _outcome,
-                                padding: const EdgeInsets.only(top: 16),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    if (_replaced && error == null)
-                                      MessageBanner(
-                                        _message!,
-                                        key: const ValueKey('signup-replaced'),
-                                        liveRegion: true,
-                                      )
-                                    else
-                                      MessageBanner(
-                                        problem ?? _message!,
-                                        isError: error != null,
-                                      ),
-                                    if (unknownAccount && _accountExists) ...[
-                                      const SizedBox(height: 12),
-                                      OutlinedButton(
-                                        key: const ValueKey(
-                                          'recover-with-email',
-                                        ),
+                                    ),
+                                  const SizedBox(height: 8),
+                                  if (_recover) ...[
+                                    if (!_hasRecoveryCode)
+                                      TextButton(
                                         onPressed: busy
                                             ? null
-                                            : () => _mode(recover: true),
+                                            : () => setState(
+                                                () => _hasRecoveryCode = true,
+                                              ),
                                         child: Text(
-                                          strings.forgotPassword,
+                                          strings.authHaveRecoveryCode,
                                           textAlign: TextAlign.center,
                                         ),
                                       ),
-                                    ] else if (unknownAccount) ...[
-                                      const SizedBox(height: 12),
-                                      OutlinedButton(
-                                        key: const ValueKey(
-                                          'create-account-with-email',
-                                        ),
-                                        onPressed: busy
-                                            ? null
-                                            : () => _mode(register: true),
-                                        child: Text(
-                                          strings.createAccountWithEmail,
-                                          textAlign: TextAlign.center,
-                                        ),
+                                    // Apart, so a tap on one doesn't land on the
+                                    // other.
+                                    if (!_hasRecoveryCode)
+                                      const SizedBox(height: 8),
+                                    TextButton(
+                                      onPressed: busy ? null : () => _mode(),
+                                      child: Text(strings.backToSignIn),
+                                    ),
+                                  ] else if (!folded &&
+                                      (!unknownAccount || _accountExists))
+                                    // Hidden while the banner offers the same
+                                    // create as a button.
+                                    TextButton(
+                                      onPressed: busy
+                                          ? null
+                                          : () => _mode(register: !_register),
+                                      child: Text(
+                                        _register
+                                            ? strings.alreadyHaveAccount
+                                            : strings.createAnAccount,
+                                        textAlign: TextAlign.center,
                                       ),
-                                    ],
-                                  ],
-                                ),
+                                    ),
+                                ],
                               ),
-                            const SizedBox(height: 8),
-                            if (_recover) ...[
-                              if (!_hasRecoveryCode)
-                                TextButton(
-                                  onPressed: busy
-                                      ? null
-                                      : () => setState(
-                                          () => _hasRecoveryCode = true,
-                                        ),
-                                  child: Text(
-                                    strings.authHaveRecoveryCode,
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              // Apart, so a tap on one doesn't land on the
-                              // other.
-                              if (!_hasRecoveryCode) const SizedBox(height: 8),
-                              TextButton(
-                                onPressed: busy ? null : () => _mode(),
-                                child: Text(strings.backToSignIn),
-                              ),
-                            ] else if (!folded &&
-                                (!unknownAccount || _accountExists))
-                              // Hidden while the banner offers the same
-                              // create as a button.
-                              TextButton(
-                                onPressed: busy
-                                    ? null
-                                    : () => _mode(register: !_register),
-                                child: Text(
-                                  _register
-                                      ? strings.alreadyHaveAccount
-                                      : strings.createAnAccount,
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    // Before an account is created, Google's included: the
-                    // terms must be available beforehand.
-                    if (!_recover && !widget.signInAgain)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Wrap(
-                          alignment: WrapAlignment.center,
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            for (final (page, label) in [
-                              (SitePage.privacy, strings.privacyPolicy),
-                              (SitePage.terms, strings.termsAndConditions),
-                            ])
-                              TextButton(
-                                key: ValueKey('site-${page.path}'),
-                                onPressed: () =>
-                                    openSitePage(context, ref, page),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: colors.onSurfaceVariant,
-                                  // Narrow enough that both fit on one line
-                                  // of a 360 dp phone, 8 dp apart.
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                  ),
-                                  textStyle: Theme.of(
-                                    context,
-                                  ).textTheme.bodySmall,
-                                ),
-                                child: Text(label, textAlign: TextAlign.center),
-                              ),
-                          ],
-                        ),
-                      ),
-                    if (DevelopmentLogin.enabled && !_register && !_recover)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            OutlinedButton.icon(
-                              key: const ValueKey('development-sign-in'),
-                              onPressed: busy ? null : _testSignIn,
-                              icon: const Icon(
-                                Icons.science_outlined,
-                                size: 20,
-                              ),
-                              label: Text(
-                                strings.useTestAccount,
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              strings.developmentOnly,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: colors.onSurfaceVariant,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    if (kDebugMode)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child: TextButton(
-                          onPressed: busy ? null : _connectionSettings,
-                          child: Text(
-                            strings.connectionSettings,
-                            style: TextStyle(
-                              color: colors.onSurfaceVariant,
-                              fontSize: 12,
                             ),
                           ),
-                        ),
+                          // Before an account is created, Google's included: the
+                          // terms must be available beforehand.
+                          if (!_recover && !widget.signInAgain)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Wrap(
+                                alignment: WrapAlignment.center,
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  for (final (page, label) in [
+                                    (SitePage.privacy, strings.privacyPolicy),
+                                    (
+                                      SitePage.terms,
+                                      strings.termsAndConditions,
+                                    ),
+                                  ])
+                                    TextButton(
+                                      key: ValueKey('site-${page.path}'),
+                                      onPressed: () =>
+                                          openSitePage(context, ref, page),
+                                      style: TextButton.styleFrom(
+                                        foregroundColor:
+                                            colors.onSurfaceVariant,
+                                        // Narrow enough that both fit on one line
+                                        // of a 360 dp phone, 8 dp apart.
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                        ),
+                                        textStyle: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall,
+                                      ),
+                                      child: Text(
+                                        label,
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          if (DevelopmentLogin.enabled &&
+                              !_register &&
+                              !_recover)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  OutlinedButton.icon(
+                                    key: const ValueKey('development-sign-in'),
+                                    onPressed: busy ? null : _testSignIn,
+                                    icon: const Icon(
+                                      Icons.science_outlined,
+                                      size: 20,
+                                    ),
+                                    label: Text(
+                                      strings.useTestAccount,
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    strings.developmentOnly,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: colors.onSurfaceVariant,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          if (kDebugMode)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: TextButton(
+                                onPressed: busy ? null : _connectionSettings,
+                                child: Text(
+                                  strings.connectionSettings,
+                                  style: TextStyle(
+                                    color: colors.onSurfaceVariant,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                  ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ),
@@ -1174,32 +1246,18 @@ class AuthBrand extends StatelessWidget {
   const AuthBrand({super.key});
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: colors.primary,
-            borderRadius: BorderRadius.circular(11),
-          ),
-          child: Icon(
-            Icons.done_all_rounded,
-            color: colors.onPrimary,
-            size: 21,
-          ),
-        ),
+        const BrandMark(size: 32),
         const SizedBox(width: 10),
         Flexible(
           child: Text(
             'taskflow',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontSize: 21),
+            style: Theme.of(context).textTheme.titleLarge
+                ?.copyWith(fontSize: 21),
           ),
         ),
       ],

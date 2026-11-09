@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:agenda/widgets/ambient.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/l10n/region.dart';
@@ -200,6 +201,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     final recording = ref.watch(
         meetingsProvider.select((meetings) => meetings.recording != null));
     return Scaffold(
+      backgroundColor: AmbientBackdrop.scaffoldColor(context),
       appBar: CustomAppBar(title: context.l10n.notes, isRoot: widget.isRoot),
       body: RefreshIndicator(
         onRefresh: () => ref.read(taskProvider.notifier).loadTasks(),
