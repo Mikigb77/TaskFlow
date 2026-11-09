@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the signed staging APK in GitHub Actions (.github/workflows/app-release.yml).
+# Builds the signed staging APK in GitHub Actions (.github/workflows/deploy.yml).
 # The same checks as build-staging.ps1, which stays the way to build it on the PC.
 #
 # Needs, from the repository's Actions secrets (App/scripts/upload-ci-secrets.sh):
