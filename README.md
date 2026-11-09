@@ -15,16 +15,19 @@ TaskFlow is a calendar-first task app for Android, built in Flutter, with a Djan
 
 ## From pull request to release
 
-Everything runs in GitHub Actions, so nothing needs your computer.
+Everything runs in GitHub Actions, so nothing needs your computer. There are two branches and two workflows:
+
+- **`dev`** is the default branch. Every pull request goes into `dev`.
+- **`main`** is production. A pull request from `dev` into `main` is a release, and merging it deploys.
 
 | When | What runs | Workflow |
 |---|---|---|
-| A pull request into `main` or `dev` touches `App/` | `flutter analyze` and the whole test suite, split across four machines that run at once | [`app-checks.yml`](.github/workflows/app-checks.yml) |
-| A pull request into `main` or `dev` touches `Backend/` | The Django tests | [`backend-checks.yml`](.github/workflows/backend-checks.yml) |
-| A merge into `main` changes the app | The same checks and the signed staging APK build, side by side; the APK is published as the newest [release](https://github.com/Mikigb77/TaskFlow/releases) | [`app-release.yml`](.github/workflows/app-release.yml) |
-| A merge into `main` changes the backend | Tests, then the staging API on Cloud Run: build, migrate, health check | [`deploy-backend.yml`](.github/workflows/deploy-backend.yml) |
+| A pull request into `dev` or `main` touches `App/` | `flutter analyze` and the whole test suite, split across four machines that run at once | **CI**, [`ci.yml`](.github/workflows/ci.yml) |
+| A pull request into `dev` or `main` touches `Backend/` | The Django tests and the Docker image build | **CI**, [`ci.yml`](.github/workflows/ci.yml) |
+| A merge into `main` changes the app | CI's app checks and the signed staging APK build, side by side; the APK is published as the newest [release](https://github.com/Mikigb77/TaskFlow/releases) | **Deploy**, [`deploy.yml`](.github/workflows/deploy.yml) |
+| A merge into `main` changes the backend | CI's backend checks, then the staging API on Cloud Run: build, migrate, health check | **Deploy**, [`deploy.yml`](.github/workflows/deploy.yml) |
 
-Every workflow can also be started by hand from **Actions → (workflow) → Run workflow** on `main`. The website deploys from its own repository the same way.
+Both workflows can also be started by hand from **Actions → CI** or **Actions → Deploy → Run workflow** on `main`; Deploy asks which parts to deploy. The website has the same two branches and workflows in its own repository.
 
 ### One-time setup
 

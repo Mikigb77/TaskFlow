@@ -1,0 +1,200 @@
+# Deploy: a merge into main is a release. main is production; work lands on
+# dev first, and a pull request from dev into main releases it. Each part
+# deploys only when what it is built from changed:
+#
+# - The API on Cloud Run, when Backend/ changes what the API's image is built
+#   from: CI's backend checks, then Backend/scripts/deploy-staging-ci.sh
+#   (build, migrate, replace the service, check /api/health/). Google sign-in
+#   is keyless (Workload Identity Federation), and only main of this repo can
+#   use it. One-time setup: TaskFlowWeb's scripts/dev/setup-github-deploy.sh.
+#   See Backend/docs/STAGING.md.
+# - The signed APK, when App/ changed: CI's app checks and the build run at
+#   the same time, and the APK is published as the newest GitHub release only
+#   when both pass, so the newest build is always at
+#   https://github.com/Mikigb77/TaskFlow/releases/latest/download/taskflow-staging.apk
+#   Same steps and guards as App/scripts/build-staging.ps1, in
+#   App/scripts/ci-build-staging.sh. One-time setup: the four secrets that
+#   App/scripts/upload-ci-secrets.sh uploads.
+#
+# A change to this file deploys both. By hand: Actions -> Deploy -> Run
+# workflow on main, choosing the parts.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      backend:
+        description: Deploy the API
+        type: boolean
+        default: true
+      app:
+        description: Build and publish the APK
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: 3.47.9 # keep in step with App/README.md and ci.yml
+  JAVA_VERSION: "26" # App/android/gradle/gradle-daemon-jvm.properties
+
+jobs:
+  changes:
+    name: What to deploy
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.diff.outputs.backend }}
+      app: ${{ steps.diff.outputs.app }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          MANUAL_BACKEND: ${{ inputs.backend }}
+          MANUAL_APP: ${{ inputs.app }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            backend=$MANUAL_BACKEND; app=$MANUAL_APP
+          elif [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            # A first push or a rewritten history: deploy everything.
+            backend=true; app=true
+          else
+            files=$(git diff --name-only "$BEFORE" "$GITHUB_SHA")
+            all=false; grep -qx '.github/workflows/deploy.yml' <<<"$files" && all=true
+            # What the API's image is built from.
+            backend=$all
+            grep -qE '^Backend/(core/|config/|templates/|manage\.py$|requirements\.(txt|lock)$|Dockerfile$|\.dockerignore$|scripts/(start-server|deploy-staging-ci)\.sh$)' <<<"$files" && backend=true
+            # The app, without its docs and Markdown.
+            app=$all
+            grep '^App/' <<<"$files" | grep -v '^App/docs/' | grep -qv '\.md$' && app=true
+          fi
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "app=$app" >> "$GITHUB_OUTPUT"
+          echo "Deploy the API: $backend. Release the APK: $app."
+
+  ci:
+    name: CI
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.app == 'true'
+    uses: ./.github/workflows/ci.yml
+    with:
+      backend: ${{ needs.changes.outputs.backend == 'true' }}
+      app: ${{ needs.changes.outputs.app == 'true' }}
+
+  api:
+    name: API on Cloud Run
+    needs: [changes, ci]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/177649734578/locations/global/workloadIdentityPools/github/providers/github
+          service_account: github-deployer@taskflow-511107.iam.gserviceaccount.com
+      - uses: google-github-actions/setup-gcloud@v3
+      - run: bash Backend/scripts/deploy-staging-ci.sh
+
+  apk:
+    name: Staging APK
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: App
+    outputs:
+      version: ${{ steps.build.outputs.version }}
+      code: ${{ steps.build.outputs.code }}
+      sha256: ${{ steps.build.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the build number counts the commits (ci-build-staging.sh)
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+
+      - name: Build and check the signed staging APK
+        id: build
+        env:
+          APP_STAGING_CONFIG: ${{ secrets.APP_STAGING_CONFIG }}
+          STAGING_KEYSTORE_BASE64: ${{ secrets.STAGING_KEYSTORE_BASE64 }}
+          STAGING_STORE_PASSWORD: ${{ secrets.STAGING_STORE_PASSWORD }}
+          STAGING_KEY_PASSWORD: ${{ secrets.STAGING_KEY_PASSWORD }}
+        run: bash scripts/ci-build-staging.sh
+
+      - name: Remove the signing material
+        if: always()
+        run: rm -rf .credentials config/staging.json
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: staging-apk
+          path: |
+            App/build/releases/taskflow-staging.apk
+            App/build/releases/staging-build.json
+          retention-days: 3
+          if-no-files-found: error
+
+  release:
+    name: Publish the APK release
+    needs: [ci, apk]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: staging-apk
+          path: releases
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.apk.outputs.version }}
+          CODE: ${{ needs.apk.outputs.code }}
+          SHA256: ${{ needs.apk.outputs.sha256 }}
+        run: |
+          echo "$SHA256  releases/taskflow-staging.apk" | sha256sum -c -
+          tag="staging-$VERSION-$CODE-${GITHUB_SHA::7}"
+          cp releases/taskflow-staging.apk "releases/taskflow-staging-$VERSION.apk"
+          {
+            echo "Staging build of TaskFlow $VERSION ($CODE), from $GITHUB_SHA on main."
+            echo
+            echo "Installs as **TaskFlow Staging** (com.example.agenda.staging) beside the normal app and talks to the staging API. Purchases use RevenueCat's Test Store."
+            echo
+            echo "SHA-256 of taskflow-staging.apk: \`$SHA256\`"
+          } > "$RUNNER_TEMP/notes.md"
+          files=(releases/taskflow-staging.apk "releases/taskflow-staging-$VERSION.apk" releases/staging-build.json)
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # A re-run of the same commit replaces its files.
+            gh release upload "$tag" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
+          else
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest \
+              --title "TaskFlow Staging $VERSION ($CODE)" --notes-file "$RUNNER_TEMP/notes.md" "${files[@]}"
+          fi

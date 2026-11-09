@@ -7,7 +7,7 @@ Neon branch and the marketing website deployment remain separate.
 ## Use the private Android build
 
 - Build: the newest [GitHub release](https://github.com/Mikigb77/TaskFlow/releases/latest/download/taskflow-staging.apk),
-  built from `main` by `.github/workflows/app-release.yml` and visible only to
+  built from `main` by `.github/workflows/deploy.yml` and visible only to
   people with access to the repository. A local build lands in
   `App/build/releases/taskflow-staging.apk`.
 - App label/package: **TaskFlow Staging**, `com.example.agenda.staging`.
@@ -93,7 +93,7 @@ set it up once:
    `bash Backend/scripts/set-staging-update-token.sh` and paste the token. It
    adds a new version of the secret, keeping every other value, and saves the
    token in `Backend/.credentials/` so `deploy-staging.ps1` keeps it.
-3. Deploy the backend: **Actions → Deploy backend → Run workflow** on `main`.
+3. Deploy the backend: **Actions → Deploy → Run workflow** on `main`, with only "Deploy the API" ticked.
 
 When the token expires, repeat the three steps with a new one.
 
@@ -192,13 +192,14 @@ stay on the backend and paid access is verified independently of the phone.
 **A merge into `main` deploys staging.** When a push to `main` changes what the
 API's image is built from (`core/`, `config/`, `templates/`, `manage.py`, the
 requirements, the Dockerfile or `scripts/start-server.sh`),
-`.github/workflows/deploy-backend.yml` runs the tests, then
+`.github/workflows/deploy.yml` (the **Deploy** workflow) runs the tests, then
 `Backend/scripts/deploy-staging-ci.sh`: it builds the image, pins the newest
 version of the `taskflow-api-staging-config` secret, migrates, redeploys the
 maintenance job, replaces the API service and checks `/api/health/`. To deploy
-again without a change, use **Actions → Deploy backend → Run workflow** on `main`.
+again without a change, use **Actions → Deploy → Run workflow** on `main`, with only "Deploy the API" ticked.
 Pull requests that touch `Backend/` run the tests first
-(`.github/workflows/backend-checks.yml`).
+(the **CI** workflow, `.github/workflows/ci.yml`). Pull requests go into `dev`;
+a pull request from `dev` into `main` is the release.
 
 Google sign-in is keyless (Workload Identity Federation), and only `main` can
 use it. The one-time setup is TaskFlowWeb's `scripts/dev/setup-github-deploy.sh`,

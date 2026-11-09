@@ -1,0 +1,151 @@
+# CI: the checks. Runs on every pull request into dev or main, and from Deploy
+# (deploy.yml) before a release. Each part runs only when its folder changed:
+#
+# - App/: the analyzer and the whole test suite, split across SHARDS machines
+#   that run at the same time (`flutter test --total-shards`), so it takes
+#   about a quarter of the time. Each machine spends about two minutes setting
+#   up, so more shards cost more Actions minutes for less gain.
+# - Backend/: the Django tests, and the Docker image the deploy builds.
+#
+# A change to this file runs both. A run by hand (Actions -> CI -> Run
+# workflow) runs both too.
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+  workflow_call:
+    inputs:
+      app:
+        description: Check the app
+        type: boolean
+        default: false
+      backend:
+        description: Check the backend
+        type: boolean
+        default: false
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # A newer push to a pull request cancels its older run. A release's checks
+  # are never cancelled, so every merge into main finishes its release.
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  FLUTTER_VERSION: 3.47.9 # keep in step with App/README.md and deploy.yml
+
+jobs:
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      app: ${{ steps.diff.outputs.app }}
+      backend: ${{ steps.diff.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2 # a pull request's merge commit and the base it merges into
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          # Set only when Deploy calls this workflow.
+          CALLED_APP: ${{ inputs.app }}
+          CALLED_BACKEND: ${{ inputs.backend }}
+        run: |
+          if [ -n "$CALLED_APP$CALLED_BACKEND" ]; then
+            app=$CALLED_APP; backend=$CALLED_BACKEND
+          elif [ "$EVENT" = "pull_request" ]; then
+            files=$(git diff --name-only HEAD^1 HEAD)
+            all=false; grep -qx '.github/workflows/ci.yml' <<<"$files" && all=true
+            app=$all; grep -q '^App/' <<<"$files" && app=true
+            backend=$all; grep -q '^Backend/' <<<"$files" && backend=true
+          else
+            app=true; backend=true
+          fi
+          echo "app=$app" >> "$GITHUB_OUTPUT"
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "Check the app: $app. Check the backend: $backend."
+
+  analyze:
+    name: App analyze
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: App
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze --no-pub
+
+  test:
+    name: App tests (${{ matrix.shard }} of 4)
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4] # keep --total-shards below in step
+    defaults:
+      run:
+        working-directory: App
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - run: flutter test --no-pub --total-shards=4 --shard-index=$(( ${{ matrix.shard }} - 1 ))
+
+  backend-tests:
+    name: Backend Django tests
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: Backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14" # the Docker image's Python
+          cache: pip
+          cache-dependency-path: Backend/requirements.lock
+      - run: pip install -r requirements.lock
+      - name: python manage.py test core
+        run: |
+          # Committed test settings with every key blank or fake: no test may
+          # reach a paid or real service, and no secret is needed.
+          set -a; . ./.env.ci; set +a
+          python manage.py test core --settings=config.test_settings
+
+  backend-image:
+    name: Backend Docker image builds
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      # The same build Cloud Build runs on a deploy; .dockerignore keeps .env out.
+      - run: docker build --pull --tag taskflow-api:check Backend
+      - name: The image starts its Python and imports Django
+        run: docker run --rm --entrypoint python taskflow-api:check -c "import django, gunicorn, psycopg; print(django.get_version())"
