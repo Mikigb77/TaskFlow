@@ -53,6 +53,9 @@ Future<void> main() async {
     yield LicenseEntryWithLineBreaks([
       'Manrope',
     ], await rootBundle.loadString('assets/fonts/OFL.txt'));
+    yield LicenseEntryWithLineBreaks([
+      'Bricolage Grotesque',
+    ], await rootBundle.loadString('assets/fonts/OFL-Bricolage.txt'));
   });
   final appearance = ThemeController(ThemePreferenceStore());
   final regional = RegionalController(RegionalPreferenceStore());

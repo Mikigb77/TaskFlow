@@ -263,8 +263,12 @@ class TaskTile extends ConsumerWidget {
           context.l10n.reschedule,
           Alignment.centerRight,
         ),
+        // White cards that float a little on the light page; on night the
+        // border alone sets them off.
         child: Material(
           color: color ?? colors.surface,
+          elevation: Theme.of(context).brightness == Brightness.dark ? 0 : 3,
+          shadowColor: Lagoon.accent.withValues(alpha: 0.22),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
             side: BorderSide(color: colors.outlineVariant),

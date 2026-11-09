@@ -15,6 +15,7 @@ import 'package:agenda/widgets/task_assignment_picker.dart';
 import 'package:agenda/widgets/task_planning_control.dart';
 import 'package:agenda/widgets/task_schedule_label.dart';
 import 'package:flutter/material.dart';
+import 'package:agenda/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// The same draft stays mounted as a compact card or a direct editor. All
@@ -1008,10 +1009,18 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
       ],
     );
     return widget.compact
+        // One white card per thing said, edged in mint, as on the website.
         ? Material(
-            color: colors.surfaceContainerLow,
+            color: colors.surface,
             shape: RoundedRectangleBorder(
-              side: BorderSide(color: colors.outlineVariant),
+              side: BorderSide(
+                color: Lagoon.hot.withValues(
+                  alpha: Theme.of(context).brightness == Brightness.dark
+                      ? 0.45
+                      : 0.7,
+                ),
+                width: 1.5,
+              ),
               borderRadius: BorderRadius.circular(22),
             ),
             clipBehavior: Clip.antiAlias,
