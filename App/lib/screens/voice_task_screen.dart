@@ -34,6 +34,7 @@ import 'package:agenda/services/bulk_plan.dart';
 import 'package:agenda/services/command_plan.dart';
 import 'package:agenda/services/command_runner.dart';
 import 'package:agenda/services/text_search.dart';
+import 'package:agenda/widgets/ambient.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/capture_command_cards.dart';
 import 'package:agenda/widgets/capture_review_editor.dart';
@@ -2776,7 +2777,17 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
       dimension: 72,
       child: Stack(
         alignment: Alignment.center,
+        clipBehavior: Clip.none,
         children: [
+          // Rings ripple out while it listens, wider as the voice gets
+          // louder (ambient.dart).
+          Positioned.fill(
+            child: VoiceRipples(
+              level: _level,
+              active: phase == _CapturePhase.listening,
+              color: colors.primary,
+            ),
+          ),
           SizedBox.expand(
             child: CircularProgressIndicator(
               value: switch (phase) {

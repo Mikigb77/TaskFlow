@@ -10,6 +10,7 @@ import 'package:agenda/widgets/project_scope_control.dart';
 import 'package:agenda/providers/task_lists_provider.dart';
 import 'package:agenda/l10n/request_locale.dart';
 import 'package:flutter/material.dart';
+import 'package:agenda/widgets/ambient.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -791,6 +792,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     final invitations =
         ref.watch(pendingInvitationsProvider).value ?? const [];
     return Scaffold(
+      backgroundColor: AmbientBackdrop.scaffoldColor(context),
       key: _page,
       appBar: CustomAppBar(title: context.l10n.calendar, isRoot: true),
       body: RefreshIndicator(

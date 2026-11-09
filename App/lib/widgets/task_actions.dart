@@ -10,6 +10,7 @@ import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/services/capture_store.dart';
 import 'package:agenda/services/native_speech.dart';
 import 'package:agenda/screens/voice_task_screen.dart';
+import 'package:agenda/widgets/ambient.dart';
 import 'package:agenda/widgets/task_form_entry.dart';
 
 /// The one way to add a task: `Añadir tarea` opens the capture sheet,
@@ -111,14 +112,18 @@ class _TaskActionsState extends ConsumerState<TaskActions> {
     if (form && ref.watch(freeVoiceUsedUpProvider)) {
       ref.watch(freeVoiceNoticeProvider);
     }
-    return FilledButton.icon(
-      onPressed: () => unawaited(_add()),
-      icon: Icon(
-        !form && ref.watch(voiceAvailableProvider)
-            ? Icons.mic_none_rounded
-            : Icons.add_rounded,
+    // Alive: a glow breathes around it and a light crosses it now and then
+    // (ambient.dart), so it is the tap the eye finds first.
+    return LivelyButton(
+      child: FilledButton.icon(
+        onPressed: () => unawaited(_add()),
+        icon: Icon(
+          !form && ref.watch(voiceAvailableProvider)
+              ? Icons.mic_none_rounded
+              : Icons.add_rounded,
+        ),
+        label: Text(form ? context.l10n.newTask : context.l10n.addTask),
       ),
-      label: Text(form ? context.l10n.newTask : context.l10n.addTask),
     );
   }
 

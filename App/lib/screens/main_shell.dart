@@ -13,6 +13,8 @@ import 'package:agenda/screens/settings_screen.dart';
 import 'package:agenda/screens/notes_screen.dart';
 import 'package:agenda/services/app_update.dart';
 import 'package:agenda/services/meeting_controller.dart';
+import 'package:agenda/theme/motion.dart';
+import 'package:agenda/widgets/ambient.dart';
 import 'package:agenda/widgets/app_update_dialog.dart';
 import 'package:agenda/widgets/note_task.dart';
 
@@ -75,8 +77,21 @@ class MainShell extends ConsumerStatefulWidget {
   ConsumerState<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends ConsumerState<MainShell> {
+class _MainShellState extends ConsumerState<MainShell>
+    with SingleTickerProviderStateMixin {
   late int _index = widget.initialIndex;
+
+  /// A tab that comes forward rises a little into place and fades in, on
+  /// the website's curve (AppMotion). It starts settled.
+  late final AnimationController _arrive = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+    value: 1,
+  );
+  late final CurvedAnimation _arriving = CurvedAnimation(
+    parent: _arrive,
+    curve: AppMotion.ease,
+  );
 
   /// Only the private staging app updates itself (app_update.dart).
   late final bool _updates = ref.read(appUpdaterProvider) != null;
@@ -100,6 +115,8 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   @override
   void dispose() {
+    _arriving.dispose();
+    _arrive.dispose();
     _lifecycle?.dispose();
     _installs?.cancel();
     super.dispose();
@@ -142,6 +159,7 @@ class _MainShellState extends ConsumerState<MainShell> {
         listen: false,
       ).read(shellTabSwitchesProvider.notifier).state++;
     }
+    if (index != _index && AppMotion.of(context)) _arrive.forward(from: 0);
     setState(() => _index = index);
   }
 
@@ -252,17 +270,35 @@ class _MainShellState extends ConsumerState<MainShell> {
             child: MediaQuery.removePadding(
               context: context,
               removeBottom: true,
-              child: IndexedStack(
-                index: _index,
-                children: [
-                  for (final (index, screen) in const [
-                    CalendarScreen(),
-                    HomeScreen(),
-                    NotesScreen(),
-                    SettingsScreen(),
-                  ].indexed)
-                    HeroMode(enabled: index == _index, child: screen),
-                ],
+              // The tabs sit on slow drifting colour (ambient.dart).
+              child: AmbientBackdrop(
+                child: AnimatedBuilder(
+                  animation: _arriving,
+                  builder: (context, child) {
+                    final t = _arriving.value;
+                    if (t >= 1) return child!;
+                    return Opacity(
+                      opacity: 0.4 + 0.6 * t,
+                      alwaysIncludeSemantics: true,
+                      child: Transform.translate(
+                        offset: Offset(0, 14 * (1 - t)),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: IndexedStack(
+                    index: _index,
+                    children: [
+                      for (final (index, screen) in const [
+                        CalendarScreen(),
+                        HomeScreen(),
+                        NotesScreen(),
+                        SettingsScreen(),
+                      ].indexed)
+                        HeroMode(enabled: index == _index, child: screen),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
