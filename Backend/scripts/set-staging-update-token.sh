@@ -5,7 +5,7 @@
 # Adds APP_UPDATE_GITHUB_TOKEN to a new version of the staging config secret,
 # keeping every other value, and saves the token in Backend/.credentials/ so a
 # by-hand deploy-staging.ps1 keeps it too. Nothing is printed. The next backend
-# deploy (a merge into main, or Actions -> Deploy backend -> Run workflow) uses it.
+# deploy (a merge into main, or Actions -> Deploy -> Run workflow) uses it.
 #
 # Run from the repo root in Git Bash or Google Cloud Shell, with gcloud signed
 # in as the owner. The token: a fine-grained GitHub token for Mikigb77/TaskFlow

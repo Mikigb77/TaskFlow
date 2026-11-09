@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Uploads, once, what GitHub Actions needs to build the signed staging APK
-# (.github/workflows/app-release.yml) as Actions secrets of Mikigb77/TaskFlow.
+# (.github/workflows/deploy.yml) as Actions secrets of Mikigb77/TaskFlow.
 # Run it on the PC that holds the staging key, from App/ in Git Bash, with the
 # GitHub CLI signed in (gh auth status). Values go through stdin and are never
 # printed. Run it again after changing config/staging.json or the key.

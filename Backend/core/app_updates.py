@@ -1,7 +1,7 @@
 """The newest staging build of the app, for the staging app's own updater.
 
 GitHub Actions publishes each staging APK as the newest release of the private
-app repository (.github/workflows/app-release.yml), with `staging-build.json`
+app repository (.github/workflows/deploy.yml), with `staging-build.json`
 beside it. A phone can't read a private release, so the backend reads it with a
 read-only token and gives a signed-in phone what it needs: the build's version,
 its SHA-256, and on request a short-lived download link straight from GitHub.

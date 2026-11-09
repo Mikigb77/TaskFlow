@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploys the staging API from GitHub Actions (.github/workflows/deploy-backend.yml).
+# Deploys the staging API from GitHub Actions (.github/workflows/deploy.yml).
 #
 # The same release steps as deploy-staging.ps1, without its one-time setup
 # (service accounts, queue, bucket, scheduler, IAM) and without writing a new
