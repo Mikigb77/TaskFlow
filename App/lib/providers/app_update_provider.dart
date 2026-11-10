@@ -72,14 +72,17 @@ class AppUpdateController extends StateNotifier<AppUpdate?> {
   }
 
   /// Downloads the update if it isn't yet, then hands it to Android.
-  Future<AppInstallResult> install() async {
+  /// [onProgress] hears the download's progress (AppUpdater.download).
+  Future<AppInstallResult> install({
+    void Function(double? done)? onProgress,
+  }) async {
     final updater = _updater;
     var update = state;
     if (updater == null || update == null) return AppInstallResult.failed;
     await _checking;
     if (update.file == null) {
       try {
-        update = await updater.download();
+        update = await updater.download(onProgress: onProgress);
       } catch (_) {
         return AppInstallResult.failed;
       }
