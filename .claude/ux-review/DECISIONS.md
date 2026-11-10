@@ -2,6 +2,11 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-11-10 — The listening sheet follows light and dark mode
+
+- The owner, seeing the app's light-mode screenshots on the website: "within the app we should also make the recording part also match whether it's in dark mode or not."
+- Built as: the capture sheet keeps its lime-to-mint orb, lit from below, in both modes. In dark mode it stays Lagoon night; in light mode it is the light sheet with a soft mint glow under the orb, teal `Terminar` and teal level ring and live dot. This replaces the 2026-11-09 line "the capture sheet is night … while it listens" for light mode.
+
 ## 2026-11-10 — A plan and reminders some minutes before, together
 
 - The owner, on a 3-month project with a rhythm of reminders: "we want to be able to make … both of them at the same time … give the user the illusion that he can say whatever and we are gonna comply with it." Plans stay counted in whole days, one notice a day, with no rhythm of hours ("for the plan, I agree that we shouldn't allow a custom time").
