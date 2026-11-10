@@ -235,14 +235,14 @@ class TaskTile extends ConsumerWidget {
       customSemanticsActions: editable
           ? {CustomSemanticsAction(label: context.l10n.reschedule): reschedule}
           : null,
-      child: Dismissible(
+      child: _SwipeRow(
         // With TalkBack or Switch Access on, the swipe's scroll actions
         // would complete or move the task unseen: the circle completes and
         // «Cambiar fecha» stays as the row's custom action.
         direction: editable && !MediaQuery.accessibleNavigationOf(context)
             ? DismissDirection.horizontal
             : DismissDirection.none,
-        key: ValueKey('gesture:${task.id}:${task.occurrenceId}'),
+        dismissKey: ValueKey('gesture:${task.id}:${task.occurrenceId}'),
         confirmDismiss: (direction) async {
           if (direction == DismissDirection.startToEnd) {
             await toggle();
@@ -255,13 +255,13 @@ class TaskTile extends ConsumerWidget {
           context,
           Icons.check_rounded,
           task.isCompleted ? context.l10n.reopen : context.l10n.complete,
-          Alignment.centerLeft,
+          AlignmentDirectional.centerStart,
         ),
         secondaryBackground: _gestureBackground(
           context,
           Icons.event_outlined,
           context.l10n.reschedule,
-          Alignment.centerRight,
+          AlignmentDirectional.centerEnd,
         ),
         // White cards that float a little on the light page; on night the
         // border alone sets them off.
@@ -365,22 +365,119 @@ class TaskTile extends ConsumerWidget {
     );
   }
 
+  /// The action a swipe uncovers: a rounded card of its own beside the
+  /// row, its icon and label held at the screen's edge and uncovered as
+  /// the pill grows. On a short row they shrink rather than overflow.
   Widget _gestureBackground(
     BuildContext context,
     IconData icon,
     String label,
-    Alignment alignment,
-  ) => Container(
-    alignment: alignment,
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
+    AlignmentDirectional alignment,
+  ) => ClipRRect(
+    borderRadius: BorderRadius.circular(20),
+    child: ColoredBox(
       color: Theme.of(context).colorScheme.primaryContainer,
-      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        child: OverflowBox(
+          alignment: alignment,
+          minWidth: 0,
+          maxWidth: double.infinity,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: alignment,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [Icon(icon), const SizedBox(height: 4), Text(label)],
+            ),
+          ),
+        ),
+      ),
     ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [Icon(icon), const SizedBox(height: 4), Text(label)],
-    ),
+  );
+}
+
+/// A row that slides aside to complete or reschedule its task. The row
+/// moves as the whole rounded card, and what it uncovers is a rounded card
+/// of its own, a small gap apart, rather than [Dismissible]'s background
+/// cut square along the row's edge.
+class _SwipeRow extends StatefulWidget {
+  const _SwipeRow({
+    required this.dismissKey,
+    required this.direction,
+    required this.confirmDismiss,
+    required this.background,
+    required this.secondaryBackground,
+    required this.child,
+  });
+  final Key dismissKey;
+  final DismissDirection direction;
+  final ConfirmDismissCallback confirmDismiss;
+
+  /// Uncovered at the start when the row slides toward the end.
+  final Widget background;
+
+  /// Uncovered at the end when the row slides toward the start.
+  final Widget secondaryBackground;
+  final Widget child;
+
+  @override
+  State<_SwipeRow> createState() => _SwipeRowState();
+}
+
+class _SwipeRowState extends State<_SwipeRow> {
+  /// The gap between the sliding row and what it uncovers.
+  static const _gap = 8.0;
+
+  final _swipe = ValueNotifier<DismissUpdateDetails?>(null);
+
+  @override
+  void dispose() {
+    _swipe.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    children: [
+      Positioned.fill(
+        child: ValueListenableBuilder(
+          valueListenable: _swipe,
+          builder: (context, swipe, _) {
+            if (swipe == null || swipe.progress == 0) {
+              return const SizedBox.shrink();
+            }
+            final start = swipe.direction == DismissDirection.startToEnd;
+            return LayoutBuilder(
+              builder: (context, box) {
+                // The row has moved by this share of its width.
+                final open = swipe.progress * box.maxWidth - _gap;
+                if (open <= 0) return const SizedBox.shrink();
+                return Align(
+                  alignment: start
+                      ? AlignmentDirectional.centerStart
+                      : AlignmentDirectional.centerEnd,
+                  child: SizedBox(
+                    width: open,
+                    height: box.maxHeight,
+                    child: start
+                        ? widget.background
+                        : widget.secondaryBackground,
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      ),
+      Dismissible(
+        key: widget.dismissKey,
+        direction: widget.direction,
+        confirmDismiss: widget.confirmDismiss,
+        onUpdate: (details) => _swipe.value = details,
+        child: widget.child,
+      ),
+    ],
   );
 }
 
