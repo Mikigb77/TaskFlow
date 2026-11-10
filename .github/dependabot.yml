@@ -1,0 +1,88 @@
+# Dependabot: weekly version-update pull requests into dev, plus security-fix
+# pull requests as soon as an advisory lands (those are switched on in the
+# repo's settings, not here). Minor and patch bumps come grouped, one pull
+# request per ecosystem, so each week costs a handful of CI runs; major bumps
+# come one by one, because they can break things.
+#
+# Not covered on purpose:
+# - Gradle (App/android): Flutter manages the Android Gradle plugin and Kotlin
+#   versions, so those move with Flutter upgrades, not on their own.
+# - Major Docker image bumps (Python, Postgres, Redis): a new Python or
+#   Postgres major is a planned upgrade, not a weekly bump.
+version: 2
+
+updates:
+  - package-ecosystem: pub
+    directory: /App
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Madrid
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(app)"
+    groups:
+      app-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: pip
+    directory: /Backend
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Madrid
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(backend)"
+    groups:
+      backend-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directory: /Backend
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Madrid
+    commit-message:
+      prefix: "deps(docker)"
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: docker-compose
+    directory: /Backend
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Madrid
+    commit-message:
+      prefix: "deps(docker)"
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
+    groups:
+      compose-images:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Madrid
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns: ["*"]
