@@ -2,9 +2,9 @@
 
 Calendar-first task app for Android, built in Flutter, with a Django backend. You say or type a thought; the app turns it into tasks on your calendar and reminds you about them.
 
-This repo holds the app (`App/`) and its backend (`Backend/`). The marketing website is its own repo, `../TaskFlowWeb`, with its own instructions and UX loop.
+This repo holds the app (`App/`) and its backend (`Backend/`). The marketing website is its own repo, `../TaskFlowWeb`, with its own instructions.
 
-These instructions are for every coding agent. Claude Code reads them through `CLAUDE.md`, which adds what only Claude needs; Codex reads them here, with its setup in `.codex/`.
+These instructions are for every coding agent. Claude Code reads them through `CLAUDE.md`, which adds what only Claude needs.
 
 ## Product rules — read before changing anything user-facing
 
@@ -13,35 +13,13 @@ These instructions are for every coding agent. Claude Code reads them through `C
 - **Show advanced things only when relevant:** projects, deadlines, durations, assignees, checklists and the like.
 - **Current direction and open decisions:** `../UX_REVIEW.md` (plan items U1–U14). Earlier critique: `../CRITIQUE.md`. Both files sit one folder above this repo.
 
-## UX review loop
+## Owner decisions
 
-This section is for the main session.
-
-When user-facing app work is finished, run the UX loop once on the whole change, before you report it as done — not after every edit: **`/ux`** in Claude Code, **`$ux`** in Codex. This is the owner's standing opt-in to the loop (2026-10-13).
-- `ux` reviews what changed since the last UX review, fixes the findings, re-checks them, and commits the verified round on `dev`.
-- `ux app` reviews the whole app and stops for the owner's approval. `ux fix` then carries out the approved plan.
-- `ux <screens>` reviews only the screens named.
-
-Owner policy (2026-10-13):
-- fix everything the reviewer finds, except product decisions;
-- stop for approval only on whole-app runs;
-- commit each verified round on `dev`. A loop never pushes, and never touches `main`.
-
-The loop is a self-contained skill: `.claude/skills/ux/` for Claude (its workflows, scripts and references) and `.agents/skills/ux/` for Codex. Both keep one shared history in `.claude/ux-review/` (decisions, the issue ledger, phone checks and runs), and the reviewers' memory in `.claude/agent-memory/`. Never fork that history.
-
-The agents can't see the conversation. Before running the loop, record lasting owner decisions in `.claude/ux-review/DECISIONS.md`, and pass anything else they need to know as notes. How the loop works: `.claude/skills/ux/references/loop.md`. Issues and their status: `.claude/ux-review/ISSUES.md`.
-
-**User-facing** means:
-- `App/lib/screens/`, `App/lib/widgets/`, `App/lib/theme/`, and routes in `App/lib/main.dart`;
-- the ARB files in `App/lib/l10n/`;
-- `App/assets/`;
-- notification and reminder text;
-- Android and iOS strings, launcher shortcuts, the home-screen widget, and permission text;
-- native behaviour the user feels directly, such as when speech listening starts and stops.
+Record lasting owner decisions about the app in `.claude/ux-review/DECISIONS.md`, newest first.
 
 ## The website
 
-`../TaskFlowWeb` has its own `AGENTS.md`, `CLAUDE.md` and UX web loop (`/ux-web`, `$ux-web`), run from a session in that repo. When an app change affects what the site should say — a new feature, a limit, a price, or what happens to people's data — run that loop there before you report the work as done. It checks every claim on the site against this repo.
+`../TaskFlowWeb` has its own `AGENTS.md` and `CLAUDE.md`. When an app change affects what the site should say — a new feature, a limit, a price, or what happens to people's data — update the site there too before you report the work as done.
 
 ## Layout
 
@@ -54,7 +32,7 @@ The agents can't see the conversation. Before running the loop, record lasting o
 
 **`Backend/`** — Django API, Docker Compose (PostgreSQL, Redis, Mailpit), and the AI pipeline in `core/ai.py`. The contracts with the app are in `Backend/docs/`.
 
-**Agent setup** — `.claude/` (Claude Code: skills, agents, the loop's history), `.agents/skills/` and `.codex/` (Codex).
+**Agent records** — `.claude/ux-review/DECISIONS.md`, the owner's decisions about the app.
 
 ## Commands
 
@@ -79,8 +57,6 @@ flutter test --no-pub --dart-define=WRITE_AUTH_PREVIEWS=true test/auth_gate_test
 flutter test --no-pub --dart-define=WRITE_FORM_PREVIEWS=true test/new_task_form_test.dart
 ```
 
-What Android draws around the app (the launcher, the widget, notifications, permission dialogs, TalkBack) comes from the separate `TaskFlow_Review` test emulator: `.claude/skills/ux/scripts/emulator/README.md`.
-
 Backend (from `Backend/`, with Docker Desktop running; API on http://localhost:8088):
 
 ```powershell
@@ -94,7 +70,7 @@ After a change to the AI prompts, check dictations against the real model, throu
 .venv/Scripts/python.exe -X utf8 scripts/check_dictations.py --times 3 project-es until-es noday-es
 ```
 
-Where commands run: Flutter, Python and Git on Windows; the website's Node, npm and Playwright in WSL. Use Windows Git Bash, not WSL's, for the loops' shell helpers.
+Where commands run: Flutter, Python and Git on Windows; the website's Node, npm and Playwright in WSL. Use Windows Git Bash, not WSL's, for shell scripts.
 
 ## Email
 
@@ -127,12 +103,4 @@ How email is sent:
   - After an integration-test build, reinstall the normal app with `adb install -r`.
 - **Evidence.** Say what kind of evidence you have: unit or widget test, emulator, or physical device. Don't present an emulator run as a physical-phone or real-microphone result.
 - **Secrets.** Never commit a secret: the repo may be made public to run GitHub Actions. Secrets live in three places only: `Backend/.env`, `Backend/.credentials/` and `App/config/` on the PC (all ignored by Git; never print, copy or log their values); GitHub Actions secrets for CI (`App/scripts/upload-ci-secrets.sh`); and Google Secret Manager for the staging API. CI must never need the PC: the backend tests use the committed, key-free `Backend/.env.ci`, and deploys sign in to Google without a key. A new setting goes in `Backend/.env.example` with a placeholder, and in `.env.ci` if the tests need it.
-- **Scripts.** Root `scripts/` is for the essential deployment entry points; the loops' helpers live in their skills.
-
-## Codex
-
-- The app loop: `.agents/skills/ux/SKILL.md` (`$ux`). Protocol: `.codex/ux-workflow.md`. Roles: `.codex/agents/*.toml`.
-- The skill authorizes delegating to those roles when a run is actually requested, never background jobs or starting a run during setup.
-- Never run `.claude/skills/*/workflows/*.js` through Codex: they need Claude's Workflow runtime.
-- Codex runs are named `<client-date>-codex-<mode>` in the same `runs/` folders. Don't overlap Claude and Codex review or fix runs: they share Git refs, ledgers, evidence and working directories.
-- The orchestrator and reviewer use `gpt-6.1-sol` with `max`; the implementer and tester use `xhigh`. These are the roles' settings, not a change to the main chat's model.
+- **Scripts.** Root `scripts/` is for the essential deployment entry points.
