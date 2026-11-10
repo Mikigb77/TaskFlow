@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -37,6 +38,7 @@ void main() {
     Map<String, dynamic>? answer,
     List<int>? body,
     int installed = 5000,
+    http.Client? transport,
   }) {
     final latestAnswer = answer ?? latest();
     return AppUpdater(
@@ -53,12 +55,14 @@ void main() {
       },
       installedCode: () async => installed,
       folder: () async => folder,
-      transport: MockClient((request) async {
-        downloads++;
-        expect(request.url.host, 'objects.example');
-        expect(request.headers.containsKey('Authorization'), isFalse);
-        return http.Response.bytes(body ?? apk, 200);
-      }),
+      transport:
+          transport ??
+          MockClient((request) async {
+            downloads++;
+            expect(request.url.host, 'objects.example');
+            expect(request.headers.containsKey('Authorization'), isFalse);
+            return http.Response.bytes(body ?? apk, 200);
+          }),
     );
   }
 
@@ -206,6 +210,128 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text(l10n.appUpdateAllow), findsOneWidget);
         expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  test('a download reports how far along it is, from 0 to 1', () async {
+    final heard = <double?>[];
+    final half = apk.length ~/ 2;
+    final updates = updater(
+      transport: MockClient.streaming((request, _) async {
+        downloads++;
+        return http.StreamedResponse(
+          Stream.fromIterable([apk.sublist(0, half), apk.sublist(half)]),
+          200,
+          contentLength: apk.length,
+        );
+      }),
+    );
+    final downloaded = await updates.download(onProgress: heard.add);
+    expect(downloaded.file, isNotNull);
+    expect(heard, [0, half / apk.length, 1]);
+  });
+
+  test('without a size the download reports no share', () async {
+    final heard = <double?>[];
+    final updates = updater(
+      transport: MockClient.streaming((request, _) async {
+        downloads++;
+        return http.StreamedResponse(Stream.value(apk), 200);
+      }),
+    );
+    await updates.download(onProgress: heard.add);
+    expect(heard, [null]);
+  });
+
+  for (final (locale, half) in const [
+    (Locale('en'), '46%'),
+    (Locale('es'), '46\u00a0%'),
+    (Locale('ca'), '46\u00a0%'),
+  ]) {
+    testWidgets(
+      'Update shows a bar and the share downloaded while the build arrives (${locale.languageCode}, 2x text)',
+      (tester) async {
+        final chunks = StreamController<List<int>>();
+        final controller = AppUpdateController(
+          updater(
+            transport: MockClient.streaming((request, _) async {
+              downloads++;
+              return http.StreamedResponse(
+                chunks.stream,
+                200,
+                contentLength: apk.length,
+              );
+            }),
+          ),
+        );
+        metered = true;
+        await tester.runAsync(controller.check);
+        expect(controller.state?.file, isNull);
+        tester.view.physicalSize = const Size(320, 640);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [appUpdateProvider.overrideWith((ref) => controller)],
+            child: MaterialApp(
+              locale: locale,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context)
+                    .copyWith(textScaler: const TextScaler.linear(2)),
+                child: child!,
+              ),
+              home: Scaffold(body: AppUpdateDialog(update: controller.state!)),
+            ),
+          ),
+        );
+        final l10n = lookupAppLocalizations(locale);
+        // No bar until Update is tapped.
+        expect(find.byType(LinearProgressIndicator), findsNothing);
+        await tester.tap(find.text(l10n.appUpdateInstall));
+        final rest = apk.length ~/ 2; // 7 of the 15 bytes: 46 %.
+        chunks.add(apk.sublist(0, rest));
+        // The download runs on real IO: let it reach the first chunk.
+        for (var i = 0; i < 50; i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          await tester.pump();
+          final bars = find.byType(LinearProgressIndicator);
+          if (bars.evaluate().isNotEmpty &&
+              (tester.widget<LinearProgressIndicator>(bars).value ?? 0) > 0) {
+            break;
+          }
+        }
+        final bar = tester.widget<LinearProgressIndicator>(
+          find.byType(LinearProgressIndicator),
+        );
+        expect(bar.value, closeTo(rest / apk.length, 0.001));
+        expect(bar.semanticsLabel, l10n.appUpdateDownloading);
+        expect(find.text(half), findsOneWidget);
+        expect(bar.semanticsValue, half);
+        expect(find.text(l10n.appUpdateDownloading), findsOneWidget);
+        expect(tester.takeException(), isNull);
+
+        // The rest arrives, Android takes the build and the dialog closes.
+        chunks.add(apk.sublist(rest));
+        // Not awaited: it completes only once the download has read it.
+        unawaited(chunks.close());
+        for (
+          var i = 0;
+          i < 50 && find.byType(AppUpdateDialog).evaluate().isNotEmpty;
+          i++
+        ) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          await tester.pump();
+        }
+        await tester.pumpAndSettle();
+        expect(find.byType(AppUpdateDialog), findsNothing);
+        expect(native.map((call) => call.method), contains('install'));
       },
     );
   }

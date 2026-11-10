@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
@@ -108,8 +109,10 @@ class AppUpdater {
   }
 
   /// Downloads the newest build and checks its SHA-256. It may be newer than
-  /// the one [latest] found, if one was published meanwhile.
-  Future<AppUpdate> download() async {
+  /// the one [latest] found, if one was published meanwhile. [onProgress]
+  /// hears the share downloaded, from 0 to 1, as it arrives; null when the
+  /// server doesn't say how big the build is.
+  Future<AppUpdate> download({void Function(double? done)? onProgress}) async {
     final link = await get('app/update/download/');
     if (link is! Map) throw const AppUpdateFailed('link');
     final url = Uri.tryParse('${link['url']}');
@@ -133,8 +136,17 @@ class AppUpdater {
       if (response.statusCode != 200) {
         throw AppUpdateFailed('http ${response.statusCode}');
       }
+      final total = response.contentLength;
+      final known = total != null && total > 0;
+      var received = 0;
+      onProgress?.call(known ? 0 : null);
       await response.stream
           .timeout(const Duration(seconds: 60))
+          .map((chunk) {
+            received += chunk.length;
+            if (known) onProgress?.call(math.min(1, received / total));
+            return chunk;
+          })
           .pipe(part.openWrite());
       if (await _digest(part) != sha) throw const AppUpdateFailed('sha256');
       await part.rename(target.path);
