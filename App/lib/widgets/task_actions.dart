@@ -117,17 +117,8 @@ class _TaskActionsState extends ConsumerState<TaskActions> {
     // (ambient.dart), so it is the tap the eye finds first.
     return LivelyButton(
       child: FilledButton.icon(
-        // The one mint tap in the app: night on mint, as on the website.
-        style: FilledButton.styleFrom(
-          backgroundColor: Lagoon.hot,
-          foregroundColor: Lagoon.onHot,
-          iconSize: 24,
-          textStyle: const TextStyle(
-            fontFamily: Lagoon.display,
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+        // Night on mint, as `Añadir nota` and the website.
+        style: AppTheme.mainTap,
         onPressed: () => unawaited(_add()),
         icon: Icon(
           !form && ref.watch(voiceAvailableProvider)
