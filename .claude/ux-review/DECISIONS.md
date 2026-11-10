@@ -2,6 +2,11 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-11-10 — A rounder tab bar
+
+- The owner asked whether the bottom tab bar could be "a little bit more round", without competing with `Añadir tarea` above it. Shown three renders (today's flat bar, rounded top corners, a floating pill), they picked rounded top corners.
+- Built as: the bar stays full width at the bottom; its top corners round at 28 px, like the capture sheet, and a soft shadow replaces the 1 px line (UX-433). The page's drifting colour shows round the corners. Not a floating pill: two pills stacked would compete with `Añadir tarea`, which stays the one pill on the page.
+
 ## 2026-11-09 — The Lagoon look, shared with the website
 
 - The owner picked the website's Nova design in its green "Lagoon" palette, and asked: "Make sure to also re-design the app accordingly."
