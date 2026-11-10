@@ -58,7 +58,7 @@ dependencies:
   http_parser: ^4.1.2
   # 10.x first: it migrates data saved by 9.x to the new ciphers. 11 can't
   # read 9.x data, so it waits until phones have run a 10.x build.
-  flutter_secure_storage: ^10.3.4
+  flutter_secure_storage: ^11.2.0
   flutter_timezone: ^5.1.1
   record: ^7.1.2
   path_provider: ^2.1.6
