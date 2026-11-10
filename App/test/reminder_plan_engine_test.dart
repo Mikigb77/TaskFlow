@@ -1070,6 +1070,66 @@ void main() {
     );
 
     test(
+      'a plan and reminders some minutes before ring together: «cada día la '
+      'última semana, y 20 y 5 minutos antes»',
+      () async {
+        await defaults();
+        // Without a time of its own: the day's notice rings at 20 minutes
+        // before (D1), and 5 minutes before rings beside it.
+        await add(
+          timed(ownersPlan).copyWith(
+            reminderMinutes: 20,
+            reminderExtraMinutes: [5],
+          ),
+        );
+        await engine.reconcile('local');
+        final friday1700 = DateTime(2026, 11, 13, 17);
+        List<DateTime> onFriday() =>
+            driver.pending.values
+                .where((reminder) => Task.day(reminder.when) == friday)
+                .map((reminder) => reminder.when)
+                .toList()
+              ..sort();
+        expect(onFriday(), [
+          friday1700.subtract(const Duration(minutes: 20)),
+          friday1700.subtract(const Duration(minutes: 5)),
+        ]);
+        // The plan still rings as a plan: its last notice, the day after.
+        expect(
+          ReminderEngine.isPlanAlert(onDay(DateTime(2026, 11, 14)).identity),
+          isTrue,
+        );
+        final task = (await database.getTasks()).single;
+        expect(
+          ReminderPlans.leadsBesidePlan(task, 10),
+          [5],
+          reason: '20 is the plan’s own notice for the day.',
+        );
+
+        // With a time of its own (D8), the day keeps 09:00 and both leads
+        // ring as well.
+        await update(task.copyWith(reminderPlan: sameDay));
+        await engine.reconcile('local');
+        expect(onFriday(), [
+          DateTime(2026, 11, 13, 9),
+          friday1700.subtract(const Duration(minutes: 20)),
+          friday1700.subtract(const Duration(minutes: 5)),
+        ]);
+
+        // Settings' default lead alone adds nothing beside a plan.
+        await update(
+          task.copyWith(
+            reminderPlan: sameDay,
+            reminderMinutes: null,
+            reminderExtraMinutes: const [],
+          ),
+        );
+        await engine.reconcile('local');
+        expect(onFriday(), [DateTime(2026, 11, 13, 9)]);
+      },
+    );
+
+    test(
       'UX-2022: «el mismo día a las 9» on a task at 17:00 rings on Fri 13 Nov '
       'at 09:00, «Es hoy a las 17:00», as a plain plan notice: identity '
       '…/plan/2026-11-13, «Completar» only, plan_es; nothing at 16:50',

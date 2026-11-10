@@ -144,7 +144,7 @@ String reminderPlanText(
 }) {
   final plan = ReminderPlans.active(task)!;
   final settings = ref.watch(reminderPreferencesProvider).value;
-  return planLine(
+  final line = planLine(
     context.l10n,
     plan,
     anchor: ReminderPlans.anchor(task)!,
@@ -159,6 +159,16 @@ String reminderPlanText(
       (settings ?? const ReminderPreferences()).leadMinutes,
     ),
   );
+  // The reminders some minutes before that ring beside the plan, too.
+  final beside = bare
+      ? const <int>[]
+      : ReminderPlans.leadsBesidePlan(
+          task,
+          (settings ?? const ReminderPreferences()).leadMinutes,
+        );
+  return beside.isEmpty
+      ? line
+      : '$line · ${beside.map(context.reminderLead).join(', ')}';
 }
 
 /// Why the reminder line can't simply read «Recordatorio: …» on this phone:
@@ -681,7 +691,8 @@ Future<int?> _pickFrom(
   final preferences =
       ref.watch(reminderPreferencesProvider).value ??
       const ReminderPreferences();
-  // A plan replaces the single reminder: the line is its one line. It's this
+  // A plan's line is the task's one line, with any reminders some minutes
+  // before that ring beside it ([reminderPlanText]). It's this
   // account's own, so it counts only where this phone rings.
   final ringsHere = reminderRingsHere(ref, task);
   final plan = ringsHere ? ReminderPlans.active(task) : null;
@@ -898,6 +909,7 @@ class ReminderControl extends ConsumerWidget {
         ? null
         : schedule!.copyWith(
             reminderMinutes: minutes,
+            reminderExtraMinutes: extra,
             reminderTime: time,
             reminderPlan: plan,
           );

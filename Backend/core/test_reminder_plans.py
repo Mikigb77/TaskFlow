@@ -538,6 +538,16 @@ class DictatedPlanTests(SimpleTestCase):
         self.assertEqual(self.extract(task(date="2026-10-23", time="10:00", reminder_extra_minutes=15))[0]
                          ["reminder_minutes"], 15)
 
+    def test_a_rhythm_and_minutes_before_said_together_are_both_kept(self):
+        # «Entregar el informe el viernes a las 12, recuérdamelo cada día los últimos 3 días y también una
+        # hora y 10 minutos antes».
+        draft, = self.extract(task(title="Entregar el informe", date="2026-10-30", time="12:00",
+                                   reminder_minutes=60, reminder_extra_minutes=[10],
+                                   reminder_plan={"phases": [phase(3, 0, 1)], "time": None,
+                                                  "said": "cada día los últimos 3 días"}))
+        self.assertEqual(draft["reminder_plan"]["phases"], [phase(3, 0, 1)])
+        self.assertEqual((draft["reminder_minutes"], draft["reminder_extra_minutes"]), (60, [10]))
+
     def test_a_reminder_said_without_a_day_waits_for_one(self):
         # D3: «Renovar el pasaporte, recuérdamelo cada semana» keeps its reminders, and the card asks for a day.
         plan = {"phases": [phase(366, 0, 7)], "time": None, "said": "cada semana"}
