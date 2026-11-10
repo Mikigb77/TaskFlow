@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/services/feedback_timeout.dart';
+import 'package:agenda/theme/motion.dart';
+import 'package:agenda/widgets/ambient.dart';
 
 /// Every brief message goes through here: it replaces the one on screen,
 /// floats above the bottom bar and goes away by itself, after Android's
@@ -130,14 +132,36 @@ class SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
       padding: const EdgeInsets.only(bottom: 12),
       // A heading, so a screen reader can jump between sections.
+      // A heading, so a screen reader can jump between sections. A short
+      // green rule leads into it, as the website's and Lucid Saga's
+      // eyebrows do.
       child: Semantics(
           header: true,
-          child: Text(text.toUpperCase(),
-              style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: 11,
-                  letterSpacing: 1.5,
-                  fontWeight: FontWeight.w800))));
+          child: Row(children: [
+            ExcludeSemantics(
+              child: Container(
+                  width: 18,
+                  height: 2,
+                  margin: const EdgeInsetsDirectional.only(end: 8),
+                  decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(1),
+                      gradient: LinearGradient(colors: [
+                        Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0),
+                        Theme.of(context).colorScheme.primary,
+                      ]))),
+            ),
+            Flexible(
+              child: Text(text.toUpperCase(),
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 11,
+                      letterSpacing: 1.5,
+                      fontWeight: FontWeight.w800)),
+            ),
+          ])));
 }
 
 class EmptyState extends StatelessWidget {
@@ -156,17 +180,36 @@ class EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final icon = this.icon;
-    return Padding(
+    return Rise(
+        child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           if (icon != null) ...[
-            Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                    color: colors.primaryContainer,
-                    borderRadius: BorderRadius.circular(22)),
-                child: Icon(icon, size: 28, color: colors.onPrimaryContainer)),
+            // Its tile floats gently, lit from behind (ambient.dart).
+            Floating(
+              child: Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            colors.primaryContainer,
+                            Color.alphaBlend(
+                                colors.primary.withValues(alpha: 0.12),
+                                colors.primaryContainer),
+                          ]),
+                      borderRadius: BorderRadius.circular(22),
+                      boxShadow: [
+                        BoxShadow(
+                            color: colors.primary.withValues(alpha: 0.14),
+                            blurRadius: 24,
+                            offset: const Offset(0, 10)),
+                      ]),
+                  child:
+                      Icon(icon, size: 28, color: colors.onPrimaryContainer)),
+            ),
             const SizedBox(height: 16),
           ],
           if (title case final title?) ...[
@@ -179,7 +222,7 @@ class EmptyState extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(color: colors.onSurfaceVariant, height: 1.5)),
           if (action != null) ...[const SizedBox(height: 12), action!],
-        ]));
+        ])));
   }
 }
 

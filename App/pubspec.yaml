@@ -97,11 +97,15 @@ flutter:
   uses-material-design: true
   assets:
     - assets/fonts/OFL.txt
+    - assets/fonts/OFL-Bricolage.txt
     - assets/brand/google-g.png
   fonts:
     - family: Manrope
       fonts:
         - asset: assets/fonts/Manrope.ttf
+    - family: Bricolage
+      fonts:
+        - asset: assets/fonts/BricolageGrotesque.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

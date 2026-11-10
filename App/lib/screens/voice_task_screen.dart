@@ -34,6 +34,8 @@ import 'package:agenda/services/bulk_plan.dart';
 import 'package:agenda/services/command_plan.dart';
 import 'package:agenda/services/command_runner.dart';
 import 'package:agenda/services/text_search.dart';
+import 'package:agenda/theme/app_theme.dart';
+import 'package:agenda/widgets/ambient.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/capture_command_cards.dart';
 import 'package:agenda/widgets/capture_review_editor.dart';
@@ -135,6 +137,7 @@ Future<void> showCaptureSheet(
         localizations.bottomSheetLabel,
       ),
       modalBarrierColor: Theme.of(context).bottomSheetTheme.modalBarrierColor,
+      night: captureId == null,
       builder: (_) => _SheetFrame(
         child: _CaptureOrigin(
           page: page,
@@ -242,14 +245,23 @@ class _CaptureSheetRoute extends ModalBottomSheetRoute<void> {
     super.barrierLabel,
     super.barrierOnTapHint,
     super.modalBarrierColor,
-  }) : super(
+    bool night = true,
+  }) : night = ValueNotifier(night),
+       super(
          isScrollControlled: true,
          useSafeArea: true,
          enableDrag: false,
          showDragHandle: false,
+         // [_SheetFrame] paints the sheet: night while it listens, the page's
+         // own surface once there's a result.
+         backgroundColor: Colors.transparent,
+         elevation: 0,
        );
 
   bool _holdScrim = false;
+
+  /// Whether the sheet shows the night listening face (no result yet).
+  final ValueNotifier<bool> night;
 
   // The sheets on screen, so a widget or shortcut tap can tell whether an
   // empty one already waits on top (UX-2110).
@@ -275,6 +287,7 @@ class _CaptureSheetRoute extends ModalBottomSheetRoute<void> {
   @override
   void dispose() {
     _open.remove(this);
+    night.dispose();
     super.dispose();
   }
 
@@ -332,7 +345,51 @@ class _SheetFrameState extends State<_SheetFrame> {
   double _pulled = 0;
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
+  Widget build(BuildContext context) {
+    final route = ModalRoute.of(context);
+    final night = route is _CaptureSheetRoute ? route.night : null;
+    final instant = MediaQuery.disableAnimationsOf(context);
+    final page = Theme.of(context);
+    // A plain Theme: an AnimatedTheme here rebuilds the capture under it.
+    Widget frame(bool dark) => Theme(
+      data: dark ? AppTheme.night : page,
+      child: Builder(
+        builder: (context) => AnimatedContainer(
+          duration: instant ? Duration.zero : const Duration(milliseconds: 300),
+          decoration: BoxDecoration(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            color: dark ? null : page.bottomSheetTheme.backgroundColor,
+            // Night, lit from below by the orb, as on the website's phone.
+            gradient: dark
+                ? RadialGradient(
+                    center: const Alignment(0, 0.55),
+                    radius: 1.1,
+                    colors: [
+                      Color.lerp(Lagoon.night, Lagoon.accent2, 0.42)!,
+                      Color.lerp(Lagoon.night, Lagoon.accent, 0.18)!,
+                      Lagoon.night,
+                    ],
+                    stops: const [0, 0.45, 1],
+                  )
+                : null,
+          ),
+          // Ink lands above the painted night, not under it.
+          child: Material(
+            type: MaterialType.transparency,
+            child: _body(context),
+          ),
+        ),
+      ),
+    );
+    return night == null
+        ? frame(false)
+        : ValueListenableBuilder<bool>(
+            valueListenable: night,
+            builder: (context, dark, _) => frame(dark),
+          );
+  }
+
+  Widget _body(BuildContext context) => GestureDetector(
     behavior: HitTestBehavior.translucent,
     onVerticalDragStart: (_) => _pulled = 0,
     onVerticalDragUpdate: (details) => _pulled += details.delta.dy,
@@ -2312,6 +2369,16 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   }
 
   /// While the sheet listens or works, a tap on the scrim doesn't close it.
+  /// Night while it listens and understands; the page's light for the
+  /// result, so the tasks to add read as the calendar's own cards.
+  void _markNight(bool night) {
+    final route = ModalRoute.of(context);
+    if (route is! _CaptureSheetRoute || route.night.value == night) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (route.isActive) route.night.value = night;
+    });
+  }
+
   void _holdScrim(bool hold) {
     final route = ModalRoute.of(context);
     if (route is! _CaptureSheetRoute || route.barrierDismissible != hold) {
@@ -2324,6 +2391,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   Widget build(BuildContext context) {
     final result = _result;
     _markEmpty(result == null && !_hasWords);
+    _markNight(result == null);
     if (result != null) {
       _holdScrim(false);
       return CaptureResult(
@@ -2553,7 +2621,11 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
         : Text(
             _words.text,
             key: const ValueKey('capture-heard'),
-            style: wordsStyle,
+            // Said words read large, in the display face; at large text the
+            // usual size, so the newest stay in view.
+            style: MediaQuery.textScalerOf(context).scale(14) > 18
+                ? wordsStyle
+                : theme.textTheme.headlineMedium,
           );
     final banners = <Widget>[
       // A meeting holds the mic: say why the sheet types, while it still
@@ -2646,7 +2718,45 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (status != null)
+              // Listening is a pill with a live dot, as on the website.
+              if (status != null && listening)
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(12, 6, 14, 6),
+                    decoration: BoxDecoration(
+                      color: colors.onSurface.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(40),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Lagoon.hot,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Lagoon.hot.withValues(alpha: 0.6),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            status,
+                            style: theme.textTheme.titleMedium,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else if (status != null)
                 Text(status, style: theme.textTheme.titleMedium),
               if (error != null || banners.isNotEmpty || words != null)
                 Flexible(
@@ -2769,39 +2879,96 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
     );
   }
 
-  /// The level ring around a mic that isn't a button: listening is controlled
-  /// only by the buttons below it.
-  Widget _ring(ColorScheme colors, _CapturePhase phase) => ExcludeSemantics(
-    child: SizedBox.square(
-      dimension: 72,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          SizedBox.expand(
-            child: CircularProgressIndicator(
-              value: switch (phase) {
-                _CapturePhase.processing => null,
-                _CapturePhase.listening => _level,
-                _ => 0,
-              },
-              strokeWidth: 4,
-              backgroundColor: colors.surfaceContainerHighest,
+  /// The orb around a mic that isn't a button: listening is controlled only
+  /// by the buttons below it. Lime to mint, it swells a little with the
+  /// voice; understanding, a mint ring turns around it.
+  Widget _ring(ColorScheme colors, _CapturePhase phase) {
+    final listening = phase == _CapturePhase.listening;
+    final processing = phase == _CapturePhase.processing;
+    final instant = MediaQuery.disableAnimationsOf(context);
+    // At large text, or on a short screen, the words and the buttons need the
+    // room: the orb keeps the old ring's size.
+    final roomy =
+        MediaQuery.textScalerOf(context).scale(14) <= 18 &&
+        MediaQuery.sizeOf(context).height >= 640;
+    final orb = roomy ? 96.0 : 56.0;
+    return ExcludeSemantics(
+      child: SizedBox.square(
+        dimension: roomy ? 132 : 72,
+        child: Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
+            // Rings ripple out while it listens, wider as the voice gets
+            // louder (ambient.dart).
+            Positioned.fill(
+              child: VoiceRipples(
+                level: _level,
+                active: listening,
+                color: Lagoon.hot,
+              ),
             ),
-          ),
-          // Understanding: the spinner alone, so it doesn't look like
-          // listening.
-          if (phase != _CapturePhase.processing)
-            Icon(
-              Icons.mic_none_rounded,
-              size: 32,
-              color: phase == _CapturePhase.listening
-                  ? colors.primary
-                  : colors.onSurfaceVariant,
+            // The level ring: how loud while listening, turning while it
+            // understands, empty while it starts.
+            SizedBox.square(
+              dimension: roomy ? 124 : 72,
+              child: CircularProgressIndicator(
+                value: switch (phase) {
+                  _CapturePhase.processing => null,
+                  _CapturePhase.listening => _level,
+                  _ => 0,
+                },
+                strokeWidth: 4,
+                color: Lagoon.hot,
+                backgroundColor: const Color(0x1FF1FBF8),
+              ),
             ),
-        ],
+            AnimatedScale(
+              scale: listening ? 1 + 0.12 * _level : 0.94,
+              duration: instant
+                  ? Duration.zero
+                  : const Duration(milliseconds: 140),
+              child: AnimatedOpacity(
+                opacity: listening || processing ? 1 : 0.7,
+                duration: instant
+                    ? Duration.zero
+                    : const Duration(milliseconds: 200),
+                child: Container(
+                  width: orb,
+                  height: orb,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const RadialGradient(
+                      center: Alignment(-0.35, -0.4),
+                      radius: 0.95,
+                      colors: [Lagoon.sun, Lagoon.hot, Lagoon.accent2],
+                      stops: [0, 0.55, 1],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Lagoon.hot.withValues(alpha: 0.45),
+                        blurRadius: 36,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  // Understanding: the orb alone, so it doesn't look like
+                  // listening.
+                  child: processing
+                      ? null
+                      : Icon(
+                          Icons.mic_none_rounded,
+                          size: roomy ? 40 : 28,
+                          color: Lagoon.onHot,
+                        ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   /// The filled action (with `Seguir` beside it when paused) the whole width;
   /// under it `Cancelar` at the start and `Escribir`, named in full, at the
@@ -4881,7 +5048,7 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
                 child: Text(
                   l.captureThingsToAdd(cards),
-                  style: theme.textTheme.titleMedium,
+                  style: theme.textTheme.headlineSmall,
                 ),
               ),
             if (_error != null)
@@ -4975,12 +5142,17 @@ class _CaptureResultState extends ConsumerState<CaptureResult> {
                       // With every card removed, the button finishes
                       // instead.
                       onPressed: onSave,
+                      // The mint of `Añadir tarea`: the same tap that
+                      // started it ends it. A deletion keeps its warning.
                       style: deleteOnly
                           ? FilledButton.styleFrom(
                               backgroundColor: theme.colorScheme.error,
                               foregroundColor: theme.colorScheme.onError,
                             )
-                          : null,
+                          : FilledButton.styleFrom(
+                              backgroundColor: Lagoon.hot,
+                              foregroundColor: Lagoon.onHot,
+                            ),
                       icon: _busy
                           ? const SizedBox(
                               width: 18,

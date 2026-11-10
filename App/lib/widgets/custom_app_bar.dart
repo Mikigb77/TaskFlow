@@ -1,5 +1,6 @@
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/screens/activity_screen.dart';
+import 'package:agenda/widgets/ambient.dart';
 import 'package:flutter/material.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -33,19 +34,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.done_all_rounded,
-                    size: 20,
-                    color: Theme.of(context).colorScheme.onPrimary,
-                  ),
-                ),
+                const BrandMark(),
                 const SizedBox(width: 10),
                 const Flexible(
                   child: Text(

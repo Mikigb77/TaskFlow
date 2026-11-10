@@ -1,6 +1,7 @@
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/providers/calendar_focus_provider.dart';
+import 'package:agenda/widgets/ambient.dart';
 import 'package:agenda/widgets/task_assignment_picker.dart';
 import 'package:agenda/widgets/task_planning_control.dart';
 import 'package:flutter/material.dart';
@@ -262,8 +263,12 @@ class TaskTile extends ConsumerWidget {
           context.l10n.reschedule,
           Alignment.centerRight,
         ),
+        // White cards that float a little on the light page; on night the
+        // border alone sets them off.
         child: Material(
           color: color ?? colors.surface,
+          elevation: Theme.of(context).brightness == Brightness.dark ? 0 : 3,
+          shadowColor: Lagoon.accent.withValues(alpha: 0.22),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
             side: BorderSide(color: colors.outlineVariant),
@@ -292,12 +297,21 @@ class TaskTile extends ConsumerWidget {
                       label: task.isCompleted
                           ? context.l10n.reopenNamedTask(task.title)
                           : context.l10n.completeNamedTask(task.title),
-                      child: Checkbox(
-                        value: task.isCompleted,
-                        shape: const CircleBorder(),
-                        onChanged: editable
-                            ? (_) => toggle()
-                            : null,
+                      child: Builder(
+                        builder: (context) => Checkbox(
+                          value: task.isCompleted,
+                          shape: const CircleBorder(),
+                          onChanged: editable
+                              ? (_) {
+                                  // Ticking it done bursts a little
+                                  // (ambient.dart).
+                                  if (!task.isCompleted) {
+                                    CheckBurst.play(context);
+                                  }
+                                  toggle();
+                                }
+                              : null,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 4),

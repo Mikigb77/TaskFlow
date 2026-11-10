@@ -12,6 +12,7 @@ import 'package:agenda/providers/subscription_provider.dart';
 import 'package:agenda/screens/completed_tasks_screen.dart';
 import 'package:agenda/widgets/project_scope_control.dart';
 import 'package:flutter/material.dart';
+import 'package:agenda/widgets/ambient.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/widgets/app_components.dart';
@@ -567,6 +568,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             pin: false,
           );
     return Scaffold(
+      backgroundColor: AmbientBackdrop.scaffoldColor(context),
       key: _page,
       appBar: CustomAppBar(
         title: title,
