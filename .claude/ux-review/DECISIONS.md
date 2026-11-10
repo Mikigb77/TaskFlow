@@ -2,6 +2,12 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-11-09 — The Lagoon look, shared with the website
+
+- The owner picked the website's Nova design in its green "Lagoon" palette, and asked: "Make sure to also re-design the app accordingly."
+- Built as: the `Lagoon` palette in `App/lib/theme/app_theme.dart` (night `#032229`, mint `#3EF0B0` with night text for the main taps, teal `#0A7A63` on the light page, aqua `#DAF4EF` tint, lime `#D9FF6B` spark), Bricolage Grotesque for titles and Manrope for everything read. `Añadir tarea` is a mint pill with a glow; the chosen day is a night pill (mint in dark mode); phone events are aqua cards with a teal edge; the capture sheet is night with a lime-to-mint orb while it listens, and turns light for the result; the `2 tareas añadidas · Deshacer` message is a night toast.
+- Reviewers: judge new screens against this look, not the earlier greens. The site's record: `../TaskFlowWeb/.claude/ux-web/DECISIONS.md`, 2026-11-09.
+
 ## 2026-11-08 — Attachment allowances, and completed tasks' files go after 15 days
 
 - The owner: "Every user: attachment files on a task are deleted 15 days after the task is completed […] but we will still keep the count on how many megabytes you have used." Free accounts: 200 MB per account, for life: "once across all your history, you have expended those 200 megabytes, then you can no longer attach files." Paying users: 500 MB per month.

@@ -5,6 +5,7 @@ import 'package:agenda/providers/device_calendar_provider.dart';
 import 'package:agenda/services/device_calendars.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:flutter/material.dart';
+import 'package:agenda/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 Future<void> showDeviceCalendarEvent(
@@ -182,30 +183,61 @@ class _EventRow extends StatelessWidget {
           overflow: TextOverflow.ellipsis);
       onTap = () => showDeviceCalendarEvent(context, day, event);
     }
+    final row = Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        child: Row(children: [
+          if (event == null)
+            const SizedBox(width: 20)
+          else
+            Icon(Icons.event_outlined, size: 20, color: colors.onSurfaceVariant),
+          const SizedBox(width: 10),
+          Expanded(child: label),
+        ]));
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Semantics(
             button: true,
-            child: InkWell(
-                key: event == null
-                    ? null
-                    : ValueKey('calendar-event-${event.identity}'),
-                onTap: onTap,
-                borderRadius: BorderRadius.circular(12),
-                child: ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 48),
-                    child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 8),
-                        child: Row(children: [
-                          if (event == null)
-                            const SizedBox(width: 20)
-                          else
-                            Icon(Icons.event_outlined,
-                                size: 20, color: colors.onSurfaceVariant),
-                          const SizedBox(width: 10),
-                          Expanded(child: label),
-                        ]))))));
+            // An event is an aqua card with a teal edge, set apart from the
+            // white task cards; the line that opens them all stays plain.
+            child: event == null
+                ? InkWell(
+                    onTap: onTap,
+                    borderRadius: BorderRadius.circular(12),
+                    child: ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 48),
+                        child: row))
+                : Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Material(
+                        color: dark
+                            ? Lagoon.tint.withValues(alpha: 0.12)
+                            : Lagoon.tintBg,
+                        borderRadius: BorderRadius.circular(14),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                            key: ValueKey('calendar-event-${event.identity}'),
+                            onTap: onTap,
+                            child: IntrinsicHeight(
+                                child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                  Container(
+                                      width: 4,
+                                      color: dark
+                                          ? Lagoon.tint
+                                          : Lagoon.accent2),
+                                  Expanded(
+                                      child: ConstrainedBox(
+                                          constraints: const BoxConstraints(
+                                              minHeight: 48),
+                                          child: Padding(
+                                              padding:
+                                                  const EdgeInsetsDirectional
+                                                      .only(start: 8),
+                                              child: row))),
+                                ])))))));
   }
 }
 

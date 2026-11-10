@@ -549,16 +549,27 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     final scaler = MediaQuery.textScalerOf(context);
     final base = Theme.of(context).textTheme.bodyMedium!.copyWith(height: 1.2);
     final plainStyle = base.copyWith(
+      fontFamily: Lagoon.display,
       color: colors.onSurface,
-      fontWeight: FontWeight.w600,
+      fontWeight: FontWeight.w700,
     );
-    final weekendStyle = base.copyWith(color: colors.onSurfaceVariant);
+    final weekendStyle = base.copyWith(
+      fontFamily: Lagoon.display,
+      color: colors.onSurfaceVariant,
+      fontWeight: FontWeight.w500,
+    );
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    // The chosen day is a night pill on the light page and a mint one on
+    // night, as on the website's phone.
+    final selectedFill = dark ? Lagoon.hot : Lagoon.night;
     final selectedStyle = base.copyWith(
-      color: colors.onPrimary,
+      fontFamily: Lagoon.display,
+      color: dark ? Lagoon.onHot : Lagoon.onNight,
       fontWeight: FontWeight.w800,
     );
     final todayStyle = base.copyWith(
-      color: colors.primary,
+      fontFamily: Lagoon.display,
+      color: dark ? colors.onPrimaryContainer : Lagoon.accent,
       fontWeight: FontWeight.w800,
     );
     final weekdayStyle = base.copyWith(
@@ -604,7 +615,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: fill,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
           // Shrunk only as far as the pill needs, never cut.
           child: FittedBox(
@@ -650,7 +661,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
         defaultBuilder: (context, day, _) => plain(day),
         outsideBuilder: (context, day, _) => plain(day),
         selectedBuilder: (context, day, _) =>
-            cell(day, selectedStyle, colors.primary),
+            cell(day, selectedStyle, selectedFill),
         todayBuilder: (context, day, _) =>
             cell(day, todayStyle, colors.primaryContainer),
         // The cell names only its date. Beside it, every day says whether
@@ -994,7 +1005,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                         context.l10n.agendaCounts(total - completed, completed),
                         style: TextStyle(
                           color: colors.onSurfaceVariant,
-                          fontSize: 12,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],

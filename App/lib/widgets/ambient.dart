@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/theme/motion.dart';
 
 /// The living details that give TaskFlow the feel of its website and of
@@ -10,7 +11,8 @@ import 'package:agenda/theme/motion.dart';
 /// decoration only: excluded from semantics, never in the way of a tap, and
 /// still where the phone asks for less motion (AppMotion).
 
-/// TaskFlow's light colours, in each theme: the site's greens and its lime.
+/// TaskFlow's light colours, in each theme: the site's Lagoon teals, its
+/// aqua and its lime.
 class AmbientColors {
   const AmbientColors._(this.a, this.b, this.c, this.mote);
   final Color a;
@@ -22,16 +24,16 @@ class AmbientColors {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return dark
         ? const AmbientColors._(
-            Color(0x3329876A),
-            Color(0x26A5D88B),
-            Color(0x1F6A9BC3),
-            Color(0xFFD4ECA3),
+            Color(0x381FB5A6),
+            Color(0x1F3EF0B0),
+            Color(0x1A8BE9E0),
+            Color(0xFFD9FF6B),
           )
         : const AmbientColors._(
-            Color(0x473F9A6E),
-            Color(0x66D4ECA3),
-            Color(0x2E9CC9B6),
-            Color(0xFF3C9A73),
+            Color(0x401FB5A6),
+            Color(0x668BE9E0),
+            Color(0x3DD9FF6B),
+            Color(0xFF0A7A63),
           );
   }
 }
@@ -335,7 +337,7 @@ class _GlintPainter extends CustomPainter {
 /// crosses it now and then, so the one button that adds a task is the one
 /// that draws the eye. [child] is the button itself, untouched.
 class LivelyButton extends StatefulWidget {
-  const LivelyButton({super.key, required this.child, this.radius = 18});
+  const LivelyButton({super.key, required this.child, this.radius = 40});
   final Widget child;
   final double radius;
 
@@ -349,24 +351,30 @@ class _LivelyButtonState extends State<LivelyButton> with AmbientState {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final glint = Glint(
       radius: widget.radius,
-      opacity: dark ? 0.16 : 0.26,
+      opacity: dark ? 0.2 : 0.32,
       child: widget.child,
     );
+    // A mint halo that breathes, and a soft ring around the pill, as on the
+    // website's phone.
     Widget glow(double v) => DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(widget.radius),
         boxShadow: [
           BoxShadow(
-            color: colors.primary.withValues(
-              alpha: (dark ? 0.18 : 0.22) + 0.14 * v,
+            color: Lagoon.hot.withValues(alpha: (dark ? 0.16 : 0.26) + 0.1 * v),
+            blurRadius: 0,
+            spreadRadius: 5 + 2 * v,
+          ),
+          BoxShadow(
+            color: (dark ? Lagoon.hot : Lagoon.accent2).withValues(
+              alpha: (dark ? 0.18 : 0.24) + 0.12 * v,
             ),
-            blurRadius: 18 + 10 * v,
-            spreadRadius: -4 + 2 * v,
-            offset: const Offset(0, 8),
+            blurRadius: 22 + 10 * v,
+            spreadRadius: -2 + 2 * v,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -420,8 +428,8 @@ class BrandMark extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: dark
-                ? [colors.primary, const Color(0xFFD4ECA3)]
-                : [colors.primary, const Color(0xFF2E9A78)],
+                ? [colors.primary, Lagoon.sun]
+                : [colors.primary, Lagoon.accent2],
           ),
           boxShadow: [
             BoxShadow(
@@ -614,7 +622,7 @@ abstract final class CheckBurst {
       builder: (_) => _Burst(
         center: center,
         primary: colors.primary,
-        accent: const Color(0xFFA9D66F),
+        accent: Lagoon.sun,
         onDone: () => entry.remove(),
       ),
     );
