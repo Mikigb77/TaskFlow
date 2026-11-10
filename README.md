@@ -34,3 +34,32 @@ Both workflows can also be started by hand from **Actions → CI** or **Actions 
 1. **Google Cloud**, for the backend and the website. Run TaskFlowWeb's `scripts/dev/setup-github-deploy.sh` once, either in [Google Cloud Shell](https://shell.cloud.google.com/?project=taskflow-511107) or in Git Bash with `gcloud` signed in as the owner. It sets up keyless sign-in that only `main` of the two repositories can use. No key is stored in GitHub.
 2. **The app's signing key and build config.** On the PC that holds `App/.credentials/` and `App/config/staging.json`, run `bash App/scripts/upload-ci-secrets.sh` in Git Bash, with `gh` signed in. It stores four Actions secrets: `APP_STAGING_CONFIG`, `STAGING_KEYSTORE_BASE64`, `STAGING_STORE_PASSWORD` and `STAGING_KEY_PASSWORD`. CI signs with the same staging key, so installed apps keep updating and Google sign-in keeps working. Run it again after changing either file.
 3. **Cloudflare**, for the website's edge worker. Add an "Edit Cloudflare Workers" API token to TaskFlowWeb as the `CLOUDFLARE_API_TOKEN` secret.
+
+## Dependabot
+
+Dependabot watches the app's Dart packages, the backend's Python packages, the API image's Python, the local Docker Compose services and the workflows' actions. It is free, and stays free if the repository goes private.
+
+- **Alerts** list each known vulnerability under the repository's Security tab.
+- **Security updates** open a PR into `dev`, the default branch, as soon as an advisory affects a package and a fixed version exists. They never wait.
+- **Version updates** ([`.github/dependabot.yml`](.github/dependabot.yml)) open PRs into `dev` once a week. The minor and patch updates of each ecosystem share one PR, and each major update gets its own; RevenueCat's two Flutter packages always move together. A release waits 7 days before it is offered, so a broken or hijacked release is usually pulled first.
+- **Left out on purpose**, each with its reason in the file: `intl`, which the Flutter SDK pins; a newer Python for the API image (3.14 to 3.15 is a new Python, a PR of its own); Postgres and Redis majors; and the Android Gradle files, which follow Flutter.
+
+Alerts and security updates are switched on in the repository's settings, not in the file (since 2026-11-10; `gh api repos/Mikigb77/TaskFlow/automated-security-fixes` shows whether they still are). The backend's exact versions are in `Backend/requirements-lock.txt`, which the image and CI install, so Dependabot updates and checks those too. CI's backend tests read their Python from `Backend/Dockerfile`, so an update of the image's Python is tested on the new one, and CI fails a PR if any Dependabot entry doesn't open its PRs into `dev`.
+
+Dependabot checks early on Monday (04:00 Madrid time), and a scheduled Claude pass at 06:09 works through its PRs, security updates first (Miki, 2026-11-10):
+
+- A green patch or minor update is squash-merged into `dev`.
+- A major update needs a look at its release notes. It is merged if CI is green and nothing affects us; if it changes behavior, cost or licence, it waits for Miki.
+- If CI fails, a small, clear fix goes on the Dependabot branch. Otherwise the PR is closed with the reason, and a version that can't work yet gets an ignore, with the reason, in the file.
+- A merged security fix to code that ships (the app or the API) is released at once, by a pull request from `dev` into `main`; Deploy runs one release at a time. Anything else ships with the next release.
+- The pass reads the repository's open alerts and notes any that are new or changed.
+
+### The weekly report
+
+By 07:55 Madrid time the pass files one GitHub issue in each repository that has something to report, labelled `dependabot-report` and assigned to Miki, so one search lists every open report: [label:dependabot-report assignee:Mikigb77](https://github.com/issues?q=is%3Aopen+is%3Aissue+label%3Adependabot-report+assignee%3AMikigb77). A week with no Dependabot PR to handle, no new or changed alert and nothing merged, closed or deployed files nothing. The title (`[high] Dependabot report, YYYY-MM-DD`) and an `urgency:` label say how soon it needs Miki:
+
+- **high**, act today: something that ships is exposed or broken. An alert on a dependency that ships is still open after the pass, a release or rollback failed, or `dev` or `main` is red because of an update.
+- **medium**, decide this week: something only Miki can decide is waiting, such as a major update that changes behavior, cost or licence, or a red update with no clear fix.
+- **low**, for the record: updates were merged, closed or released, and nothing needs Miki.
+
+The report's first line says what Miki needs to do, or "Nothing for you to do." Then it lists what needs Miki, what merged, closed (with the reason), was released or is still pending, and any new alert, with a link for each. An alert already reported and unchanged isn't repeated, and the report holds no secrets, IP addresses or users' data. Work still running at 07:55 is finished afterwards and added as a comment, with the urgency changed if it changed. The next week's report closes a low one; a high or medium report stays open until what it asks for is done.
