@@ -70,6 +70,13 @@ jobs:
           echo "app=$app" >> "$GITHUB_OUTPUT"
           echo "backend=$backend" >> "$GITHUB_OUTPUT"
           echo "Check the app: $app. Check the backend: $backend."
+      # Every Dependabot update opens its PR into dev, like every PR (README.md#dependabot).
+      - name: Dependabot opens every update into dev
+        run: |
+          entries=$(grep -c '^  - package-ecosystem: ' .github/dependabot.yml || true)
+          into_dev=$(grep -c '^    target-branch: dev$' .github/dependabot.yml || true)
+          echo "$entries entries, $into_dev of them into dev."
+          [ "$entries" -gt 0 ] && [ "$entries" -eq "$into_dev" ]
 
   analyze:
     name: App analyze
@@ -124,12 +131,20 @@ jobs:
         working-directory: Backend
     steps:
       - uses: actions/checkout@v7
+      # The Python of the Docker image, read from its Dockerfile, so a Dependabot update of the
+      # image's Python is tested on the new one.
+      - id: python
+        name: The Docker image's Python
+        run: |
+          version=$(sed -nE 's/^FROM python:([0-9]+\.[0-9]+).*/\1/p' Dockerfile | head -n 1)
+          [ -n "$version" ] && echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Python $version"
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.14" # the Docker image's Python
+          python-version: ${{ steps.python.outputs.version }}
           cache: pip
-          cache-dependency-path: Backend/requirements.lock
-      - run: pip install -r requirements.lock
+          cache-dependency-path: Backend/requirements-lock.txt
+      - run: pip install -r requirements-lock.txt
       - name: python manage.py test core
         run: |
           # Committed test settings with every key blank or fake: no test may

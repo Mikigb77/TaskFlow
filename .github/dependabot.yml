@@ -1,88 +1,107 @@
-# Dependabot: weekly version-update pull requests into dev, plus security-fix
-# pull requests as soon as an advisory lands (those are switched on in the
-# repo's settings, not here). Minor and patch bumps come grouped, one pull
-# request per ecosystem, so each week costs a handful of CI runs; major bumps
-# come one by one, because they can break things.
+# Dependabot keeps the dependencies current and patched (README.md#dependabot).
 #
-# Not covered on purpose:
-# - Gradle (App/android): Flutter manages the Android Gradle plugin and Kotlin
-#   versions, so those move with Flutter upgrades, not on their own.
-# - Major Docker image bumps (Python, Postgres, Redis): a new Python or
-#   Postgres major is a planned upgrade, not a weekly bump.
+# Alerts and security updates are switched on in the repository's settings: a security update
+# opens a PR into the default branch, dev, as soon as an advisory affects a dependency and a fixed
+# version exists, and never waits. The version updates below open their PRs into dev too, like
+# every PR, once a week: the minor and patch updates of each ecosystem together in one PR, each
+# major update in its own. A new release waits 7 days before it is offered, so a broken or
+# hijacked release is usually pulled before it reaches us.
+#
+# Updates are checked early on Monday (04:00 Madrid time), so their PRs and CI are done before
+# the weekly Dependabot pass at 06:09, which merges the green ones (README.md#dependabot).
+#
+# The Android build's Gradle files (App/android) are left out: the Android Gradle plugin and
+# Kotlin follow Flutter's versions, so they move when Flutter does.
 version: 2
 
 updates:
+  # The app's Dart packages: App/pubspec.yaml and pubspec.lock.
   - package-ecosystem: pub
     directory: /App
     target-branch: dev
     schedule:
       interval: weekly
       day: monday
-      time: "06:00"
+      time: "04:00"
       timezone: Europe/Madrid
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "deps(app)"
+    cooldown:
+      default-days: 7
+    ignore:
+      # flutter_localizations pins intl to the Flutter SDK's version, so it moves with Flutter.
+      - dependency-name: intl
     groups:
-      app-minor-and-patch:
+      # RevenueCat's SDK and its paywall UI only work at the same version, majors included.
+      purchases:
+        patterns: [purchases_flutter, purchases_ui_flutter]
+      # The rest: minor and patch updates in one PR, each major update in its own.
+      app:
         update-types: [minor, patch]
 
+  # The backend's Python packages: Backend/requirements.txt (the ranges) and
+  # requirements-lock.txt (the exact versions the image and CI install).
   - package-ecosystem: pip
     directory: /Backend
     target-branch: dev
     schedule:
       interval: weekly
       day: monday
-      time: "06:00"
+      time: "04:00"
       timezone: Europe/Madrid
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "deps(backend)"
+    cooldown:
+      default-days: 7
     groups:
-      backend-minor-and-patch:
+      backend:
         update-types: [minor, patch]
 
+  # The API image's Python (Backend/Dockerfile). CI's backend tests read their Python from it.
+  # Moving to a newer Python (3.14 to 3.15 is a new Python, not a patch) is a PR of its own, so
+  # Dependabot only offers its patch releases.
   - package-ecosystem: docker
     directory: /Backend
     target-branch: dev
     schedule:
       interval: weekly
       day: monday
-      time: "06:00"
+      time: "04:00"
       timezone: Europe/Madrid
-    commit-message:
-      prefix: "deps(docker)"
+    cooldown:
+      default-days: 7
     ignore:
-      - dependency-name: "*"
-        update-types: [version-update:semver-major]
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
+  # The local Docker Compose services (Backend/compose.yaml). A new Postgres or Redis major
+  # changes the stored data's format, so it is a planned upgrade of its own.
   - package-ecosystem: docker-compose
     directory: /Backend
     target-branch: dev
     schedule:
       interval: weekly
       day: monday
-      time: "06:00"
+      time: "04:00"
       timezone: Europe/Madrid
-    commit-message:
-      prefix: "deps(docker)"
+    cooldown:
+      default-days: 7
     ignore:
-      - dependency-name: "*"
-        update-types: [version-update:semver-major]
+      - dependency-name: postgres
+        update-types: ["version-update:semver-major"]
+      - dependency-name: redis
+        update-types: ["version-update:semver-major"]
     groups:
-      compose-images:
-        patterns: ["*"]
+      compose:
+        update-types: [minor, patch]
 
+  # The actions the workflows use.
   - package-ecosystem: github-actions
     directory: /
     target-branch: dev
     schedule:
       interval: weekly
       day: monday
-      time: "06:00"
+      time: "04:00"
       timezone: Europe/Madrid
-    commit-message:
-      prefix: "ci"
+    cooldown:
+      default-days: 7
     groups:
       actions:
-        patterns: ["*"]
+        update-types: [minor, patch]

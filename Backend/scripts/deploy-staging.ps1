@@ -103,7 +103,7 @@ if (-not $SkipBuild) {
     $taskflowSource = Join-Path $taskflowBackend "artifacts/source-$taskflowTag"
     New-Item -ItemType Directory -Path $taskflowSource -Force | Out-Null
     # Explicit allowlist: no .env, signing keys, ADC, media, or database dumps.
-    foreach ($name in @('core','config','templates','manage.py','requirements.txt','requirements.lock','Dockerfile','.dockerignore')) {
+    foreach ($name in @('core','config','templates','manage.py','requirements.txt','requirements-lock.txt','Dockerfile','.dockerignore')) {
         Copy-Item -LiteralPath (Join-Path $taskflowBackend $name) -Destination $taskflowSource -Recurse
     }
     New-Item -ItemType Directory -Path (Join-Path $taskflowSource 'scripts') -Force | Out-Null
