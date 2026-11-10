@@ -137,7 +137,7 @@ Future<void> showCaptureSheet(
         localizations.bottomSheetLabel,
       ),
       modalBarrierColor: Theme.of(context).bottomSheetTheme.modalBarrierColor,
-      night: captureId == null,
+      listening: captureId == null,
       builder: (_) => _SheetFrame(
         child: _CaptureOrigin(
           page: page,
@@ -245,23 +245,23 @@ class _CaptureSheetRoute extends ModalBottomSheetRoute<void> {
     super.barrierLabel,
     super.barrierOnTapHint,
     super.modalBarrierColor,
-    bool night = true,
-  }) : night = ValueNotifier(night),
+    bool listening = true,
+  }) : listening = ValueNotifier(listening),
        super(
          isScrollControlled: true,
          useSafeArea: true,
          enableDrag: false,
          showDragHandle: false,
-         // [_SheetFrame] paints the sheet: night while it listens, the page's
-         // own surface once there's a result.
+         // [_SheetFrame] paints the sheet: lit by the orb while it listens,
+         // the page's own surface once there's a result.
          backgroundColor: Colors.transparent,
          elevation: 0,
        );
 
   bool _holdScrim = false;
 
-  /// Whether the sheet shows the night listening face (no result yet).
-  final ValueNotifier<bool> night;
+  /// Whether the sheet shows the listening face (no result yet).
+  final ValueNotifier<bool> listening;
 
   // The sheets on screen, so a widget or shortcut tap can tell whether an
   // empty one already waits on top (UX-2110).
@@ -287,7 +287,7 @@ class _CaptureSheetRoute extends ModalBottomSheetRoute<void> {
   @override
   void dispose() {
     _open.remove(this);
-    night.dispose();
+    listening.dispose();
     super.dispose();
   }
 
@@ -347,45 +347,48 @@ class _SheetFrameState extends State<_SheetFrame> {
   @override
   Widget build(BuildContext context) {
     final route = ModalRoute.of(context);
-    final night = route is _CaptureSheetRoute ? route.night : null;
+    final listening = route is _CaptureSheetRoute ? route.listening : null;
     final instant = MediaQuery.disableAnimationsOf(context);
     final page = Theme.of(context);
-    // A plain Theme: an AnimatedTheme here rebuilds the capture under it.
-    Widget frame(bool dark) => Theme(
-      data: dark ? AppTheme.night : page,
-      child: Builder(
-        builder: (context) => AnimatedContainer(
-          duration: instant ? Duration.zero : const Duration(milliseconds: 300),
-          decoration: BoxDecoration(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-            color: dark ? null : page.bottomSheetTheme.backgroundColor,
-            // Night, lit from below by the orb, as on the website's phone.
-            gradient: dark
-                ? RadialGradient(
-                    center: const Alignment(0, 0.55),
-                    radius: 1.1,
-                    colors: [
-                      Color.lerp(Lagoon.night, Lagoon.accent2, 0.42)!,
-                      Color.lerp(Lagoon.night, Lagoon.accent, 0.18)!,
-                      Lagoon.night,
-                    ],
-                    stops: const [0, 0.45, 1],
-                  )
-                : null,
-          ),
-          // Ink lands above the painted night, not under it.
-          child: Material(
-            type: MaterialType.transparency,
-            child: _body(context),
-          ),
-        ),
+    final dark = page.brightness == Brightness.dark;
+    final surface =
+        page.bottomSheetTheme.backgroundColor ?? page.colorScheme.surface;
+    // The listening face follows the app's mode, lit from below by the orb as
+    // on the website's phone: night in dark mode, a soft mint glow on the
+    // light page.
+    final glow = dark
+        ? [
+            Color.lerp(Lagoon.night, Lagoon.accent2, 0.42)!,
+            Color.lerp(Lagoon.night, Lagoon.accent, 0.18)!,
+            Lagoon.night,
+          ]
+        : [
+            Color.lerp(surface, Lagoon.hot, 0.32)!,
+            Color.lerp(surface, Lagoon.tintBg, 0.7)!,
+            surface,
+          ];
+    Widget frame(bool lit) => AnimatedContainer(
+      duration: instant ? Duration.zero : const Duration(milliseconds: 300),
+      decoration: BoxDecoration(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        color: lit ? null : surface,
+        gradient: lit
+            ? RadialGradient(
+                center: const Alignment(0, 0.55),
+                radius: 1.1,
+                colors: glow,
+                stops: const [0, 0.45, 1],
+              )
+            : null,
       ),
+      // Ink lands above the painted glow, not under it.
+      child: Material(type: MaterialType.transparency, child: _body(context)),
     );
-    return night == null
+    return listening == null
         ? frame(false)
         : ValueListenableBuilder<bool>(
-            valueListenable: night,
-            builder: (context, dark, _) => frame(dark),
+            valueListenable: listening,
+            builder: (context, lit, _) => frame(lit),
           );
   }
 
@@ -2369,13 +2372,16 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   }
 
   /// While the sheet listens or works, a tap on the scrim doesn't close it.
-  /// Night while it listens and understands; the page's light for the
-  /// result, so the tasks to add read as the calendar's own cards.
-  void _markNight(bool night) {
+  /// Lit by the orb while it listens and understands; the page's plain
+  /// surface for the result, so the tasks to add read as the calendar's own
+  /// cards.
+  void _markListening(bool listening) {
     final route = ModalRoute.of(context);
-    if (route is! _CaptureSheetRoute || route.night.value == night) return;
+    if (route is! _CaptureSheetRoute || route.listening.value == listening) {
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (route.isActive) route.night.value = night;
+      if (route.isActive) route.listening.value = listening;
     });
   }
 
@@ -2391,7 +2397,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
   Widget build(BuildContext context) {
     final result = _result;
     _markEmpty(result == null && !_hasWords);
-    _markNight(result == null);
+    _markListening(result == null);
     if (result != null) {
       _holdScrim(false);
       return CaptureResult(
@@ -2736,10 +2742,10 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
                           height: 8,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Lagoon.hot,
+                            color: colors.primary,
                             boxShadow: [
                               BoxShadow(
-                                color: Lagoon.hot.withValues(alpha: 0.6),
+                                color: colors.primary.withValues(alpha: 0.6),
                                 blurRadius: 8,
                               ),
                             ],
@@ -2905,7 +2911,7 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
               child: VoiceRipples(
                 level: _level,
                 active: listening,
-                color: Lagoon.hot,
+                color: colors.primary,
               ),
             ),
             // The level ring: how loud while listening, turning while it
@@ -2919,8 +2925,8 @@ class _VoiceTaskScreenState extends ConsumerState<_VoiceCaptureScreen>
                   _ => 0,
                 },
                 strokeWidth: 4,
-                color: Lagoon.hot,
-                backgroundColor: const Color(0x1FF1FBF8),
+                color: colors.primary,
+                backgroundColor: colors.onSurface.withValues(alpha: 0.12),
               ),
             ),
             AnimatedScale(

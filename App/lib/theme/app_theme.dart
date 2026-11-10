@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 /// a bright mint for the one main tap, and a lime spark. The roles keep the
 /// site's names so both stay in step.
 abstract final class Lagoon {
-  /// The deep teal of dark mode, the listening screen and the toast.
+  /// The deep teal of dark mode and the toast.
   static const night = Color(0xFF032229);
   static const night2 = Color(0xFF0A3A44);
 
@@ -54,9 +54,6 @@ abstract final class AppTheme {
 
   static ThemeData get light => _build(Brightness.light);
   static ThemeData get dark => _build(Brightness.dark);
-
-  /// The listening sheet's face in either mode: Lagoon night.
-  static final ThemeData night = _build(Brightness.dark);
 
   static ThemeData _build(Brightness brightness) {
     final dark = brightness == Brightness.dark;
