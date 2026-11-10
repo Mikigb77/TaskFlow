@@ -35,7 +35,7 @@ tag="main-${COMMIT:0:12}"
 image="$REGION-docker.pkg.dev/$PROJECT/taskflow-api/backend:$tag"
 source="$work/source"
 mkdir -p "$source/scripts"
-for name in core config templates manage.py requirements.txt requirements.lock Dockerfile .dockerignore; do
+for name in core config templates manage.py requirements.txt requirements-lock.txt Dockerfile .dockerignore; do
   cp -R "Backend/$name" "$source/"
 done
 cp Backend/scripts/start-server.sh "$source/scripts/start-server.sh"
