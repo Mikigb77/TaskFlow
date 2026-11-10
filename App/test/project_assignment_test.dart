@@ -145,7 +145,8 @@ void main() {
               ..remove('createdByName')
               ..remove('reminderPlan')
               ..remove('completedAt')
-              ..remove('completedTimes');
+              ..remove('completedTimes')
+          ..remove('reminderExtraMinutes');
         await old.insert('tasks', {
           ...row,
           'owner_key': owner,
@@ -353,7 +354,8 @@ void main() {
             ..remove('createdByName')
             ..remove('reminderPlan')
             ..remove('completedAt')
-            ..remove('completedTimes');
+            ..remove('completedTimes')
+          ..remove('reminderExtraMinutes');
       await old.insert('tasks', {
         ...row,
         'owner_key': owner,

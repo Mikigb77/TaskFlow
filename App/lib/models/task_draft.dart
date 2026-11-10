@@ -1,6 +1,7 @@
 import 'package:agenda/models/checklist_item.dart';
 import 'package:agenda/models/capture_clarification.dart';
 import 'package:agenda/models/reminder_plan.dart';
+import 'package:agenda/models/task.dart';
 
 class TaskDraft {
   final String title;
@@ -42,6 +43,11 @@ class TaskDraft {
   final ReminderPlan? reminderPlan;
   final int? reminderMinutes;
 
+  /// More reminders said for the same timed task: «20 minutos antes y 5
+  /// minutos antes» is [reminderMinutes] 20 and `[5]`. Empty from older
+  /// servers, and when one or none was said.
+  final List<int> reminderExtraMinutes;
+
   /// A reminder was said for a task with neither a day nor a deadline: it
   /// applies once the task has a day. Absent from older servers.
   final bool reminderNeedsDay;
@@ -50,6 +56,9 @@ class TaskDraft {
     : title = data['title'] as String,
       reminderPlan = ReminderPlan.tryParse(data['reminder_plan']),
       reminderMinutes = _minutes(data['reminder_minutes']),
+      reminderExtraMinutes = Task.extraLeads(
+        Task.readExtraLeads(() => data['reminder_extra_minutes']),
+      ),
       reminderNeedsDay = data['reminder_needs_day'] == true,
       clarifications = (data['clarifications'] as List? ?? [])
           .map(

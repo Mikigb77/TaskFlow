@@ -61,6 +61,12 @@ class CloudTaskRepository extends TaskRepository {
       ) &&
       sent['priority'] == remote['priority'] &&
       sent['reminder_minutes'] == remote['reminder_minutes'] &&
+      // A server without extra reminders can't tell either.
+      (!remote.containsKey('reminder_extra_minutes') ||
+          const DeepCollectionEquality().equals(
+            sent['reminder_extra_minutes'] ?? const [],
+            remote['reminder_extra_minutes'],
+          )) &&
       sent['reminder_time'] == remote['reminder_time'] &&
       // As maps: the server may send the keys in another order. A server
       // without plans can't tell: only one that sends them differs.
@@ -108,6 +114,7 @@ class CloudTaskRepository extends TaskRepository {
   /// The reminder fields that are each account's own, as [remote] has them.
   Map<String, dynamic> _reminders(Map<String, dynamic> remote) => {
     'reminder_minutes': remote['reminder_minutes'],
+    'reminder_extra_minutes': remote['reminder_extra_minutes'] ?? const [],
     'reminder_time': remote['reminder_time'],
     'reminder_anchor': remote['reminder_anchor'] ?? 'planned',
     'reminder_plan': remote['reminder_plan'],
@@ -133,6 +140,7 @@ class CloudTaskRepository extends TaskRepository {
         data: {
           ...remote,
           'reminder_minutes': data['reminder_minutes'],
+          'reminder_extra_minutes': data['reminder_extra_minutes'] ?? const [],
           'reminder_time': data['reminder_time'],
           'reminder_plan': data['reminder_plan'],
           'version': remote['version'],

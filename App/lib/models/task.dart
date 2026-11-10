@@ -56,6 +56,13 @@ class Task {
   /// Null follows device defaults; -1 disables; otherwise minutes before.
   final int? reminderMinutes;
 
+  /// More reminders before a timed task, besides [reminderMinutes]: «20
+  /// minutos antes y 5 minutos antes» is 20 and `[5]`. Each in minutes
+  /// before (0 at its start), largest first, never [reminderMinutes] again.
+  /// They ring with the single reminder: not while it's off, not while a
+  /// plan is set, and not on a task without a time.
+  final List<int> reminderExtraMinutes;
+
   /// Local minute of day for date-only tasks. Null follows device defaults.
   final int? reminderTime;
 
@@ -112,6 +119,7 @@ class Task {
     this.occurrenceHasTime,
     required this.priority,
     this.reminderMinutes,
+    List<int> reminderExtraMinutes = const [],
     this.reminderTime,
     this.reminderPlan,
     bool isCompleted = false,
@@ -136,6 +144,7 @@ class Task {
            ..sort((a, b) => a.originalDate.compareTo(b.originalDate)),
        ),
        _isCompleted = isCompleted,
+       reminderExtraMinutes = extraLeads(reminderExtraMinutes, reminderMinutes),
        completedDates = List.unmodifiable(completedDates ?? []),
        // Only what the completion says: a task that doesn't repeat has a
        // time while it's completed; a repeating one, for its completed dates.
@@ -181,6 +190,7 @@ class Task {
             isCompleted ||
             reminderTime != null ||
             reminderPlan != null ||
+            reminderExtraMinutes.isNotEmpty ||
             (reminderMinutes != null && reminderMinutes != -1) ||
             reminderAnchor != 'planned' ||
             this.checklist.any((item) => item.completedDates.isNotEmpty))) {
@@ -582,6 +592,38 @@ class Task {
   static DateTime? _instant(Object? value) =>
       value is String ? DateTime.tryParse(value)?.toLocal() : null;
 
+  /// The most extra reminders a task keeps, as the server takes them.
+  static const maxExtraLeads = 5;
+
+  /// [values] as [reminderExtraMinutes] keeps them: each lead from 0 to a
+  /// week once, largest first, without the single reminder's [main] lead.
+  static List<int> extraLeads(Iterable<int> values, [int? main]) {
+    final leads =
+        (values.where((value) => value >= 0 && value <= 10080).toSet()
+              ..remove(main))
+            .toList()
+          ..sort((a, b) => b.compareTo(a));
+    return List.unmodifiable(leads.take(maxExtraLeads));
+  }
+
+  /// Extra leads as stored or sent: a list of whole numbers. Anything else,
+  /// or nothing, is none.
+  static List<int> readExtraLeads(Object? Function() read) {
+    try {
+      final value = read();
+      if (value is! List) return const [];
+      return [
+        for (final item in value)
+          if (item is int)
+            item
+          else if (item is num && item == item.roundToDouble())
+            item.toInt(),
+      ];
+    } catch (_) {
+      return const [];
+    }
+  }
+
   static Map<String, DateTime> _times(Object? Function() read) {
     Object? value;
     try {
@@ -619,6 +661,7 @@ class Task {
     Object? occurrenceHasTime = _unchanged,
     int? priority,
     Object? reminderMinutes = _unchanged,
+    List<int>? reminderExtraMinutes,
     Object? reminderTime = _unchanged,
     Object? reminderPlan = _unchanged,
     bool? isCompleted,
@@ -674,6 +717,7 @@ class Task {
     reminderMinutes: identical(reminderMinutes, _unchanged)
         ? this.reminderMinutes
         : reminderMinutes as int?,
+    reminderExtraMinutes: reminderExtraMinutes ?? this.reminderExtraMinutes,
     reminderTime: identical(reminderTime, _unchanged)
         ? this.reminderTime
         : reminderTime as int?,
@@ -732,6 +776,7 @@ class Task {
     'completedTimes': jsonEncode(_timesJson),
     'priority': priority,
     'reminderMinutes': reminderMinutes,
+    'reminderExtraMinutes': jsonEncode(reminderExtraMinutes),
     'reminderTime': reminderTime,
     'reminderPlan': reminderPlan?.encode(),
     'isCompleted': _isCompleted ? 1 : 0,
@@ -781,6 +826,9 @@ class Task {
     completedTimes: _times(() => jsonDecode(map['completedTimes'] ?? '{}')),
     priority: map['priority'],
     reminderMinutes: map['reminderMinutes'],
+    reminderExtraMinutes: (map['kind'] ?? 'task') == 'note'
+        ? const []
+        : readExtraLeads(() => jsonDecode(map['reminderExtraMinutes'] ?? '[]')),
     reminderTime: map['reminderTime'],
     // Notes take no reminders; a plan this app can't read is left out.
     reminderPlan: (map['kind'] ?? 'task') == 'note'
@@ -829,6 +877,7 @@ class Task {
     'completed_times': _timesJson,
     'priority': priority,
     'reminder_minutes': reminderMinutes,
+    'reminder_extra_minutes': reminderExtraMinutes,
     'reminder_time': reminderTime,
     'reminder_plan': reminderPlan?.toJson(),
     'notes': notes ?? '',
@@ -875,6 +924,10 @@ class Task {
     completedTimes: _times(() => data['completed_times']),
     priority: data['priority'],
     reminderMinutes: data['reminder_minutes'],
+    // Missing on an older server: none.
+    reminderExtraMinutes: (data['kind'] ?? 'task') == 'note'
+        ? const []
+        : readExtraLeads(() => data['reminder_extra_minutes']),
     reminderTime: data['reminder_time'],
     // Missing on an older server, or a shape this app can't read: none.
     reminderPlan: (data['kind'] ?? 'task') == 'note'

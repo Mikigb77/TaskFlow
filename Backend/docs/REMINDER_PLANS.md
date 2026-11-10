@@ -24,11 +24,12 @@ The plan counts back from the task's **deadline** when it has one, otherwise fro
 
 ## The field: `reminder_plan`
 
-Each person's own reminders for a task. The server keeps one row per person and task (`TaskReminder`), and the task API shows it as the task's four reminder fields, always those of the account asking:
+Each person's own reminders for a task. The server keeps one row per person and task (`TaskReminder`), and the task API shows it as the task's five reminder fields, always those of the account asking:
 
 | Field | Meaning | Default |
 |---|---|---|
 | `reminder_minutes` | Minutes before a timed task; `-1` is no reminder | `null`: the lead in Settings |
+| `reminder_extra_minutes` | More reminders before the same timed task, each in minutes before (0, at its start, up to a week): «20 minutos antes y 5 minutos antes» is `reminder_minutes` 20 and `reminder_extra_minutes` `[5]`. At most 5, largest first, never the single reminder's own lead again. They ring with the single reminder: not while it's `-1`, not while a plan is set, and not on a task without a time | `[]` |
 | `reminder_time` | A date-only task's reminder time, in minutes after midnight | `null`: the time in Settings |
 | `reminder_anchor` | What the single reminder counts from: `"planned"` or `"deadline"` | `"planned"` |
 | `reminder_plan` | The plan, below | `null`: no plan |
@@ -94,6 +95,7 @@ A rhythm the person says or types (`custom`) is kept as said, however far back i
 The drafts endpoint (`POST /api/ai/drafts/`) reads reminders said while dictating, for everyone:
 - **A rhythm, or a reminder some days before:** the draft gets `reminder_plan` with `kind` `"custom"` and its `phases`, counted back from the draft's anchor (its deadline, else its day). A rhythm also gets a reminder on the day itself, unless the words exclude it. A single reminder said is just that one: «recuérdamelo el día antes a las 9» is one phase, `{"from_days":1,"to_days":1,"every_days":1}`, at `"09:00"`.
 - **A reminder some minutes or hours before a timed task** («una hora antes»): the existing `reminder_minutes`, 60.
+- **Several of them** («20 minutos antes y 5 minutos antes», «mitja hora abans i quan comenci»): each is a reminder. The earliest is `reminder_minutes`, and the others are `reminder_extra_minutes`, largest first: 20 and `[5]`; «when it starts» among them is 0. The draft always carries `reminder_extra_minutes`, `[]` when one or none was said.
 - **Until the day, with no rhythm said** («recuérdamelo hasta la fecha límite», «hasta el jueves», «fins al termini», "until the due date"): `{"kind": "rhythm", "strength": "normal", "time": null}`, the same as Normal in the sheet, counted back from the anchor. A task that only has a day counts back from that day (D4).
 - **No anchor (D3):** a reminder said for a task with neither a day nor a deadline isn't dropped. The draft keeps its `reminder_plan` (counted back from whatever day the task gets) or its `reminder_minutes`, and gets `"reminder_needs_day": true`. The card says «Para recordártelo, ponle un día.» under the date, and tapping it opens the date. Once the task has a day, the reminder said applies; saved without one, it's dropped.
 - **Nothing said about reminders:** neither key is set.

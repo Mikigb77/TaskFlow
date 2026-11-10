@@ -246,13 +246,17 @@ class Task(models.Model):
 class TaskReminder(models.Model):
     """One person's reminders for one task (docs/REMINDER_PLANS.md, «Every reminder is personal»):
     they ring only for that person, and each member of a shared project has their own. The task API
-    shows them as the task's reminder_minutes, reminder_time, reminder_anchor and reminder_plan,
+    shows them as the task's reminder_minutes, reminder_extra_minutes, reminder_time, reminder_anchor
+    and reminder_plan,
     always the asker's; someone with no row has the defaults (null, null, "planned", null). The
     phone schedules them, and the server only checks their shape (TaskSerializer)."""
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="reminders")
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="reminders")
     # Minutes before a timed task; -1 is no reminder, and null the lead in Settings.
     minutes = models.SmallIntegerField(null=True, blank=True)
+    # More reminders before a timed task, besides minutes: «20 minutes before and 5 minutes before»
+    # is minutes 20 and extra_minutes [5]. Each in minutes before, largest first.
+    extra_minutes = models.JSONField(default=list, blank=True)
     # A date-only task's reminder time, in minutes after midnight; null is the time in Settings.
     time = models.PositiveSmallIntegerField(null=True, blank=True)
     # What the single reminder counts from: the planned start, or the deadline.
@@ -261,7 +265,7 @@ class TaskReminder(models.Model):
     plan = models.JSONField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    DEFAULTS = {"minutes": None, "time": None, "anchor": "planned", "plan": None}
+    DEFAULTS = {"minutes": None, "extra_minutes": [], "time": None, "anchor": "planned", "plan": None}
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["task", "user"], name="one_reminder_per_person")]

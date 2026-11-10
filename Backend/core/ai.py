@@ -22,7 +22,7 @@ from langchain_core.runnables import RunnableLambda
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from .capture_context import prompt_context, resolve_targets
 from .ai_routing import route
-from .reminder_plans import PHASES_RULE, lead_minutes, plan_answer, read_plan, reminders_prompt
+from .reminder_plans import MAX_LEAD_MINUTES, PHASES_RULE, dictated_leads, whole_number, lead_minutes, plan_answer, read_plan, reminders_prompt
 from .voice_commands import ExtractedCommand, commands_prompt, is_command, new_projects, resolve_commands
 
 logger = logging.getLogger(__name__)
@@ -90,6 +90,8 @@ class ExtractedTask(BaseModel):
     assignment_request: Literal["me", "member", "group"] | None = None
     # Reminders said while dictating (docs/REMINDER_PLANS.md). An invalid one is dropped, never fatal.
     reminder_minutes: int | None = None
+    # More leads said for the same task: «20 minutos antes y 5 minutos antes» (dictated_leads).
+    reminder_extra_minutes: list[int] = Field(default_factory=list)
     reminder_plan: ReadPlan | None = None
 
     @field_validator("notes", mode="before")
@@ -101,6 +103,14 @@ class ExtractedTask(BaseModel):
     @classmethod
     def minutes_before(cls, value):
         return lead_minutes(value)
+
+    @field_validator("reminder_extra_minutes", mode="before")
+    @classmethod
+    def more_minutes_before(cls, value):
+        # A slip (null, one number, a string) keeps what can be read, and never fails the dictation.
+        values = value if isinstance(value, list) else [] if value is None else [value]
+        read = (whole_number(item) for item in values)
+        return [item for item in read if item is not None and 0 <= item <= MAX_LEAD_MINUTES]
 
     @field_validator("reminder_plan", mode="before")
     @classmethod
@@ -538,7 +548,9 @@ def task_payload(draft, text, zone):
     anchor = draft.deadline_date or draft.date
     plan = draft.reminder_plan.contract() if draft.reminder_plan and draft.recurrence == "none" else None
     timed = due is not None if draft.date else deadline is not None
-    minutes = draft.reminder_minutes if timed or anchor is None else None
+    minutes, extra = dictated_leads(draft.reminder_minutes, draft.reminder_extra_minutes)
+    if not (timed or anchor is None):
+        minutes, extra = None, []
     needs_day = anchor is None and (plan is not None or minutes is not None)
     return {"title": draft.title, "due_date": due.isoformat() if due else None,
             "deadline_at": deadline.isoformat() if deadline else None,
@@ -552,7 +564,7 @@ def task_payload(draft, text, zone):
             "repeat_weekdays": sorted(set(draft.repeat_weekdays)) if draft.recurrence == "weekly" else [],
             "repeat_until": draft.repeat_until.isoformat() if draft.repeat_until and draft.recurrence != "none" else None,
             "priority": draft.priority, "notes": draft.notes,
-            "reminder_minutes": minutes, "reminder_plan": plan, "reminder_needs_day": needs_day,
+            "reminder_minutes": minutes, "reminder_extra_minutes": extra, "reminder_plan": plan, "reminder_needs_day": needs_day,
             "checklist": [{"id": str(uuid.uuid4()), "title": title.strip(), "completed": False, "completed_dates": []}
                           for title in draft.checklist],
             "questions": draft.questions, "clarifications": [c.model_dump() for c in draft.clarifications],

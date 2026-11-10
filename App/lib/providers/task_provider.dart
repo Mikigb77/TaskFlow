@@ -103,10 +103,13 @@ class TaskNotifier extends StateNotifier<AsyncValue<List<Task>>> {
   /// Sets only this account's own reminders on task [id], as a project's
   /// «lector» may (D9), and shows them at once, syncing behind.
   Future<void> setOwnReminders(int id,
-          {int? minutes, int? time, ReminderPlan? plan}) =>
+          {int? minutes,
+          List<int> extra = const [],
+          int? time,
+          ReminderPlan? plan}) =>
       _mutate(() async {
         await _repository.updateOwnReminders(id,
-            minutes: minutes, time: time, plan: plan);
+            minutes: minutes, extra: extra, time: time, plan: plan);
         if (mounted) await showLocal();
       });
 

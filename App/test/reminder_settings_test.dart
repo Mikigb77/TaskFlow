@@ -241,6 +241,52 @@ void main() {
     }
 
     testWidgets(
+      'several reminders said for one task read as one line and one chosen row; another row is one reminder again',
+      (tester) async {
+        final store = MemoryReminderStore(
+          const ReminderPreferences(enabled: true),
+        );
+        final access = FakeReminderAccess(allowed: true);
+        final task = ValueNotifier(
+          timed.copyWith(reminderMinutes: 20, reminderExtraMinutes: [5]),
+        );
+        addTearDown(task.dispose);
+        await tester.pumpWidget(
+          app(
+            store,
+            access,
+            Scaffold(
+              body: Padding(
+                padding: const EdgeInsets.all(24),
+                child: ValueListenableBuilder<Task>(
+                  valueListenable: task,
+                  builder: (context, value, _) => ReminderChip(
+                    task: value,
+                    onChanged: (changed) => task.value = changed,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final both = '${lead(tester, 20)}, ${lead(tester, 5)}';
+        expect(chipText(es.reminderValue(both)), findsOneWidget);
+        await tester.tap(find.byType(ReminderChip));
+        await tester.pumpAndSettle();
+        final row = find.widgetWithText(ListTile, both);
+        expect(row, findsOneWidget);
+        expect(tester.widget<ListTile>(row).selected, isTrue);
+        await tester.tap(find.widgetWithText(ListTile, lead(tester, 60)));
+        await tester.pumpAndSettle();
+        expect(task.value.reminderMinutes, 60);
+        expect(task.value.reminderExtraMinutes, isEmpty);
+        expect(chipText(es.reminderValue(lead(tester, 60))), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
       'UX-209: a refused permission leaves reminders off and offers the phone’s settings',
       (tester) async {
         final store = MemoryReminderStore();

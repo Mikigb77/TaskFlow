@@ -562,6 +562,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                                           series!.copyWith(
                                             reminderMinutes:
                                                 updated.reminderMinutes,
+                                            reminderExtraMinutes:
+                                                updated.reminderExtraMinutes,
                                             reminderTime: updated.reminderTime,
                                             reminderPlan: updated.reminderPlan,
                                           ),
@@ -570,6 +572,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                                         await tasks.setOwnReminders(
                                           series!.id!,
                                           minutes: updated.reminderMinutes,
+                                          extra: updated.reminderExtraMinutes,
                                           time: updated.reminderTime,
                                           plan: updated.reminderPlan,
                                         );

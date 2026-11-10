@@ -15,6 +15,7 @@ MAX_DAYS = 366  # Also "from now on": the phone only schedules days still to com
 MAX_EVERY_DAYS = 30
 MAX_SAID = 200
 MAX_LEAD_MINUTES = 10080  # reminder_minutes, as the task field allows: a week.
+MAX_EXTRA_LEADS = 5  # reminder_extra_minutes: up to six reminders before a task in all.
 PHASE_KEYS = ("from_days", "to_days", "every_days")
 CLOCK = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
 
@@ -90,6 +91,26 @@ def lead_minutes(value):
     "nothing said" would otherwise move the reminder to the task's own start."""
     value = whole_number(value)
     return value if value is not None and 1 <= value <= MAX_LEAD_MINUTES else None
+
+
+def clean_extra_leads(values, main=None):
+    """reminder_extra_minutes as the task API keeps it: each lead once, largest first, never the
+    single reminder's own lead again, and at most MAX_EXTRA_LEADS."""
+    return sorted({value for value in values if value != main}, reverse=True)[:MAX_EXTRA_LEADS]
+
+
+def dictated_leads(minutes, extra):
+    """The leads said while dictating, as the draft's reminder_minutes and reminder_extra_minutes:
+    the earliest reminder is reminder_minutes, and the rest are the extras. A model that wrote only
+    the list still gets its first one. 0, at the task's start, counts only among several."""
+    leads = {value for value in (whole_number(item) for item in extra or [])
+             if value is not None and 0 <= value <= MAX_LEAD_MINUTES}
+    if minutes is not None:
+        leads.add(minutes)
+    if not leads or leads == {0}:
+        return minutes, []
+    main = max(leads)
+    return main, clean_extra_leads(leads, main)
 
 
 def _clock(value):
@@ -204,7 +225,10 @@ def reminders_prompt(today):
           "reminder_plan": _plan([(366, 0, 2)], None, "cada dos dies")}),
         ("Dentist tomorrow at 5, remind me an hour before",
          {"title": "Go to the dentist", "date": day(1), "time": "17:00", "reminder_minutes": 60,
-          "reminder_plan": None}),
+          "reminder_extra_minutes": [], "reminder_plan": None}),
+        ("Reunión mañana a las 10, avísame 20 minutos antes y otra vez 5 minutos antes",
+         {"title": "Reunión", "date": day(1), "time": "10:00", "reminder_minutes": 20,
+          "reminder_extra_minutes": [5], "reminder_plan": None}),
         ("Renew the passport in two weeks, remind me every day the last week but not on the day",
          {"title": "Renew the passport", "date": day(14), "reminder_plan": _plan(
              [(7, 1, 1)], None, "every day the last week but not on the day")}),
@@ -218,7 +242,11 @@ def reminders_prompt(today):
         "Reminders: each task also has reminder_minutes and reminder_plan, both null unless the user asks to be "
         "reminded about it ('recuérdamelo', 'avísame'; Catalan 'recorda-m’ho', 'avisa’m'; English 'remind me'). "
         "Minutes or hours before the task are reminder_minutes, an integer: 'una hora antes' is 60, also for a "
-        "task said without a time. "
+        "task said without a time. Several said for one task ('20 minutos antes y 5 minutos antes', 'una hora "
+        "antes y otra vez al empezar'; Catalan 'mitja hora abans i 5 minuts abans'; English 'an hour before and "
+        "again 10 minutes before') are each a reminder: the earliest is reminder_minutes, and the others go in "
+        "reminder_extra_minutes, a list of integers, where at the start is 0. Every one said is kept, none "
+        "dropped. reminder_extra_minutes is [] unless more than one is said. "
         "A rhythm of reminders, or reminders some days before, is reminder_plan: an object with phases, time and "
         "said, counted back from the task's anchor, which is its deadline_date when it has one, else its date. A task "
         "with neither yet still keeps every reminder asked for: write its reminder_plan or reminder_minutes as usual, "
