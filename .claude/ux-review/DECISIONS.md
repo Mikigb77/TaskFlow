@@ -2,6 +2,11 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-11-10 — A plan and reminders some minutes before, together
+
+- The owner, on a 3-month project with a rhythm of reminders: "we want to be able to make … both of them at the same time … give the user the illusion that he can say whatever and we are gonna comply with it." Plans stay counted in whole days, one notice a day, with no rhythm of hours ("for the plan, I agree that we shouldn't allow a custom time").
+- Built as: on a timed task, the leads said or chosen (`reminder_minutes` and `reminder_extra_minutes`) ring beside the plan on the task's day; the plan's own notice for the day (D1) isn't set twice, and Settings' default lead adds nothing. The plan's line ends with them («… · 1 hora antes, 10 minutos antes»). `Backend/docs/REMINDER_PLANS.md`.
+
 ## 2026-11-10 — Several reminders said for one task each ring
 
 - The owner: "schedule a meeting for 10 … remind me 20 minutes before it, and then 5 minutes right before it starts … should translate into me getting two different push notifications", said from the start, in the one capture.

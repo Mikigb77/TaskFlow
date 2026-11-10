@@ -33,7 +33,8 @@ abstract final class ReminderPlans {
   static bool plannable(Task task) =>
       !task.isNote && !task.isRecurring && anchor(task) != null;
 
-  /// [task]'s plan while it applies, which replaces its single reminder.
+  /// [task]'s plan while it applies. On a timed task the reminders some
+  /// minutes before ring beside it ([leadsBesidePlan]).
   static ReminderPlan? active(Task task) =>
       plannable(task) ? task.reminderPlan : null;
 
@@ -92,6 +93,26 @@ abstract final class ReminderPlans {
       }
     }
     return null;
+  }
+
+  /// The reminders some minutes before a timed [task] that ring beside its
+  /// plan, largest lead first: «recuérdamelo cada día la última semana, y 20
+  /// y 5 minutos antes» rings both. Only leads said or chosen, never
+  /// Settings' default, and never the one the plan's own notice for the day
+  /// already rings at (D1, [dayLead]). None while the single reminder is off
+  /// or without a plan in effect.
+  static List<int> leadsBesidePlan(Task task, int defaultLead) {
+    final date = task.reminderDate;
+    if (active(task) == null ||
+        date == null ||
+        !task.reminderHasTime ||
+        task.reminderMinutes == -1) {
+      return const [];
+    }
+    final leads = <int>{?task.reminderMinutes, ...task.reminderExtraMinutes};
+    final day = dayLead(task, defaultLead);
+    if (day != null && anchor(task) == date) leads.remove(day);
+    return leads.toList()..sort((a, b) => b.compareTo(a));
   }
 
   /// Every reminder of [plan] still to come after [now], earliest first,

@@ -59,17 +59,19 @@ class Task {
   /// More reminders before a timed task, besides [reminderMinutes]: «20
   /// minutos antes y 5 minutos antes» is 20 and `[5]`. Each in minutes
   /// before (0 at its start), largest first, never [reminderMinutes] again.
-  /// They ring with the single reminder: not while it's off, not while a
-  /// plan is set, and not on a task without a time.
+  /// They ring with the single reminder, and beside a plan: not while it's
+  /// off, and not on a task without a time.
   final List<int> reminderExtraMinutes;
 
   /// Local minute of day for date-only tasks. Null follows device defaults.
   final int? reminderTime;
 
   /// Nudges counted back from the deadline, else from the task's own day
-  /// (Backend/docs/REMINDER_PLANS.md). While set, it replaces the single
-  /// reminder: [reminderMinutes] and [reminderTime] stay as they are, unused.
-  /// A repeating task, or one with no day, has none in effect.
+  /// (Backend/docs/REMINDER_PLANS.md). While set, it takes the single
+  /// reminder's notice ([reminderTime] stays as it is, unused); on a timed
+  /// task the leads said or chosen still ring beside it
+  /// ([ReminderPlans.leadsBesidePlan]). A repeating task, or one with no
+  /// day, has none in effect.
   final ReminderPlan? reminderPlan;
   final bool _isCompleted;
   final String? notes;

@@ -320,12 +320,17 @@ class ReminderEngine {
     // A plan rings by its own days, whatever the single reminder says.
     if (ReminderPlans.active(task) != null) {
       return ReminderPlans.taskAlerts(
-        task,
-        preferences.dateOnlyTime,
-        now,
-        defaultLead: preferences.leadMinutes,
-        late: false,
-      ).isNotEmpty;
+            task,
+            preferences.dateOnlyTime,
+            now,
+            defaultLead: preferences.leadMinutes,
+            late: false,
+          ).isNotEmpty ||
+          ReminderPlans.leadsBesidePlan(task, preferences.leadMinutes).any(
+            (lead) => task.reminderDate!
+                .subtract(Duration(minutes: lead))
+                .isAfter(now),
+          );
     }
     if (task.reminderMinutes == -1) return false;
     final on = ReminderPreferences(
@@ -426,8 +431,9 @@ class ReminderEngine {
     final l = c.strings;
     final result = <PlannedReminder>[];
     bool reader(Task task) => readOnly.contains(task.listId);
-    // A plan replaces its task's single reminder while it's set: on a timed
+    // A plan takes its task's single reminder while it's set: on a timed
     // anchor's own day, its notice rings at that reminder's moment instead.
+    // Other leads said or chosen for a timed task ring beside the plan.
     final single = <Task>[];
     for (final task in tasks) {
       final plan = ReminderPlans.active(task);
@@ -445,6 +451,27 @@ class ReminderEngine {
             readOnly: reader(task),
           ),
         );
+        for (final lead in ReminderPlans.leadsBesidePlan(
+          task,
+          preferences.leadMinutes,
+        )) {
+          final when = task.reminderDate!.subtract(Duration(minutes: lead));
+          if (!when.isAfter(now)) continue;
+          result.add(
+            PlannedReminder(
+              identity: lead == task.reminderMinutes
+                  ? identity(owner, task)
+                  : extraIdentity(owner, task, lead),
+              taskId: task.id,
+              due: task.reminderDate,
+              when: when,
+              title: task.title,
+              languageCode: c.languageCode,
+              body: c.body(task, when, lead),
+              readOnly: reader(task),
+            ),
+          );
+        }
       }
     }
     for (final task in upcoming(single, now)) {
