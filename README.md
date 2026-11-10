@@ -52,7 +52,7 @@ Dependabot checks early on Monday (04:00 Madrid time), and a scheduled Claude pa
 - A major update needs a look at its release notes. It is merged if CI is green and nothing affects us; if it changes behavior, cost or licence, it waits for Miki.
 - If CI fails, a small, clear fix goes on the Dependabot branch. Otherwise the PR is closed with the reason, and a version that can't work yet gets an ignore, with the reason, in the file.
 - A merged security fix to code that ships (the app or the API) is released at once, by a pull request from `dev` into `main`; Deploy runs one release at a time. Anything else ships with the next release.
-- The pass reads the repository's open alerts and notes any that are new or changed.
+- The pass goes through every open alert, Dependabot's and secret scanning's (Miki, 2026-11-10). An alert whose security update is open is handled with the PRs, first; an alert with a fixed version but no PR gets the update by hand, through a PR into `dev`; an alert with no fix yet is checked against the code, to say whether we use what it affects. The GitHub tools in Claude's cloud sessions can't read alerts, so the pass reads them with `gh` on Miki's laptop; when the laptop is off, the report says the alerts weren't checked.
 
 ### The weekly report
 
@@ -62,4 +62,4 @@ By 07:55 Madrid time the pass files one GitHub issue in each repository that has
 - **medium**, decide this week: something only Miki can decide is waiting, such as a major update that changes behavior, cost or licence, or a red update with no clear fix.
 - **low**, for the record: updates were merged, closed or released, and nothing needs Miki.
 
-The report's first line says what Miki needs to do, or "Nothing for you to do." Then it lists what needs Miki, what merged, closed (with the reason), was released or is still pending, and any new alert, with a link for each. An alert already reported and unchanged isn't repeated, and the report holds no secrets, IP addresses or users' data. Work still running at 07:55 is finished afterwards and added as a comment, with the urgency changed if it changed. The next week's report closes a low one; a high or medium report stays open until what it asks for is done.
+The report's first line says what Miki needs to do, or "Nothing for you to do." Then it lists what needs Miki, every alert still open, what merged, closed (with the reason), was released or is still pending, and any new alert, with a link for each. An alert already reported and unchanged isn't repeated, and the report holds no secrets, IP addresses or users' data. Work still running at 07:55 is finished afterwards and added as a comment, with the urgency changed if it changed. The next week's report closes a low one; a high or medium report stays open until what it asks for is done.
