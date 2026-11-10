@@ -7,7 +7,7 @@ from .models import User, Task, TaskList, TaskGroup, ProjectPreference, TaskRemi
 from .billing import complimentary_pro
 from .email_verification import unconfirmed
 from .free_tier import free_voice
-from .reminder_plans import MAX_SAID, InvalidPlan, check_plan
+from .reminder_plans import MAX_EXTRA_LEADS, MAX_SAID, InvalidPlan, check_plan, clean_extra_leads
 
 EMAIL_EXISTS = "An account with this email already exists."
 
@@ -168,8 +168,8 @@ class ChecklistItemSerializer(serializers.Serializer):
 
 
 # The task API's reminder fields, each the asker's own, and the TaskReminder field each is kept in.
-PERSONAL_REMINDERS = {"reminder_minutes": "minutes", "reminder_time": "time", "reminder_anchor": "anchor",
-                      "reminder_plan": "plan"}
+PERSONAL_REMINDERS = {"reminder_minutes": "minutes", "reminder_extra_minutes": "extra_minutes",
+                      "reminder_time": "time", "reminder_anchor": "anchor", "reminder_plan": "plan"}
 
 
 class TaskSerializer(serializers.ModelSerializer):
@@ -179,7 +179,7 @@ class TaskSerializer(serializers.ModelSerializer):
     deadline_at = ZonedDateTimeField(allow_null=True, required=False)
     deadline_date = serializers.DateField(allow_null=True, required=False)
     duration_minutes = serializers.IntegerField(min_value=1, max_value=1440, allow_null=True, required=False)
-    # The four reminder fields are the asker's own (docs/REMINDER_PLANS.md, «Every reminder is
+    # The five reminder fields are the asker's own (docs/REMINDER_PLANS.md, «Every reminder is
     # personal»), kept apart from the task (TaskReminder) and saved by the view. Without a default,
     # an app that doesn't send one keeps it.
     reminder_anchor = serializers.ChoiceField(choices=["planned", "deadline"], required=False, write_only=True)
@@ -190,6 +190,11 @@ class TaskSerializer(serializers.ModelSerializer):
     completed_at = serializers.DateTimeField(allow_null=True, required=False)
     completed_times = serializers.DictField(child=serializers.DateTimeField(), required=False)
     reminder_minutes = serializers.IntegerField(min_value=-1, max_value=10080, allow_null=True, required=False, write_only=True)
+    # More reminders before a timed task, besides reminder_minutes: each a lead from 0 (at its
+    # start) to a week. Null is none.
+    reminder_extra_minutes = serializers.ListField(
+        child=serializers.IntegerField(min_value=0, max_value=10080), max_length=MAX_EXTRA_LEADS,
+        allow_null=True, required=False, write_only=True)
     reminder_time = serializers.IntegerField(min_value=0, max_value=1439, allow_null=True, required=False, write_only=True)
     reminder_plan = serializers.JSONField(allow_null=True, required=False, write_only=True)
     version = serializers.IntegerField(min_value=0, required=False, default=0)
@@ -244,6 +249,9 @@ class TaskSerializer(serializers.ModelSerializer):
 
     def validate_repeat_weekdays(self, value):
         return sorted(set(value))
+
+    def validate_reminder_extra_minutes(self, value):
+        return clean_extra_leads(value or [])
 
     def validate_reminder_plan(self, value):
         # Only the shape: the phone schedules the plan.
@@ -309,7 +317,7 @@ class TaskSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ["id", "kind", "title", "due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "reminder_anchor", "recurrence", "repeat_until", "repeat_interval", "repeat_weekdays", "exceptions", "completed_dates", "priority", "reminder_minutes", "reminder_time", "reminder_plan", "notes", "checklist", "list_id", "labels", "is_completed", "completed_at", "completed_times", "is_deleted", "version", "created_at", "updated_at", "assignment", "assignee_id", "assignee_name", "created_by", "created_by_name"]
+        fields = ["id", "kind", "title", "due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "reminder_anchor", "recurrence", "repeat_until", "repeat_interval", "repeat_weekdays", "exceptions", "completed_dates", "priority", "reminder_minutes", "reminder_extra_minutes", "reminder_time", "reminder_plan", "notes", "checklist", "list_id", "labels", "is_completed", "completed_at", "completed_times", "is_deleted", "version", "created_at", "updated_at", "assignment", "assignee_id", "assignee_name", "created_by", "created_by_name"]
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate(self, attrs):
@@ -322,6 +330,7 @@ class TaskSerializer(serializers.ModelSerializer):
             effective = lambda key, default=None: attrs.get(key, getattr(self.instance, key, default))
             if (any(effective(key) is not None for key in ("due_date", "scheduled_date", "deadline_at", "deadline_date", "duration_minutes", "repeat_until"))
                     or attrs.get("reminder_time") is not None or attrs.get("reminder_plan") is not None
+                    or attrs.get("reminder_extra_minutes")
                     or attrs.get("reminder_anchor", "planned") != "planned" or attrs.get("reminder_minutes") not in (None, -1)
                     or effective("priority", 1) != 1 or effective("is_completed", False)
                     or effective("recurrence", "none") != "none" or effective("repeat_interval", 1) != 1
@@ -336,6 +345,9 @@ class TaskSerializer(serializers.ModelSerializer):
         # when the task loses its deadline, whoever removes it.
         if attrs.get("reminder_anchor") == "deadline" and deadline_at is None and deadline_date is None:
             raise serializers.ValidationError({"reminder_anchor": "Set a deadline or use the planned start for reminders."})
+        if attrs.get("reminder_extra_minutes") and "reminder_minutes" in attrs:
+            # The single reminder's own lead isn't a second reminder at the same moment.
+            attrs["reminder_extra_minutes"] = clean_extra_leads(attrs["reminder_extra_minutes"], attrs["reminder_minutes"])
         repeat = attrs.get("recurrence", getattr(self.instance, "recurrence", "none"))
         weekdays = attrs.get("repeat_weekdays", getattr(self.instance, "repeat_weekdays", []))
         if repeat == "none":

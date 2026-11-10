@@ -1340,7 +1340,9 @@ void main() {
     );
     await TaskDatabase.upgrade(old, 3, 21);
     await old.insert('tasks', {
-      ...(Task(title: 'Kept', priority: 1).toMap()..remove('id')),
+      ...(Task(title: 'Kept', priority: 1).toMap()
+        ..remove('id')
+        ..remove('reminderExtraMinutes')),
       'owner_key': owner,
       'sync_id': 'kept',
     });
@@ -1372,6 +1374,16 @@ void main() {
       checklist: [ChecklistItem(title: 'Send the budget'), ChecklistItem(title: 'Book the room')],
     );
 
+    /// A note saved by the released build: without the columns added since.
+    Future<int> savedBy22(Database db, Task note) => db.insert('tasks', {
+      ...(note.toMap()
+        ..remove('id')
+        ..remove('reminderExtraMinutes')),
+      'owner_key': owner,
+      'sync_id': note.title,
+      'sync_pending': 1,
+    });
+
     Future<void> meetingRow(Database db, String id, String key, int? noteId) => db.insert('meetings', {
       'id': id,
       'owner_key': key,
@@ -1393,8 +1405,8 @@ void main() {
       await Directory(folder).create();
       final old = await version22(p.join(folder, 'task_database.db'));
       final released = TaskDatabase.forTesting(old);
-      final linked = await released.insertTask(meetingNoteWithSteps('Weekly meeting'), ownerKey: owner);
-      final unlinked = await released.insertTask(meetingNoteWithSteps('Croquetas'), ownerKey: owner);
+      final linked = await savedBy22(old, meetingNoteWithSteps('Weekly meeting'));
+      final unlinked = await savedBy22(old, meetingNoteWithSteps('Croquetas'));
       await meetingRow(old, 'm-linked', owner, linked);
       await meetingRow(old, 'm-gone', owner, 9999);
       await meetingRow(old, 'm-no-note', owner, null);
@@ -1423,8 +1435,8 @@ void main() {
       final old = await version22(p.join(directory.path, 'marked.db'));
       addTearDown(old.close);
       final released = TaskDatabase.forTesting(old);
-      final kept = await released.insertTask(meetingNoteWithSteps('Saved after D1'), ownerKey: owner);
-      final linked = await released.insertTask(meetingNoteWithSteps('Saved before D1'), ownerKey: owner);
+      final kept = await savedBy22(old, meetingNoteWithSteps('Saved after D1'));
+      final linked = await savedBy22(old, meetingNoteWithSteps('Saved before D1'));
       await MeetingNoteMarks.add(old, owner, kept);
       await meetingRow(old, 'm-linked', owner, linked);
       await meetingRow(old, 'm-linked-again', owner, linked);
@@ -1445,8 +1457,7 @@ void main() {
       await openRealDatabase(folder);
       final fresh = TaskDatabase();
       final version = await (await fresh.database).rawQuery('PRAGMA user_version');
-      expect(TaskDatabase.schemaVersion, 23);
-      expect(version.single.values.single, 23);
+      expect(version.single.values.single, TaskDatabase.schemaVersion);
       expect(await MeetingNoteMarks.read(fresh, owner), isEmpty);
       expect(await MeetingNoteMarks.read(fresh, other), isEmpty);
     });

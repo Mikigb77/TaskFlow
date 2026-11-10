@@ -90,6 +90,13 @@ class CaptureDraft {
           draft.kind != 'note' && (_timedReminder(draft) || _waitsForDay(draft))
           ? draft.reminderMinutes
           : null,
+      // Every lead said is a reminder of its own, by the same rules.
+      reminderExtraMinutes:
+          draft.kind != 'note' &&
+              draft.reminderMinutes != null &&
+              (_timedReminder(draft) || _waitsForDay(draft))
+          ? draft.reminderExtraMinutes
+          : const [],
       reminderPlan: draft.kind == 'note' ? null : draft.reminderPlan,
     ),
     questions: draft.questions,

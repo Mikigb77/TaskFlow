@@ -56,7 +56,8 @@ void main() {
         ..remove('reminderTime')
         ..remove('reminderPlan')
         ..remove('completedAt')
-        ..remove('completedTimes'),
+        ..remove('completedTimes')
+          ..remove('reminderExtraMinutes'),
     );
     await TaskDatabase.upgrade(sql, 3, TaskDatabase.schemaVersion);
     database = TaskDatabase.forTesting(sql);
@@ -659,7 +660,8 @@ void main() {
         ).toMap()
           ..remove('id')
           ..remove('completedAt')
-          ..remove('completedTimes');
+          ..remove('completedTimes')
+          ..remove('reminderExtraMinutes');
         await old.insert('tasks', {
           ...row,
           'owner_key': 'account',
@@ -671,7 +673,8 @@ void main() {
           ...Task(title: 'Comprar pan', priority: 1, isCompleted: true).toMap()
             ..remove('id')
             ..remove('completedAt')
-            ..remove('completedTimes'),
+            ..remove('completedTimes')
+          ..remove('reminderExtraMinutes'),
           'owner_key': 'account',
           'sync_id': 'bread',
           'sync_pending': 0,

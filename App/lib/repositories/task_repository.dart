@@ -39,12 +39,14 @@ class TaskRepository {
   Future<int> updateOwnReminders(
     int id, {
     int? minutes,
+    List<int> extra = const [],
     int? time,
     ReminderPlan? plan,
   }) => _database.updateOwnReminders(
     id,
     ownerKey: ownerKey,
     minutes: minutes,
+    extra: extra,
     time: time,
     plan: plan,
   );

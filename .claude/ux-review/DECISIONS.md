@@ -2,6 +2,11 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-11-10 — Several reminders said for one task each ring
+
+- The owner: "schedule a meeting for 10 … remind me 20 minutes before it, and then 5 minutes right before it starts … should translate into me getting two different push notifications", said from the start, in the one capture.
+- Built as: a task keeps its single reminder plus `reminder_extra_minutes`, more leads before a timed task (up to 6 in all), each its own notification. Dictation reads every lead said (`Backend/docs/REMINDER_PLANS.md`). Nothing new on the default path: the reminder row reads «20 minutos antes, 5 minutos antes», and its sheet shows that as the chosen row; any other row is one reminder again.
+
 ## 2026-11-10 — Every "add" looks the same
 
 - The owner: «Añadir nota» "has a different look and feel than the button to add tasks. Wouldn't it be better if all the buttons had the same look and feel?"
