@@ -229,6 +229,10 @@ def reminders_prompt(today):
         ("Reunión mañana a las 10, avísame 20 minutos antes y otra vez 5 minutos antes",
          {"title": "Reunión", "date": day(1), "time": "10:00", "reminder_minutes": 20,
           "reminder_extra_minutes": [5], "reminder_plan": None}),
+        ("Entregar el informe el viernes a las 12, recuérdamelo cada día los últimos 3 días y también una hora y "
+         "10 minutos antes",
+         {"title": "Entregar el informe", "date": day(4), "time": "12:00", "reminder_minutes": 60,
+          "reminder_extra_minutes": [10], "reminder_plan": _plan([(3, 0, 1)], None, "cada día los últimos 3 días")}),
         ("Renew the passport in two weeks, remind me every day the last week but not on the day",
          {"title": "Renew the passport", "date": day(14), "reminder_plan": _plan(
              [(7, 1, 1)], None, "every day the last week but not on the day")}),
@@ -246,7 +250,9 @@ def reminders_prompt(today):
         "antes y otra vez al empezar'; Catalan 'mitja hora abans i 5 minuts abans'; English 'an hour before and "
         "again 10 minutes before') are each a reminder: the earliest is reminder_minutes, and the others go in "
         "reminder_extra_minutes, a list of integers, where at the start is 0. Every one said is kept, none "
-        "dropped. reminder_extra_minutes is [] unless more than one is said. "
+        "dropped. reminder_extra_minutes is [] unless more than one is said. A task can have both: a rhythm of "
+        "reminders in reminder_plan and reminders minutes or hours before in reminder_minutes and "
+        "reminder_extra_minutes, each kept as said. "
         "A rhythm of reminders, or reminders some days before, is reminder_plan: an object with phases, time and "
         "said, counted back from the task's anchor, which is its deadline_date when it has one, else its date. A task "
         "with neither yet still keeps every reminder asked for: write its reminder_plan or reminder_minutes as usual, "
