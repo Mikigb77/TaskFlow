@@ -1,3 +1,4 @@
+import 'package:agenda/widgets/ambient.dart';
 import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/main.dart';
 import 'package:agenda/providers/regional_provider.dart';
@@ -7,6 +8,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
 import 'support/design_fixtures.dart';
 
 // Tab-bar layout depends on real glyph widths, so this file loads Manrope and
@@ -319,7 +321,8 @@ void main() {
         );
         final barRect = tester.getRect(bar);
         expect(
-          rect.left >= barRect.left - 0.01 && rect.right <= barRect.right + 0.01,
+          rect.left >= barRect.left - 0.01 &&
+              rect.right <= barRect.right + 0.01,
           isTrue,
           reason: '$reason: `$label` ($rect) is inside the bar ($barRect)',
         );
@@ -349,8 +352,10 @@ void main() {
             expectWholeLabels(tester, labels, reason);
             expectInsideBar(tester, reason);
           }
-          expect(find.descendant(of: bar, matching: find.text(l.settings)),
-              findsWidgets);
+          expect(
+            find.descendant(of: bar, matching: find.text(l.settings)),
+            findsWidgets,
+          );
           expect(tester.takeException(), isNull);
         },
       );
@@ -411,7 +416,11 @@ void main() {
 
   for (final tab in ['tasks', 'notes', 'settings']) {
     testWidgets(
-      'UX-223: system Back on ${tab == 'tasks' ? 'Tareas' : tab == 'notes' ? 'Notas' : 'Ajustes'} selects Calendario and stays in the app',
+      'UX-223: system Back on ${tab == 'tasks'
+          ? 'Tareas'
+          : tab == 'notes'
+          ? 'Notas'
+          : 'Ajustes'} selects Calendario and stays in the app',
       (tester) async {
         final l = await pumpShell(
           tester,
@@ -453,11 +462,13 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  // ---- Round 1 · P23 · UX-433: the tab bar's top line shows ----
+  // ---- Round 1 · P23 · UX-433: the tab bar stands off the page. Since
+  // 2026-11-10 (the owner's pick) by rounded top corners and a soft shadow,
+  // not a ruled line ----
 
   for (final dark in [false, true]) {
     testWidgets(
-      'UX-433: the tab bar’s 1 px outlineVariant top border is painted in front of the NavigationBar (${dark ? 'dark' : 'light'})',
+      'UX-433: the tab bar is a full-width base with 28 px rounded top corners and a soft shadow, over the drifting backdrop (${dark ? 'dark' : 'light'})',
       (tester) async {
         tester.view.physicalSize = const Size(390, 844);
         tester.view.devicePixelRatio = 1;
@@ -472,20 +483,37 @@ void main() {
         await tester.pumpAndSettle();
         final colors = Theme.of(tester.element(bar)).colorScheme;
         expect(colors.brightness, dark ? Brightness.dark : Brightness.light);
-        final frame = find.byWidgetPredicate(
-          (widget) => widget is DecoratedBox && widget.child is NavigationBar,
+        const top = BorderRadius.vertical(top: Radius.circular(28));
+        final clip = find.byWidgetPredicate(
+          (widget) => widget is ClipRRect && widget.child is NavigationBar,
+        );
+        expect(clip, findsOneWidget);
+        expect(tester.widget<ClipRRect>(clip).borderRadius, top);
+        final frame = find.ancestor(
+          of: clip,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is DecoratedBox &&
+                (widget.decoration as BoxDecoration?)?.boxShadow?.isNotEmpty ==
+                    true,
+          ),
         );
         expect(frame, findsOneWidget);
-        final box = tester.widget<DecoratedBox>(frame);
-        expect(box.position, DecorationPosition.foreground);
-        final border = (box.decoration as BoxDecoration).border! as Border;
-        expect(border.top.color, colors.outlineVariant);
-        expect(border.top.width, 1);
-        expect(border.left, BorderSide.none);
-        expect(border.bottom, BorderSide.none);
-        // The line runs along the bar's top edge, the full width.
+        final decoration =
+            tester.widget<DecoratedBox>(frame).decoration as BoxDecoration;
+        expect(decoration.borderRadius, top);
+        expect(decoration.border, isNull);
+        // The shadow rises above the bar, not below it.
+        expect(decoration.boxShadow!.single.offset.dy, lessThan(0));
+        // The bar runs the full width along the bottom, as before.
         expect(tester.getRect(frame).top, tester.getRect(bar).top);
         expect(tester.getRect(frame).width, 390);
+        expect(tester.getRect(frame).bottom, 844);
+        // The corners show the page's drifting colour, not a blank strip.
+        expect(
+          find.ancestor(of: bar, matching: find.byType(AmbientBackdrop)),
+          findsOneWidget,
+        );
         expect(tester.takeException(), isNull);
       },
     );

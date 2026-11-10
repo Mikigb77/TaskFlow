@@ -13,6 +13,7 @@ import 'package:agenda/screens/settings_screen.dart';
 import 'package:agenda/screens/notes_screen.dart';
 import 'package:agenda/services/app_update.dart';
 import 'package:agenda/services/meeting_controller.dart';
+import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/theme/motion.dart';
 import 'package:agenda/widgets/ambient.dart';
 import 'package:agenda/widgets/app_update_dialog.dart';
@@ -262,16 +263,18 @@ class _MainShellState extends ConsumerState<MainShell>
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _select(0);
       },
-      child: Column(
-        children: [
-          Expanded(
-            // Each tab owns its Scaffold so feedback sits above its capture
-            // controls. The navigation bar below consumes the bottom safe area.
-            child: MediaQuery.removePadding(
-              context: context,
-              removeBottom: true,
-              // The tabs sit on slow drifting colour (ambient.dart).
-              child: AmbientBackdrop(
+      // The tabs sit on slow drifting colour (ambient.dart), which also
+      // shows round the bar's top corners.
+      child: AmbientBackdrop(
+        child: Column(
+          children: [
+            Expanded(
+              // Each tab owns its Scaffold so feedback sits above its capture
+              // controls. The navigation bar below consumes the bottom safe
+              // area.
+              child: MediaQuery.removePadding(
+                context: context,
+                removeBottom: true,
                 child: AnimatedBuilder(
                   animation: _arriving,
                   builder: (context, child) {
@@ -301,21 +304,40 @@ class _MainShellState extends ConsumerState<MainShell>
                 ),
               ),
             ),
-          ),
-          DecoratedBox(
-            // In front: the bar's opaque surface would hide a border behind it.
-            position: DecorationPosition.foreground,
-            decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(
-                  color: Theme.of(context).colorScheme.outlineVariant,
-                ),
-              ),
-            ),
-            child: navigationBar,
+            _RoundedBar(child: navigationBar),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The tab bar as the page's base: full width, its top corners rounded like
+/// the capture sheet's, lifted by a soft shadow rather than a ruled line, so
+/// it stays a base and Añadir tarea above stays the one pill.
+class _RoundedBar extends StatelessWidget {
+  const _RoundedBar({required this.child});
+  final Widget child;
+
+  static const radius = BorderRadius.vertical(top: Radius.circular(28));
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: [
+          BoxShadow(
+            color: dark
+                ? Colors.black.withValues(alpha: 0.35)
+                : Lagoon.accent.withValues(alpha: 0.12),
+            blurRadius: 24,
+            offset: const Offset(0, -2),
           ),
         ],
       ),
+      child: ClipRRect(borderRadius: radius, child: child),
     );
   }
 }
