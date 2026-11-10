@@ -445,6 +445,78 @@ void main() {
     expect(roundTrip.reminderTime, 660);
   });
 
+  test('every reminder said for a task rings: 20 and 5 minutes before',
+      () async {
+    await enable();
+    final meeting = DateTime(2026, 9, 22, 10);
+    await database.insertTasks([
+      Task(
+          title: 'Reunión',
+          priority: 1,
+          dueDate: meeting,
+          reminderMinutes: 20,
+          reminderExtraMinutes: [5, 0, 20]),
+      // Off is off, whatever else was said.
+      Task(
+          title: 'Off',
+          priority: 1,
+          dueDate: meeting,
+          reminderMinutes: -1,
+          reminderExtraMinutes: [5]),
+    ]);
+    await engine.reconcile('local');
+    final rings = driver.pending.values.toList()
+      ..sort((a, b) => a.when.compareTo(b.when));
+    expect(rings.map((a) => (a.title, a.when)), [
+      ('Reunión', DateTime(2026, 9, 22, 9, 40)),
+      ('Reunión', DateTime(2026, 9, 22, 9, 55)),
+      ('Reunión', meeting),
+    ]);
+    expect(rings.map((a) => a.identity).toSet(), hasLength(3));
+    // Each says how far the meeting is.
+    expect(rings.first.body, isNot(rings[1].body));
+
+    // An extra one still ahead after the first rang is still set, and the
+    // task's reminder hasn't passed.
+    now = DateTime(2026, 9, 22, 9, 45);
+    await engine.reconcile('local');
+    expect(
+        driver.pending.values
+            .where((a) => a.when.isAfter(now))
+            .map((a) => a.when),
+        unorderedEquals([DateTime(2026, 9, 22, 9, 55), meeting]));
+    final task = (await database.getTasks())
+        .firstWhere((task) => task.title == 'Reunión');
+    expect(
+        ReminderEngine.alertAhead(task, const ReminderPreferences(), now),
+        isTrue);
+
+    // Back to one reminder: the extra ones go.
+    await database.updateTask(task.copyWith(reminderExtraMinutes: const []));
+    await engine.reconcile('local');
+    expect(driver.pending.values.where((a) => a.when.isAfter(now)), isEmpty);
+  });
+
+  test('extra reminders survive the phone and the server unchanged', () {
+    final task = Task(
+        title: 'Reunión',
+        priority: 1,
+        dueDate: DateTime(2026, 9, 22, 10),
+        reminderMinutes: 20,
+        reminderExtraMinutes: [5]);
+    expect(Task.fromMap(task.toMap()).reminderExtraMinutes, [5]);
+    expect(task.toApi()['reminder_extra_minutes'], [5]);
+    expect(Task.fromApi(task.toApi()).reminderExtraMinutes, [5]);
+    // An older server sends none.
+    expect(
+        Task.fromApi(task.toApi()..remove('reminder_extra_minutes'))
+            .reminderExtraMinutes,
+        isEmpty);
+    expect(
+        () => Task(title: 'Nota', kind: 'note', priority: 1, reminderExtraMinutes: [5]),
+        throwsArgumentError);
+  });
+
   test(
       'stable IDs avoid rescheduling unchanged tasks and surface permission and scheduling failures',
       () async {

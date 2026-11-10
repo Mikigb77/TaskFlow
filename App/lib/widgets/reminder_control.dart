@@ -461,23 +461,35 @@ Future<bool> _switchOn(
 /// be saved) also gets the plans under the list (reminder_plan_sheet.dart):
 /// the choices are exclusive, so a plan keeps [minutes] and [time] as they
 /// are, unused, and a single reminder clears the [plan]. On a [shared] task
-/// the choices say they're only for this person.
+/// the choices say they're only for this person. A timed task with [extra]
+/// reminders («20 minutos antes y 5 minutos antes») has them as one row,
+/// chosen; any other row is one reminder again.
 Future<void> _chooseReminder(
   BuildContext context, {
   required bool hasTime,
   required int? minutes,
+  List<int> extra = const [],
   required int? time,
   required int defaultLead,
   required int? defaultTime,
   ReminderPlan? plan,
   Task? schedule,
   bool shared = false,
-  required void Function(int? minutes, int? time, ReminderPlan? plan) onChosen,
+  required void Function(
+    int? minutes,
+    int? time,
+    ReminderPlan? plan,
+    List<int> extra,
+  )
+  onChosen,
 }) async {
   const useDefault = -2;
   const pickTime = -3;
+  const several = -4;
+  final hasSeveral = hasTime && minutes != -1 && extra.isNotEmpty;
   final values = hasTime
       ? (<int>{
+          if (hasSeveral) several,
           useDefault,
           -1,
           0,
@@ -488,7 +500,9 @@ Future<void> _chooseReminder(
           ?minutes,
         }..remove(defaultLead))
       : <int>{if (defaultTime != null) useDefault, -1, pickTime};
-  final current = hasTime
+  final current = hasSeveral
+      ? several
+      : hasTime
       ? minutes == null || minutes == defaultLead
             ? useDefault
             : minutes
@@ -499,7 +513,9 @@ Future<void> _chooseReminder(
       : defaultTime != null
       ? useDefault
       : -1;
-  String label(BuildContext context, int value) => value == pickTime
+  String label(BuildContext context, int value) => value == several
+      ? reminderLeads(context, minutes ?? defaultLead, extra)
+      : value == pickTime
       ? context.l10n.chooseAlertTime
       : value == useDefault
       ? '${hasTime ? context.reminderLead(defaultLead) : _clock(context, defaultTime!)} · ${context.l10n.defaultChoice}'
@@ -528,7 +544,7 @@ Future<void> _chooseReminder(
     );
     if (choice == null || !context.mounted) return;
     if (choice.plan case final chosen?) {
-      onChosen(minutes, time, chosen);
+      onChosen(minutes, time, chosen, extra);
       return;
     }
     value = choice.value;
@@ -544,7 +560,9 @@ Future<void> _chooseReminder(
     );
   }
   if (value == null || !context.mounted) return;
-  if (value == pickTime) {
+  if (value == several) {
+    onChosen(minutes, time, null, extra);
+  } else if (value == pickTime) {
     final initial = time ?? defaultTime ?? 540;
     final picked = await showTimePicker(
       context: context,
@@ -552,14 +570,22 @@ Future<void> _chooseReminder(
       initialEntryMode: TimePickerEntryMode.input,
     );
     if (picked != null) {
-      onChosen(null, picked.hour * 60 + picked.minute, null);
+      onChosen(null, picked.hour * 60 + picked.minute, null, const []);
     }
   } else if (value == useDefault) {
     // For a date-only task the default also means the default time.
-    onChosen(null, hasTime ? time : null, null);
+    onChosen(null, hasTime ? time : null, null, const []);
   } else {
-    onChosen(value, time, null);
+    onChosen(value, time, null, const []);
   }
+}
+
+/// A timed task's reminders as one reading, earliest first: «20 minutos
+/// antes, 5 minutos antes». [main] is the single reminder's lead, and
+/// [extra] the others ([Task.reminderExtraMinutes]).
+String reminderLeads(BuildContext context, int main, List<int> extra) {
+  final leads = <int>{main, ...extra}.toList()..sort((a, b) => b.compareTo(a));
+  return leads.map(context.reminderLead).join(', ');
 }
 
 /// The default lead for tasks with a time, from the chip's list of leads.
@@ -678,7 +704,11 @@ Future<int?> _pickFrom(
   final label = task.reminderMinutes == -1
       ? context.l10n.off
       : task.reminderHasTime
-      ? context.reminderLead(task.reminderMinutes ?? preferences.leadMinutes)
+      ? reminderLeads(
+          context,
+          task.reminderMinutes ?? preferences.leadMinutes,
+          task.reminderExtraMinutes,
+        )
       : minute == null
       ? context.l10n.off
       : _clock(context, minute);
@@ -714,6 +744,7 @@ Future<int?> _pickFrom(
             context,
             hasTime: task.reminderHasTime,
             minutes: task.reminderMinutes,
+            extra: task.reminderExtraMinutes,
             time: task.reminderTime,
             defaultLead: preferences.leadMinutes,
             defaultTime: preferences.dateOnlyTime,
@@ -721,9 +752,10 @@ Future<int?> _pickFrom(
             // Plans only where they can ring.
             schedule: ringsHere ? task : null,
             shared: reminderShared(ref, task),
-            onChosen: (minutes, time, plan) => onChanged(
+            onChosen: (minutes, time, plan, extra) => onChanged(
               task.copyWith(
                 reminderMinutes: minutes,
+                reminderExtraMinutes: extra,
                 reminderTime: time,
                 reminderPlan: plan,
               ),
@@ -806,6 +838,9 @@ class ReminderControl extends ConsumerWidget {
   final bool hasDate;
   final bool hasTime;
   final int? minutes;
+
+  /// More reminders before the timed task ([Task.reminderExtraMinutes]).
+  final List<int> extra;
   final int? time;
 
   /// The task's project and person, which decide whether this phone rings.
@@ -820,15 +855,23 @@ class ReminderControl extends ConsumerWidget {
   final ValueChanged<int?> onMinutes;
   final ValueChanged<int?> onTime;
 
-  /// The choice as one change: the single reminder's minutes and time, and
-  /// the plan. With it, the choices also offer plans to a task with a
-  /// deadline or a day ([schedule]); [onMinutes] and [onTime] go unused.
-  final void Function(int? minutes, int? time, ReminderPlan? plan)? onChanged;
+  /// The choice as one change: the single reminder's minutes and time, the
+  /// plan, and the extra reminders. With it, the choices also offer plans to
+  /// a task with a deadline or a day ([schedule]); [onMinutes] and [onTime]
+  /// go unused.
+  final void Function(
+    int? minutes,
+    int? time,
+    ReminderPlan? plan,
+    List<int> extra,
+  )?
+  onChanged;
   const ReminderControl({
     super.key,
     required this.hasDate,
     required this.hasTime,
     this.minutes,
+    this.extra = const [],
     this.time,
     this.task,
     this.schedule,
@@ -875,6 +918,7 @@ class ReminderControl extends ConsumerWidget {
         planned ??
         schedule?.copyWith(
           reminderMinutes: minutes,
+          reminderExtraMinutes: extra,
           reminderTime: time,
           // A plan that can't ring here doesn't count.
           reminderPlan: ringsHere ? schedule!.reminderPlan : null,
@@ -887,7 +931,7 @@ class ReminderControl extends ConsumerWidget {
     final value = active != null
         ? reminderPlanText(context, ref, planned!)
         : hasTime
-        ? '${context.reminderLead(minutes ?? settings.leadMinutes)}${minutes == null ? ' · ${context.l10n.defaultChoice}' : ''}'
+        ? '${minutes == -1 ? context.l10n.off : reminderLeads(context, minutes ?? settings.leadMinutes, extra)}${minutes == null && extra.isEmpty ? ' · ${context.l10n.defaultChoice}' : ''}'
         : minutes == -1 || minute == null
         ? context.l10n.off
         : _clock(context, minute);
@@ -899,6 +943,8 @@ class ReminderControl extends ConsumerWidget {
             context,
             hasTime: hasTime,
             minutes: minutes,
+            // The extra reminders only where they can be kept.
+            extra: onChanged == null ? const [] : extra,
             time: time,
             defaultLead: settings.leadMinutes,
             defaultTime: settings.dateOnlyTime,
@@ -906,9 +952,9 @@ class ReminderControl extends ConsumerWidget {
             // Plans only where they can be kept, and ring.
             schedule: onChanged == null || !ringsHere ? null : schedule,
             shared: reminderShared(ref, task),
-            onChosen: (value, chosenTime, chosenPlan) {
+            onChosen: (value, chosenTime, chosenPlan, chosenExtra) {
               if (onChanged case final changed?) {
-                changed(value, chosenTime, chosenPlan);
+                changed(value, chosenTime, chosenPlan, chosenExtra);
                 return;
               }
               if (value != minutes) onMinutes(value);

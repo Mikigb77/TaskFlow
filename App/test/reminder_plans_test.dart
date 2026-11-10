@@ -263,7 +263,8 @@ void main() {
           ..remove('id')
           ..remove('reminderPlan')
           ..remove('completedAt')
-          ..remove('completedTimes');
+          ..remove('completedTimes')
+          ..remove('reminderExtraMinutes');
         await old.insert('tasks', {...row, 'sync_id': 'kept', 'revision': 4});
         await TaskDatabase.upgrade(old, 18, TaskDatabase.schemaVersion);
         expect(TaskDatabase.schemaVersion, greaterThanOrEqualTo(21));
@@ -421,6 +422,16 @@ void main() {
               'reminder_minutes': 60,
             },
             {
+              // «Reunión a las 10, avísame 20 minutos antes y 5 minutos antes».
+              'title': 'Reunión',
+              'due_date': DateTime(2026, 10, 27, 10).toUtc().toIso8601String(),
+              'priority': 1,
+              'notes': '',
+              'questions': [],
+              'reminder_minutes': 20,
+              'reminder_extra_minutes': [5],
+            },
+            {
               'title': 'Comprar pan',
               'priority': 1,
               'notes': '',
@@ -438,12 +449,18 @@ void main() {
         expect(tasks[0].reminderMinutes, isNull);
         expect(tasks[1].reminderPlan, isNull);
         expect(tasks[1].reminderMinutes, 60);
+        expect(tasks[1].reminderExtraMinutes, isEmpty);
+        // Every lead said is a reminder.
+        expect(tasks[2].reminderMinutes, 20);
+        expect(tasks[2].reminderExtraMinutes, [5]);
         // An older server sends neither: no plan, the single default.
-        expect(tasks[2].reminderPlan, isNull);
-        expect(tasks[2].reminderMinutes, isNull);
+        expect(tasks[3].reminderPlan, isNull);
+        expect(tasks[3].reminderMinutes, isNull);
+        expect(tasks[3].reminderExtraMinutes, isEmpty);
         // Kept with the capture until it's saved.
         final reread = (await store.read(session.id, 'local'))!;
         expect(reread.drafts.first.task.reminderPlan, ownersPlan);
+        expect(reread.drafts[2].task.reminderExtraMinutes, [5]);
       },
     );
   });

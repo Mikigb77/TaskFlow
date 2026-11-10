@@ -149,6 +149,11 @@ class ReminderEngine {
   static String identity(String owner, Task task) =>
       '$owner/task/${task.id}/${task.occurrenceId ?? 'once'}';
 
+  /// One of [task]'s extra reminders ([Task.reminderExtraMinutes]), by its
+  /// [lead]: «20 minutos antes y 5 minutos antes» rings at both.
+  static String extraIdentity(String owner, Task task, int lead) =>
+      '${identity(owner, task)}/before/$lead';
+
   /// One reminder of [task]'s plan, by the day it rings. [onTime] marks the
   /// day's own one ringing at the task's usual reminder ([isPlanDayAlert]).
   static String planIdentity(
@@ -260,6 +265,25 @@ class ReminderEngine {
     return result..sort(Task.compareBySchedule);
   }
 
+  /// Every moment [task]'s reminders ring: the single reminder's
+  /// ([_firing]) first, then each extra lead's, for a timed task whose
+  /// single reminder is on. None at the same moment twice.
+  static List<({DateTime when, int lead})> _firings(
+    Task task,
+    ReminderPreferences preferences,
+  ) {
+    final first = _firing(task, preferences);
+    if (first == null) return const [];
+    if (!task.reminderHasTime) return [first];
+    final date = task.reminderDate!;
+    return [
+      first,
+      for (final lead in task.reminderExtraMinutes)
+        if (lead != first.lead)
+          (when: date.subtract(Duration(minutes: lead)), lead: lead),
+    ];
+  }
+
   /// When [task]'s alert fires, and how many minutes ahead of the task.
   static ({DateTime when, int lead})? _firing(
     Task task,
@@ -311,8 +335,7 @@ class ReminderEngine {
     );
     return upcoming([task], now).any((next) {
       if (next.reminderMinutes == -1) return false;
-      final firing = _firing(next, on);
-      return firing != null && firing.when.isAfter(now);
+      return _firings(next, on).any((firing) => firing.when.isAfter(now));
     });
   }
 
@@ -348,8 +371,8 @@ class ReminderEngine {
     if (anchor == null || (!planned && task.reminderMinutes == -1)) {
       return null;
     }
-    final firing = planned ? null : _firing(task, preferences);
-    if (!planned && firing == null) return null;
+    final firings = planned ? null : _firings(task, preferences);
+    if (!planned && firings!.isEmpty) return null;
     DateTime? last;
     DateTime? snooze;
     for (final row in alerts) {
@@ -368,7 +391,7 @@ class ReminderEngine {
       }
       // A snooze sets the alert again at its own time.
       if (!planned &&
-          !fired.isAtSameMomentAs(firing!.when) &&
+          !firings!.any((firing) => fired.isAtSameMomentAs(firing.when)) &&
           (snoozedAt == null || !fired.isAtSameMomentAs(snoozedAt))) {
         continue;
       }
@@ -426,21 +449,25 @@ class ReminderEngine {
     }
     for (final task in upcoming(single, now)) {
       if (task.id == null || task.reminderMinutes == -1) continue;
-      final firing = _firing(task, preferences);
-      if (firing == null || !firing.when.isAfter(now)) continue;
-      result.add(
-        PlannedReminder(
-          identity: identity(owner, task),
-          taskId: task.id,
-          occurrence: task.occurrenceId,
-          due: task.reminderDate,
-          when: firing.when,
-          title: task.title,
-          languageCode: c.languageCode,
-          body: c.body(task, firing.when, firing.lead),
-          readOnly: reader(task),
-        ),
-      );
+      // The single reminder, then each extra one said for the same task.
+      for (final (index, firing) in _firings(task, preferences).indexed) {
+        if (!firing.when.isAfter(now)) continue;
+        result.add(
+          PlannedReminder(
+            identity: index == 0
+                ? identity(owner, task)
+                : extraIdentity(owner, task, firing.lead),
+            taskId: task.id,
+            occurrence: task.occurrenceId,
+            due: task.reminderDate,
+            when: firing.when,
+            title: task.title,
+            languageCode: c.languageCode,
+            body: c.body(task, firing.when, firing.lead),
+            readOnly: reader(task),
+          ),
+        );
+      }
     }
     for (final entry in {
       'morning': preferences.morning,

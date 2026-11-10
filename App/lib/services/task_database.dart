@@ -15,7 +15,7 @@ import 'package:agenda/services/reminder_copy.dart';
 enum ReminderBlock { archived, muted, notForAccount }
 
 class TaskDatabase {
-  static const schemaVersion = 23;
+  static const schemaVersion = 24;
   static final TaskDatabase _instance = TaskDatabase._internal();
   Database? _database;
   Future<Database>? _opening;
@@ -68,6 +68,7 @@ class TaskDatabase {
           completedDates TEXT NOT NULL DEFAULT '[]',
           completedAt TEXT, completedTimes TEXT NOT NULL DEFAULT '{}',
           reminderMinutes INTEGER, reminderTime INTEGER, reminderPlan TEXT,
+          reminderExtraMinutes TEXT NOT NULL DEFAULT '[]',
           deadline TEXT, deadlineHasTime INTEGER NOT NULL DEFAULT 0,
           durationMinutes INTEGER, reminderAnchor TEXT NOT NULL DEFAULT 'planned',
           checklist TEXT NOT NULL DEFAULT '[]',
@@ -291,6 +292,14 @@ class TaskDatabase {
           row['note_id'] as int,
         );
       }
+    }
+    if (oldVersion < 24 && newVersion >= 24) {
+      // More than one reminder before a timed task: «20 minutos antes y 5
+      // minutos antes» (Backend/docs/REMINDER_PLANS.md). Every reminder
+      // saved before stays a single one.
+      await db.execute(
+        "ALTER TABLE tasks ADD COLUMN reminderExtraMinutes TEXT NOT NULL DEFAULT '[]'",
+      );
     }
   }
 
@@ -655,7 +664,7 @@ class TaskDatabase {
   }
 
   /// Sets only this account's own reminders on task [taskId]: the single
-  /// reminder's [minutes] and [time], and the [plan]. The one write a
+  /// reminder's [minutes], [extra] leads and [time], and the [plan]. The one write a
   /// «lector» project takes from a reader (D9), so it skips [validateList]'s
   /// read-only refusal; nothing else of the task changes. The row goes
   /// pending, and the sync sends it as a change to these reminders alone.
@@ -667,11 +676,13 @@ class TaskDatabase {
     int taskId, {
     String ownerKey = 'local',
     int? minutes,
+    List<int> extra = const [],
     int? time,
     ReminderPlan? plan,
   }) async {
     final count = await (await database).rawUpdate(
-      '''UPDATE tasks SET reminderMinutes = ?, reminderTime = ?, reminderPlan = ?,
+      '''UPDATE tasks SET reminderMinutes = ?, reminderExtraMinutes = ?,
+      reminderTime = ?, reminderPlan = ?,
       sync_pending = ?, revision = revision + 1,
       own_reminders_pending = CASE WHEN ? = 1
         AND (sync_pending = 0 OR own_reminders_pending = 1) THEN 1 ELSE 0 END
@@ -679,6 +690,7 @@ class TaskDatabase {
         AND (kind IS NULL OR kind != 'note')''',
       [
         minutes,
+        jsonEncode(Task.extraLeads(extra, minutes)),
         time,
         plan?.encode(),
         ownerKey == 'local' ? 0 : 1,
@@ -840,6 +852,7 @@ class TaskDatabase {
         'tasks',
         _remoteValues(remote)
           ..remove('reminderMinutes')
+          ..remove('reminderExtraMinutes')
           ..remove('reminderTime')
           ..remove('reminderPlan')
           ..remove('sync_pending')
@@ -867,6 +880,8 @@ class TaskDatabase {
       ..removeWhere(
         (key, _) =>
             (key == 'reminderPlan' && !remote.containsKey('reminder_plan')) ||
+            (key == 'reminderExtraMinutes' &&
+                !remote.containsKey('reminder_extra_minutes')) ||
             (key == 'completedAt' && !remote.containsKey('completed_at')) ||
             (key == 'completedTimes' && !remote.containsKey('completed_times')),
       )),

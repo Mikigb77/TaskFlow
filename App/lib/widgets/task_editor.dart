@@ -111,6 +111,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor>
   DateTime? _repeatUntil;
   late int _priority;
   int? _reminderMinutes;
+  List<int> _reminderExtraMinutes = const [];
   int? _reminderTime;
   ReminderPlan? _reminderPlan;
   late final List<String> _attachments;
@@ -135,6 +136,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor>
     recurrence: _dueDate == null ? 'none' : _recurrence,
     reminderAnchor: _reminderAnchor,
     reminderMinutes: _reminderMinutes,
+    reminderExtraMinutes: _reminderExtraMinutes,
     reminderTime: _reminderTime,
     reminderPlan: _isNote ? null : _reminderPlan,
   );
@@ -300,6 +302,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor>
     _repeatUntil = task.repeatUntil;
     _priority = task.priority;
     _reminderMinutes = task.reminderMinutes;
+    _reminderExtraMinutes = task.reminderExtraMinutes;
     _reminderTime = task.reminderTime;
     _reminderPlan = task.reminderPlan;
     _attachments = [...task.filePaths, ...task.imagePaths];
@@ -502,6 +505,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor>
           : before.completedDates,
       priority: _isNote ? 1 : _priority,
       reminderMinutes: _isNote ? -1 : _reminderMinutes,
+      reminderExtraMinutes: _isNote ? const [] : _reminderExtraMinutes,
       reminderTime: _isNote ? null : _reminderTime,
       isCompleted: _isNote || _recurrence != 'none'
           ? false
@@ -1420,6 +1424,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor>
     hasDate: _planningTask.reminderDate != null,
     hasTime: _planningTask.reminderHasTime,
     minutes: _reminderMinutes,
+    extra: _reminderExtraMinutes,
     time: _reminderTime,
     plan: _reminderPlan,
     task: _responsibility,
@@ -1433,8 +1438,9 @@ class _TaskEditorState extends ConsumerState<TaskEditor>
     onMinutes: (value) => setState(() => _reminderMinutes = value),
     onTime: (value) => setState(() => _reminderTime = value),
     // One choice of the exclusive ones: a plan, or the single reminder.
-    onChanged: (minutes, time, plan) => setState(() {
+    onChanged: (minutes, time, plan, extra) => setState(() {
       _reminderMinutes = minutes;
+      _reminderExtraMinutes = extra;
       _reminderTime = time;
       _reminderPlan = plan;
     }),

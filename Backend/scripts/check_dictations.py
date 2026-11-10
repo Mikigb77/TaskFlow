@@ -53,6 +53,9 @@ DICTATIONS = {
     "report-ca": ("ca", "Entregar l'informe d'aquí a dues setmanes, recorda-m'ho cada dos dies"),
     "rent-en": ("en", "Pay the rent on the 30th, remind me the day before at 9"),
     "call-es": ("es", "Llamar a Ana mañana a las 10, avísame una hora antes"),
+    "twice-es": ("es", "Reunión mañana a las 10, recuérdamelo 20 minutos antes y 5 minutos antes"),
+    "twice-ca": ("ca", "Reunió demà a les 10, avisa'm mitja hora abans i quan comenci"),
+    "twice-en": ("en", "Meeting tomorrow at 10, remind me 20 minutes before and again 5 minutes before"),
     "plain-es": ("es", "Comprar pan mañana"),
     "until-es": ("es", "Terminar la solicitud el jueves y recuérdamelo hasta la fecha límite"),
     "until-ca": ("ca", "Acabar la sol·licitud dijous i recorda-m'ho fins al termini"),
@@ -71,7 +74,7 @@ MY_WAY = {
     "myway-en": ("en", "every other day, then daily for the last 5 days, at 8 in the morning", "2026-11-11"),
     "myway-unclear": ("es", "comprar leche", "2026-11-11"),
 }
-KEYS = ("title", "date", "time", "deadline_date", "recurrence", "reminder_minutes", "reminder_plan",
+KEYS = ("title", "date", "time", "deadline_date", "recurrence", "reminder_minutes", "reminder_extra_minutes", "reminder_plan",
         "reminder_needs_day", "questions")
 
 

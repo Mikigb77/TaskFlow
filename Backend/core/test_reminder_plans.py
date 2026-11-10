@@ -339,6 +339,25 @@ class PersonalSingleReminderTests(TestCase):
         self.put(self.marc, 2, reminder_minutes=None, reminder_time=None)
         self.assertEqual(list(TaskReminder.objects.values_list("user_id", flat=True)), [self.ana.pk])
 
+    def test_several_reminders_before_a_task_are_each_kept_for_their_person(self):
+        # «Reunión a las 10, avísame 20 minutos antes y 5 minutos antes»: two reminders, not one.
+        created = self.put(self.ana, 0, reminder_minutes=20, reminder_extra_minutes=[0, 5, 20, 5])
+        self.assertEqual(created.status_code, 201, created.data)
+        self.assertEqual((created.data["reminder_minutes"], created.data["reminder_extra_minutes"]), (20, [5, 0]))
+        self.assertEqual(self.client_for(self.marc).get(self.path).data["reminder_extra_minutes"], [])
+        # An app that doesn't send them keeps them; changing only them is no new version.
+        self.assertEqual(self.put(self.ana, 1, title="Presentar en clase hoy").data["reminder_extra_minutes"], [5, 0])
+        cleared = self.put(self.ana, 2, title="Presentar en clase hoy", reminder_extra_minutes=None)
+        self.assertEqual((cleared.status_code, cleared.data["version"], cleared.data["reminder_extra_minutes"]),
+                         (200, 2, []))
+        for extra in ([-1], [10081], [1, 2, 3, 4, 5, 6]):
+            self.assertEqual(self.put(self.ana, 2, reminder_extra_minutes=extra).status_code, 400, extra)
+
+    def test_a_note_takes_no_extra_reminders(self):
+        path = f"/api/tasks/{uuid.uuid4()}/"
+        note = {"kind": "note", "title": "Ideas", "version": 0, "reminder_extra_minutes": [5]}
+        self.assertEqual(self.client_for(self.ana).put(path, note, format="json").status_code, 400)
+
     def test_a_deadline_removed_by_anyone_moves_every_kept_anchor_back_to_the_start(self):
         self.assertEqual(self.put(self.ana, 0, reminder_anchor="deadline", reminder_minutes=30).status_code, 201)
         self.assertEqual(self.put(self.marc, 1, deadline_date=None, reminder_anchor="planned").status_code, 200)
@@ -497,6 +516,28 @@ class DictatedPlanTests(SimpleTestCase):
         self.assertEqual((nowhere["reminder_minutes"], nowhere["reminder_needs_day"]), (15, True))
         self.assertEqual([draft["reminder_needs_day"] for draft in (timed, deadline, day_only)], [False] * 3)
 
+    def test_several_leads_said_are_every_one_a_reminder(self):
+        # «Reunión mañana a las 10, avísame 20 minutos antes y 5 minutos antes».
+        both, listed, flipped, start, slips, day_only = self.extract(
+            task(title="Reunión", date="2026-10-23", time="10:00", reminder_minutes=20, reminder_extra_minutes=[5]),
+            task(title="Reunión", date="2026-10-23", time="10:00", reminder_extra_minutes=[20, 5]),
+            task(title="Reunión", date="2026-10-23", time="10:00", reminder_minutes=5, reminder_extra_minutes=[60]),
+            task(title="Reunión", date="2026-10-23", time="10:00", reminder_minutes=30, reminder_extra_minutes=[0]),
+            task(title="Reunión", date="2026-10-23", time="10:00", reminder_minutes=30,
+                 reminder_extra_minutes=["10", None, -5, 99999, 30]),
+            task(title="Llamar al banco", date="2026-10-23", reminder_minutes=60, reminder_extra_minutes=[10]))
+        lead = lambda draft: (draft["reminder_minutes"], draft["reminder_extra_minutes"])
+        self.assertEqual(lead(both), (20, [5]))
+        self.assertEqual(lead(listed), (20, [5]))  # Only the list: its earliest is the single reminder.
+        self.assertEqual(lead(flipped), (60, [5]))
+        self.assertEqual(lead(start), (30, [0]))  # «… y al empezar».
+        self.assertEqual(lead(slips), (30, [10]))
+        self.assertEqual(lead(day_only), (None, []))  # Minutes before need a time, as before.
+        self.assertEqual(self.extract(task(date="2026-10-23", time="10:00", reminder_extra_minutes=[0]))[0]
+                         ["reminder_minutes"], None)
+        self.assertEqual(self.extract(task(date="2026-10-23", time="10:00", reminder_extra_minutes=15))[0]
+                         ["reminder_minutes"], 15)
+
     def test_a_reminder_said_without_a_day_waits_for_one(self):
         # D3: «Renovar el pasaporte, recuérdamelo cada semana» keeps its reminders, and the card asks for a day.
         plan = {"phases": [phase(366, 0, 7)], "time": None, "said": "cada semana"}
@@ -607,6 +648,7 @@ class DictatedPlanTests(SimpleTestCase):
             schema = vertex_response_schema(commands)
             fields = schema["$defs"]["ExtractedTask"]["properties"]
             self.assertEqual(fields["reminder_minutes"], {"anyOf": [{"type": "integer"}, {"type": "null"}]})
+            self.assertEqual(fields["reminder_extra_minutes"], {"items": {"type": "integer"}, "type": "array"})
             self.assertEqual(set(schema["$defs"]["ReadPlan"]["properties"]), {"phases", "time", "said", "strength"})
             converted = _transformers.t_schema(None, deepcopy(schema)).properties["tasks"].items
             plan = converted.properties["reminder_plan"]
@@ -653,7 +695,7 @@ class DictationPromptTests(SimpleTestCase):
             '{"title":"Entregar l’informe","date":null,"deadline_date":"2026-11-01","reminder_plan":{"phases":'
             '[{"from_days":366,"to_days":0,"every_days":2}],"time":null,"said":"cada dos dies"}}',
             "'Dentist tomorrow at 5, remind me an hour before' has "
-            '{"title":"Go to the dentist","date":"2026-10-23","time":"17:00","reminder_minutes":60,"reminder_plan":null}',
+            '{"title":"Go to the dentist","date":"2026-10-23","time":"17:00","reminder_minutes":60,"reminder_extra_minutes":[],"reminder_plan":null}',
             "'Renew the passport in two weeks, remind me every day the last week but not on the day' has "
             '{"title":"Renew the passport","date":"2026-11-05","reminder_plan":{"phases":[{"from_days":7,'
             '"to_days":1,"every_days":1}],"time":null,"said":"every day the last week but not on the day"}}',

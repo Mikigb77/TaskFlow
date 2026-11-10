@@ -221,6 +221,7 @@ class CaptureStore {
     return task.copyWith(
       reminderPlan: stalePlan ? null : task.reminderPlan,
       reminderMinutes: staleLead ? null : lead,
+      reminderExtraMinutes: staleLead ? const [] : null,
     );
   }
 

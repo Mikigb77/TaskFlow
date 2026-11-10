@@ -645,6 +645,7 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
       hasDate: task.reminderDate != null,
       hasTime: task.reminderHasTime,
       minutes: task.reminderMinutes,
+      extra: task.reminderExtraMinutes,
       time: task.reminderTime,
       plan: task.reminderPlan,
       task: task,
@@ -659,11 +660,12 @@ class _CaptureReviewEditorState extends ConsumerState<CaptureReviewEditor> {
           _change(task.copyWith(reminderTime: value));
         }
       },
-      onChanged: (minutes, time, plan) {
+      onChanged: (minutes, time, plan, extra) {
         if (widget.enabled) {
           _change(
             task.copyWith(
               reminderMinutes: minutes,
+              reminderExtraMinutes: extra,
               reminderTime: time,
               reminderPlan: plan,
             ),
