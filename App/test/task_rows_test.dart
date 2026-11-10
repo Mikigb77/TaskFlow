@@ -1034,6 +1034,82 @@ void main() {
   // ---- Run 2026-10-28-app, round 1 · P279 (UX-2305, UX-1416, UX-2313,
   // UX-2312, UX-2616): task rows read whole and calm ----
 
+  for (final dark in [false, true]) {
+    testWidgets(
+      'UX-2412: a row swiped part way slides as its whole rounded card, and what it uncovers is a rounded card of its own beside it (${dark ? 'dark' : 'light'})',
+      (tester) async {
+        await page(
+          tester,
+          const HomeScreen(),
+          theme: dark ? AppTheme.dark : AppTheme.light,
+          tasks: [
+            Task(
+              id: 1,
+              title: 'Llamar a Daryl',
+              priority: 1,
+              dueDate: on(0, 10, 30),
+            ),
+          ],
+        );
+        final face = find
+            .descendant(
+              of: inRow('Llamar a Daryl', find.byType(Dismissible)),
+              matching: find.byType(Material),
+            )
+            .first;
+        final rest = tester.getRect(face);
+        expect(find.text(es.reschedule), findsNothing, reason: 'at rest');
+
+        // Toward the start: «Cambiar fecha» at the end.
+        final gesture = await tester.startGesture(rest.center);
+        await gesture.moveBy(const Offset(-20, 0));
+        await gesture.moveBy(const Offset(-100, 0));
+        await tester.pump();
+        final card = tester.getRect(face);
+        expect(card.left, lessThan(rest.left - 90));
+        expect(card.size, rest.size, reason: 'the whole card moves');
+        final pill = find.ancestor(
+          of: find.text(es.reschedule),
+          matching: find.byType(ClipRRect),
+        );
+        expect(pill, findsOneWidget);
+        expect(
+          tester.widget<ClipRRect>(pill).borderRadius,
+          BorderRadius.circular(20),
+        );
+        final uncovered = tester.getRect(pill);
+        expect(uncovered.right, moreOrLessEquals(rest.right));
+        expect(uncovered.left, moreOrLessEquals(card.right + 8));
+        expect(uncovered.top, moreOrLessEquals(rest.top));
+        expect(uncovered.height, moreOrLessEquals(rest.height));
+        expect(tester.takeException(), isNull, reason: 'no overflow');
+
+        // Let go short of the threshold: it springs home and the pill goes.
+        await gesture.up();
+        await tester.pumpAndSettle();
+        expect(tester.getRect(face), rest);
+        expect(find.text(es.reschedule), findsNothing);
+
+        // Toward the end: «Completar» at the start.
+        final other = await tester.startGesture(rest.center);
+        await other.moveBy(const Offset(20, 0));
+        await other.moveBy(const Offset(100, 0));
+        await tester.pump();
+        final done = tester.getRect(
+          find.ancestor(
+            of: find.text(es.complete),
+            matching: find.byType(ClipRRect),
+          ),
+        );
+        expect(done.left, moreOrLessEquals(rest.left));
+        expect(done.right, moreOrLessEquals(tester.getRect(face).left - 8));
+        expect(tester.takeException(), isNull);
+        await other.up();
+        await tester.pumpAndSettle();
+      },
+    );
+  }
+
   group('P279 · task rows read whole and calm', () {
     final ca = lookupAppLocalizations(const Locale('ca'));
     final en = lookupAppLocalizations(const Locale('en'));
