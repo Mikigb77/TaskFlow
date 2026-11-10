@@ -40,6 +40,18 @@ abstract final class Lagoon {
 
 /// Shared palette, type and controls for every screen and native picker.
 abstract final class AppTheme {
+  /// Each tab's main tap (`Añadir tarea`, `Añadir nota`): night on mint, in
+  /// the display face, as on the website. Wrapped in LivelyButton, so its
+  /// halo breathes; one look for every "add" in the app.
+  static final ButtonStyle mainTap = FilledButton.styleFrom(
+      backgroundColor: Lagoon.hot,
+      foregroundColor: Lagoon.onHot,
+      iconSize: 24,
+      textStyle: const TextStyle(
+          fontFamily: Lagoon.display,
+          fontSize: 15,
+          fontWeight: FontWeight.w700));
+
   static ThemeData get light => _build(Brightness.light);
   static ThemeData get dark => _build(Brightness.dark);
 
