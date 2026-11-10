@@ -2,6 +2,11 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-11-10 — Every "add" looks the same
+
+- The owner: «Añadir nota» "has a different look and feel than the button to add tasks. Wouldn't it be better if all the buttons had the same look and feel?"
+- Built as: one style, `AppTheme.mainTap` (night on mint, Bricolage, inside `LivelyButton`'s breathing halo), used by `Añadir tarea` and `Añadir nota`. «Reunión» beside it stays outlined, 12 dp away so the halo doesn't touch it.
+
 ## 2026-11-10 — A rounder tab bar
 
 - The owner asked whether the bottom tab bar could be "a little bit more round", without competing with `Añadir tarea` above it. Shown three renders (today's flat bar, rounded top corners, a floating pill), they picked rounded top corners.

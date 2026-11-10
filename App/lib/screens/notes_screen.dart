@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:agenda/theme/app_theme.dart';
 import 'package:agenda/widgets/ambient.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -141,15 +142,19 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   /// «Añadir nota», and beside it «Reunión» unless a meeting records. At
   /// large text the two stack, «Añadir nota» first, so neither label is cut.
   Widget _actions(BuildContext context, {required bool recording}) {
-    final add = FilledButton.icon(
-        icon: Icon(ref.watch(voiceAvailableProvider)
-            ? Icons.mic_none_rounded
-            : Icons.add_rounded),
-        label: Text(context.l10n.addNote),
-        // The project shown, or on all projects none at all: a note never
-        // follows another screen's filter.
-        onPressed: () => _add(() => showCaptureSheet(context,
-            kind: 'note', projectId: _saveTo, useScope: false)));
+    // The same mint tap as «Añadir tarea», its halo breathing (the owner,
+    // 2026-11-10: every "add" looks the same).
+    final add = LivelyButton(
+        child: FilledButton.icon(
+            style: AppTheme.mainTap,
+            icon: Icon(ref.watch(voiceAvailableProvider)
+                ? Icons.mic_none_rounded
+                : Icons.add_rounded),
+            label: Text(context.l10n.addNote),
+            // The project shown, or on all projects none at all: a note
+            // never follows another screen's filter.
+            onPressed: () => _add(() => showCaptureSheet(context,
+                kind: 'note', projectId: _saveTo, useScope: false))));
     if (recording) return add;
     // The visible word is in the spoken name («Grabar una reunión»), so
     // voice control finds it by what it shows.
@@ -171,11 +176,12 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
       return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [add, const SizedBox(height: 8), meeting]);
+          children: [add, const SizedBox(height: 12), meeting]);
     }
     return Row(children: [
       Expanded(child: add),
-      const SizedBox(width: 8),
+      // Room for the halo, so it doesn't touch «Reunión».
+      const SizedBox(width: 12),
       meeting,
     ]);
   }
