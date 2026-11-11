@@ -646,29 +646,41 @@ abstract class AppLocalizations {
   /// **'Other calendar'**
   String get calendarOther;
 
-  /// Phone calendars: the switch that also puts each task with a day in the phone's calendar.
-  ///
-  /// In en, this message translates to:
-  /// **'Add my tasks to my calendar'**
-  String get calendarExport;
-
-  /// Phone calendars: under the switch while it's on; calendar is the calendar's name or its account's email address.
-  ///
-  /// In en, this message translates to:
-  /// **'Tasks with a day also go to {calendar}.'**
-  String calendarExportTo(String calendar);
-
-  /// Phone calendars, under More options: heading over the calendars a task can go to, shown only while the switch is on and there are two or more.
-  ///
-  /// In en, this message translates to:
-  /// **'Add tasks to'**
-  String get calendarExportTarget;
-
   /// Phone calendars: said when the phone refused to let TaskFlow add events.
   ///
   /// In en, this message translates to:
   /// **'Without permission, TaskFlow can’t add tasks to your calendar.'**
   String get calendarExportRefused;
+
+  /// Phone calendars: the row (and its page's title) for choosing whose phone-calendar events show in TaskFlow's Calendar.
+  ///
+  /// In en, this message translates to:
+  /// **'Your calendar in TaskFlow'**
+  String get calendarIntoApp;
+
+  /// Phone calendars: the row (and its page's title) for choosing which accounts' calendars get the tasks made in TaskFlow.
+  ///
+  /// In en, this message translates to:
+  /// **'TaskFlow in your calendar'**
+  String get calendarIntoPhone;
+
+  /// Your calendar in TaskFlow: the line above the accounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose whose events show in Calendar, beside your tasks.'**
+  String get calendarIntoAppLead;
+
+  /// TaskFlow in your calendar: the line above the accounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Your tasks with a day are added to the main calendar of each account you tick.'**
+  String get calendarIntoPhoneLead;
+
+  /// Phone calendars: under each of the two rows, how many accounts are ticked there.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Off} =1{1 account} other{{count} accounts}}'**
+  String calendarAccountsOn(int count);
 
   /// No description provided for @calendarReadRetry.
   ///

@@ -172,8 +172,8 @@ class _MainShellState extends ConsumerState<MainShell>
     // label from the start (R1-P318-1, UX-2903).
     ref.listen(noteTasksProvider, (_, _) {});
     ref.listen(meetingNotesProvider, (_, _) {});
-    // Tasks go to the phone's calendar while «Add my tasks to my calendar»
-    // is on.
+    // Tasks go to the phone's calendar while «TaskFlow in your calendar»
+    // has an account ticked.
     ref.listen(calendarExportProvider, (_, _) {});
     if (_updates) {
       ref.listen(appUpdateProvider, (_, _) => _offerUpdate());

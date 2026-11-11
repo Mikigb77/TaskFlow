@@ -71,7 +71,7 @@ Deterministic tests verify exact entitlement matching; cancelled-but-still-activ
 - Replace the published test paywall's preview copy with the actual Pro benefits, add public Terms/Privacy URLs, and review the intended real-store price. Recheck all three languages and rerun native checkout under the intended production sandbox-access policy.
 - Supply public Android/iOS platform SDK keys, configure the real store apps/products, signing and credentials, and validate the account restore/transfer policy.
 - Test real Google Play/App Store sandbox renewals, expiration, billing retry, refunds and store management. A Test Store run cannot validate these store-specific paths.
-- Compile and test iOS on macOS. iOS 15 deployment settings, Podfile and capability were added but cannot be validated by a Windows Android build.
+- Test iOS on a device. CI compiles it on macOS (unsigned, `flutter build ios --no-codesign`); the Podfile was removed on 2026-11-11 because every plugin is a Swift Package.
 - Voice capture now requires Pro and Django independently verifies access. Validate real-store renewals, refunds, transfers and offline behavior before selling; authenticated webhooks can complement the current request-time verification.
 
 ## Local evidence

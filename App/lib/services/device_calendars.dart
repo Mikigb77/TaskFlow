@@ -81,7 +81,7 @@ class DeviceCalendars {
   }
 
   /// Whether TaskFlow may add events, asked for only when the person turns on
-  /// «Add my tasks to my calendar». On iOS full access covers both.
+  /// «TaskFlow in your calendar». On iOS full access covers both.
   Future<CalendarAccess> writeAccess({bool request = false}) async {
     if (!supported) return CalendarAccess.unavailable;
     try {

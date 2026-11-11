@@ -380,19 +380,34 @@ class AppLocalizationsEs extends AppLocalizations {
   String get calendarOther => 'Otro calendario';
 
   @override
-  String get calendarExport => 'Añadir mis tareas a mi calendario';
-
-  @override
-  String calendarExportTo(String calendar) {
-    return 'Las tareas con día también van a $calendar.';
-  }
-
-  @override
-  String get calendarExportTarget => 'Añadir las tareas a';
-
-  @override
   String get calendarExportRefused =>
       'Sin permiso, TaskFlow no puede añadir tareas a tu calendario.';
+
+  @override
+  String get calendarIntoApp => 'Tu calendario en TaskFlow';
+
+  @override
+  String get calendarIntoPhone => 'TaskFlow en tu calendario';
+
+  @override
+  String get calendarIntoAppLead =>
+      'Elige de qué cuentas ver los eventos en Calendario, junto a tus tareas.';
+
+  @override
+  String get calendarIntoPhoneLead =>
+      'Tus tareas con día se añaden al calendario principal de cada cuenta que marques.';
+
+  @override
+  String calendarAccountsOn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count cuentas',
+      one: '1 cuenta',
+      zero: 'Desactivado',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get calendarReadRetry =>
