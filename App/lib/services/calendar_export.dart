@@ -168,59 +168,66 @@ class CalendarExporter {
     return Map.fromEntries(first.take(maxEvents));
   }
 
-  /// Brings [target]'s events in step with [tasks]. Returns the event ids
-  /// TaskFlow now has on the phone, so Calendar doesn't show a task twice.
-  Future<Set<String>> sync(List<Task> tasks, DeviceCalendar target,
+  /// Brings [targets]' events in step with [tasks]; a calendar no longer
+  /// among them loses the events TaskFlow added there from today on. Returns
+  /// the event ids TaskFlow now has on the phone, so Calendar doesn't show a
+  /// task twice.
+  Future<Set<String>> sync(List<Task> tasks, List<DeviceCalendar> targets,
       {required DateTime now, int? accountId}) async {
-    var entries = await store.read();
+    final entries = await store.read();
     for (var pass = 0; pass < 2; pass++) {
-      final gone = await _pass(entries, tasks, target, now, accountId);
+      final gone = await _pass(entries, tasks, targets, now, accountId);
       if (!gone) break;
     }
-    entries = await store.read();
     return {for (final entry in entries.values) entry.event};
   }
 
+  /// Keys are the calendar's id, `|`, then the task's key from [plan].
   Future<bool> _pass(Map<String, CalendarExportEntry> entries, List<Task> tasks,
-      DeviceCalendar target, DateTime now, int? accountId) async {
+      List<DeviceCalendar> targets, DateTime now, int? accountId) async {
     final today = Task.day(now).millisecondsSinceEpoch;
     final ids = {for (final task in tasks) ?task.id};
-    final planned =
-        plan(tasks, now, accountId: accountId, mapped: entries.keys.toSet());
-    final writes = <(String, CalendarWrite, PlannedEvent?)>[];
+    final planned = <String, (String, PlannedEvent)>{};
+    for (final target in {for (final t in targets) t.id}) {
+      final prefix = '$target|';
+      final mapped = {
+        for (final key in entries.keys)
+          if (key.startsWith(prefix)) key.substring(prefix.length)
+      };
+      for (final MapEntry(:key, :value)
+          in plan(tasks, now, accountId: accountId, mapped: mapped).entries) {
+        planned['$prefix$key'] = (target, value);
+      }
+    }
+    final writes = <(String, CalendarWrite, (String, PlannedEvent)?)>[];
     final handled = <String>{};
     for (final MapEntry(:key, value: entry) in entries.entries) {
       final want = planned[key];
       final repeating = key.contains('@');
       final past = entry.start < today;
+      final target = targets.any((t) => t.id == entry.calendar);
       if (!ids.contains(entry.task)) {
         writes.add((key, _delete(entry), null));
-      } else if (entry.calendar != target.id) {
-        // Another calendar was chosen: what's ahead moves there.
-        if (past && want != null) {
-          handled.add(key);
-        } else {
-          writes.add((key, _delete(entry), null));
-        }
       } else if (want != null) {
         handled.add(key);
-        if (want.fingerprint(target.id) != entry.fingerprint) {
+        if (want.$2.fingerprint(want.$1) != entry.fingerprint) {
           writes.add((
             key,
             CalendarWrite.update(
                 event: entry.event,
-                calendar: target.id,
-                title: want.title,
-                start: want.start,
-                end: want.end,
-                allDay: want.allDay),
+                calendar: want.$1,
+                title: want.$2.title,
+                start: want.$2.start,
+                end: want.$2.end,
+                allDay: want.$2.allDay),
             want
           ));
         }
-      } else if (!repeating || !past) {
-        writes.add((key, _delete(entry), null));
-      } else {
+      } else if (past && (repeating || !target)) {
+        // Days gone by keep their events.
         handled.add(key);
+      } else {
+        writes.add((key, _delete(entry), null));
       }
     }
     for (final MapEntry(:key, value: want) in planned.entries) {
@@ -228,11 +235,11 @@ class CalendarExporter {
       writes.add((
         key,
         CalendarWrite.insert(
-            calendar: target.id,
-            title: want.title,
-            start: want.start,
-            end: want.end,
-            allDay: want.allDay),
+            calendar: want.$1,
+            title: want.$2.title,
+            start: want.$2.start,
+            end: want.$2.end,
+            allDay: want.$2.allDay),
         want
       ));
     }
@@ -244,31 +251,25 @@ class CalendarExporter {
       for (var i = 0; i < chunk.length; i++) {
         final (key, write, want) = chunk[i];
         final answer = i < answers.length ? answers[i] : '';
+        CalendarExportEntry entry(String event) => CalendarExportEntry(
+            event: event,
+            calendar: want!.$1,
+            fingerprint: want.$2.fingerprint(want.$1),
+            start: want.$2.start,
+            task: want.$2.task);
         switch (write.op) {
           case 'delete':
             entries.remove(key);
           case 'update':
             if (answer == 'ok') {
-              entries[key] = CalendarExportEntry(
-                  event: write.event,
-                  calendar: target.id,
-                  fingerprint: want!.fingerprint(target.id),
-                  start: want.start,
-                  task: want.task);
+              entries[key] = entry(write.event);
             } else {
               // Deleted in the calendar app: the next pass adds it again.
               entries.remove(key);
               gone = true;
             }
           case 'insert':
-            if (answer.isNotEmpty) {
-              entries[key] = CalendarExportEntry(
-                  event: answer,
-                  calendar: target.id,
-                  fingerprint: want!.fingerprint(target.id),
-                  start: want.start,
-                  task: want.task);
-            }
+            if (answer.isNotEmpty) entries[key] = entry(answer);
         }
       }
       await store.write(entries);

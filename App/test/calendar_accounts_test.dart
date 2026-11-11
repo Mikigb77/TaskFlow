@@ -183,13 +183,18 @@ void main() {
       expect(saved.enabled, isTrue);
       expect(saved.accounts, {primaryCal.accountKey, office.accountKey});
       expect(saved.extras, isEmpty);
-      expect(saved.export, isFalse);
+      expect(saved.exportAccounts, isEmpty);
       final again = CalendarPreferences.fromJson(
-        saved.copyWith(extras: {holidays.selectionKey}, export: true).toJson(),
+        saved
+            .copyWith(
+              extras: {holidays.selectionKey},
+              exportAccounts: {office.accountKey},
+            )
+            .toJson(),
       );
       expect(again.accounts, saved.accounts);
       expect(again.extras, {holidays.selectionKey});
-      expect(again.export, isTrue);
+      expect(again.exportAccounts, {office.accountKey});
     });
   });
 
@@ -239,29 +244,34 @@ void main() {
       },
     );
 
-    test(
-      'tasks go to the first ticked account’s primaryCal calendar, or the one chosen',
-      () async {
-        final bridge = phoneWithAccounts();
-        final controller = DeviceCalendarController(
-          bridge,
-          MemoryCalendarPreferences(),
-        );
-        await controller.ready;
-        await controller.enable();
-        expect(controller.state.exportCalendar, primaryCal);
-        await controller.selectAccount(primaryCal.accountKey, false);
-        expect(controller.state.exportCalendar, office);
-        await controller.setExportTarget(family.selectionKey);
-        expect(controller.state.exportCalendar, family);
-        await expectLater(
-          controller.setExportTarget(holidays.selectionKey),
-          throwsStateError,
-        );
-        controller.dispose();
-        bridge.close();
-      },
-    );
+    test('tasks go to each ticked account’s main calendar, after the phone allows it', () async {
+      final bridge = phoneWithAccounts();
+      final controller = DeviceCalendarController(
+        bridge,
+        MemoryCalendarPreferences(),
+      );
+      await controller.ready;
+      await controller.enable();
+      expect(controller.state.preferences.exportAccounts, isEmpty);
+      expect(controller.state.exportCalendars, isEmpty);
+      expect(
+        await controller.selectExportAccount(primaryCal.accountKey, true),
+        isTrue,
+      );
+      expect(bridge.writeRequests, 1);
+      expect(
+        await controller.selectExportAccount(office.accountKey, true),
+        isTrue,
+      );
+      expect(controller.state.exportCalendars, [primaryCal, office]);
+      // Showing an account's events and adding tasks to it are separate.
+      await controller.selectAccount(primaryCal.accountKey, false);
+      expect(controller.state.exportCalendars, [primaryCal, office]);
+      await controller.selectExportAccount(primaryCal.accountKey, false);
+      expect(controller.state.exportCalendars, [office]);
+      controller.dispose();
+      bridge.close();
+    });
   });
 
   group('adding tasks to the calendar', () {
@@ -319,7 +329,7 @@ void main() {
       );
     });
 
-    test('while the switch is on, a new task is added, a change changes it, and deleting removes it; Calendar doesn’t show it twice', () async {
+    test('with an account ticked, a new task is added, a change changes it, and deleting removes it; Calendar doesn’t show it twice', () async {
       final bridge = phoneWithAccounts();
       final exports = MemoryExportStore();
       final controller = DeviceCalendarController(
@@ -330,11 +340,13 @@ void main() {
       await controller.ready;
       await controller.enable();
       final tasks = [task(1, 'Dentist', DateTime(2026, 9, 22, 10))];
-      // Off: nothing is written.
+      // None ticked: nothing is written.
       await controller.exportTasks(tasks, now: now);
       expect(bridge.written, isEmpty);
-      expect(await controller.setExport(true), isTrue);
-      expect(bridge.writeRequests, 1);
+      expect(
+        await controller.selectExportAccount(primaryCal.accountKey, true),
+        isTrue,
+      );
       await controller.exportTasks(tasks, now: now);
       expect(bridge.written, hasLength(1));
       final id = bridge.written.keys.single;
@@ -361,7 +373,26 @@ void main() {
         task(1, 'Dentist at 11', DateTime(2026, 9, 23, 11)),
       ], now: now);
       expect(bridge.written, before);
+      // A second account gets its own copy.
+      await controller.selectExportAccount(office.accountKey, true);
+      await controller.exportTasks([
+        task(1, 'Dentist at 11', DateTime(2026, 9, 23, 11)),
+      ], now: now);
+      expect(
+        bridge.written.values.map((w) => w.calendar),
+        unorderedEquals([primaryCal.id, office.id]),
+      );
+      // Unticking every account takes TaskFlow's events away again.
+      await controller.selectExportAccount(primaryCal.accountKey, false);
+      await controller.selectExportAccount(office.accountKey, false);
+      await controller.exportTasks([
+        task(1, 'Dentist at 11', DateTime(2026, 9, 23, 11)),
+      ], now: now);
+      expect(bridge.written, isEmpty);
       // Deleted in the app: removed from the calendar.
+      await controller.selectExportAccount(primaryCal.accountKey, true);
+      await controller.exportTasks(tasks, now: now);
+      expect(bridge.written, hasLength(1));
       await controller.exportTasks([], now: now);
       expect(bridge.written, isEmpty);
       expect(exports.value, isEmpty);
@@ -377,32 +408,42 @@ void main() {
         final exporter = CalendarExporter(bridge, exports);
         await exporter.sync(
           [task(1, 'Call', DateTime(2026, 9, 25, 9))],
-          primaryCal,
+          [primaryCal],
           now: now,
         );
         bridge.written.clear();
         await exporter.sync(
           [task(1, 'Call Ana', DateTime(2026, 9, 25, 9))],
-          primaryCal,
+          [primaryCal],
           now: now,
         );
         expect(bridge.written.values.single.title, 'Call Ana');
-        expect(exports.value.keys, ['t:1']);
+        expect(exports.value.keys, ['1|t:1']);
       },
     );
 
-    test('choosing another calendar moves what is ahead there', () async {
+    test('an account unticked keeps the events of days gone by', () async {
       final bridge = phoneWithAccounts()..writeState = CalendarAccess.granted;
       final exports = MemoryExportStore();
       final exporter = CalendarExporter(bridge, exports);
-      final tasks = [task(1, 'Call', DateTime(2026, 9, 25, 9))];
-      await exporter.sync(tasks, primaryCal, now: now);
-      await exporter.sync(tasks, office, now: now);
-      expect(bridge.written.values.single.calendar, office.id);
-      expect(exports.value['t:1']!.calendar, office.id);
+      final tasks = [
+        task(1, 'Call', DateTime(2026, 9, 25, 9)),
+        task(2, 'Walk', DateTime(2026, 9, 1, 8), recurrence: 'daily'),
+      ];
+      await exporter.sync(tasks, [primaryCal], now: now);
+      expect(bridge.written, hasLength(31));
+      // Two days later, the account is unticked.
+      await exporter.sync(tasks, [], now: DateTime(2026, 9, 24, 9));
+      expect(
+        bridge.written.values.map(
+          (w) => DateTime.fromMillisecondsSinceEpoch(w.start),
+        ),
+        everyElement(isA<DateTime>().having((d) => d.day, 'day', lessThan(24))),
+      );
+      expect(bridge.written, hasLength(2));
     });
 
-    test('a refusal leaves the switch off', () async {
+    test('a refusal leaves the account unticked', () async {
       final bridge = _RefusingWrites()..access = CalendarAccess.denied;
       final controller = DeviceCalendarController(
         bridge,
@@ -410,8 +451,11 @@ void main() {
       );
       await controller.ready;
       await controller.enable();
-      expect(await controller.setExport(true), isFalse);
-      expect(controller.state.preferences.export, isFalse);
+      expect(
+        await controller.selectExportAccount(primaryCal.accountKey, true),
+        isFalse,
+      );
+      expect(controller.state.preferences.exportAccounts, isEmpty);
       controller.dispose();
       bridge.close();
     });
@@ -481,36 +525,42 @@ void main() {
       return container;
     }
 
+    Future<void> openWay(WidgetTester tester, String key) async {
+      await tester.tap(find.byKey(ValueKey(key)));
+      await tester.pumpAndSettle();
+    }
+
     for (final language in ['en', 'es', 'ca']) {
       testWidgets(
-        '($language) one tick per account; holidays wait in More options, named «Holidays» from their account',
+        '($language) two rows, one per way; the first lists one tick per account, holidays wait in More options, named «Holidays» from their account',
         (tester) async {
           final l = lookupAppLocalizations(Locale(language));
           final bridge = phoneWithAccounts();
           addTearDown(bridge.close);
           await open(tester, bridge, language: language);
-          final ticks = find.byType(CheckboxListTile, skipOffstage: false);
-          expect(ticks, findsNWidgets(3));
+          // No list on the first page: two rows saying how many are ticked.
+          expect(find.byType(CheckboxListTile), findsNothing);
           expect(
-            find.text(l.calendarOnPhone, skipOffstage: false),
+            find.descendant(
+              of: find.byKey(const ValueKey('calendar-into-app')),
+              matching: find.text(l.calendarAccountsOn(3)),
+            ),
             findsOneWidget,
           );
           expect(
-            find.text(l.calendarAccountCalendars(2), skipOffstage: false),
+            find.descendant(
+              of: find.byKey(const ValueKey('calendar-into-phone')),
+              matching: find.text(l.calendarAccountsOn(0)),
+            ),
             findsOneWidget,
           );
-          expect(
-            find.text(l.calendarHolidays, skipOffstage: false),
-            findsNothing,
-          );
-          expect(
-            find.textContaining('#holiday', skipOffstage: false),
-            findsNothing,
-          );
-          await tester.scrollUntilVisible(
-            find.byKey(const ValueKey('calendar-more')),
-            200,
-          );
+          await openWay(tester, 'calendar-into-app');
+          expect(find.text(l.calendarIntoAppLead), findsOneWidget);
+          expect(find.byType(CheckboxListTile), findsNWidgets(3));
+          expect(find.text(l.calendarOnPhone), findsOneWidget);
+          expect(find.text(l.calendarAccountCalendars(2)), findsOneWidget);
+          expect(find.text(l.calendarHolidays), findsNothing);
+          expect(find.textContaining('#holiday'), findsNothing);
           await tester.tap(find.byKey(const ValueKey('calendar-more')));
           await tester.pumpAndSettle();
           final tile = find.byKey(const ValueKey('device-calendar-3'));
@@ -533,40 +583,35 @@ void main() {
     }
 
     testWidgets(
-      'the switch asks the phone, then says where tasks go; with two or more calendars More options offers the choice',
+      'TaskFlow in your calendar: none ticked; the first tick asks the phone, then the row counts it',
       (tester) async {
         final l = lookupAppLocalizations(const Locale('en'));
         final bridge = phoneWithAccounts();
         addTearDown(bridge.close);
         final container = await open(tester, bridge);
-        final toggle = find.byKey(const ValueKey('calendar-export'));
-        await tester.scrollUntilVisible(toggle, 200);
-        expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
-        await tester.tap(toggle);
+        await openWay(tester, 'calendar-into-phone');
+        expect(find.text(l.calendarIntoPhoneLead), findsOneWidget);
+        expect(find.byKey(const ValueKey('calendar-more')), findsNothing);
+        final work = find.byKey(
+          ValueKey('export-account-${office.accountKey}'),
+        );
+        expect(tester.widget<CheckboxListTile>(work).value, isFalse);
+        await tester.tap(work);
         await tester.pumpAndSettle();
         expect(bridge.writeRequests, 1);
-        expect(tester.widget<SwitchListTile>(toggle).value, isTrue);
+        expect(tester.widget<CheckboxListTile>(work).value, isTrue);
+        expect(container.read(deviceCalendarProvider).exportCalendars, [
+          office,
+        ]);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
         expect(
-          container.read(deviceCalendarProvider).preferences.export,
-          isTrue,
-        );
-        expect(
-          find.textContaining(l.calendarExportTo('').replaceAll('.', '')),
+          find.descendant(
+            of: find.byKey(const ValueKey('calendar-into-phone')),
+            matching: find.text(l.calendarAccountsOn(1)),
+          ),
           findsOneWidget,
         );
-        await tester.scrollUntilVisible(
-          find.byKey(const ValueKey('calendar-more')),
-          200,
-        );
-        await tester.tap(find.byKey(const ValueKey('calendar-more')));
-        await tester.pumpAndSettle();
-        final family = find.byKey(const ValueKey('calendar-target-2'));
-        await tester.scrollUntilVisible(family, 200);
-        await tester.ensureVisible(family);
-        await tester.pumpAndSettle();
-        await tester.tap(family);
-        await tester.pumpAndSettle();
-        expect(container.read(deviceCalendarProvider).exportCalendar?.id, '2');
         expect(tester.takeException(), isNull);
       },
     );

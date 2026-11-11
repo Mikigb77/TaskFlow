@@ -380,19 +380,34 @@ class AppLocalizationsCa extends AppLocalizations {
   String get calendarOther => 'Un altre calendari';
 
   @override
-  String get calendarExport => 'Afegeix les meves tasques al meu calendari';
-
-  @override
-  String calendarExportTo(String calendar) {
-    return 'Les tasques amb dia també van a $calendar.';
-  }
-
-  @override
-  String get calendarExportTarget => 'Afegeix les tasques a';
-
-  @override
   String get calendarExportRefused =>
       'Sense permís, TaskFlow no pot afegir tasques al teu calendari.';
+
+  @override
+  String get calendarIntoApp => 'El teu calendari a TaskFlow';
+
+  @override
+  String get calendarIntoPhone => 'TaskFlow al teu calendari';
+
+  @override
+  String get calendarIntoAppLead =>
+      'Tria de quins comptes vols veure els esdeveniments a Calendari, al costat de les tasques.';
+
+  @override
+  String get calendarIntoPhoneLead =>
+      'Les tasques amb dia s’afegeixen al calendari principal de cada compte que marquis.';
+
+  @override
+  String calendarAccountsOn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count comptes',
+      one: '1 compte',
+      zero: 'Desactivat',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get calendarReadRetry =>

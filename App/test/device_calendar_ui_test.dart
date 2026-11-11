@@ -62,6 +62,12 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('calendar-connect')));
         await tester.pumpAndSettle();
         expect(bridge.permissionRequests, 1);
+        // Your calendar in TaskFlow opens the accounts.
+        await tester.scrollUntilVisible(
+            find.byKey(const ValueKey('calendar-into-app')), 220);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('calendar-into-app')));
+        await tester.pumpAndSettle();
         await tester.scrollUntilVisible(
             find.byKey(ValueKey('device-account-${workCalendar.accountKey}')),
             220);
@@ -288,7 +294,7 @@ void main() {
 
     for (final language in ['es', 'en', 'ca']) {
       testWidgets(
-          'UX-1611: after allowing ($language): the first line reads Conectado. Los eventos se ven en Calendario., every account is ticked, Actualizar calendarios waits in Más opciones, Ocultar eventos del calendario is a TextButton below the list, and Calendar shows the events',
+          'UX-1611: after allowing ($language): the first line reads Conectado. Los eventos se ven en Calendario., two rows open the two ways and every account is ticked, Actualizar calendarios waits in Más opciones, Ocultar eventos del calendario is a TextButton below the rows, and Calendar shows the events',
           (tester) async {
         final l = lookupAppLocalizations(Locale(language));
         final bridge = FakeDeviceCalendars()..access = CalendarAccess.denied;
@@ -306,6 +312,18 @@ void main() {
             .reduce((a, b) => a.$2 <= b.$2 ? a : b);
         expect(first.$1.data, l.calendarConnected);
         expect(find.byKey(const ValueKey('calendar-connect')), findsNothing);
+        // Two rows, one per way; the first counts both accounts.
+        final intoApp =
+            find.byKey(const ValueKey('calendar-into-app'), skipOffstage: false);
+        expect(
+            find.descendant(
+                of: intoApp,
+                matching: find.text(l.calendarAccountsOn(2)),
+                skipOffstage: false),
+            findsOneWidget);
+        expect(find.byType(CheckboxListTile, skipOffstage: false), findsNothing);
+        await tester.tap(intoApp);
+        await tester.pumpAndSettle();
         // Every account is ticked, one line each.
         for (final calendar in [workCalendar, homeCalendar]) {
           final tile = find.byKey(
@@ -315,11 +333,11 @@ void main() {
           expect(tester.widget<CheckboxListTile>(tile).value, isTrue,
               reason: calendar.name);
         }
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
         expect(container.read(deviceCalendarProvider).showing, isTrue);
-        // Refresh waits behind More options.
+        // Refresh waits behind More options, on the accounts' page.
         expect(find.text(l.calendarRefresh, skipOffstage: false), findsNothing);
-        expect(find.text(l.calendarMoreOptions, skipOffstage: false),
-            findsOneWidget);
         // The off switch is a plain TextButton, below every calendar.
         final disable =
             find.byKey(const ValueKey('calendar-disable'), skipOffstage: false);
@@ -330,13 +348,13 @@ void main() {
                 of: disable, matching: find.text(l.calendarDisable)),
             findsOneWidget);
         final lastCalendar = tester.getRect(find.byKey(
-            ValueKey('device-account-${workCalendar.accountKey}'),
+            const ValueKey('calendar-into-phone'),
             skipOffstage: false));
         expect(tester.getRect(disable).top,
             greaterThanOrEqualTo(lastCalendar.bottom));
         // It isn't the first control.
         final controls = [
-          ...tester.widgetList(inScreen(find.byType(CheckboxListTile))),
+          ...tester.widgetList(inScreen(find.byType(ListTile))),
           ...tester.widgetList(
               inScreen(find.byWidgetPredicate((w) => w is ButtonStyleButton))),
         ];
@@ -379,7 +397,7 @@ void main() {
 
     for (final large in [false, true]) {
       testWidgets(
-          'UX-1651: ES ${large ? '2×' : '1×'} on 360×800, every account ticked: below the list only Más opciones and Ocultar eventos del calendario (TextButtons); Borrar selección in no state',
+          'UX-1651: ES ${large ? '2×' : '1×'} on 360×800, every account ticked: below the two rows only Ocultar eventos del calendario (TextButton); Borrar selección in no state',
           (tester) async {
         final es = lookupAppLocalizations(const Locale('es'));
         const removed = 'Borrar selección';
@@ -391,7 +409,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('calendar-connect')));
         await tester.pumpAndSettle();
 
-        Future<void> expectTwoControlsBelow(String state) async {
+        Future<void> expectOneControlBelow(String state) async {
           // At 2× the list builds lazily: bring its end in.
           await tester.scrollUntilVisible(
               find.byKey(const ValueKey('calendar-disable')), 200,
@@ -401,20 +419,19 @@ void main() {
                       matching: find.byType(Scrollable))
                   .first);
           await tester.pumpAndSettle();
-          final lastCalendar = tester.getRect(find.byKey(
-              ValueKey('device-account-${workCalendar.accountKey}'),
+          final lastRow = tester.getRect(find.byKey(
+              const ValueKey('calendar-into-phone'),
               skipOffstage: false));
           final below = tester
               .widgetList<ButtonStyleButton>(inScreen(
                   find.byWidgetPredicate((w) => w is ButtonStyleButton)))
               .where((button) =>
                   tester.getRect(find.byWidget(button)).top >=
-                  lastCalendar.bottom - 0.5)
+                  lastRow.bottom - 0.5)
               .toList();
-          expect(below, hasLength(2), reason: state);
-          expect(below.whereType<TextButton>().map((b) => b.key),
-              [const ValueKey('calendar-more'), const ValueKey('calendar-disable')],
+          expect(below.map((b) => b.key), [const ValueKey('calendar-disable')],
               reason: state);
+          expect(below.single, isA<TextButton>(), reason: state);
           expect(
               find.descendant(
                   of: find.byKey(const ValueKey('calendar-disable')),
@@ -426,20 +443,16 @@ void main() {
               reason: state);
         }
 
-        for (final calendar in [workCalendar, homeCalendar]) {
-          expect(
-              tester
-                  .widget<CheckboxListTile>(find.byKey(
-                      ValueKey('device-account-${calendar.accountKey}'),
-                      skipOffstage: false))
-                  .value,
-              isTrue,
-              reason: calendar.name);
-        }
-        await expectTwoControlsBelow('every account ticked');
+        await expectOneControlBelow('every account ticked');
 
-        // Untick one, then the other: still no Borrar selección.
+        // Untick one, then the other, on the accounts' page: still no
+        // Borrar selección, there or here.
         for (final calendar in [workCalendar, homeCalendar]) {
+          final row = find.byKey(const ValueKey('calendar-into-app'));
+          await tester.ensureVisible(row);
+          await tester.pumpAndSettle();
+          await tester.tap(row);
+          await tester.pumpAndSettle();
           final tile = find.byKey(
               ValueKey('device-account-${calendar.accountKey}'),
               skipOffstage: false);
@@ -449,7 +462,10 @@ void main() {
           await tester.pumpAndSettle();
           expect(tester.widget<CheckboxListTile>(tile).value, isFalse,
               reason: calendar.name);
-          await expectTwoControlsBelow('${calendar.name} unticked');
+          expect(find.text(removed, skipOffstage: false), findsNothing);
+          await tester.tap(find.byType(BackButton));
+          await tester.pumpAndSettle();
+          await expectOneControlBelow('${calendar.name} unticked');
         }
         expect(tester.takeException(), isNull);
       });
@@ -870,7 +886,7 @@ void main() {
 
     for (final scale in [1.0, 2.0]) {
       testWidgets(
-        'UX-2610: first-run/phone-calendars.allowed, ES at ${scale.toInt()}× on 360×800: no paragraph between «ELEGIR CALENDARIOS» and the checkboxes; each account line breaks only after «@» or «.», and TalkBack reads it whole',
+        'UX-2610: first-run/phone-calendars.allowed, ES at ${scale.toInt()}× on 360×800: no paragraph between the lead line and the checkboxes; each account line breaks only after «@» or «.», and TalkBack reads it whole',
         (tester) async {
           await loadManrope();
           final semantics = tester.ensureSemantics();
@@ -905,16 +921,16 @@ void main() {
           await tester.tap(find.byKey(const ValueKey('calendar-connect')));
           await tester.pumpAndSettle();
 
-          final heading = find.text(es.calendarChoose.toUpperCase());
-          await tester.ensureVisible(heading);
+          await tester.tap(find.byKey(const ValueKey('calendar-into-app')));
           await tester.pumpAndSettle();
+          final heading = find.text(es.calendarIntoAppLead);
           expect(heading, findsOneWidget);
           final tiles = find.byType(CheckboxListTile);
           expect(tiles, findsNWidgets(2));
           final firstTile = tester.getRect(tiles.first);
           final label = tester.getRect(heading);
           expect(firstTile.top, greaterThanOrEqualTo(label.bottom));
-          // Nothing drawn between the heading and the first checkbox.
+          // Nothing drawn between the lead line and the first checkbox.
           final between = tester
               .widgetList<Text>(find.descendant(
                   of: find.byType(ListView), matching: find.byType(Text)))

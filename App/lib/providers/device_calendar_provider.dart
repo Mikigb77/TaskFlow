@@ -12,35 +12,33 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
 
-/// What the person chose on «Phone calendars»: which accounts show (each
-/// with all of its own calendars), which extra calendars show (holidays,
-/// birthdays, calendars only read), and whether tasks are added to a calendar.
+/// What the person chose on «Phone calendars»: which accounts' events show
+/// (each with all of its own calendars), which extra calendars show
+/// (holidays, birthdays, calendars only read), and which accounts get the
+/// tasks made in TaskFlow.
 class CalendarPreferences {
   const CalendarPreferences(
       {this.enabled = false,
       this.accounts = const {},
       this.extras = const {},
-      this.export = false,
-      this.exportTarget = ''});
+      this.exportAccounts = const {}});
   final bool enabled;
 
-  /// [DeviceCalendar.accountKey]s ticked.
+  /// [DeviceCalendar.accountKey]s whose events show in Calendar.
   final Set<String> accounts;
 
   /// [DeviceCalendar.selectionKey]s of extra calendars ticked.
   final Set<String> extras;
 
-  /// Tasks with a day are added to the phone's calendar.
-  final bool export;
-
-  /// The [DeviceCalendar.selectionKey] tasks go to; empty for the first
-  /// ticked account's main calendar.
-  final String exportTarget;
+  /// [DeviceCalendar.accountKey]s whose main calendar gets every task with a
+  /// day. None until the person ticks one.
+  final Set<String> exportAccounts;
 
   static const maxAccounts = 20;
   static const maxExtras = 50;
 
   bool get chosen => accounts.isNotEmpty || extras.isNotEmpty;
+  bool get exporting => exportAccounts.isNotEmpty;
   bool shows(DeviceCalendar calendar) => calendar.isOwn
       ? accounts.contains(calendar.accountKey)
       : extras.contains(calendar.selectionKey);
@@ -49,21 +47,18 @@ class CalendarPreferences {
           {bool? enabled,
           Set<String>? accounts,
           Set<String>? extras,
-          bool? export,
-          String? exportTarget}) =>
+          Set<String>? exportAccounts}) =>
       CalendarPreferences(
           enabled: enabled ?? this.enabled,
           accounts: accounts ?? this.accounts,
           extras: extras ?? this.extras,
-          export: export ?? this.export,
-          exportTarget: exportTarget ?? this.exportTarget);
+          exportAccounts: exportAccounts ?? this.exportAccounts);
 
   Map<String, dynamic> toJson() => {
         'enabled': enabled,
         'accounts': accounts.toList()..sort(),
         'extras': extras.toList()..sort(),
-        'export': export,
-        'exportTarget': exportTarget,
+        'exportAccounts': exportAccounts.toList()..sort(),
       };
 
   static Set<String> _strings(Object? value, int limit) => value is List
@@ -80,13 +75,11 @@ class CalendarPreferences {
             .whereType<String>()
             .take(maxAccounts)
             .toSet();
-    final target = data['exportTarget'];
     return CalendarPreferences(
         enabled: data['enabled'] == true,
         accounts: accounts,
         extras: _strings(data['extras'], maxExtras),
-        export: data['export'] == true,
-        exportTarget: target is String ? target : '');
+        exportAccounts: _strings(data['exportAccounts'], maxAccounts));
   }
 }
 
@@ -145,23 +138,23 @@ class DeviceCalendarState {
   List<DeviceCalendar> get writable =>
       [for (final calendar in calendars) if (calendar.isOwn) calendar];
 
-  /// Where tasks go: the one chosen, else the main calendar of the first
-  /// ticked account, else of any account. Null when there is none.
-  DeviceCalendar? get exportCalendar {
-    final options = writable;
-    final chosen = options
-        .where((c) => c.selectionKey == preferences.exportTarget)
-        .firstOrNull;
-    if (chosen != null) return chosen;
-    final ticked = options
-        .where((c) => preferences.accounts.contains(c.accountKey))
-        .toList();
-    for (final list in [ticked, options]) {
-      final main = list.where((c) => c.primary).firstOrNull ?? list.firstOrNull;
-      if (main != null) return main;
-    }
-    return null;
+  /// The main calendar of [account]: the one the phone calls main, else its
+  /// first own calendar. Null when the phone has none for it.
+  DeviceCalendar? mainCalendar(String account) {
+    final own = [
+      for (final c in writable)
+        if (c.accountKey == account) c
+    ];
+    return own.where((c) => c.primary).firstOrNull ?? own.firstOrNull;
   }
+
+  /// Where tasks go: the main calendar of each account ticked under «TaskFlow in
+  /// your calendar» that the phone still lists.
+  List<DeviceCalendar> get exportCalendars => [
+        for (final account in {for (final c in writable) c.accountKey})
+          if (preferences.exportAccounts.contains(account))
+            ?mainCalendar(account),
+      ];
 }
 
 class DeviceCalendarController extends StateNotifier<DeviceCalendarState> {
@@ -239,7 +232,9 @@ class DeviceCalendarController extends StateNotifier<DeviceCalendarState> {
       final access = await bridge.status();
       if (!mounted || generation != _generation) return;
       final result = access == CalendarAccess.granted &&
-              (browse || state.preferences.enabled)
+              (browse ||
+                  state.preferences.enabled ||
+                  state.preferences.exporting)
           ? await bridge.calendars()
           : const CalendarRead<DeviceCalendar>([]);
       if (!mounted || generation != _generation) return;
@@ -329,46 +324,52 @@ class DeviceCalendarController extends StateNotifier<DeviceCalendarState> {
         return before.copyWith(extras: ids);
       });
 
-  /// Turns «Add my tasks to my calendar» on, asking the phone first, or off.
-  /// False when the phone said no.
-  Future<bool> setExport(bool on) async {
+  /// Ticks or unticks an account under «TaskFlow in your calendar». The first tick
+  /// asks the phone for permission to add events; false when it said no.
+  Future<bool> selectExportAccount(String account, bool selected) async {
     await ready;
-    if (on) {
+    if (selected) {
       final access = await bridge.writeAccess(request: true);
       if (!mounted || access != CalendarAccess.granted) return false;
     }
-    await _change((before) => before.copyWith(export: on));
+    await _change((before) {
+      final keys = {...before.exportAccounts};
+      if (selected) {
+        if (state.mainCalendar(account) == null) {
+          throw StateError('This account is no longer available.');
+        }
+        keys.add(account);
+      } else {
+        keys.remove(account);
+      }
+      return before.copyWith(exportAccounts: keys);
+    });
     return true;
   }
 
-  Future<void> setExportTarget(String id) => _change((before) {
-        if (!state.writable.any((c) => c.selectionKey == id)) {
-          throw StateError('This calendar is no longer available.');
-        }
-        return before.copyWith(exportTarget: id);
-      });
-
   Future<void> _exporting = Future.value();
 
-  /// Adds [tasks] with a day to the chosen calendar, and keeps their events
-  /// in step. Nothing happens while the switch is off or access is missing.
+  /// Adds [tasks] with a day to the main calendar of each account ticked
+  /// under «TaskFlow in your calendar», and keeps their events in step; an account
+  /// unticked loses the events TaskFlow added there from today on. Nothing
+  /// happens without access, or before the phone has listed its calendars.
   Future<void> exportTasks(List<Task> tasks, {int? accountId, DateTime? now}) {
     final run = _exporting.then((_) async {
       await ready;
       final exporter = this.exporter;
       final snapshot = state;
-      final target = snapshot.exportCalendar;
+      final targets = snapshot.exportCalendars;
       if (!mounted ||
           exporter == null ||
           _suspended ||
-          !snapshot.preferences.enabled ||
-          !snapshot.preferences.export ||
           snapshot.access != CalendarAccess.granted ||
-          target == null) {
+          // Ticked accounts the phone hasn't listed yet aren't unticked.
+          (snapshot.preferences.exporting && targets.isEmpty) ||
+          (!snapshot.preferences.exporting && _added.isEmpty)) {
         return;
       }
       if (await bridge.writeAccess() != CalendarAccess.granted) return;
-      final added = await exporter.sync(tasks, target,
+      final added = await exporter.sync(tasks, targets,
           now: now ?? DateTime.now(), accountId: accountId);
       if (!mounted) return;
       if (added.length != _added.length || !added.containsAll(_added)) {
@@ -463,9 +464,9 @@ final deviceCalendarProvider =
       exporter: CalendarExporter(bridge, ref.watch(calendarExportStoreProvider)));
 });
 
-/// Adds tasks to the phone's calendar while «Add my tasks to my calendar» is
-/// on: after each change to the tasks, and when the switch or the chosen
-/// calendar changes. Listened to by the app's shell.
+/// Adds tasks to the phone's calendars ticked under «TaskFlow in your calendar»: after
+/// each change to the tasks, and when the ticked accounts change. Listened
+/// to by the app's shell.
 final calendarExportProvider = Provider<void>((ref) {
   Timer? timer;
   void schedule() {
@@ -483,15 +484,14 @@ final calendarExportProvider = Provider<void>((ref) {
   ref.onDispose(() => timer?.cancel());
   ref.listen(
       deviceCalendarProvider.select((state) => (
-            state.preferences.enabled && state.preferences.export,
             state.access,
-            state.exportCalendar?.selectionKey,
+            state.exportCalendars.map((c) => c.selectionKey).join(' '),
           )), (_, next) {
-    if (next.$1) schedule();
+    if (next.$1 == CalendarAccess.granted) schedule();
   }, fireImmediately: true);
   ref.listen(taskProvider, (_, next) {
     if (next.hasValue &&
-        ref.read(deviceCalendarProvider).preferences.export) {
+        ref.read(deviceCalendarProvider).preferences.exporting) {
       schedule();
     }
   });

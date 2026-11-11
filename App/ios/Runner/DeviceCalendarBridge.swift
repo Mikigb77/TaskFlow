@@ -5,7 +5,7 @@ import UIKit
 /// The iOS side of `taskflow/device_calendars`, on EventKit: the same calls
 /// and answers as Android's DeviceCalendarBridge.kt. It reads the calendars
 /// the person allows, and changes only the events TaskFlow added for its
-/// tasks, after they turn on «Add my tasks to my calendar».
+/// tasks, after they turn on «TaskFlow in your calendar».
 final class DeviceCalendarBridge {
   private let channel: FlutterMethodChannel
   private var store = EKEventStore()
