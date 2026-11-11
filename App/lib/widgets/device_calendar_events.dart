@@ -1,3 +1,4 @@
+import 'package:agenda/l10n/generated/app_localizations.dart';
 import 'package:agenda/l10n/region.dart';
 import 'package:agenda/models/device_calendar_event.dart';
 import 'package:agenda/models/task.dart';
@@ -7,6 +8,24 @@ import 'package:agenda/widgets/app_components.dart';
 import 'package:flutter/material.dart';
 import 'package:agenda/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+/// A phone calendar's name as people read it: its own name, or for one the
+/// phone names only by an id, what it holds («Holidays», «Birthdays»).
+String calendarName(AppLocalizations l, DeviceCalendar calendar) {
+  final name = calendar.readableName;
+  if (name.isNotEmpty) return name;
+  return switch (calendar.kind) {
+    CalendarKind.holidays => l.calendarHolidays,
+    CalendarKind.birthdays => l.calendarBirthdays,
+    CalendarKind.weekNumbers => l.calendarWeekNumbers,
+    CalendarKind.own => calendarAccount(l, calendar),
+    CalendarKind.other => l.calendarOther,
+  };
+}
+
+/// The account a phone calendar belongs to: its address, or «On this phone».
+String calendarAccount(AppLocalizations l, DeviceCalendar calendar) =>
+    calendar.onPhone ? l.calendarOnPhone : calendar.account;
 
 Future<void> showDeviceCalendarEvent(
         BuildContext context, DateTime day, DeviceCalendarEvent event) =>
@@ -75,7 +94,7 @@ class _DeviceCalendarEventsState extends ConsumerState<DeviceCalendarEvents>
     if (state.access != CalendarAccess.granted) {
       return _EventsLine(l.calendarDenied, onTap: choose);
     }
-    if (state.preferences.selected.isEmpty) {
+    if (!state.preferences.chosen) {
       return _EventsLine(l.calendarNoSelection, onTap: choose);
     }
     final key = Task.dateKey(day);
@@ -314,7 +333,7 @@ class _EventTile extends ConsumerWidget {
                 title:
                     Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
                 subtitle: Text(
-                    '${deviceEventTime(context, event, day)}\n${event.sources.map((c) => c.name).join(' · ')}'),
+                    '${deviceEventTime(context, event, day)}\n${event.sources.map((c) => calendarName(l, c)).join(' · ')}'),
                 onTap: () => showDeviceCalendarEvent(context, day, event))));
   }
 }
@@ -380,7 +399,7 @@ class _CalendarSheetState extends ConsumerState<_CalendarSheet>
                   if (event.allDay)
                     Text(
                         '${context.shortDate(event.start)} – ${context.shortDate(event.end.isAfter(event.start) ? event.end.subtract(const Duration(days: 1)) : event.start)}'),
-                  Text(event.sources.map((c) => c.name).join(' · ')),
+                  Text(event.sources.map((c) => calendarName(l, c)).join(' · ')),
                   if (event.location.isNotEmpty)
                     Padding(
                         padding: const EdgeInsets.symmetric(vertical: 12),

@@ -1,2 +1,4 @@
 "NSMicrophoneUsageDescription" = "TaskFlow solo escucha mientras usas el micrófono, para que puedas dictar una tarea en lugar de escribirla.";
 "NSLocalNetworkUsageDescription" = "Conecta con tu servidor local de TaskFlow.";
+"NSCalendarsFullAccessUsageDescription" = "TaskFlow muestra los eventos de tu calendario junto a tus tareas y, si lo activas, añade tus tareas a tu calendario.";
+"NSCalendarsUsageDescription" = "TaskFlow muestra los eventos de tu calendario junto a tus tareas y, si lo activas, añade tus tareas a tu calendario.";

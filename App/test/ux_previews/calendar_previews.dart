@@ -359,7 +359,7 @@ void calendarPreviews() {
           calendarAccess: CalendarAccess.granted,
           phoneCalendars: CalendarPreferences(
             enabled: true,
-            selected: {PreviewDeviceCalendars.work.selectionKey},
+            accounts: {PreviewDeviceCalendars.work.accountKey},
           ),
           phoneEvents: [
             DeviceCalendarEvent(
@@ -402,7 +402,7 @@ void calendarPreviews() {
           calendarAccess: CalendarAccess.granted,
           phoneCalendars: CalendarPreferences(
             enabled: true,
-            selected: {PreviewDeviceCalendars.work.selectionKey},
+            accounts: {PreviewDeviceCalendars.work.accountKey},
           ),
           phoneEvents: [
             DeviceCalendarEvent(
@@ -519,7 +519,7 @@ void calendarPreviews() {
           calendarAccess: CalendarAccess.granted,
           phoneCalendars: CalendarPreferences(
             enabled: true,
-            selected: {PreviewDeviceCalendars.work.selectionKey},
+            accounts: {PreviewDeviceCalendars.work.accountKey},
           ),
         );
         (app.container.read(deviceCalendarsProvider) as PreviewDeviceCalendars)

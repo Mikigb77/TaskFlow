@@ -1,5 +1,10 @@
 import 'dart:convert';
 
+/// What a phone calendar holds, for the account-first picker: an account's
+/// own calendars come with its one tick; holidays, birthdays, week numbers
+/// and calendars it can only read wait in «More options», off by default.
+enum CalendarKind { own, holidays, birthdays, weekNumbers, other }
+
 class DeviceCalendar {
   const DeviceCalendar(
       {required this.id,
@@ -7,18 +12,83 @@ class DeviceCalendar {
       this.account = '',
       this.accountType = '',
       this.sourceId = '',
-      this.color = 0});
+      this.color = 0,
+      this.writable = true,
+      this.primary = false,
+      this.type = ''});
   final String id, name, account, accountType, sourceId;
   final int color;
+
+  /// The phone lets apps add events here: Android's access level is at least
+  /// contributor; iOS allows content modifications.
+  final bool writable;
+
+  /// The account's main calendar, where new tasks go by default.
+  final bool primary;
+
+  /// The platform's own word for a special calendar, when it has one:
+  /// `birthdays`, `holidays` or `subscription` (iOS). Empty otherwise.
+  final String type;
+
   // A reused provider row ID must not select a different account's calendar.
   String get selectionKey => jsonEncode([id, accountType, account, sourceId]);
+
+  /// The account this calendar belongs to, as one tick on the picker.
+  String get accountKey => jsonEncode([accountType, account]);
+
+  /// The account a [selectionKey] names, without the calendar's list.
+  static String? accountKeyOf(String selectionKey) {
+    try {
+      final parts = jsonDecode(selectionKey);
+      if (parts is List && parts.length == 4) {
+        return jsonEncode([parts[1], parts[2]]);
+      }
+    } on FormatException {
+      // Not a key this app wrote.
+    }
+    return null;
+  }
+
+  /// A calendar kept on the phone only, with no account behind it.
+  bool get onPhone {
+    final value = accountType.toLowerCase();
+    return account.isEmpty || value == 'local' || value.endsWith('.local');
+  }
+
+  CalendarKind get kind {
+    final source = '$sourceId $name'.toLowerCase();
+    if (type == 'holidays' || source.contains('#holiday@')) {
+      return CalendarKind.holidays;
+    }
+    if (type == 'birthdays' || source.contains('#contacts@')) {
+      return CalendarKind.birthdays;
+    }
+    if (source.contains('#weeknum@')) return CalendarKind.weekNumbers;
+    if (writable && type != 'subscription') return CalendarKind.own;
+    return CalendarKind.other;
+  }
+
+  bool get isOwn => kind == CalendarKind.own;
+
+  /// The calendar's name as people read it, or empty when the phone gives
+  /// only an address or an id («es.spain#holiday@group.v.calendar.google.com»);
+  /// the picker then names it by its [kind].
+  String get readableName {
+    final value = name.trim();
+    if (value.isEmpty || value.contains('#') || value.contains('@')) return '';
+    return value;
+  }
+
   factory DeviceCalendar.fromMap(Map<Object?, Object?> map) => DeviceCalendar(
       id: map['id'] as String,
       name: map['name'] as String,
       account: map['account'] as String? ?? '',
       color: map['color'] as int? ?? 0,
       accountType: map['accountType'] as String? ?? '',
-      sourceId: map['sourceId'] as String? ?? '');
+      sourceId: map['sourceId'] as String? ?? '',
+      writable: map['writable'] as bool? ?? true,
+      primary: map['primary'] as bool? ?? false,
+      type: map['type'] as String? ?? '');
 }
 
 /// Read-only event instances never become Task rows or participate in sync,
