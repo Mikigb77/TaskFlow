@@ -174,6 +174,9 @@ class DeviceCalendarController extends StateNotifier<DeviceCalendarState> {
 
   /// Events TaskFlow added for tasks: Calendar shows the task, not these.
   Set<String> _added = const {};
+
+  /// Whether TaskFlow still has events of its own on the phone.
+  bool get hasAddedEvents => _added.isNotEmpty;
   late final StreamSubscription<void> _subscription;
   Timer? _debounce;
   int _generation = 0;
@@ -486,8 +489,14 @@ final calendarExportProvider = Provider<void>((ref) {
       deviceCalendarProvider.select((state) => (
             state.access,
             state.exportCalendars.map((c) => c.selectionKey).join(' '),
-          )), (_, next) {
-    if (next.$1 == CalendarAccess.granted) schedule();
+          )), (previous, next) {
+    // Something ticked, just unticked, or events left to remove.
+    if (next.$1 == CalendarAccess.granted &&
+        (next.$2.isNotEmpty ||
+            (previous?.$2.isNotEmpty ?? false) ||
+            ref.read(deviceCalendarProvider.notifier).hasAddedEvents)) {
+      schedule();
+    }
   }, fireImmediately: true);
   ref.listen(taskProvider, (_, next) {
     if (next.hasValue &&
