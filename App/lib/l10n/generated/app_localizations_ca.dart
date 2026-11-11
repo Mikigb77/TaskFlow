@@ -340,6 +340,76 @@ class AppLocalizationsCa extends AppLocalizations {
   String get calendarRefresh => 'Actualitza els calendaris';
 
   @override
+  String calendarAccountCalendars(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count calendaris',
+      one: '1 calendari',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get calendarOnPhone => 'En aquest telèfon';
+
+  @override
+  String get calendarMoreOptions => 'Més opcions';
+
+  @override
+  String get calendarFewerOptions => 'Menys opcions';
+
+  @override
+  String get calendarExtras => 'Festius, aniversaris i més';
+
+  @override
+  String calendarFromAccount(String account) {
+    return 'De $account';
+  }
+
+  @override
+  String get calendarHolidays => 'Festius';
+
+  @override
+  String get calendarBirthdays => 'Aniversaris';
+
+  @override
+  String get calendarWeekNumbers => 'Números de setmana';
+
+  @override
+  String get calendarOther => 'Un altre calendari';
+
+  @override
+  String get calendarExportRefused =>
+      'Sense permís, TaskFlow no pot afegir tasques al teu calendari.';
+
+  @override
+  String get calendarIntoApp => 'El teu calendari a TaskFlow';
+
+  @override
+  String get calendarIntoPhone => 'TaskFlow al teu calendari';
+
+  @override
+  String get calendarIntoAppLead =>
+      'Tria de quins comptes vols veure els esdeveniments a Calendari, al costat de les tasques.';
+
+  @override
+  String get calendarIntoPhoneLead =>
+      'Les tasques amb dia s’afegeixen al calendari principal de cada compte que marquis.';
+
+  @override
+  String calendarAccountsOn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count comptes',
+      one: '1 compte',
+      zero: 'Desactivat',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get calendarReadRetry =>
       'No s’han pogut llegir els esdeveniments. Toca per tornar-ho a provar.';
 
@@ -3274,7 +3344,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get billingTestMode =>
-      'Només compres de prova. No es farà cap cobrament real. Una subscripció de prova activa dona dictat i espai per a fitxers il·limitats en aquesta versió de desenvolupament.';
+      'Només compres de prova. No es farà cap cobrament real. Una subscripció de prova activa dona el mateix que Pro en aquesta versió de desenvolupament.';
 
   @override
   String get billingGuestHelp =>

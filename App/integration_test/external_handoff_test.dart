@@ -57,7 +57,7 @@ void main() {
       deviceCalendarsProvider.overrideWithValue(bridge),
       calendarPreferenceStoreProvider.overrideWithValue(_TransientCalendarStore(
           CalendarPreferences(
-              enabled: true, selected: {calendar.selectionKey}))),
+              enabled: true, accounts: {calendar.accountKey}))),
       attachmentEntriesProvider.overrideWith((ref, id) async {
         if (id != task.id) throw StateError('Unexpected fixture task.');
         return [

@@ -6,6 +6,10 @@
     <array><string>fetch</string></array>
     <key>NSMicrophoneUsageDescription</key>
     <string>TaskFlow listens only while you use the microphone, so you can say a task instead of typing it.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>TaskFlow shows your calendar’s events beside your tasks and, if you turn it on, adds your tasks to your calendar.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>TaskFlow shows your calendar’s events beside your tasks and, if you turn it on, adds your tasks to your calendar.</string>
     <key>NSLocalNetworkUsageDescription</key>
     <string>Connect to your local TaskFlow backend.</string>
 	<key>CFBundleDevelopmentRegion</key>

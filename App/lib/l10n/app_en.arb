@@ -192,6 +192,85 @@
   "calendarSettings": "Open app settings",
   "calendarEmptySources": "No visible calendars are synced to this phone. Connect an account in your calendar app, then refresh here.",
   "calendarRefresh": "Refresh calendars",
+  "calendarAccountCalendars": "{count, plural, =1{1 calendar} other{{count} calendars}}",
+  "@calendarAccountCalendars": {
+    "description": "Phone calendars: under an account's name, how many of its own calendars its one tick shows. Shown only for 2 or more.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "calendarOnPhone": "On this phone",
+  "@calendarOnPhone": {
+    "description": "Phone calendars: the name of the calendars kept on the phone itself, with no account (in place of an email address)."
+  },
+  "calendarMoreOptions": "More options",
+  "@calendarMoreOptions": {
+    "description": "Phone calendars: the button that shows holidays, birthdays and other extra calendars, and where tasks go."
+  },
+  "calendarFewerOptions": "Fewer options",
+  "@calendarFewerOptions": {
+    "description": "Phone calendars: the same button once open; it hides the extra options again."
+  },
+  "calendarExtras": "Holidays, birthdays and more",
+  "@calendarExtras": {
+    "description": "Phone calendars, under More options: heading over the extra calendars, all off by default."
+  },
+  "calendarFromAccount": "From {account}",
+  "@calendarFromAccount": {
+    "description": "Phone calendars: under an extra calendar's name (Holidays in Spain), the account it comes from, usually an email address.",
+    "placeholders": {
+      "account": {
+        "type": "String"
+      }
+    }
+  },
+  "calendarHolidays": "Holidays",
+  "@calendarHolidays": {
+    "description": "Phone calendars: the name of a holidays calendar when the phone gives only an id."
+  },
+  "calendarBirthdays": "Birthdays",
+  "@calendarBirthdays": {
+    "description": "Phone calendars: the name of a birthdays calendar when the phone gives only an id."
+  },
+  "calendarWeekNumbers": "Week numbers",
+  "@calendarWeekNumbers": {
+    "description": "Phone calendars: the name of a week-numbers calendar when the phone gives only an id."
+  },
+  "calendarOther": "Other calendar",
+  "@calendarOther": {
+    "description": "Phone calendars: the name of a calendar the phone gives no readable name for."
+  },
+  "calendarExportRefused": "Without permission, TaskFlow can’t add tasks to your calendar.",
+  "@calendarExportRefused": {
+    "description": "Phone calendars: said when the phone refused to let TaskFlow add events."
+  },
+  "calendarIntoApp": "Your calendar in TaskFlow",
+  "@calendarIntoApp": {
+    "description": "Phone calendars: the row (and its page's title) for choosing whose phone-calendar events show in TaskFlow's Calendar."
+  },
+  "calendarIntoPhone": "TaskFlow in your calendar",
+  "@calendarIntoPhone": {
+    "description": "Phone calendars: the row (and its page's title) for choosing which accounts' calendars get the tasks made in TaskFlow."
+  },
+  "calendarIntoAppLead": "Choose whose events show in Calendar, beside your tasks.",
+  "@calendarIntoAppLead": {
+    "description": "Your calendar in TaskFlow: the line above the accounts."
+  },
+  "calendarIntoPhoneLead": "Your tasks with a day are added to the main calendar of each account you tick.",
+  "@calendarIntoPhoneLead": {
+    "description": "TaskFlow in your calendar: the line above the accounts."
+  },
+  "calendarAccountsOn": "{count, plural, =0{Off} =1{1 account} other{{count} accounts}}",
+  "@calendarAccountsOn": {
+    "description": "Phone calendars: under each of the two rows, how many accounts are ticked there.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "calendarReadRetry": "Couldn’t read your events. Tap to try again.",
   "changeView": "Change view",
   "calendarPreferenceError": "Could not save that calendar choice. Try again. You can select up to 50 calendars.",

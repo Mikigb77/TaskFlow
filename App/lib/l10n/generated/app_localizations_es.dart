@@ -340,6 +340,76 @@ class AppLocalizationsEs extends AppLocalizations {
   String get calendarRefresh => 'Actualizar calendarios';
 
   @override
+  String calendarAccountCalendars(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count calendarios',
+      one: '1 calendario',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get calendarOnPhone => 'En este teléfono';
+
+  @override
+  String get calendarMoreOptions => 'Más opciones';
+
+  @override
+  String get calendarFewerOptions => 'Menos opciones';
+
+  @override
+  String get calendarExtras => 'Festivos, cumpleaños y más';
+
+  @override
+  String calendarFromAccount(String account) {
+    return 'De $account';
+  }
+
+  @override
+  String get calendarHolidays => 'Festivos';
+
+  @override
+  String get calendarBirthdays => 'Cumpleaños';
+
+  @override
+  String get calendarWeekNumbers => 'Números de semana';
+
+  @override
+  String get calendarOther => 'Otro calendario';
+
+  @override
+  String get calendarExportRefused =>
+      'Sin permiso, TaskFlow no puede añadir tareas a tu calendario.';
+
+  @override
+  String get calendarIntoApp => 'Tu calendario en TaskFlow';
+
+  @override
+  String get calendarIntoPhone => 'TaskFlow en tu calendario';
+
+  @override
+  String get calendarIntoAppLead =>
+      'Elige de qué cuentas ver los eventos en Calendario, junto a tus tareas.';
+
+  @override
+  String get calendarIntoPhoneLead =>
+      'Tus tareas con día se añaden al calendario principal de cada cuenta que marques.';
+
+  @override
+  String calendarAccountsOn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count cuentas',
+      one: '1 cuenta',
+      zero: 'Desactivado',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get calendarReadRetry =>
       'No se pudieron leer los eventos. Toca para reintentar.';
 
@@ -3283,7 +3353,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get billingTestMode =>
-      'Solo compras de prueba. No se realizará ningún cobro real. Una suscripción de prueba activa da dictado y espacio para archivos ilimitados en esta versión de desarrollo.';
+      'Solo compras de prueba. No se realizará ningún cobro real. Una suscripción de prueba activa da lo mismo que Pro en esta versión de desarrollo.';
 
   @override
   String get billingGuestHelp =>

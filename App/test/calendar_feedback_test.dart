@@ -1208,7 +1208,7 @@ void main() {
             MemoryCalendarPreferences(
               CalendarPreferences(
                 enabled: true,
-                selected: {workCalendar.selectionKey},
+                accounts: {workCalendar.accountKey},
               ),
             ),
           ),
@@ -1276,7 +1276,7 @@ void main() {
           MemoryCalendarPreferences(
             CalendarPreferences(
               enabled: true,
-              selected: {workCalendar.selectionKey},
+              accounts: {workCalendar.accountKey},
             ),
           ),
         ),
@@ -2006,7 +2006,7 @@ void main() {
       MemoryCalendarPreferences(
         CalendarPreferences(
           enabled: true,
-          selected: {workCalendar.selectionKey},
+          accounts: {workCalendar.accountKey},
         ),
       ),
     ),

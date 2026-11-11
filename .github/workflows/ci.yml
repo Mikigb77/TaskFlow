@@ -5,6 +5,9 @@
 #   that run at the same time (`flutter test --total-shards`), so it takes
 #   about a quarter of the time. Each machine spends about two minutes setting
 #   up, so more shards cost more Actions minutes for less gain.
+# - App/ios/: the iOS app compiled on a Mac, unsigned (`flutter build ios
+#   --no-codesign`). Only when App/ios/ changed: a Mac's minutes cost ten
+#   times a Linux machine's while the repository is private.
 # - Backend/: the Django tests, and the Docker image the deploy builds.
 #
 # A change to this file runs both. A run by hand (Actions -> CI -> Run
@@ -45,6 +48,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       app: ${{ steps.diff.outputs.app }}
+      ios: ${{ steps.diff.outputs.ios }}
       backend: ${{ steps.diff.outputs.backend }}
     steps:
       - uses: actions/checkout@v7
@@ -58,18 +62,20 @@ jobs:
           CALLED_BACKEND: ${{ inputs.backend }}
         run: |
           if [ -n "$CALLED_APP$CALLED_BACKEND" ]; then
-            app=$CALLED_APP; backend=$CALLED_BACKEND
+            app=$CALLED_APP; ios=false; backend=$CALLED_BACKEND
           elif [ "$EVENT" = "pull_request" ]; then
             files=$(git diff --name-only HEAD^1 HEAD)
             all=false; grep -qx '.github/workflows/ci.yml' <<<"$files" && all=true
             app=$all; grep -q '^App/' <<<"$files" && app=true
+            ios=$all; grep -q '^App/ios/' <<<"$files" && ios=true
             backend=$all; grep -q '^Backend/' <<<"$files" && backend=true
           else
-            app=true; backend=true
+            app=true; ios=true; backend=true
           fi
           echo "app=$app" >> "$GITHUB_OUTPUT"
+          echo "ios=$ios" >> "$GITHUB_OUTPUT"
           echo "backend=$backend" >> "$GITHUB_OUTPUT"
-          echo "Check the app: $app. Check the backend: $backend."
+          echo "Check the app: $app. Build iOS: $ios. Check the backend: $backend."
       # Every Dependabot update opens its PR into dev, like every PR (README.md#dependabot).
       - name: Dependabot opens every update into dev
         run: |
@@ -119,6 +125,25 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter test --no-pub --total-shards=4 --shard-index=$(( ${{ matrix.shard }} - 1 ))
+
+  ios:
+    name: iOS build (unsigned)
+    needs: changes
+    if: needs.changes.outputs.ios == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: App
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - run: flutter build ios --debug --no-codesign --no-pub
 
   backend-tests:
     name: Backend Django tests

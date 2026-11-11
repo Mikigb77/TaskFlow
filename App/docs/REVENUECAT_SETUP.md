@@ -13,7 +13,7 @@ flutter pub get
 
 The dependencies and lockfile are already updated. Commit the lockfile so collaborators use the tested versions. On Windows, Flutter needs generated plugin symlinks (Developer Mode or equivalent local directory junctions).
 
-Android now uses `FlutterFragmentActivity`, retains `singleTop`, and requires at least API 24 for native paywalls. Existing capture, speech and calendar bridges remain attached. iOS is configured for 15+, with a CocoaPods Podfile and the In-App Purchase capability; run `flutter pub get`, then `pod install` inside `ios/` on a Mac and open `Runner.xcworkspace`. iOS cannot be compiled on this Windows workstation.
+Android now uses `FlutterFragmentActivity`, retains `singleTop`, and requires at least API 24 for native paywalls. Existing capture, speech and calendar bridges remain attached. iOS is configured for 15+ (the Xcode project's deployment target) with the In-App Purchase capability. Every iOS plugin, RevenueCat's included, comes in as a Swift Package, so there is no Podfile: on a Mac, `flutter build ios` or opening `Runner.xcworkspace` after `flutter pub get` is enough. CI compiles it on a GitHub macOS runner when `App/ios/` changes; it cannot be compiled on this Windows workstation.
 
 Reference: [Flutter installation](https://www.revenuecat.com/docs/getting-started/installation/flutter).
 

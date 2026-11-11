@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/providers/device_calendar_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agenda/providers/app_update_provider.dart';
@@ -171,6 +172,9 @@ class _MainShellState extends ConsumerState<MainShell>
     // label from the start (R1-P318-1, UX-2903).
     ref.listen(noteTasksProvider, (_, _) {});
     ref.listen(meetingNotesProvider, (_, _) {});
+    // Tasks go to the phone's calendar while «TaskFlow in your calendar»
+    // has an account ticked.
+    ref.listen(calendarExportProvider, (_, _) {});
     if (_updates) {
       ref.listen(appUpdateProvider, (_, _) => _offerUpdate());
       ref.listen(meetingRecordingProvider, (_, recording) {
