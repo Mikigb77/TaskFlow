@@ -565,7 +565,7 @@ abstract class AppLocalizations {
   /// No description provided for @calendarUnsupported.
   ///
   /// In en, this message translates to:
-  /// **'Phone calendars are available on Android and iPhone.'**
+  /// **'Phone calendar display is currently available on Android.'**
   String get calendarUnsupported;
 
   /// No description provided for @calendarSettings.

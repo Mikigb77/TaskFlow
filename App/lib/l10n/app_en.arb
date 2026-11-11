@@ -188,7 +188,7 @@
     "description": "Phone calendars, after the person refused calendar access: the one line above «Connect phone calendars»."
   },
   "calendarBlocked": "Calendar access is off. You can enable it in the phone’s app settings.",
-  "calendarUnsupported": "Phone calendars are available on Android and iPhone.",
+  "calendarUnsupported": "Phone calendar display is currently available on Android.",
   "calendarSettings": "Open app settings",
   "calendarEmptySources": "No visible calendars are synced to this phone. Connect an account in your calendar app, then refresh here.",
   "calendarRefresh": "Refresh calendars",

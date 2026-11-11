@@ -77,7 +77,7 @@
   "calendarDenied": "Permet l’accés al calendari per mostrar els esdeveniments. Les tasques continuen funcionant sense aquest permís.",
   "calendarRefused": "Sense permís, TaskFlow no pot veure els esdeveniments.",
   "calendarBlocked": "L’accés al calendari està desactivat. El pots activar a la configuració de l’aplicació del telèfon.",
-  "calendarUnsupported": "Els calendaris del telèfon estan disponibles a Android i iPhone.",
+  "calendarUnsupported": "La visualització dels calendaris del telèfon està disponible a Android.",
   "calendarSettings": "Obre la configuració de l’aplicació",
   "calendarEmptySources": "No hi ha calendaris visibles sincronitzats amb aquest telèfon. Connecta un compte a l’aplicació de calendari i actualitza aquesta pantalla.",
   "calendarRefresh": "Actualitza els calendaris",

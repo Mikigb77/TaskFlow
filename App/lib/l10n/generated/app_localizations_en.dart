@@ -328,7 +328,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get calendarUnsupported =>
-      'Phone calendars are available on Android and iPhone.';
+      'Phone calendar display is currently available on Android.';
 
   @override
   String get calendarSettings => 'Open app settings';

@@ -125,7 +125,7 @@ final class DeviceCalendarBridge {
     let main = store.defaultCalendarForNewEvents?.calendarIdentifier
     let all = store.calendars(for: .event)
       .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-    let items: [[String: Any]] = all.prefix(200).map { calendar in
+    let items: [[String: Any]] = all.prefix(200).map { calendar -> [String: Any] in
       let source = calendar.source
       let type: String
       switch calendar.type {
@@ -160,7 +160,7 @@ final class DeviceCalendarBridge {
       .sorted { $0.startDate < $1.startDate }
     var utc = Calendar(identifier: .gregorian)
     utc.timeZone = TimeZone(identifier: "UTC")!
-    let items: [[String: Any]] = found.prefix(1000).map { event in
+    let items: [[String: Any]] = found.prefix(1000).map { event -> [String: Any] in
       var from = event.startDate!, until = event.endDate!
       if event.isAllDay {
         // Android's all-day dates are UTC midnights with an exclusive end.

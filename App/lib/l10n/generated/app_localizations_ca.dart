@@ -327,7 +327,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get calendarUnsupported =>
-      'Els calendaris del telèfon estan disponibles a Android i iPhone.';
+      'La visualització dels calendaris del telèfon està disponible a Android.';
 
   @override
   String get calendarSettings => 'Obre la configuració de l’aplicació';
