@@ -1,4 +1,5 @@
 import 'package:agenda/l10n/region.dart';
+import 'package:agenda/models/device_calendar_event.dart';
 import 'package:agenda/providers/device_calendar_provider.dart';
 import 'package:agenda/services/device_calendars.dart';
 import 'package:agenda/widgets/app_components.dart';
@@ -18,6 +19,7 @@ class _DeviceCalendarsScreenState extends ConsumerState<DeviceCalendarsScreen>
     with WidgetsBindingObserver {
   bool _busy = false;
   bool _refused = false;
+  bool? _more;
   @override
   void initState() {
     super.initState();
@@ -54,6 +56,15 @@ class _DeviceCalendarsScreenState extends ConsumerState<DeviceCalendarsScreen>
     }
   }
 
+  Future<void> _export(bool on) async {
+    final allowed =
+        await ref.read(deviceCalendarProvider.notifier).setExport(on);
+    if (!allowed && mounted) {
+      showFeedback(
+          ScaffoldMessenger.of(context), context.l10n.calendarExportRefused);
+    }
+  }
+
   Future<void> _run(Future<void> Function() operation) async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -67,6 +78,141 @@ class _DeviceCalendarsScreenState extends ConsumerState<DeviceCalendarsScreen>
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// One tick per account, the switch that adds tasks to the calendar, and
+  /// behind «More options» the extra calendars (holidays, birthdays…, off by
+  /// default) and, with two or more, where tasks go.
+  List<Widget> _choices(
+      DeviceCalendarState state, DeviceCalendarController controller) {
+    final l = context.l10n;
+    final preferences = state.preferences;
+    final accounts = <String, List<DeviceCalendar>>{};
+    for (final calendar in state.calendars) {
+      if (calendar.isOwn) {
+        (accounts[calendar.accountKey] ??= []).add(calendar);
+      }
+    }
+    // Accounts by address; the phone's own calendars last.
+    final ordered = accounts.values.toList()
+      ..sort((a, b) {
+        if (a.first.onPhone != b.first.onPhone) return a.first.onPhone ? 1 : -1;
+        return a.first.account
+            .toLowerCase()
+            .compareTo(b.first.account.toLowerCase());
+      });
+    final extras = [for (final c in state.calendars) if (!c.isOwn) c];
+    final target = state.exportCalendar;
+    final more = _more ??
+        extras.any((c) => preferences.extras.contains(c.selectionKey));
+    Widget address(String text) =>
+        Text(breakableAddress(text), semanticsLabel: text);
+    return [
+      const SizedBox(height: 20),
+      SectionLabel(l.calendarChoose),
+      if (state.truncated) MessageBanner(l.calendarTruncated),
+      if (state.calendars.isEmpty) ...[
+        Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Text(l.calendarEmptySources)),
+        OutlinedButton.icon(
+            onPressed:
+                _busy ? null : () => _run(() => controller.refresh(browse: true)),
+            icon: const Icon(Icons.refresh_rounded),
+            label: Text(l.calendarRefresh)),
+      ],
+      for (final calendars in ordered)
+        CheckboxListTile(
+            key: ValueKey('device-account-${calendars.first.accountKey}'),
+            contentPadding: EdgeInsets.zero,
+            // An address wraps after «@» or «.», never mid-word.
+            title: address(calendarAccount(l, calendars.first)),
+            subtitle: calendars.length < 2
+                ? null
+                : Text(l.calendarAccountCalendars(calendars.length)),
+            value: preferences.accounts.contains(calendars.first.accountKey),
+            onChanged: _busy
+                ? null
+                : (selected) => _run(() => controller.selectAccount(
+                    calendars.first.accountKey, selected == true))),
+      if (target != null)
+        SwitchListTile(
+            key: const ValueKey('calendar-export'),
+            contentPadding: EdgeInsets.zero,
+            title: Text(l.calendarExport),
+            subtitle: preferences.export
+                ? Text(l.calendarExportTo(
+                    breakableAddress(calendarName(l, target))))
+                : null,
+            value: preferences.export,
+            onChanged: _busy ? null : (on) => _run(() => _export(on))),
+      if (state.calendars.isNotEmpty) ...[
+        const SizedBox(height: 4),
+        Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+                key: const ValueKey('calendar-more'),
+                onPressed: () => setState(() => _more = !more),
+                icon: Icon(more
+                    ? Icons.expand_less_rounded
+                    : Icons.expand_more_rounded),
+                label: Text(
+                    more ? l.calendarFewerOptions : l.calendarMoreOptions))),
+      ],
+      if (more && state.calendars.isNotEmpty) ...[
+        if (extras.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          SectionLabel(l.calendarExtras),
+          for (final calendar in extras)
+            CheckboxListTile(
+                key: ValueKey('device-calendar-${calendar.id}'),
+                contentPadding: EdgeInsets.zero,
+                title: Text(calendarName(l, calendar)),
+                subtitle: calendar.onPhone ||
+                        const {'subscribed', 'birthdays'}
+                            .contains(calendar.accountType)
+                    ? null
+                    : Text(
+                        l.calendarFromAccount(
+                            breakableAddress(calendar.account)),
+                        semanticsLabel:
+                            l.calendarFromAccount(calendar.account)),
+                value: preferences.extras.contains(calendar.selectionKey),
+                onChanged: _busy
+                    ? null
+                    : (selected) => _run(() => controller.selectExtra(
+                        calendar.selectionKey, selected == true))),
+        ],
+        if (preferences.export && state.writable.length > 1) ...[
+          const SizedBox(height: 8),
+          SectionLabel(l.calendarExportTarget),
+          RadioGroup<String>(
+              groupValue: target?.selectionKey,
+              onChanged: (id) {
+                if (id != null && !_busy) {
+                  _run(() => controller.setExportTarget(id));
+                }
+              },
+              child: Column(children: [
+                for (final calendar in state.writable)
+                  RadioListTile<String>(
+                      key: ValueKey('calendar-target-${calendar.id}'),
+                      contentPadding: EdgeInsets.zero,
+                      value: calendar.selectionKey,
+                      title: address(calendarName(l, calendar)),
+                      subtitle: calendar.readableName.isEmpty
+                          ? null
+                          : address(calendarAccount(l, calendar))),
+              ])),
+        ],
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+            onPressed:
+                _busy ? null : () => _run(() => controller.refresh(browse: true)),
+            icon: const Icon(Icons.refresh_rounded),
+            label: Text(l.calendarRefresh)),
+      ],
+    ];
   }
 
   @override
@@ -113,40 +259,8 @@ class _DeviceCalendarsScreenState extends ConsumerState<DeviceCalendarsScreen>
                   label: Text(l.calendarEnable,
                       textAlign: TextAlign.center,
                       textWidthBasis: TextWidthBasis.longestLine)),
-            if (state.access == CalendarAccess.granted && enabled) ...[
-              const SizedBox(height: 20),
-              SectionLabel(l.calendarChoose),
-              if (state.truncated) MessageBanner(l.calendarTruncated),
-              if (state.calendars.isEmpty)
-                Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Text(l.calendarEmptySources)),
-              for (final calendar in state.calendars)
-                CheckboxListTile(
-                    key: ValueKey('device-calendar-${calendar.id}'),
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(calendar.name.isEmpty
-                        ? l.calendarUntitled
-                        : calendar.name),
-                    // An address wraps after «@» or «.», never mid-word.
-                    subtitle: calendar.account.isEmpty
-                        ? null
-                        : Text(breakableAddress(calendar.account),
-                            semanticsLabel: calendar.account),
-                    value: state.preferences.selected
-                        .contains(calendar.selectionKey),
-                    onChanged: _busy
-                        ? null
-                        : (selected) => _run(() => controller.select(
-                            calendar.selectionKey, selected == true))),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                  onPressed: _busy
-                      ? null
-                      : () => _run(() => controller.refresh(browse: true)),
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: Text(l.calendarRefresh)),
-            ],
+            if (state.access == CalendarAccess.granted && enabled)
+              ..._choices(state, controller),
             // The off switch sits below the list, never where «Conectar» was.
             if (enabled) ...[
               const SizedBox(height: 8),

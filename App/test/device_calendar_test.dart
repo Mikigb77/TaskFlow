@@ -34,6 +34,43 @@ class FakeDeviceCalendars extends DeviceCalendars {
   List<DeviceCalendar> sources = [workCalendar, homeCalendar];
   List<DeviceCalendarEvent> data = [calendarEvent()];
   Completer<CalendarRead<DeviceCalendarEvent>>? pending;
+  Set<String> lastIds = {};
+  CalendarAccess writeState = CalendarAccess.denied;
+  int writeRequests = 0;
+
+  /// Events written, by id, as the phone would keep them.
+  final Map<String, CalendarWrite> written = {};
+  int nextEvent = 100;
+  @override
+  Future<CalendarAccess> writeAccess({bool request = false}) async {
+    if (request) {
+      writeRequests++;
+      writeState = CalendarAccess.granted;
+    }
+    return writeState;
+  }
+
+  @override
+  Future<List<String>> write(List<CalendarWrite> writes) async => [
+        for (final item in writes)
+          switch (item.op) {
+            'insert' => () {
+                final id = '${nextEvent++}';
+                written[id] = item;
+                return id;
+              }(),
+            'update' => written.containsKey(item.event)
+                ? (() {
+                    written[item.event] = item;
+                    return 'ok';
+                  })()
+                : 'gone',
+            _ => (() {
+                written.remove(item.event);
+                return 'ok';
+              })(),
+          }
+      ];
   int permissionRequests = 0, eventReads = 0;
   bool failRead = false;
   @override
@@ -52,6 +89,7 @@ class FakeDeviceCalendars extends DeviceCalendars {
   Future<CalendarRead<DeviceCalendarEvent>> events(
       Set<String> ids, DateTime day) async {
     eventReads++;
+    lastIds = ids;
     if (failRead) throw PlatformException(code: 'calendar_permission');
     return pending == null ? CalendarRead(data) : pending!.future;
   }
@@ -143,12 +181,12 @@ void main() {
     await controller.enable();
     expect(bridge.permissionRequests, 1);
     // A first connection ticks every calendar (D7).
-    expect(controller.state.preferences.selected.length, 2);
+    expect(controller.state.preferences.accounts.length, 2);
     expect((await controller.events(day)).items.length, 1);
     controller.dispose();
     controller = DeviceCalendarController(bridge, store);
     await controller.ready;
-    expect(controller.state.preferences.selected.length, 2);
+    expect(controller.state.preferences.accounts.length, 2);
     expect(bridge.permissionRequests, 1);
     await controller.disable();
     final reads = bridge.eventReads;
@@ -164,7 +202,7 @@ void main() {
     final controller = DeviceCalendarController(
         bridge,
         MemoryCalendarPreferences(CalendarPreferences(
-            enabled: true, selected: {workCalendar.selectionKey})));
+            enabled: true, accounts: {workCalendar.accountKey})));
     await controller.ready;
     bridge.pending = Completer<CalendarRead<DeviceCalendarEvent>>();
     final oldRead = controller.events(day);
@@ -186,7 +224,7 @@ void main() {
     final controller = DeviceCalendarController(
         bridge,
         MemoryCalendarPreferences(CalendarPreferences(
-            enabled: true, selected: {workCalendar.selectionKey})));
+            enabled: true, accounts: {workCalendar.accountKey})));
     await controller.ready;
     bridge.access = CalendarAccess.denied;
     bridge.failRead = true;
@@ -210,14 +248,14 @@ void main() {
   test('failed preference writes preserve the last saved selection', () async {
     final bridge = FakeDeviceCalendars();
     final store = MemoryCalendarPreferences(CalendarPreferences(
-        enabled: true, selected: {workCalendar.selectionKey}));
+        enabled: true, accounts: {workCalendar.accountKey}));
     final controller = DeviceCalendarController(bridge, store);
     await controller.ready;
     store.fail = true;
     await expectLater(
-        controller.select(homeCalendar.selectionKey, true), throwsStateError);
-    expect(controller.state.preferences.selected, {workCalendar.selectionKey});
-    expect(store.value.selected, {workCalendar.selectionKey});
+        controller.selectAccount(homeCalendar.accountKey, true), throwsStateError);
+    expect(controller.state.preferences.accounts, {workCalendar.accountKey});
+    expect(store.value.accounts, {workCalendar.accountKey});
     store.fail = false;
     await controller.clearSelection();
     expect((await controller.events(day)).items, isEmpty);
@@ -233,7 +271,7 @@ void main() {
     final first = CalendarPreferenceStore('account-1', database);
     final second = CalendarPreferenceStore('account-2', database);
     await first.write(CalendarPreferences(
-        enabled: true, selected: {workCalendar.selectionKey}));
+        enabled: true, accounts: {workCalendar.accountKey}));
     expect(
         (await CalendarPreferenceStore('account-1', database).read()).enabled,
         isTrue);
@@ -257,17 +295,18 @@ void main() {
     expect(controller.state.showing, isFalse);
     await controller.enable();
     expect(controller.state.preferences.enabled, isTrue);
-    expect(controller.state.preferences.selected,
-        {workCalendar.selectionKey, homeCalendar.selectionKey});
-    expect(store.value.selected,
-        {workCalendar.selectionKey, homeCalendar.selectionKey});
+    expect(controller.state.preferences.accounts,
+        {workCalendar.accountKey, homeCalendar.accountKey});
+    expect(store.value.accounts,
+        {workCalendar.accountKey, homeCalendar.accountKey});
     expect(controller.state.showing, isTrue);
     expect((await controller.events(day)).items, hasLength(1));
     controller.dispose();
     bridge.close();
   });
 
-  test('UX-1611: with 60 phone calendars, the first 50 as listed are selected',
+  test(
+      'with one account of 60 calendars, connecting ticks the account, and events are asked for 50 at a time',
       () async {
     final calendars = [
       for (var i = 0; i < 60; i++)
@@ -281,9 +320,12 @@ void main() {
     final controller = DeviceCalendarController(bridge, store);
     await controller.ready;
     await controller.enable();
-    expect(controller.state.preferences.selected,
-        calendars.take(50).map((c) => c.selectionKey).toSet());
+    expect(controller.state.preferences.accounts,
+        {calendars.first.accountKey});
     expect(controller.state.showing, isTrue);
+    final result = await controller.events(day);
+    expect(bridge.lastIds, hasLength(50));
+    expect(result.truncated, isTrue);
     controller.dispose();
     bridge.close();
   });
@@ -296,12 +338,12 @@ void main() {
     final controller = DeviceCalendarController(bridge, store);
     await controller.ready;
     await controller.enable();
-    await controller.select(homeCalendar.selectionKey, false);
-    expect(controller.state.preferences.selected, {workCalendar.selectionKey});
+    await controller.selectAccount(homeCalendar.accountKey, false);
+    expect(controller.state.preferences.accounts, {workCalendar.accountKey});
     await controller.disable();
     expect(controller.state.showing, isFalse);
     await controller.enable();
-    expect(controller.state.preferences.selected, {workCalendar.selectionKey});
+    expect(controller.state.preferences.accounts, {workCalendar.accountKey});
     expect(controller.state.showing, isTrue);
     controller.dispose();
     bridge.close();
@@ -312,11 +354,11 @@ void main() {
       () async {
     final bridge = FakeDeviceCalendars()..access = CalendarAccess.denied;
     final store = MemoryCalendarPreferences(
-        CalendarPreferences(selected: {homeCalendar.selectionKey}));
+        CalendarPreferences(accounts: {homeCalendar.accountKey}));
     final controller = DeviceCalendarController(bridge, store);
     await controller.ready;
     await controller.enable();
-    expect(controller.state.preferences.selected, {homeCalendar.selectionKey});
+    expect(controller.state.preferences.accounts, {homeCalendar.accountKey});
     expect(controller.state.showing, isTrue);
     controller.dispose();
     bridge.close();

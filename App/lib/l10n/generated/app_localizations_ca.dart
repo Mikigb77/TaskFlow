@@ -327,7 +327,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get calendarUnsupported =>
-      'La visualització dels calendaris del telèfon està disponible a Android.';
+      'Els calendaris del telèfon estan disponibles a Android i iPhone.';
 
   @override
   String get calendarSettings => 'Obre la configuració de l’aplicació';
@@ -338,6 +338,61 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get calendarRefresh => 'Actualitza els calendaris';
+
+  @override
+  String calendarAccountCalendars(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count calendaris',
+      one: '1 calendari',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get calendarOnPhone => 'En aquest telèfon';
+
+  @override
+  String get calendarMoreOptions => 'Més opcions';
+
+  @override
+  String get calendarFewerOptions => 'Menys opcions';
+
+  @override
+  String get calendarExtras => 'Festius, aniversaris i més';
+
+  @override
+  String calendarFromAccount(String account) {
+    return 'De $account';
+  }
+
+  @override
+  String get calendarHolidays => 'Festius';
+
+  @override
+  String get calendarBirthdays => 'Aniversaris';
+
+  @override
+  String get calendarWeekNumbers => 'Números de setmana';
+
+  @override
+  String get calendarOther => 'Un altre calendari';
+
+  @override
+  String get calendarExport => 'Afegeix les meves tasques al meu calendari';
+
+  @override
+  String calendarExportTo(String calendar) {
+    return 'Les tasques amb dia també van a $calendar.';
+  }
+
+  @override
+  String get calendarExportTarget => 'Afegeix les tasques a';
+
+  @override
+  String get calendarExportRefused =>
+      'Sense permís, TaskFlow no pot afegir tasques al teu calendari.';
 
   @override
   String get calendarReadRetry =>
@@ -3274,7 +3329,7 @@ class AppLocalizationsCa extends AppLocalizations {
 
   @override
   String get billingTestMode =>
-      'Només compres de prova. No es farà cap cobrament real. Una subscripció de prova activa dona dictat i espai per a fitxers il·limitats en aquesta versió de desenvolupament.';
+      'Només compres de prova. No es farà cap cobrament real. Una subscripció de prova activa dona el mateix que Pro en aquesta versió de desenvolupament.';
 
   @override
   String get billingGuestHelp =>

@@ -2,6 +2,12 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-11-11 — Phone calendars by account, and tasks added to the calendar
+
+- The owner: "simply sync everything but based on the calendar account … if I have calendars for a couple of or three Gmail accounts, I just should have to check or uncheck one or two or the three of them … by default, we shouldn't sync holidays … put a little extra button for extra options … the naming … should not be account dash holidays … holidays from ta-ta-ta account." And: "a task that you create within the app, it's also added on your calendar."
+- Built as: «Phone calendars» lists one tick per account (its address, or «On this phone»), which shows all of that account's own calendars. Connecting ticks every account; holidays, birthdays, week numbers and calendars the account can only read start off and sit behind «More options», each named as people read it («Holidays», «From ana@gmail.com»), never by its id. This replaces D7's "every calendar shows by default" for those extras. A choice saved per calendar keeps its accounts.
+- «Add my tasks to my calendar», a switch on the same screen, off until turned on, asks the phone for write access and then adds each task with a day to the first ticked account's main calendar (another one can be chosen under «More options»). Changing or deleting the task changes or removes its event; a repeating task gets an event for each day of the next 30. Calendar doesn't show those events twice. Android and iOS.
+
 ## 2026-11-10 — The listening sheet follows light and dark mode
 
 - The owner, seeing the app's light-mode screenshots on the website: "within the app we should also make the recording part also match whether it's in dark mode or not."

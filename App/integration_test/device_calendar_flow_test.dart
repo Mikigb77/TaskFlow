@@ -114,19 +114,16 @@ void main() {
         .where((c) => c.account == 'taskflow-calendar-fixture')
         .toList();
     expect(calendars, hasLength(2));
-    for (final calendar in calendars) {
-      final finder = find.byKey(ValueKey('device-calendar-${calendar.id}'));
-      await tester.scrollUntilVisible(finder, 150,
-          scrollable: find.byType(Scrollable).last);
-      await tester.pumpAndSettle();
-      await tester.tap(finder);
-      await tester.pumpAndSettle();
-    }
-    expect((await CalendarPreferenceStore(owner, database).read()).selected,
-        calendars.map((c) => c.selectionKey).toSet());
+    // Connecting ticks the fixture account, with both of its calendars.
+    expect(
+        find.byKey(ValueKey('device-account-${calendars.first.accountKey}'),
+            skipOffstage: false),
+        findsOneWidget);
+    expect((await CalendarPreferenceStore(owner, database).read()).accounts,
+        contains(calendars.first.accountKey));
     expect(
         (await CalendarPreferenceStore('$owner-other', database).read())
-            .selected,
+            .accounts,
         isEmpty);
     final selectedIds = calendars.map((c) => c.id).toSet();
     final raw = await bridge.events(selectedIds, day);

@@ -579,7 +579,7 @@ void main() {
             deviceCalendarsProvider.overrideWithValue(calendars),
             calendarPreferenceStoreProvider.overrideWithValue(
                 MemoryCalendarPreferences(CalendarPreferences(
-                    enabled: true, selected: {workCalendar.selectionKey}))),
+                    enabled: true, accounts: {workCalendar.accountKey}))),
           ]);
       final notice = onDay(find.text(copy(es)));
       expect(notice, findsOneWidget);
@@ -1024,7 +1024,7 @@ void main() {
                 calendarPreferenceStoreProvider.overrideWithValue(
                     MemoryCalendarPreferences(CalendarPreferences(
                         enabled: true,
-                        selected: {workCalendar.selectionKey}))),
+                        accounts: {workCalendar.accountKey}))),
               ]);
           expect(es.calendarReadRetry,
               'No se pudieron leer los eventos. Toca para reintentar.');
@@ -1087,7 +1087,7 @@ void main() {
               deviceCalendarsProvider.overrideWithValue(bridge),
               calendarPreferenceStoreProvider.overrideWithValue(
                   MemoryCalendarPreferences(CalendarPreferences(
-                      enabled: true, selected: {workCalendar.selectionKey}))),
+                      enabled: true, accounts: {workCalendar.accountKey}))),
             ]);
         final reads = bridge.eventReads + bridge.calendarReads;
         await tester.tap(line);

@@ -565,7 +565,7 @@ abstract class AppLocalizations {
   /// No description provided for @calendarUnsupported.
   ///
   /// In en, this message translates to:
-  /// **'Phone calendar display is currently available on Android.'**
+  /// **'Phone calendars are available on Android and iPhone.'**
   String get calendarUnsupported;
 
   /// No description provided for @calendarSettings.
@@ -585,6 +585,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Refresh calendars'**
   String get calendarRefresh;
+
+  /// Phone calendars: under an account's name, how many of its own calendars its one tick shows. Shown only for 2 or more.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 calendar} other{{count} calendars}}'**
+  String calendarAccountCalendars(int count);
+
+  /// Phone calendars: the name of the calendars kept on the phone itself, with no account (in place of an email address).
+  ///
+  /// In en, this message translates to:
+  /// **'On this phone'**
+  String get calendarOnPhone;
+
+  /// Phone calendars: the button that shows holidays, birthdays and other extra calendars, and where tasks go.
+  ///
+  /// In en, this message translates to:
+  /// **'More options'**
+  String get calendarMoreOptions;
+
+  /// Phone calendars: the same button once open; it hides the extra options again.
+  ///
+  /// In en, this message translates to:
+  /// **'Fewer options'**
+  String get calendarFewerOptions;
+
+  /// Phone calendars, under More options: heading over the extra calendars, all off by default.
+  ///
+  /// In en, this message translates to:
+  /// **'Holidays, birthdays and more'**
+  String get calendarExtras;
+
+  /// Phone calendars: under an extra calendar's name (Holidays in Spain), the account it comes from, usually an email address.
+  ///
+  /// In en, this message translates to:
+  /// **'From {account}'**
+  String calendarFromAccount(String account);
+
+  /// Phone calendars: the name of a holidays calendar when the phone gives only an id.
+  ///
+  /// In en, this message translates to:
+  /// **'Holidays'**
+  String get calendarHolidays;
+
+  /// Phone calendars: the name of a birthdays calendar when the phone gives only an id.
+  ///
+  /// In en, this message translates to:
+  /// **'Birthdays'**
+  String get calendarBirthdays;
+
+  /// Phone calendars: the name of a week-numbers calendar when the phone gives only an id.
+  ///
+  /// In en, this message translates to:
+  /// **'Week numbers'**
+  String get calendarWeekNumbers;
+
+  /// Phone calendars: the name of a calendar the phone gives no readable name for.
+  ///
+  /// In en, this message translates to:
+  /// **'Other calendar'**
+  String get calendarOther;
+
+  /// Phone calendars: the switch that also puts each task with a day in the phone's calendar.
+  ///
+  /// In en, this message translates to:
+  /// **'Add my tasks to my calendar'**
+  String get calendarExport;
+
+  /// Phone calendars: under the switch while it's on; calendar is the calendar's name or its account's email address.
+  ///
+  /// In en, this message translates to:
+  /// **'Tasks with a day also go to {calendar}.'**
+  String calendarExportTo(String calendar);
+
+  /// Phone calendars, under More options: heading over the calendars a task can go to, shown only while the switch is on and there are two or more.
+  ///
+  /// In en, this message translates to:
+  /// **'Add tasks to'**
+  String get calendarExportTarget;
+
+  /// Phone calendars: said when the phone refused to let TaskFlow add events.
+  ///
+  /// In en, this message translates to:
+  /// **'Without permission, TaskFlow can’t add tasks to your calendar.'**
+  String get calendarExportRefused;
 
   /// No description provided for @calendarReadRetry.
   ///
@@ -4963,7 +5047,7 @@ abstract class AppLocalizations {
   /// No description provided for @billingTestMode.
   ///
   /// In en, this message translates to:
-  /// **'Test purchases only. No real payment will be taken. An active test subscription gives unlimited dictation and file space in this development build.'**
+  /// **'Test purchases only. No real payment will be taken. An active test subscription gives what Pro gives in this development build.'**
   String get billingTestMode;
 
   /// No description provided for @billingGuestHelp.

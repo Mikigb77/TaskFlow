@@ -328,7 +328,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get calendarUnsupported =>
-      'Phone calendar display is currently available on Android.';
+      'Phone calendars are available on Android and iPhone.';
 
   @override
   String get calendarSettings => 'Open app settings';
@@ -339,6 +339,61 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get calendarRefresh => 'Refresh calendars';
+
+  @override
+  String calendarAccountCalendars(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count calendars',
+      one: '1 calendar',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get calendarOnPhone => 'On this phone';
+
+  @override
+  String get calendarMoreOptions => 'More options';
+
+  @override
+  String get calendarFewerOptions => 'Fewer options';
+
+  @override
+  String get calendarExtras => 'Holidays, birthdays and more';
+
+  @override
+  String calendarFromAccount(String account) {
+    return 'From $account';
+  }
+
+  @override
+  String get calendarHolidays => 'Holidays';
+
+  @override
+  String get calendarBirthdays => 'Birthdays';
+
+  @override
+  String get calendarWeekNumbers => 'Week numbers';
+
+  @override
+  String get calendarOther => 'Other calendar';
+
+  @override
+  String get calendarExport => 'Add my tasks to my calendar';
+
+  @override
+  String calendarExportTo(String calendar) {
+    return 'Tasks with a day also go to $calendar.';
+  }
+
+  @override
+  String get calendarExportTarget => 'Add tasks to';
+
+  @override
+  String get calendarExportRefused =>
+      'Without permission, TaskFlow can’t add tasks to your calendar.';
 
   @override
   String get calendarReadRetry =>
@@ -3204,7 +3259,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get billingTestMode =>
-      'Test purchases only. No real payment will be taken. An active test subscription gives unlimited dictation and file space in this development build.';
+      'Test purchases only. No real payment will be taken. An active test subscription gives what Pro gives in this development build.';
 
   @override
   String get billingGuestHelp =>
