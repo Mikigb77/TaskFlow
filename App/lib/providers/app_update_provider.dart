@@ -36,16 +36,20 @@ class AppUpdateController extends StateNotifier<AppUpdate?> {
     : _clock = clock ?? DateTime.now,
       super(null);
 
-  /// How often the app looks for a newer build: when it opens, and when it
-  /// comes back to the front after this long.
-  static const interval = Duration(hours: 1);
+  /// How often the app looks for a newer build while it stays open. It also
+  /// looks each time it opens and each time it comes back to the front.
+  static const interval = Duration(minutes: 15);
+
+  /// The least time between two checks, so flicking between apps, or
+  /// Android's installer coming and going, doesn't ask the server each time.
+  static const spacing = Duration(minutes: 1);
 
   final AppUpdater? _updater;
   final DateTime Function() _clock;
   DateTime? _checked;
   Future<void>? _checking;
 
-  /// Looks for a newer build, at most once an [interval]. Off mobile data it
+  /// Looks for a newer build, at most once a [spacing]. Off mobile data it
   /// downloads it too, so it installs at once.
   Future<void> check() => _checking ??= _check().whenComplete(() {
     _checking = null;
@@ -55,20 +59,27 @@ class AppUpdateController extends StateNotifier<AppUpdate?> {
     final updater = _updater;
     final now = _clock();
     if (updater == null ||
-        (_checked != null && now.difference(_checked!) < interval)) {
+        (_checked != null && now.difference(_checked!) < spacing)) {
       return;
     }
-    _checked = now;
+    AppUpdate? update;
+    var answered = false;
     try {
       await updater.clean();
-      var update = await updater.latest();
+      update = await updater.latest();
+      // Only a check the server answered counts: one that failed, say with
+      // no network yet as the app opens, is tried again at the next chance.
+      _checked = now;
+      answered = true;
       if (update != null && update.file == null && !await updater.metered()) {
         update = await updater.download();
       }
-      if (mounted) state = update;
     } catch (_) {
-      // No server, no network or no release: the next check tries again.
+      // No server, no network or no release: the next check tries again. A
+      // build that was found but didn't download is still offered; Update
+      // downloads it.
     }
+    if (mounted && answered) state = update;
   }
 
   /// Downloads the update if it isn't yet, then hands it to Android.
@@ -77,9 +88,11 @@ class AppUpdateController extends StateNotifier<AppUpdate?> {
     void Function(double? done)? onProgress,
   }) async {
     final updater = _updater;
-    var update = state;
-    if (updater == null || update == null) return AppInstallResult.failed;
+    if (updater == null || state == null) return AppInstallResult.failed;
+    // A check under way may be downloading this build already.
     await _checking;
+    var update = state;
+    if (update == null) return AppInstallResult.failed;
     if (update.file == null) {
       try {
         update = await updater.download(onProgress: onProgress);
