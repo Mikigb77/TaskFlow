@@ -463,6 +463,38 @@ void main() {
       },
     );
 
+    test('a completed task keeps its event, marked «✓»; reopened, the mark goes', () async {
+      final bridge = phoneWithAccounts();
+      final controller = DeviceCalendarController(
+        bridge,
+        MemoryCalendarPreferences(),
+        exporter: CalendarExporter(bridge, MemoryExportStore()),
+      );
+      await controller.ready;
+      await controller.enable();
+      await controller.selectExportAccount(primaryCal.accountKey, true);
+      final dentist = task(1, 'Dentist', DateTime(2026, 9, 22, 10));
+      final walk = task(2, 'Walk', DateTime(2026, 9, 22, 8),
+          recurrence: 'daily');
+      await controller.exportTasks([dentist, walk], now: now);
+      List<String> titles() =>
+          bridge.written.values.map((e) => e.title).toList();
+      expect(titles().where((t) => t.contains('✓')), isEmpty);
+
+      await controller.exportTasks([
+        dentist.copyWith(isCompleted: true),
+        walk.copyWith(completedDates: ['2026-09-22']),
+      ], now: now);
+      expect(titles(), contains('✓ Dentist'));
+      // Only the day that was done.
+      expect(titles().where((t) => t == '✓ Walk'), hasLength(1));
+      expect(titles().where((t) => t == 'Walk'), hasLength(29));
+
+      await controller.exportTasks([dentist, walk], now: now);
+      expect(titles().where((t) => t.contains('✓')), isEmpty);
+      expect(titles(), hasLength(31));
+    });
+
     test('an account unticked keeps the events of days gone by', () async {
       final bridge = phoneWithAccounts()..writeState = CalendarAccess.granted;
       final exports = MemoryExportStore();

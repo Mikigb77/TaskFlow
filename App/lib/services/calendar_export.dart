@@ -97,7 +97,8 @@ class PlannedEvent {
 /// Keeps the phone calendar in step with TaskFlow's tasks: one event for each
 /// task with a day, and one for each day of a repeating task in the next
 /// [repeatDays] days. Moving, renaming or deleting a task changes or removes
-/// its event; events for days already past are left as they were.
+/// its event, and completing it marks its title «✓»; events for days already
+/// past are left as they were.
 class CalendarExporter {
   CalendarExporter(this.bridge, this.store);
   final DeviceCalendars bridge;
@@ -118,10 +119,13 @@ class CalendarExporter {
     final planned = <String, PlannedEvent>{};
     PlannedEvent event(Task task) {
       final date = task.displayDate!;
+      // A calendar has no «done», so a completed task keeps its event,
+      // marked as done.
+      final title = task.isCompleted ? '✓ ${task.title}' : task.title;
       if (!task.hasTime) {
         return PlannedEvent(
             task: task.id!,
-            title: task.title,
+            title: title,
             start: DateTime.utc(date.year, date.month, date.day)
                 .millisecondsSinceEpoch,
             end: DateTime.utc(date.year, date.month, date.day + 1)
@@ -132,7 +136,7 @@ class CalendarExporter {
           task.plannedEnd ?? date.add(const Duration(minutes: defaultMinutes));
       return PlannedEvent(
           task: task.id!,
-          title: task.title,
+          title: title,
           start: date.millisecondsSinceEpoch,
           end: end.millisecondsSinceEpoch,
           allDay: false);
