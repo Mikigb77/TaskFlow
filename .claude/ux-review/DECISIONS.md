@@ -2,6 +2,11 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-11-12 — The staging app looks for updates whenever it opens
+
+- The owner: "We have to make the app check for updates more often, or at least once when you open the app, because otherwise it's not picking up the update on its own."
+- Built as: TaskFlow Staging asks for the newest build when it opens, each time it comes back to the front (at most once a minute), and every 15 minutes while it stays open, instead of at most once an hour. A check that fails, say with no network yet as the app opens, is tried again at the next chance, and a build that was found but couldn't download is still offered. A build put off with Later is offered again the next time the app comes back to the front.
+
 ## 2026-11-11 — Phone calendars by account, and tasks added to the calendar
 
 - The owner: "simply sync everything but based on the calendar account … if I have calendars for a couple of or three Gmail accounts, I just should have to check or uncheck one or two or the three of them … by default, we shouldn't sync holidays … put a little extra button for extra options … the naming … should not be account dash holidays … holidays from ta-ta-ta account." And: "a task that you create within the app, it's also added on your calendar."

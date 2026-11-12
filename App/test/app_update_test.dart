@@ -133,11 +133,14 @@ void main() {
     expect(controller.state?.file, isNull);
     expect(downloads, 0);
 
-    // Within the hour nothing is asked again.
+    // Within a minute nothing is asked again; after it, the server is.
     asked.clear();
-    clock = now.add(const Duration(minutes: 30));
+    clock = now.add(const Duration(seconds: 30));
     await controller.check();
     expect(asked, isEmpty);
+    clock = now.add(AppUpdateController.spacing);
+    await controller.check();
+    expect(asked, ['app/update/']);
 
     // Update downloads it and installs.
     expect(await controller.install(), AppInstallResult.started);
@@ -172,6 +175,36 @@ void main() {
     );
     await controller.check();
     expect(controller.state, isNull);
+  });
+
+  test('a check that fails is tried again at once', () async {
+    var offline = true;
+    final controller = AppUpdateController(
+      AppUpdater(
+        get: (path) async {
+          if (offline) throw const SocketException('offline');
+          return latest();
+        },
+        installedCode: () async => 5000,
+        folder: () async => folder,
+      ),
+      clock: () => DateTime(2026, 11, 12, 9),
+    );
+    metered = true;
+    await controller.check();
+    expect(controller.state, isNull);
+    offline = false;
+    await controller.check();
+    expect(controller.state?.versionCode, 5210);
+  });
+
+  test('a build that fails to download is still offered', () async {
+    final controller = AppUpdateController(
+      updater(transport: MockClient((request) async => http.Response('', 500))),
+    );
+    await controller.check();
+    expect(controller.state?.versionCode, 5210);
+    expect(controller.state?.file, isNull);
   });
 
   for (final locale in const [Locale('en'), Locale('es'), Locale('ca')]) {
