@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:agenda/l10n/region.dart';
 
 /// A capture result's main line: `Hoy · 17:00`, `Mañana`,
-/// `vie, 17 oct · 17:00` or `Sin fecha`.
-String taskDayLine(BuildContext context, Task task) {
+/// `vie, 17 oct · 17:00` or `Sin fecha`; today and tomorrow as of [now].
+String taskDayLine(BuildContext context, Task task, {DateTime? now}) {
   final date = task.displayDate;
   if (date == null) return context.l10n.noDate;
-  final day = context.dayLabel(date);
+  final day = context.dayLabel(date, now: now);
   return task.hasTime ? '$day · ${context.clockTime(date)}' : day;
 }
 

@@ -31,8 +31,8 @@ extension TaskFlowLocale on BuildContext {
       DateFormat.MMMEd(localeName).format(date);
 
   /// `Hoy` or `Mañana` when they apply, otherwise [weekdayDate].
-  String dayLabel(DateTime date) {
-    final today = Task.day(DateTime.now());
+  String dayLabel(DateTime date, {DateTime? now}) {
+    final today = Task.day(now ?? DateTime.now());
     final day = Task.day(date);
     if (day == today) return l10n.today;
     if (day == DateTime(today.year, today.month, today.day + 1)) {

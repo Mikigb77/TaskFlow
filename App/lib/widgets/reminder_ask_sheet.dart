@@ -391,7 +391,7 @@ class _PlanOfferSheet extends StatelessWidget {
     // another one lit.
     final when = task.deadline != null
         ? taskDeadlineLabel(context, task)
-        : taskDayLine(context, task);
+        : taskDayLine(context, task, now: now);
     final date = task.deadline != null
         ? task.displayDeadline
         : task.displayDate;
