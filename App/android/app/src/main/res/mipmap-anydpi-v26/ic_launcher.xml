@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The launcher icon (Android 8+): the in-app mark, the white double tick on
-     the light theme's primary teal, with a monochrome layer for Android 13's
-     themed icons. Android 7 uses the mipmap-*dpi/ic_launcher.png of the same
-     mark; Android 12+ also shows it on the launch splash. -->
+<!-- The launcher icon (Android 8+): the website's and the app's mark, the
+     white double tick on the Lagoon gradient tile, with a monochrome layer for
+     Android 13's themed icons. Android 7 uses the mipmap-*dpi/ic_launcher.png
+     of the same mark; Android 12+ also shows it on the launch splash. -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/ic_launcher_background" />
+    <background android:drawable="@drawable/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
     <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
 </adaptive-icon>

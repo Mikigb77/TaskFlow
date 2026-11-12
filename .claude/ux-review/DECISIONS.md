@@ -2,6 +2,11 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-11-12 — The app icon takes the website's Lagoon mark
+
+- The owner: "we have made a lot of changes in the web, colors and stuff, so maybe we can adapt the app icon and the icon actually to the new style."
+- Built as: the launcher icon keeps the white double tick and puts it on the website mark's gradient, teal `#0A7A63` through aqua `#1FB5A6` to mint `#3EF0B0`, top left to bottom right, instead of the flat `#146C5C`. The Android 7 bitmaps are the same tile; the themed (monochrome) icon is unchanged. The website's favicon and link preview mark use the same gradient. This updates D8's colour; D8's shape stands.
+
 ## 2026-11-12 — The staging app looks for updates whenever it opens
 
 - The owner: "We have to make the app check for updates more often, or at least once when you open the app, because otherwise it's not picking up the update on its own."
