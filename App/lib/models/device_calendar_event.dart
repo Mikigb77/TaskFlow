@@ -57,10 +57,17 @@ class DeviceCalendar {
 
   CalendarKind get kind {
     final source = '$sourceId $name'.toLowerCase();
-    if (type == 'holidays' || source.contains('#holiday@')) {
+    // Some phones name a calendar by a resource id, such as Xiaomi's
+    // «calendar_displayname_birthday».
+    final id = _isId(name) ? name.toLowerCase() : '';
+    if (type == 'holidays' ||
+        source.contains('#holiday@') ||
+        id.contains('holiday')) {
       return CalendarKind.holidays;
     }
-    if (type == 'birthdays' || source.contains('#contacts@')) {
+    if (type == 'birthdays' ||
+        source.contains('#contacts@') ||
+        id.contains('birthday')) {
       return CalendarKind.birthdays;
     }
     if (source.contains('#weeknum@')) return CalendarKind.weekNumbers;
@@ -71,13 +78,24 @@ class DeviceCalendar {
   bool get isOwn => kind == CalendarKind.own;
 
   /// The calendar's name as people read it, or empty when the phone gives
-  /// only an address or an id («es.spain#holiday@group.v.calendar.google.com»);
-  /// the picker then names it by its [kind].
+  /// only an address or an id («es.spain#holiday@group.v.calendar.google.com»,
+  /// «calendar_displayname_birthday»); the picker then names it by its
+  /// [kind].
   String get readableName {
     final value = name.trim();
-    if (value.isEmpty || value.contains('#') || value.contains('@')) return '';
+    if (value.isEmpty ||
+        value.contains('#') ||
+        value.contains('@') ||
+        _isId(value)) {
+      return '';
+    }
     return value;
   }
+
+  /// A name made only of lowercase letters, digits, dots and underscores,
+  /// with an underscore: a key the phone failed to translate, not a name.
+  static bool _isId(String value) =>
+      value.contains('_') && RegExp(r'^[a-z0-9_.]+$').hasMatch(value.trim());
 
   factory DeviceCalendar.fromMap(Map<Object?, Object?> map) => DeviceCalendar(
       id: map['id'] as String,
