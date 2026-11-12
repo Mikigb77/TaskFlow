@@ -259,7 +259,8 @@ class CalendarExporter {
             task: want.$2.task);
         switch (write.op) {
           case 'delete':
-            entries.remove(key);
+            // Kept when the phone couldn't delete it, to try again.
+            if (answer == 'ok') entries.remove(key);
           case 'update':
             if (answer == 'ok') {
               entries[key] = entry(write.event);

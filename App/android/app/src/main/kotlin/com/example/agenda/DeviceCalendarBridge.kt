@@ -212,8 +212,10 @@ class DeviceCalendarBridge(private val activity: Activity, messenger: BinaryMess
         return try {
             when (write["op"]) {
                 "delete" -> {
-                    if (event != null) activity.contentResolver.delete(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, event),
-                        "${CalendarContract.Events.CALENDAR_ID}=?", arrayOf(calendar.toString()))
+                    // The provider refuses a selection on one event's URI, so
+                    // the calendar is checked first.
+                    if (event != null && exists(event, calendar))
+                        activity.contentResolver.delete(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, event), null, null)
                     "ok"
                 }
                 "update" -> {
