@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The launcher icon's tile: the Lagoon gradient of the website's mark, the
+     light theme's teal (#0A7A63) through the aqua (#1FB5A6) at 55% to the
+     mint of the main taps (#3EF0B0), top left to bottom right. The gradient
+     runs across the visible 72 dp (18-90 dp), so every launcher mask shows
+     all of it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="18"
+                android:startY="18"
+                android:endX="90"
+                android:endY="90">
+                <item android:offset="0" android:color="#FF0A7A63" />
+                <item android:offset="0.55" android:color="#FF1FB5A6" />
+                <item android:offset="1" android:color="#FF3EF0B0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>
