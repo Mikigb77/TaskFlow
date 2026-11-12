@@ -99,6 +99,7 @@ class _MainShellState extends ConsumerState<MainShell>
   late final bool _updates = ref.read(appUpdaterProvider) != null;
   AppLifecycleListener? _lifecycle;
   StreamSubscription<AppInstallResult>? _installs;
+  Timer? _updateTimer;
   final _offered = <int>{};
   bool _offering = false;
 
@@ -106,7 +107,18 @@ class _MainShellState extends ConsumerState<MainShell>
   void initState() {
     super.initState();
     if (!_updates) return;
-    _lifecycle = AppLifecycleListener(onResume: _checkUpdate);
+    // The app looks for a newer build when it opens, each time it comes back
+    // to the front, and every AppUpdateController.interval while it's open.
+    // A build put off with Later is offered again at the next return.
+    _lifecycle = AppLifecycleListener(
+      onResume: _checkUpdate,
+      onHide: _offered.clear,
+    );
+    _updateTimer = Timer.periodic(AppUpdateController.interval, (_) {
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        _checkUpdate();
+      }
+    });
     // An install that didn't go through is offered again.
     _installs = ref
         .read(appUpdaterProvider)!
@@ -120,6 +132,7 @@ class _MainShellState extends ConsumerState<MainShell>
     _arriving.dispose();
     _arrive.dispose();
     _lifecycle?.dispose();
+    _updateTimer?.cancel();
     _installs?.cancel();
     super.dispose();
   }
@@ -130,8 +143,8 @@ class _MainShellState extends ConsumerState<MainShell>
     unawaited(_offerUpdate());
   }
 
-  /// Offers a newer build once per build, on these tabs and never while a
-  /// meeting is recording: installing closes the app.
+  /// Offers a newer build once each time the app is in front, on these tabs
+  /// and never while a meeting is recording: installing closes the app.
   Future<void> _offerUpdate() async {
     final update = ref.read(appUpdateProvider);
     if (!mounted ||
