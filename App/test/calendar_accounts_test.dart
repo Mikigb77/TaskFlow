@@ -164,6 +164,47 @@ void main() {
           ),
           l.calendarWeekNumbers,
         );
+        // Xiaomi's contact birthdays, named by an untranslated resource key,
+        // on the phone and not writable.
+        const xiaomi = DeviceCalendar(
+          id: '10',
+          name: 'calendar_displayname_birthday',
+          account: 'Phone',
+          accountType: 'LOCAL',
+          sourceId: '',
+          writable: false,
+        );
+        expect(xiaomi.kind, CalendarKind.birthdays);
+        expect(calendarName(l, xiaomi), l.calendarBirthdays);
+        // Even a writable one is an extra, never the phone's own calendar.
+        expect(
+          const DeviceCalendar(
+            id: '10',
+            name: 'calendar_displayname_birthday',
+            account: 'Phone',
+            accountType: 'LOCAL',
+          ).isOwn,
+          isFalse,
+        );
+        expect(
+          calendarName(
+            l,
+            const DeviceCalendar(
+              id: '11',
+              name: 'calendar_displayname_holiday',
+              account: 'Phone',
+              accountType: 'LOCAL',
+              writable: false,
+            ),
+          ),
+          l.calendarHolidays,
+        );
+        // A name with spaces or capitals is a name, underscores or not.
+        expect(
+          const DeviceCalendar(id: '12', name: 'Work_Team', account: gmail)
+              .readableName,
+          'Work_Team',
+        );
       }
       expect(
         lookupAppLocalizations(const Locale('en')).calendarHolidays,
