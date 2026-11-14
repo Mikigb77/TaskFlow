@@ -195,7 +195,15 @@ requirements, the Dockerfile or `scripts/start-server.sh`),
 `.github/workflows/deploy.yml` (the **Deploy** workflow) runs the tests, then
 `Backend/scripts/deploy-staging-ci.sh`: it builds the image, pins the newest
 version of the `taskflow-api-staging-config` secret, migrates, redeploys the
-maintenance job, replaces the API service and checks `/api/health/`. To deploy
+maintenance job, replaces the API service and checks `/api/health/`. Last, it
+signs in end to end through the public URL, as the app does
+(`manage.py check_deploy`, run as the `taskflow-api-staging-check` job): email
+and password, the account, a renewed session, sign-out, and Google sign-in
+refusing a fake token, which proves the API knows its Google client and reaches
+Google. The check account `delivered+tf-deploy-check@resend.dev` gets a new
+random password for each check, which never leaves Google Cloud, and an
+unusable one after it. A failed check fails the deploy, and the run's log names
+the step that failed. To deploy
 again without a change, use **Actions → Deploy → Run workflow** on `main`, with only "Deploy the API" ticked.
 Pull requests that touch `Backend/` run the tests first
 (the **CI** workflow, `.github/workflows/ci.yml`). Pull requests go into `dev`;

@@ -19,6 +19,7 @@ RUNTIME="$SERVICE@$PROJECT.iam.gserviceaccount.com"
 BUILDER="taskflow-api-builder@$PROJECT.iam.gserviceaccount.com"
 MAIL_INVOKER="taskflow-mail-invoker@$PROJECT.iam.gserviceaccount.com"
 MAINTENANCE=taskflow-api-staging-maintain
+CHECK=taskflow-api-staging-check
 QUEUE=taskflow-staging-email
 BUCKET="$PROJECT-api-staging-builds"
 SECRET=taskflow-api-staging-config
@@ -141,12 +142,37 @@ PY
 g run services replace "$work/service.json" --region="$REGION"
 
 # 6. The database-backed health check.
+healthy=false
 for attempt in 1 2 3 4 5 6; do
   if curl -fsS --max-time 90 "$URL/api/health/" | python3 -c 'import json,sys; sys.exit(json.load(sys.stdin).get("status") != "ok")'; then
-    echo "Staging deployed and healthy: $URL ($digest, config version $version)"
-    exit 0
+    healthy=true
+    break
   fi
   sleep 10
 done
-echo "Staging dependency health check failed: $URL/api/health/"
-exit 1
+if [ "$healthy" != true ]; then
+  echo "Staging dependency health check failed: $URL/api/health/"
+  exit 1
+fi
+echo "Staging deployed and healthy: $URL ($digest, config version $version)"
+
+# 7. Sign in end to end through the public URL, as the app does: email and
+# password, the account, a renewed session, sign-out, and Google sign-in
+# refusing a fake token (core/management/commands/check_deploy.py). A job of
+# its own, so its check account's password never leaves Google Cloud.
+g run jobs deploy "$CHECK" --region="$REGION" --image="$digest" \
+  --service-account="$RUNTIME" --command=python --args=manage.py,check_deploy,--url="$URL" \
+  --env-vars-file="$work/environment.json" "$secrets_flag" \
+  --tasks=1 --max-retries=0 --task-timeout=300s --memory=512Mi --cpu=1
+started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+checked=true
+g run jobs execute "$CHECK" --region="$REGION" --wait || checked=false
+# What each check said, from the job's log (it never prints a password or token).
+sleep 5
+g logging read "resource.type=\"cloud_run_job\" AND resource.labels.job_name=\"$CHECK\" AND timestamp>=\"$started\"" \
+  --order=asc --limit=60 --format='value(textPayload)' || true
+if [ "$checked" != true ]; then
+  echo "The deploy check failed: sign-in on $URL doesn't work end to end. See the checks above."
+  exit 1
+fi
+echo "Staging deployed, healthy, and sign-in works end to end: $URL"

@@ -543,7 +543,7 @@ void main() {
   // in-app mark, adaptive, with a themed-icon layer ----
 
   test(
-    'UX-1608: the manifest icon is @mipmap/ic_launcher, an adaptive icon with background, foreground and monochrome layers on #146C5C',
+    'UX-1608: the manifest icon is @mipmap/ic_launcher, an adaptive icon with a Lagoon gradient background, a foreground and a monochrome layer',
     () {
       final manifest = File(
         'android/app/src/main/AndroidManifest.xml',
@@ -570,28 +570,30 @@ void main() {
 
       expect(layer('foreground'), '@drawable/ic_launcher_foreground');
       expect(layer('monochrome'), '@drawable/ic_launcher_monochrome');
-      // The background is #146C5C, the light theme's primary, as a colour
-      // resource or written in place.
-      var colour = layer('background');
-      if (colour.startsWith('@color/')) {
-        final name = colour.substring('@color/'.length);
-        final values = Directory('$_res/values')
-            .listSync()
-            .whereType<File>()
-            .where((f) => f.path.endsWith('.xml'))
-            .map((f) => f.readAsStringSync())
-            .join('\n');
-        final match = RegExp(
-          '<color name="$name">([^<]+)</color>',
-        ).firstMatch(values);
-        expect(match, isNotNull, reason: '@color/$name is defined');
-        colour = match![1]!.trim();
+      // The background is the website's mark: the Lagoon gradient, teal
+      // through aqua to mint, across the visible 72 dp (2026-11-12).
+      expect(layer('background'), '@drawable/ic_launcher_background');
+      final background = File(
+        '$_res/drawable/ic_launcher_background.xml',
+      ).readAsStringSync();
+      expect(background, contains('<vector'));
+      expect(background, contains('android:type="linear"'));
+      final stops = RegExp(
+        r'<item\s+android:offset="([^"]+)"\s+android:color="([^"]+)"',
+      ).allMatches(background).map((m) => (m[1], m[2]!.toUpperCase()));
+      expect(stops, [
+        ('0', '#FF0A7A63'),
+        ('0.55', '#FF1FB5A6'),
+        ('1', '#FF3EF0B0'),
+      ], reason: 'the tile is the site mark’s gradient');
+      for (final (attr, value) in [
+        ('startX', '18'),
+        ('startY', '18'),
+        ('endX', '90'),
+        ('endY', '90'),
+      ]) {
+        expect(background, contains('android:$attr="$value"'));
       }
-      expect(
-        colour.toUpperCase(),
-        anyOf('#146C5C', '#FF146C5C'),
-        reason: 'the icon background is the in-app mark’s teal',
-      );
     },
   );
 
@@ -672,7 +674,7 @@ void main() {
   );
 
   testWidgets(
-    'UX-1608: the legacy ic_launcher.png at every density is the teal mark with the white tick, not Flutter’s logo',
+    'UX-1608: the legacy ic_launcher.png at every density is the Lagoon gradient tile with the white tick, not Flutter’s logo',
     (tester) async {
       const sizes = {
         'mdpi': 48,
@@ -701,6 +703,11 @@ void main() {
         expect(width, side, reason: '$density width');
         expect(height, side, reason: '$density height');
         var opaque = 0, teal = 0, white = 0, centreWhite = 0;
+        int greenAt(double fx, double fy) {
+          final x = (fx * width).floor(), y = (fy * height).floor();
+          return data.getUint8((y * width + x) * 4 + 1);
+        }
+
         for (var y = 0; y < height; y++) {
           for (var x = 0; x < width; x++) {
             final o = (y * width + x) * 4;
@@ -708,11 +715,8 @@ void main() {
             final b = data.getUint8(o + 2), a = data.getUint8(o + 3);
             if (a < 250) continue;
             opaque++;
-            if ((r - 0x14).abs() <= 12 &&
-                (g - 0x6C).abs() <= 12 &&
-                (b - 0x5C).abs() <= 12) {
-              teal++;
-            }
+            // The Lagoon greens: green and blue well above red.
+            if (g > r + 60 && b > r + 40) teal++;
             if (r >= 245 && g >= 245 && b >= 245) {
               white++;
               if ((x - width / 2).abs() < width / 3 &&
@@ -725,9 +729,15 @@ void main() {
         final reason =
             '$density: $opaque opaque px, $teal teal, $white white '
             '($centreWhite in the centre)';
-        // A filled teal square: most of the icon is #146C5C.
+        // A filled gradient tile: most of the icon is the Lagoon greens,
+        // the teal #0A7A63 at the top left, the mint #3EF0B0 at the bottom
+        // right.
         expect(opaque, greaterThan(width * height * 0.6), reason: reason);
         expect(teal, greaterThan(opaque * 0.6), reason: reason);
+        final topLeft = greenAt(0.15, 0.15);
+        final bottomRight = greenAt(0.85, 0.85);
+        expect(topLeft, inInclusiveRange(0x7A, 0x9A), reason: reason);
+        expect(bottomRight, inInclusiveRange(0xD0, 0xF0), reason: reason);
         // The white tick, in the middle.
         expect(white, greaterThan(width * height * 0.015), reason: reason);
         expect(centreWhite, greaterThan(white * 0.9), reason: reason);
