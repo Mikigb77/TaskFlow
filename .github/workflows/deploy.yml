@@ -4,8 +4,9 @@
 #
 # - The API on Cloud Run, when Backend/ changes what the API's image is built
 #   from: CI's backend checks, then Backend/scripts/deploy-staging-ci.sh
-#   (build, migrate, replace the service, check /api/health/). Google sign-in
-#   is keyless (Workload Identity Federation), and only main of this repo can
+#   (build, migrate, replace the service, check /api/health/, then sign in
+#   end to end through the public URL: core/management/commands/check_deploy.py).
+#   Google sign-in is keyless (Workload Identity Federation), and only main of this repo can
 #   use it. One-time setup: TaskFlowWeb's scripts/dev/setup-github-deploy.sh.
 #   See Backend/docs/STAGING.md.
 # - The signed APK, when App/ changed: CI's app checks and the build run at
