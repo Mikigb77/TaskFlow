@@ -4109,7 +4109,7 @@ void main() {
     );
   });
 
-  group('P269 · Today lists its own tasks first, ticked rows stay, the day’s last tick', () {
+  group('P269 · Today lists its own tasks first, ticked rows, the day’s last tick', () {
     // Today, early on the app's clock: none of today's timed tasks has
     // passed, and yesterday's and older ones are overdue.
     final now = DateTime.now();
@@ -4231,14 +4231,27 @@ void main() {
     );
 
     testWidgets(
-      'UX-2304: an overdue row ticked on today stays under «Atrasada · 1», struck through, its circle reading «Reabrir», counts as «1 completada», and goes once Calendar has been left for Tareas',
+      'Owner 2026-11-14: an overdue row ticked on today shows struck through under «Atrasada · 1», its circle reading «Reabrir», then leaves Today with its heading; today’s own ticked row stays',
       (tester) async {
         final semantics = tester.ensureSemantics();
         final container = await openCalendar(
           tester,
           [
-            Task(id: 1, title: 'Comprar pan', priority: 1, dueDate: daysAgo(1)),
-            Task(id: 2, title: 'Llamar a mamá', priority: 1, dueDate: today(18), hasTime: true),
+            Task(id: 1, title: 'Comprar pan', priority: 1, dueDate: daysAgo(2)),
+            Task(
+              id: 2,
+              title: 'Llamar a mamá',
+              priority: 1,
+              dueDate: today(18),
+              hasTime: true,
+            ),
+            Task(
+              id: 3,
+              title: 'Ir al médico',
+              priority: 1,
+              dueDate: today(19),
+              hasTime: true,
+            ),
           ],
           size: const Size(360, 800),
           overrides: [clock],
@@ -4258,36 +4271,91 @@ void main() {
               .isCompleted,
           isTrue,
         );
-        // Still there, where it was, under its heading.
+        // For a moment it's still there, where it was, struck through.
         expect(heading, findsOneWidget);
         expect(overdue, findsOneWidget);
         expect(tester.getRect(overdue).top, moreOrLessEquals(before.top));
-        expect(
-          tester.getTopLeft(heading).dy,
-          lessThan(tester.getTopLeft(overdue).dy),
-        );
         expect(ticked(tester, overdue), isTrue);
         expect(struck(tester, overdue, 'Comprar pan'), isTrue);
         expect(
           tester.getSemantics(circle('Comprar pan')).label,
           contains(l.reopenNamedTask('Comprar pan')),
         );
-        expect(find.text(l.agendaCounts(1, 1)), findsOneWidget);
-        await waitOutMessage(tester);
-        expect(overdue, findsOneWidget);
-        expect(find.text(l.agendaCounts(1, 1)), findsOneWidget);
+        expect(find.text(l.agendaCounts(2, 1)), findsOneWidget);
 
-        // Leaving Calendar for Tareas and coming back: it's gone, and its
-        // heading with it, as it was the last.
-        await tab(tester, l.tasks);
-        await tab(tester, l.calendar);
-        expect(find.byType(CalendarScreen).hitTestable(), findsOneWidget);
+        // Then it leaves Today, and its heading with it, as it was the last.
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pumpAndSettle();
         expect(overdue, findsNothing);
         expect(heading, findsNothing);
         expect(inCalendar(find.textContaining('Atrasada')), findsNothing);
         expect(row('Llamar a mamá'), findsOneWidget);
+        expect(find.text(l.agendaCounts(2, 0)), findsOneWidget);
+
+        // Today's own task, ticked, stays on its day struck through.
+        await tick(tester, circle('Llamar a mamá'));
+        await tester.pump(const Duration(seconds: 2));
+        await tester.pumpAndSettle();
+        expect(row('Llamar a mamá'), findsOneWidget);
+        expect(struck(tester, row('Llamar a mamá'), 'Llamar a mamá'), isTrue);
+        expect(find.text(l.agendaCounts(1, 1)), findsOneWidget);
+
         expect(tester.takeException(), isNull);
         semantics.dispose();
+      },
+    );
+
+    testWidgets(
+      'Owner 2026-11-14: Deshacer while the ticked overdue row is leaving, or after it left, brings it back open; ticked again, it leaves again',
+      (tester) async {
+        await openCalendar(
+          tester,
+          [
+            Task(id: 1, title: 'Comprar pan', priority: 1, dueDate: daysAgo(1)),
+            Task(
+              id: 2,
+              title: 'Llamar a mamá',
+              priority: 1,
+              dueDate: today(18),
+              hasTime: true,
+            ),
+          ],
+          size: const Size(360, 800),
+          overrides: [clock],
+        );
+        final l = tester.element(find.byType(CalendarScreen)).l10n;
+        final overdue = row('Comprar pan');
+
+        // Deshacer before it leaves: it stays, open.
+        await tick(tester, circle('Comprar pan'));
+        await tester.tap(find.text(l.undo));
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 2));
+        await tester.pumpAndSettle();
+        expect(overdue, findsOneWidget);
+        expect(ticked(tester, overdue), isFalse);
+        await waitOutMessage(tester);
+
+        // Deshacer after it left: back, open.
+        await tick(tester, circle('Comprar pan'));
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pumpAndSettle();
+        expect(overdue, findsNothing);
+        await tester.tap(find.text(l.undo));
+        await tester.pumpAndSettle();
+        expect(overdue, findsOneWidget);
+        expect(ticked(tester, overdue), isFalse);
+        expect(inCalendar(find.text(l.overdueCount(1))), findsOneWidget);
+        await waitOutMessage(tester);
+
+        // Ticked again: it leaves again.
+        await tick(tester, circle('Comprar pan'));
+        expect(overdue, findsOneWidget);
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pumpAndSettle();
+        expect(overdue, findsNothing);
+        expect(row('Llamar a mamá'), findsOneWidget);
+        expect(tester.takeException(), isNull);
       },
     );
 
@@ -4324,47 +4392,48 @@ void main() {
     );
 
     testWidgets(
-      'UX-2304, WD34: a today with only overdue tasks keeps «Atrasadas · 2» and both struck-through rows after the last tick, which says «Todo listo. Respira.», and never shows «Nada previsto para este día.»',
+      'WD34, owner 2026-11-14: a today with only overdue tasks: the last tick says «Todo listo. Respira.» with the row struck through, then the rows have left Today',
       (tester) async {
         await openCalendar(
           tester,
           [
             Task(id: 1, title: 'Comprar pan', priority: 1, dueDate: daysAgo(2)),
-            Task(id: 2, title: 'Regar las plantas', priority: 1, dueDate: daysAgo(1)),
+            Task(
+              id: 2,
+              title: 'Regar las plantas',
+              priority: 1,
+              dueDate: daysAgo(1),
+            ),
           ],
           size: const Size(360, 800),
           overrides: [clock],
         );
         final l = tester.element(find.byType(CalendarScreen)).l10n;
-        final heading = inCalendar(find.text(l.overdueCount(2)));
-        expect(heading, findsOneWidget);
+        expect(inCalendar(find.text(l.overdueCount(2))), findsOneWidget);
 
         // One overdue task still open: the usual line.
         await tick(tester, circle('Comprar pan'));
         expect(find.text(l.taskCompleted), findsOneWidget);
         expect(find.text(l.dayAllClear), findsNothing);
         await waitOutMessage(tester);
+        expect(row('Comprar pan'), findsNothing);
+        expect(inCalendar(find.text(l.overdueCount(1))), findsOneWidget);
 
         // The last one: the day is clear.
         await tick(tester, circle('Regar las plantas'));
         expect(find.text(l.dayAllClear), findsOneWidget);
         expect(find.text(l.taskCompleted), findsNothing);
         expect(find.text(l.undo), findsOneWidget);
-        for (final title in ['Comprar pan', 'Regar las plantas']) {
-          expect(row(title), findsOneWidget, reason: title);
-          expect(ticked(tester, row(title)), isTrue, reason: title);
-          expect(struck(tester, row(title), title), isTrue, reason: title);
-        }
-        expect(heading, findsOneWidget);
-        expect(find.text(l.calendarEmpty), findsNothing);
-        expect(find.text(l.agendaCounts(0, 2)), findsOneWidget);
-
-        // And so while Calendar stays shown, after the message has gone.
-        await waitOutMessage(tester);
-        expect(heading, findsOneWidget);
-        expect(row('Comprar pan'), findsOneWidget);
         expect(row('Regar las plantas'), findsOneWidget);
-        expect(find.text(l.calendarEmpty), findsNothing);
+        expect(ticked(tester, row('Regar las plantas')), isTrue);
+        expect(
+          struck(tester, row('Regar las plantas'), 'Regar las plantas'),
+          isTrue,
+        );
+
+        await waitOutMessage(tester);
+        expect(row('Regar las plantas'), findsNothing);
+        expect(inCalendar(find.textContaining('Atrasada')), findsNothing);
         expect(tester.takeException(), isNull);
       },
     );
