@@ -2,6 +2,11 @@
 
 Every agent in the UX loop reads this before reviewing or planning. Only the owner makes these decisions. Agents never add to this file; the main session records what the owner says in chat. Newest first.
 
+## 2026-11-14 — A ticked overdue task leaves Today
+
+- The owner: "When you check something as done and that something belongs to another day that is not today, do not just … cross it. But rather just cross it, make a little animation and make it disappear from today … If the task is not overdue … it's for today … you can keep it on the day … But of course, overdue tasks we should keep showing them."
+- Built as: on Calendar's today, an overdue row ticked under «Atrasadas» shows struck through for a moment, then fades, slides a little and folds away; its heading goes with the last one. Deshacer brings it back open, and ticked again it leaves again. Today's own ticked rows stay on the day, struck through, as before, and open overdue tasks still show. This replaces UX-2304's "a ticked overdue row stays until Calendar is left".
+
 ## 2026-11-12 — The app icon takes the website's Lagoon mark
 
 - The owner: "we have made a lot of changes in the web, colors and stuff, so maybe we can adapt the app icon and the icon actually to the new style."

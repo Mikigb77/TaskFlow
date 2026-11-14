@@ -19,6 +19,7 @@ import 'package:agenda/models/task.dart';
 import 'package:agenda/providers/task_provider.dart';
 import 'package:agenda/providers/auth_provider.dart';
 import 'package:agenda/theme/app_theme.dart';
+import 'package:agenda/theme/motion.dart';
 import 'package:agenda/widgets/app_components.dart';
 import 'package:agenda/widgets/custom_app_bar.dart';
 import 'package:agenda/widgets/task_tile.dart';
@@ -52,9 +53,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   // Tasks seen open on the selected day. Completing one keeps its place
   // until the day changes or Calendar is left (covered, or another tab).
   final _openOnDay = <String>{};
-  // Today's overdue tasks seen open while today was shown. One ticked keeps
-  // its place under «Atrasadas», struck through, by the same rule.
+  // Today's overdue tasks seen open while today was shown. One ticked there
+  // shows struck through for a moment, then leaves Today: it was another
+  // day's task. Those that have left are in [_overdueGone].
   final _overdueSeen = <String>{};
+  final _overdueGone = <String>{};
   // Just-saved tasks: waiting to appear, then shown and highlighted. Saved
   // without a date, the no-date row is highlighted instead, or as well.
   Set<int> _landingIds = {};
@@ -107,6 +110,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     if (!isSameDay(day, _selectedDay)) {
       _openOnDay.clear();
       _overdueSeen.clear();
+      _overdueGone.clear();
       _landingIds = {};
       _landedIds = {};
       _landingInbox = false;
@@ -495,7 +499,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   }
 
   /// Today's [open] overdue tasks, with those ticked since they were seen
-  /// open, struck through where they were. [listed] are today's own rows.
+  /// open, struck through where they were until they leave
+  /// ([_LeavingRow]). [listed] are today's own rows.
   List<Task> _withTicked(
     List<Task> tasks,
     List<Task> open,
@@ -515,6 +520,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
             .where(
               (done) =>
                   _overdueSeen.contains(key(done)) &&
+                  !_overdueGone.contains(key(done)) &&
                   !listed.contains(key(done)) &&
                   (done.displayDate ?? done.displayDeadline) != null &&
                   Task.day(when(done)).isBefore(first),
@@ -717,6 +723,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     if (!shown || !Visibility.of(context)) {
       _openOnDay.clear();
       _overdueSeen.clear();
+      _overdueGone.clear();
     }
     // Leaving Calendar ends a landing's room for the save message.
     if (!shown) _end = 20;
@@ -766,7 +773,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     final now = _now();
     final today = isSameDay(_selectedDay, now);
     final overdueToday = _overdueOn(tasks, now);
-    if (today) _overdueSeen.addAll(overdueToday.map(key));
+    if (today) {
+      _overdueSeen.addAll(overdueToday.map(key));
+      // Reopened after it left (Deshacer): ticked again, it leaves again.
+      _overdueGone.removeAll(overdueToday.map(key));
+    }
     final overdue = today
         ? _withTicked(tasks, overdueToday, events.map(key).toSet(), now)
         : <Task>[];
@@ -1094,6 +1105,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   sliver: SliverList.builder(
                     itemCount: overdue.length + 1,
+                    // A leaving row keeps its own state as rows above go.
+                    findChildIndexCallback: (rowKey) {
+                      final at = overdue.indexWhere(
+                        (task) => ValueKey('overdue:${key(task)}') == rowKey,
+                      );
+                      return at < 0 ? null : at + 1;
+                    },
                     itemBuilder: (context, index) => index == 0
                         ? Padding(
                             padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
@@ -1107,13 +1125,20 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                               ),
                             ),
                           )
-                        : Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: TaskTile(
-                              task: overdue[index - 1],
-                              showDate: true,
-                              lastOpen:
-                                  lastOpen && !overdue[index - 1].isCompleted,
+                        : _LeavingRow(
+                            key: ValueKey('overdue:${key(overdue[index - 1])}'),
+                            leaving: overdue[index - 1].isCompleted,
+                            onGone: () => setState(
+                              () => _overdueGone.add(key(overdue[index - 1])),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: TaskTile(
+                                task: overdue[index - 1],
+                                showDate: true,
+                                lastOpen:
+                                    lastOpen && !overdue[index - 1].isCompleted,
+                              ),
                             ),
                           ),
                   ),
@@ -1163,4 +1188,95 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
       bottomNavigationBar: TaskActions(day: _picked ? _selectedDay : null),
     );
   }
+}
+
+/// An overdue row on Today. Ticked ([leaving]), it stays a moment struck
+/// through, then fades and folds away and calls [onGone]: the task was
+/// another day's, so Today stops listing it. Reopened before then, it stays.
+/// Where the app stands still it simply goes after the moment.
+class _LeavingRow extends StatefulWidget {
+  const _LeavingRow({
+    super.key,
+    required this.leaving,
+    required this.onGone,
+    required this.child,
+  });
+  final bool leaving;
+  final VoidCallback onGone;
+  final Widget child;
+
+  /// How long the struck-through row stays before it goes.
+  static const hold = Duration(milliseconds: 900);
+  static const fold = Duration(milliseconds: 450);
+
+  @override
+  State<_LeavingRow> createState() => _LeavingRowState();
+}
+
+class _LeavingRowState extends State<_LeavingRow>
+    with SingleTickerProviderStateMixin {
+  late final _controller = AnimationController(
+    vsync: this,
+    duration: _LeavingRow.fold,
+  );
+  late final _fade = CurvedAnimation(
+    parent: _controller,
+    curve: const Interval(0, 0.6, curve: Curves.easeOut),
+  );
+  late final _size = CurvedAnimation(
+    parent: _controller,
+    curve: const Interval(0.3, 1, curve: AppMotion.ease),
+  );
+  late final _slide = Tween(begin: Offset.zero, end: const Offset(0.08, 0))
+      .animate(
+        CurvedAnimation(
+          parent: _controller,
+          curve: const Interval(0, 0.6, curve: Curves.easeIn),
+        ),
+      );
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.leaving) _leave();
+  }
+
+  @override
+  void didUpdateWidget(_LeavingRow old) {
+    super.didUpdateWidget(old);
+    if (widget.leaving == old.leaving) return;
+    if (widget.leaving) {
+      _leave();
+    } else {
+      _timer?.cancel();
+      _controller.value = 0;
+    }
+  }
+
+  void _leave() {
+    _timer?.cancel();
+    _timer = Timer(_LeavingRow.hold, () async {
+      if (!mounted) return;
+      if (AppMotion.of(context)) await _controller.forward(from: 0);
+      if (mounted && widget.leaving) widget.onGone();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => SizeTransition(
+    sizeFactor: ReverseAnimation(_size),
+    axisAlignment: -1,
+    child: FadeTransition(
+      opacity: ReverseAnimation(_fade),
+      child: SlideTransition(position: _slide, child: widget.child),
+    ),
+  );
 }
