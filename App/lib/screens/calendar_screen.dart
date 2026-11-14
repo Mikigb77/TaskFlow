@@ -1273,7 +1273,7 @@ class _LeavingRowState extends State<_LeavingRow>
   @override
   Widget build(BuildContext context) => SizeTransition(
     sizeFactor: ReverseAnimation(_size),
-    axisAlignment: -1,
+    alignment: Alignment.topCenter,
     child: FadeTransition(
       opacity: ReverseAnimation(_fade),
       child: SlideTransition(position: _slide, child: widget.child),
